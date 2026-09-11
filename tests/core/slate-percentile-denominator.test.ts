@@ -34,15 +34,23 @@ function mkReport(over: Partial<ScriptDoctorReport>): ScriptDoctorReport {
 }
 
 describe('slate.ts renderSlateHtml — percentile denominator is disclosed', () => {
-  it('names the 20-sample reference set somewhere in the rendered page', () => {
+  // 2026-09-11 (producer-tier discovery #12): the cell used to render
+  // `${Math.round(pct)}th pct` — an ORDINAL, with the same hardcoded "th" bug the
+  // coverage letter had ("82th"), and with no comparability gate, while the IN-APP
+  // Slate table rendered a BAND for the identical number in the identical column.
+  // Both now call src/lib/percentile-copy.ts's percentileCellFor, so the cell is a
+  // band for an in-band draft and "not comparable" otherwise. The denominator
+  // disclosure this file exists to pin is unchanged.
+  it('names the 20-sample reference set, and states a BAND, for an in-band draft', () => {
     const entry = buildSlateEntry(
       'Strong Draft',
-      mkReport({ health: 71, analysisComplete: true, healthPercentile: 80 }),
+      mkReport({ health: 71, analysisComplete: true, healthPercentile: 80, sceneCount: 10, wordCount: 300 }),
       'hash1',
     );
     const html = renderSlateHtml(rankSlate([entry]), 0);
 
-    assert.match(html, /80th pct/, 'sanity: the percentile cell itself renders');
+    assert.match(html, /top 20%/, 'sanity: the percentile cell itself renders, as a band');
+    assert.doesNotMatch(html, /\d+th pct/, 'the hardcoded-"th" ordinal must be gone');
     assert.match(
       html, /20-sample/,
       'expected the rendered page to disclose the reference set size somewhere near the percentile',
@@ -53,9 +61,22 @@ describe('slate.ts renderSlateHtml — percentile denominator is disclosed', () 
     );
   });
 
+  it('states NOT COMPARABLE for a draft outside the reference set\u2019s bounds', () => {
+    const entry = buildSlateEntry(
+      'Feature Length',
+      mkReport({ health: 71, analysisComplete: true, healthPercentile: 100, sceneCount: 231, wordCount: 19293 }),
+      'hash3',
+    );
+    const html = renderSlateHtml(rankSlate([entry]), 0);
+    assert.match(html, /not comparable/);
+    assert.doesNotMatch(html, /top \d+%/, 'must not state a band it cannot support');
+  });
+
   it('still renders an em-dash, not a bare percentile, for an entry with no healthPercentile', () => {
     const entry = buildSlateEntry('No Percentile', mkReport({ health: 40, analysisComplete: true }), 'hash2');
     const html = renderSlateHtml(rankSlate([entry]), 0);
     assert.doesNotMatch(html, /\d+th pct/);
+    assert.doesNotMatch(html, /top \d+%/);
+    assert.doesNotMatch(html, /not comparable/);
   });
 });

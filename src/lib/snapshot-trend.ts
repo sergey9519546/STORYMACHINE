@@ -25,6 +25,24 @@ export interface SnapshotTrendEntry {
   health: number | null;
   verdict: CoverageVerdict | null;
   sceneCount: number | null;
+  /** 2026-09-11 (producer-tier discovery #12) — the snapshot's word count, read
+   *  as-is, never re-derived from `text`.
+   *
+   *  It exists for ONE reason: the calibration reference set's comparability gate
+   *  is a band of SCENES AND WORDS (src/lib/percentile-copy.ts's
+   *  percentileIsComparable), and the Versions list had only the scene count, so it
+   *  applied half of it — data/screenplays/runoff.fountain read "top 30%" here and
+   *  "not comparable" on every other surface for the same draft.
+   *
+   *  `null` under the same missing-data rule as every other field above: a snapshot
+   *  saved before Snapshot.wordCount existed has no reading, which the gate then
+   *  treats as not comparable. NOT back-filled from `snap.text`: a snapshot's text
+   *  is the writer's draft, while the word count the percentile is gated on is the
+   *  ANALYZER's count of the text the report was produced from (doctor.ts's
+   *  report.wordCount, via fastWordCount), and a whitespace-split of the stored
+   *  text is a different number. A different number here would silently flip a
+   *  band on or off. */
+  wordCount: number | null;
   analyzedAt: number | null;
   /** health - previous snapshot's health, rounded to 1 decimal. null when
    *  this snapshot, the previous one, or both lack a health value (includes
@@ -301,6 +319,7 @@ export function snapshotTrend(snapshots: readonly Snapshot[]): SnapshotTrendEntr
       meanAbsDialogueShareDelta: numberOrNull(snap.meanAbsDialogueShareDelta),
       actionSentenceCvOverall: numberOrNull(snap.actionSentenceCvOverall),
       healthPercentile: numberOrNull(snap.healthPercentile),
+      wordCount: numberOrNull(snap.wordCount),
     };
   });
 }

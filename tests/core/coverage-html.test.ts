@@ -675,10 +675,23 @@ describe('renderCoverageHtml — Top Priorities contradiction suppression', () =
 // surfaces already showed). Both lines are purely additive: absent inputs
 // must render byte-identical output to the pre-fix document.
 describe('renderCoverageHtml — health percentile and draft rank', () => {
-  it('renders the health-percentile line with the exact panel copy when healthPercentile is present', () => {
-    const report = buildReport({ healthPercentile: 82 });
+  // 2026-09-11 (#12): a BAND is only stated for a draft inside the calibration
+  // reference set's bounds (9-10 scenes / 256-337 words). buildReport() is 3 scenes
+  // / 540 words, so this case states the sizes explicitly; the out-of-band case —
+  // which is the case every real draft is in — is the next one.
+  it('renders the health-percentile line with the exact panel copy for an in-band draft', () => {
+    const report = buildReport({ healthPercentile: 82, sceneCount: 10, wordCount: 300 });
     const html = renderCoverageHtml(report, 'The Long Wait');
     assert.match(html, /Health percentile: top 20% within a 20-sample, hand-authored synthetic reference set/);
+    assert.match(html, /Exact rank: 82nd of 20 reference samples/);
+  });
+
+  it('renders NOT COMPARABLE, and no exact-rank tooltip, for a draft outside those bounds', () => {
+    const report = buildReport({ healthPercentile: 82, sceneCount: 231, wordCount: 19293 });
+    const html = renderCoverageHtml(report, 'The Long Wait');
+    assert.match(html, /Health percentile: not comparable/);
+    assert.ok(!html.includes('top 20%'), 'must not state a band the reference set cannot support');
+    assert.ok(!html.includes('Exact rank:'), 'and must not offer an exact ordinal either');
   });
 
   it('omits the health-percentile line entirely when the report carries no healthPercentile', () => {

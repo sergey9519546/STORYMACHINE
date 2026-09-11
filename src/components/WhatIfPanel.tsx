@@ -17,7 +17,9 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { StoryOp } from '../../server/nvm/ops/StoryOp.ts';
 import type { CoverageVerdict } from '../../server/nvm/analyze/types.ts';
 import { useModalFocusTrap } from '../lib/use-modal-focus-trap.ts';
-import { compactPercentileNote, exactRankTooltip } from '../lib/percentile-copy.ts';
+// 2026-09-11: the GATED helpers (…For), not the raw band formatters — the
+// comparability decision is one function in one place. See percentile-copy.ts.
+import { compactPercentileNoteFor, exactRankTooltipFor } from '../lib/percentile-copy.ts';
 import { ACTION_PROSE_VARIATION_LABEL, formatSignalValue } from '../lib/structural-signals-copy.ts';
 import {
   GitBranch, Eye, Zap, X, Check, AlertTriangle, FlaskConical, Play, Ban, Link2, Clock3,
@@ -178,6 +180,13 @@ interface WhatIfDoctorDraft {
   // same "complete" flag health/grade/verdict already use
   // (server/routes/nvm/twin-whatif.ts's presentReport).
   healthPercentile?: number;
+  // 2026-09-11 (producer-tier discovery #12) — the OTHER dimension the percentile's
+  // comparability gate needs, beside the `sceneCount` above
+  // (src/lib/percentile-copy.ts's percentileIsComparable is symmetric over scenes
+  // AND words). Forwarded by server/routes/nvm/twin-whatif.ts's presentReport under
+  // the same `complete` gate as health/verdict/percentile, so this panel does not
+  // have to guess whether a band is a reading about craft or about length.
+  wordCount?: number;
   // Descriptive document aggregates — NEVER part of health. Same two channels,
   // same wording, as ScriptDoctorPanel's "Shape & Rhythm" section.
   meanAbsDialogueShareDelta?: number;
@@ -251,6 +260,9 @@ export interface BranchPromotion {
   health?: number;
   verdict?: CoverageVerdict;
   sceneCount?: number;
+  /** 2026-09-11 (#12) — carried through with sceneCount so a promoted snapshot can
+   *  apply the whole comparability gate in Versions, not half of it. */
+  wordCount?: number;
   analyzedAt?: number;
   // 2026-09-04 review (REVISE item 5) — carried through so a promoted
   // snapshot is not the one row in Versions that can never show a
@@ -501,9 +513,14 @@ function DoctorReadout({ label, draft, delta }: {
           {typeof draft.healthPercentile === 'number' && (
             <div
               className="text-[10px] font-mono opacity-75 mt-0.5"
-              title={exactRankTooltip(draft.healthPercentile)}
+              /* 2026-09-11 (#12): the GATED helpers. A branch outside the
+                 calibration reference set's scene/word band reads "not comparable"
+                 here exactly as it does on every other surface — and carries no
+                 exact-rank tooltip, since an ordinal against a set the draft cannot
+                 be compared to is the false precision twice over. */
+              title={exactRankTooltipFor(draft.healthPercentile, draft.sceneCount, draft.wordCount)}
             >
-              {compactPercentileNote(draft.healthPercentile)}
+              {compactPercentileNoteFor(draft.healthPercentile, draft.sceneCount, draft.wordCount)}
             </div>
           )}
           {draft.meanAbsDialogueShareDelta !== undefined && draft.actionSentenceCvOverall !== undefined && (
@@ -915,6 +932,7 @@ export default function WhatIfPanel({ onClose, onCommitted, onPromoteToEditor }:
       health: branch.health,
       verdict: branch.verdict,
       sceneCount: branch.sceneCount,
+      wordCount: branch.wordCount,
       analyzedAt: branch.analyzedAt,
       healthPercentile: branch.healthPercentile,
       meanAbsDialogueShareDelta: branch.meanAbsDialogueShareDelta,

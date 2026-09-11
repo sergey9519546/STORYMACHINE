@@ -118,13 +118,21 @@ describe('percentile-copy.ts — no surface re-implements it', () => {
     });
   }
 
-  it('ScriptDoctorPanel.tsx renders the sentence via the shared healthPercentileSentence(), not a hand-built string', () => {
-    assert.match(panel, /\{healthPercentileSentence\(report\.healthPercentile\)\}/);
+  // 2026-09-11 (#12): every surface moved one step further — from the shared
+  // FORMATTER to the shared GATED helper (…For), which decides band-vs-not-
+  // comparable as well as wording. A surface that called the raw formatter would
+  // state a band for a draft the reference set cannot rank, which is the defect.
+  it('ScriptDoctorPanel.tsx renders the sentence via the shared GATED percentileSentenceFor()', () => {
+    assert.match(panel, /\{percentileSentenceFor\(report\.healthPercentile, report\.sceneCount, report\.wordCount\)\}/);
     assert.ok(!panel.includes('Health percentile: {percentileBand'), 'the old hand-built JSX interpolation must be gone');
+    assert.ok(!/\{healthPercentileSentence\(/.test(panel), 'the ungated formatter must not be called for the headline percentile');
   });
 
-  it('SnapshotManager.tsx renders the compact note via the shared compactPercentileNote(), and the sentence still contains "hand-authored synthetic"', () => {
-    assert.match(snapshotManager, /\{compactPercentileNote\(healthPercentile\)\}/);
+  it('SnapshotManager.tsx renders the compact note via the shared GATED compactPercentileNoteFor(), with BOTH dimensions', () => {
+    assert.match(snapshotManager, /\{compactPercentileNoteFor\(healthPercentile, sceneCount, wordCount\)\}/);
+    // The half-gate is the specific bug: this row had only the scene count, so
+    // runoff.fountain read "top 30%" here and "not comparable" everywhere else.
+    assert.match(snapshotManager, /wordCount: number \| null;/);
   });
 
   // Owner-rule follow-up (2026-09-05): the Slate table's Percentile column
@@ -141,8 +149,8 @@ describe('percentile-copy.ts — no surface re-implements it', () => {
     assert.match(slateHtml, /\$\{slatePercentileCaption\(\)\}/);
   });
 
-  it('WhatIfPanel.tsx\'s DoctorReadout renders the percentile beside health via the shared compactPercentileNote(), so the What-If Lab is not the one place this number is silent', () => {
-    assert.match(whatIfPanel, /\{compactPercentileNote\(draft\.healthPercentile\)\}/);
+  it('WhatIfPanel.tsx\'s DoctorReadout renders the percentile via the shared GATED compactPercentileNoteFor(), with both dimensions', () => {
+    assert.match(whatIfPanel, /\{compactPercentileNoteFor\(draft\.healthPercentile, draft\.sceneCount, draft\.wordCount\)\}/);
     assert.match(whatIfPanel, /typeof draft\.healthPercentile === ['"]number['"]/);
   });
 
@@ -161,10 +169,8 @@ describe('percentile-copy.ts — no surface re-implements it', () => {
   // healthPercentileSentence / notComparableSentence — the whole sentence, not the
   // pieces — so the letter carries one wording, exactly twice (pinned by
   // tests/core/coverage-letter.test.ts).
-  it('coverage-letter.ts renders the WHOLE shared percentile sentence, not a composition of its pieces', () => {
-    assert.match(coverageLetter, /healthPercentileSentence\(report\.healthPercentile\)/);
-    assert.match(coverageLetter, /notComparableSentence\(\)/);
-    assert.match(coverageLetter, /percentileIsComparable\(report\.sceneCount, report\.wordCount\)/);
+  it('coverage-letter.ts renders the WHOLE shared gated sentence, not a composition of its pieces', () => {
+    assert.match(coverageLetter, /percentileSentenceFor\(report\.healthPercentile, report\.sceneCount, report\.wordCount\)/);
     assert.ok(!/\$\{ordinal\(Math\.round\(report\.healthPercentile\)\)\}\s*percentile/.test(coverageLetter),
       'the hand-composed ordinal percentile sentence must be gone');
     assert.ok(!/\$\{Math\.round\(report\.healthPercentile\)\}th percentile/.test(coverageLetter),

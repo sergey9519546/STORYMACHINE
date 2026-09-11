@@ -23,7 +23,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { useModalFocusTrap } from "../lib/use-modal-focus-trap.ts";
 import {
-  percentileBand, exactRankTooltip, percentileColumnHeaderTooltip, slatePercentileCaption,
+  percentileCellFor, exactRankTooltipFor, percentileColumnHeaderTooltip, slatePercentileCaption,
 } from "../lib/percentile-copy.ts";
 import { formatSignalValue } from "../lib/structural-signals-copy.ts";
 import {
@@ -883,14 +883,18 @@ export default function SlatePanel({ onClose }: SlatePanelProps) {
                         </td>
                         <td
                           className="px-2 py-2 text-[var(--sm-ink-mute)]"
+                          /* 2026-09-11 (#12): the gated cell helper, shared with
+                             the EXPORTED slate HTML (server/lib/slate.ts), which
+                             until today rendered an ordinal ("82th pct") for this
+                             same number in this same column. */
                           title={
                             typeof entry.healthPercentile === "number"
-                              ? exactRankTooltip(entry.healthPercentile)
+                              ? exactRankTooltipFor(entry.healthPercentile, entry.sceneCount, entry.wordCount)
                               : undefined
                           }
                         >
                           {typeof entry.healthPercentile === "number"
-                            ? percentileBand(entry.healthPercentile)
+                            ? percentileCellFor(entry.healthPercentile, entry.sceneCount, entry.wordCount)
                             : "—"}
                         </td>
                         <td className="px-2 py-2 text-[var(--sm-ink-mute)]">

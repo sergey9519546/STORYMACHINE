@@ -51,7 +51,12 @@ import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
 import { getLabsEnabled } from "../../lib/feature-flags.ts";
 import { computeDraftRank, type DraftRank } from "../../lib/snapshot-trend.ts";
 import {
-  ordinal, percentileBand, exactRankTooltip, healthPercentileSentence,
+  // 2026-09-11: the GATED helpers (…For) for the headline percentile — the
+  // comparability decision lives in one place (see percentile-copy.ts's header).
+  // `percentileBand` stays for the per-DIMENSION percentiles, which are ranked
+  // against the same reference set's per-dimension distributions and are not part
+  // of this change's scope.
+  ordinal, percentileBand, percentileSentenceFor, exactRankTooltipFor,
 } from "../../lib/percentile-copy.ts";
 import {
   draftRankSentence, draftRankExportPayload, type DraftRankExportPayload,
@@ -4949,12 +4954,19 @@ export default function ScriptDoctorPanel({
                   {report.wordCount.toLocaleString()} words &middot; {report.totalIssues} issue
                   {report.totalIssues === 1 ? "" : "s"}
                 </div>
+                {/* 2026-09-11 (#12): the GATED helpers. The percentile read 100 for
+                    every real draft because the calibration reference set is twenty
+                    9-10-scene / 256-337-word samples, so a longer script ranks top
+                    for being longer. Outside that band this says "not comparable"
+                    and withholds the exact-rank tooltip. One decision, in
+                    src/lib/percentile-copy.ts, shared with both exports, Versions,
+                    the Slate table and the What-If Lab. */}
                 {typeof report.healthPercentile === "number" && (
                   <div
                     className="text-[10px] font-mono text-ink/60 mt-0.5"
-                    title={exactRankTooltip(report.healthPercentile)}
+                    title={exactRankTooltipFor(report.healthPercentile, report.sceneCount, report.wordCount)}
                   >
-                    {healthPercentileSentence(report.healthPercentile)}
+                    {percentileSentenceFor(report.healthPercentile, report.sceneCount, report.wordCount)}
                   </div>
                 )}
                 <DraftRankOrSampleNote draftRank={draftRank} isSample={analyzedIsSample} className="text-ink/60" />
@@ -4998,12 +5010,13 @@ export default function ScriptDoctorPanel({
                       {report.wordCount.toLocaleString()} words &middot; {report.totalIssues} issue
                       {report.totalIssues === 1 ? "" : "s"}
                     </div>
+                    {/* Same gated helpers as the full-report card above (#12). */}
                     {typeof report.healthPercentile === "number" && (
                       <div
                         className="text-[10px] font-mono opacity-70 mt-0.5"
-                        title={exactRankTooltip(report.healthPercentile)}
+                        title={exactRankTooltipFor(report.healthPercentile, report.sceneCount, report.wordCount)}
                       >
-                        {healthPercentileSentence(report.healthPercentile)}
+                        {percentileSentenceFor(report.healthPercentile, report.sceneCount, report.wordCount)}
                       </div>
                     )}
                     <DraftRankOrSampleNote draftRank={draftRank} isSample={analyzedIsSample} className="opacity-70" />

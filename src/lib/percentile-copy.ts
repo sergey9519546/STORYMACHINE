@@ -128,6 +128,65 @@ export function compactNotComparableNote(): string {
   return `not comparable \u2014 outside the ${REFERENCE_SET_LABEL}'s bounds (${referenceBoundsLine()})`;
 }
 
+// ── The three functions every surface should actually call ────────────────────
+//
+// The comparability decision is ONE `if`, and it belongs here rather than at each
+// of the seven surfaces that show a percentile (the in-app panel twice, the
+// Versions list, the Slate table in-app and exported, the What-If Lab, the
+// exported coverage HTML, the coverage letter). The first cut of this gate was a
+// ternary repeated per surface, and one of them checked only the scene count —
+// which is how data/screenplays/runoff.fountain read "top 30%" in Versions and
+// "not comparable" everywhere else in the same session. Call these instead.
+
+/** The full headline sentence, gated: a BAND for an in-band draft, the
+ *  not-comparable sentence otherwise. */
+export function percentileSentenceFor(
+  pct: number, sceneCount: number | null | undefined, wordCount: number | null | undefined,
+): string {
+  return percentileIsComparable(sceneCount, wordCount)
+    ? healthPercentileSentence(pct)
+    : notComparableSentence();
+}
+
+/** The compact list-row note, gated the same way. */
+export function compactPercentileNoteFor(
+  pct: number, sceneCount: number | null | undefined, wordCount: number | null | undefined,
+): string {
+  return percentileIsComparable(sceneCount, wordCount)
+    ? compactPercentileNote(pct)
+    : compactNotComparableNote();
+}
+
+/** The narrow TABLE-CELL form: the band alone, or "not comparable".
+ *
+ *  For the Slate triage table, which shows one reading per row and has no room
+ *  for a sentence — the column header tooltip and the table's own caption
+ *  (percentileColumnHeaderTooltip / slatePercentileCaption) already name the
+ *  denominator, so the cell states only the reading.
+ *
+ *  This closes a second drift the same audit found: the IN-APP table rendered
+ *  `percentileBand(pct)` ("top 20%") while the EXPORTED slate HTML rendered
+ *  `${Math.round(pct)}th pct` — an ordinal, with the same hardcoded "th" suffix
+ *  bug the coverage letter had ("82th"), for the identical number in the identical
+ *  column. One function now. */
+export function percentileCellFor(
+  pct: number, sceneCount: number | null | undefined, wordCount: number | null | undefined,
+): string {
+  return percentileIsComparable(sceneCount, wordCount) ? percentileBand(pct) : 'not comparable';
+}
+
+/** The exact-rank tooltip, or `undefined` when the draft is not comparable.
+ *
+ *  An exact ordinal against a reference set the draft cannot be compared to is
+ *  the false precision twice over, so the tooltip is WITHHELD rather than shown
+ *  beside a "not comparable" label. `undefined`, not '', so a caller can pass it
+ *  straight to a `title` attribute and have the attribute disappear. */
+export function exactRankTooltipFor(
+  pct: number, sceneCount: number | null | undefined, wordCount: number | null | undefined,
+): string | undefined {
+  return percentileIsComparable(sceneCount, wordCount) ? exactRankTooltip(pct) : undefined;
+}
+
 /** Ordinal suffix ("1st", "2nd", "3rd", "4th"…) — handles the 11-13 teens
  *  exception (11th/12th/13th, not 11st/12nd/13rd). */
 export function ordinal(n: number): string {

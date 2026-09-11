@@ -43,9 +43,7 @@ import { locateIssues, sceneLineSpans, type SceneLineSpan } from '../nvm/analyze
 import { suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
 import { scenePageNumbers, pageRefLabel } from './page-refs.ts';
 import { derivedReferenceBoundsLine } from './reference-bounds.ts';
-import {
-  healthPercentileSentence, notComparableSentence, percentileIsComparable,
-} from '../../src/lib/percentile-copy.ts';
+import { percentileSentenceFor } from '../../src/lib/percentile-copy.ts';
 import { prioritiesHeadingFor } from '../../src/lib/priorities-copy.ts';
 
 /** How many findings the tier leads with.
@@ -142,9 +140,7 @@ export function buildReaderTier(
   // when the report carries no percentile (an incomplete or legacy report).
   // Never an ordinal — see src/lib/percentile-copy.ts.
   const percentileLine = typeof report.healthPercentile === 'number'
-    ? (percentileIsComparable(report.sceneCount, report.wordCount)
-      ? healthPercentileSentence(report.healthPercentile)
-      : notComparableSentence())
+    ? percentileSentenceFor(report.healthPercentile, report.sceneCount, report.wordCount)
     : null;
 
   // The same list, filtered the same way, that the full report's own priorities

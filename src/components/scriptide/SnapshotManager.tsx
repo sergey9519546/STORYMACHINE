@@ -6,7 +6,11 @@ import {
   snapshotTrend, snapshotDraftRanks, type SnapshotTrendEntry, type DraftRank,
 } from "../../lib/snapshot-trend.ts";
 import { useModalFocusTrap } from "../../lib/use-modal-focus-trap.ts";
-import { exactRankTooltip, compactPercentileNote } from "../../lib/percentile-copy.ts";
+// 2026-09-11: the GATED helpers (…For), not the raw band formatters. The gate is
+// symmetric over scenes AND words, and it lives in one place — see
+// percentile-copy.ts's header for why this list row applying half of it was a
+// real defect rather than a rounding difference.
+import { exactRankTooltipFor, compactPercentileNoteFor } from "../../lib/percentile-copy.ts";
 import { draftRankSentence } from "../../lib/draft-rank-copy.ts";
 import { formatSignalDelta } from "../../lib/structural-signals-copy.ts";
 
@@ -26,6 +30,21 @@ export interface Snapshot {
   health?: number;
   verdict?: CoverageVerdict;
   sceneCount?: number;
+  // 2026-09-11 (producer-tier discovery #12) — the report's word count, captured
+  // at snapshot time under the SAME rule as `health` and `sceneCount` above.
+  //
+  // WHY IT HAS TO BE HERE: the percentile a snapshot shows is only a meaningful
+  // reading when the draft sits inside the calibration reference set's bounds, and
+  // those bounds are a band of SCENES AND WORDS (src/lib/percentile-copy.ts's
+  // percentileIsComparable). Versions used to have only the scene count, so it
+  // applied half the gate: data/screenplays/runoff.fountain (9 scenes — inside the
+  // band — 1,448 words — four times over it) read "top 30%" in this list and "not
+  // comparable" on every other surface, for the same draft, in the same session.
+  //
+  // Absent on every snapshot saved before this field existed, which resolves to
+  // `null` in SnapshotTrendEntry and therefore to "not comparable" — never to a
+  // stale band, and never to a crash.
+  wordCount?: number;
   analyzedAt?: number;
   // 2026-09-04 — Shape & Rhythm (ScriptDoctorReport.structuralSignals):
   // the same two document aggregates ScriptDoctorPanel.tsx's "Shape &
@@ -176,17 +195,23 @@ function ShapeRhythmTrendLine({ entries }: { entries: SnapshotTrendEntry[] }) {
  *  writer's OTHER saved drafts of this script (when computeDraftRank found
  *  one). Renders nothing when neither is available. */
 function SnapshotPercentileAndRankLine({
-  healthPercentile, draftRank,
+  healthPercentile, sceneCount, wordCount, draftRank,
 }: {
   healthPercentile: number | null;
+  /** 2026-09-11 — both dimensions of the comparability gate. Passed together,
+   *  always, because the gate is symmetric: a surface that has only one of them
+   *  cannot honestly decide, and the one that tried produced two different
+   *  readings of one draft in one session. See percentileIsComparable. */
+  sceneCount: number | null;
+  wordCount: number | null;
   draftRank: DraftRank | null;
 }) {
   if (healthPercentile === null && draftRank === null) return null;
   return (
     <div className="text-[10px] font-mono text-[var(--sm-ink-mute)] mt-0.5 flex flex-wrap gap-x-3">
       {healthPercentile !== null && (
-        <span title={exactRankTooltip(healthPercentile)}>
-          {compactPercentileNote(healthPercentile)}
+        <span title={exactRankTooltipFor(healthPercentile, sceneCount, wordCount)}>
+          {compactPercentileNoteFor(healthPercentile, sceneCount, wordCount)}
         </span>
       )}
       {draftRank && (
@@ -238,7 +263,12 @@ function SnapshotTrendBadge({ entry, draftRank }: { entry: SnapshotTrendEntry; d
           </span>
         )}
       </div>
-      <SnapshotPercentileAndRankLine healthPercentile={entry.healthPercentile} draftRank={draftRank} />
+      <SnapshotPercentileAndRankLine
+        healthPercentile={entry.healthPercentile}
+        sceneCount={entry.sceneCount}
+        wordCount={entry.wordCount}
+        draftRank={draftRank}
+      />
     </div>
   );
 }

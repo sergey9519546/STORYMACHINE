@@ -73,9 +73,7 @@ import { computeStructuralReliabilityNote } from './structural-reliability.ts';
 // coverage-html.ts's/slate.ts's own percentile-copy.ts imports — so this is
 // an established pattern, not a new one; it does not touch the scoring path
 // (no import edge to/from doctor.ts either direction).
-import {
-  ordinal, healthPercentileSentence, notComparableSentence, percentileIsComparable,
-} from '../../src/lib/percentile-copy.ts';
+import { ordinal, percentileSentenceFor } from '../../src/lib/percentile-copy.ts';
 // Shared draft-rank denominator copy (2026-09-05 review round 2) — same
 // established cross-import pattern as percentile-copy.ts above, fixing the
 // same class of bug: this file used to hand-write "your own saved drafts of
@@ -311,9 +309,7 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
   // bounds gets the not-comparable sentence rather than a band that is really
   // measuring length (see percentileIsComparable).
   if (typeof report.healthPercentile === 'number') {
-    const reading = percentileIsComparable(report.sceneCount, report.wordCount)
-      ? healthPercentileSentence(report.healthPercentile)
-      : notComparableSentence();
+    const reading = percentileSentenceFor(report.healthPercentile, report.sceneCount, report.wordCount);
     caveats.push(
       `${reading} — not against other scripts you might send it, and not a market comparison.`,
     );

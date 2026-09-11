@@ -237,6 +237,13 @@ router.post('/api/nvm/whatif/doctor', gameLimiter, validate(WhatIfDoctorBodySche
       // the same `complete` flag health/grade/verdict already use, never a
       // second condition that could disagree with them.
       ...(complete && typeof report.healthPercentile === 'number' ? { healthPercentile: report.healthPercentile } : {}),
+      // 2026-09-11 (producer-tier discovery #12): the two dimensions the
+      // percentile's comparability gate reads (src/lib/percentile-copy.ts's
+      // percentileIsComparable is symmetric over scenes AND words). Sent under the
+      // SAME `complete` flag as health/verdict/percentile above, never a second
+      // condition that could disagree with them — a branch with a percentile but no
+      // sizes would make the What-If Lab the one surface that has to guess.
+      ...(complete ? { sceneCount: report.sceneCount, wordCount: report.wordCount } : {}),
       ...(signals?.scored ? {
         meanAbsDialogueShareDelta: signals.meanAbsDialogueShareDelta,
         actionSentenceCvOverall: signals.actionSentenceCvOverall,

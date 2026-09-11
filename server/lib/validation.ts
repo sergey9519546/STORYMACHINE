@@ -2801,6 +2801,10 @@ export const TitlePageBodySchema = z.object({
 // absence is normal: every snapshot saved before this feature, and any future
 // save where no report exists yet for the current text, omits them.
 // `.passthrough()` so an older or newer client's extra fields still round-trip.
+//
+// The health/verdict/sceneCount/wordCount/analyzedAt fields are typed when present
+// (so a malformed value 400s instead of silently corrupting a stored row) but their
+// absence is normal: every snapshot saved before each field existed omits it.
 export const SnapshotSchema = z.object({
   id: z.string().optional(),
   name: z.string().optional(),
@@ -2809,6 +2813,17 @@ export const SnapshotSchema = z.object({
   health: z.number().optional(),
   verdict: z.enum(['RECOMMEND', 'CONSIDER', 'PASS']).optional(),
   sceneCount: z.number().int().nonnegative().optional(),
+  // 2026-09-11 (producer-tier discovery #12) — the report's word count, stored
+  // alongside sceneCount because the percentile a snapshot row displays is only a
+  // meaningful reading inside the calibration reference set's scene AND word band
+  // (src/lib/percentile-copy.ts's percentileIsComparable).
+  //
+  // OPTIONAL, like every field here: a snapshot saved before this existed simply
+  // omits it, which resolves to `null` in SnapshotTrendEntry and therefore to "not
+  // comparable" in the Versions list — never a stale band, never a crash. TYPED
+  // when present (int, non-negative), so a malformed value 400s at the route
+  // instead of being stored and later silently flipping a band on.
+  wordCount: z.number().int().nonnegative().optional(),
   analyzedAt: z.number().optional(),
   // 2026-09-04 — the same two Shape & Rhythm aggregates ScriptDoctorPanel.tsx
   // and coverage-letter.ts surface (server/nvm/analyze/structural-signals.ts's

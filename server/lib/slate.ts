@@ -22,7 +22,9 @@ import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
 // surface uses (see that module's header), instead of a hand-typed sentence
 // that had already drifted from the panel's own wording ("a fixed 20-sample
 // reference set" vs. the qualified "hand-authored synthetic" phrasing).
-import { percentileColumnHeaderTooltip, slatePercentileCaption } from '../../src/lib/percentile-copy.ts';
+import {
+  percentileColumnHeaderTooltip, slatePercentileCaption, percentileCellFor,
+} from '../../src/lib/percentile-copy.ts';
 import { formatSignalValue } from '../../src/lib/structural-signals-copy.ts';
 
 export interface SlateEntry {
@@ -264,8 +266,18 @@ export function renderSlateHtml(entries: SlateEntry[], rankedAt: number): string
     }
     const band = healthBandColor(entry.health);
     const verdictColor = entry.verdict ? VERDICT_COLOR[entry.verdict] ?? '#334155' : '#64748b';
+    // 2026-09-11 (producer-tier discovery #12) — TWO defects in this one
+    // expression, both closed by the shared percentileCellFor:
+    //   1. it rendered an ORDINAL with a hardcoded "th" ("82th pct"), the same bug
+    //      the coverage letter's percentile line had, while the IN-APP Slate table
+    //      (SlatePanel.tsx) rendered a BAND for the identical number in the
+    //      identical column;
+    //   2. it applied no comparability gate, so a feature-length row read "100th
+    //      pct" against a reference set of twenty 9-10-scene samples.
+    // SlateEntry already carries both sceneCount and wordCount, so the gate has
+    // everything it needs here.
     const percentile = typeof entry.healthPercentile === 'number'
-      ? `${Math.round(entry.healthPercentile)}th pct`
+      ? escapeHtml(percentileCellFor(entry.healthPercentile, entry.sceneCount, entry.wordCount))
       : '&mdash;';
     // 2026-09-04 — same two Shape & Rhythm aggregates every other surface
     // shows, marked descriptive here too. '&mdash;' when this row's report

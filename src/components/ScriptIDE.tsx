@@ -1172,6 +1172,12 @@ export default function ScriptIDE({
         health: previousReport.health,
         verdict: previousReport.verdict,
         sceneCount: previousReport.sceneCount,
+        // 2026-09-11 (#12) — captured alongside sceneCount because the
+        // percentile's comparability gate needs BOTH (src/lib/percentile-copy.ts's
+        // percentileIsComparable). A snapshot with only the scene count makes the
+        // Versions list apply half the gate, which is how one draft came to read
+        // "top 30%" here and "not comparable" everywhere else.
+        wordCount: previousReport.wordCount,
         analyzedAt: previousReport.analyzedAt,
       } : {}),
       // 2026-09-04 (honesty-audit matrix fix) — same rule as confirmSnapshot
@@ -1198,6 +1204,11 @@ export default function ScriptIDE({
       ...(promotedBranch.health !== undefined ? { health: promotedBranch.health } : {}),
       ...(promotedBranch.verdict !== undefined ? { verdict: promotedBranch.verdict } : {}),
       ...(promotedBranch.sceneCount !== undefined ? { sceneCount: promotedBranch.sceneCount } : {}),
+      // 2026-09-11 (#12) — the other half of the comparability gate, forwarded the
+      // same present-only-when-sent way. Without it a promoted branch would be the
+      // one row in Versions that can never show a band, which is the mirror of the
+      // defect this gate exists to fix.
+      ...(promotedBranch.wordCount !== undefined ? { wordCount: promotedBranch.wordCount } : {}),
       ...(promotedBranch.analyzedAt !== undefined ? { analyzedAt: promotedBranch.analyzedAt } : {}),
       // 2026-09-04 review (REVISE item 5) — carried through so a promoted
       // snapshot is not the one row in Versions that can never show a
@@ -2159,6 +2170,9 @@ export default function ScriptIDE({
           health: freshReport.health,
           verdict: freshReport.verdict,
           sceneCount: freshReport.sceneCount,
+          // 2026-09-11 (#12) — see the undo path above: both dimensions of the
+          // comparability gate, captured together or not at all.
+          wordCount: freshReport.wordCount,
           analyzedAt: freshReport.analyzedAt,
         } : {}),
         // 2026-09-04 (honesty-audit matrix fix) — the same calibration

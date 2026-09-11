@@ -43,9 +43,7 @@ import { STRENGTHS_SECTION_TITLE, STRENGTHS_SECTION_CAPTION } from './strengths-
 // server/routes/export.ts's imports of fountain.ts/fdx.ts/docx.ts — so this
 // is an established pattern, not a new one; it does not touch the scoring
 // path (no import edge to/from doctor.ts either direction).
-import {
-  healthPercentileSentence, exactRankTooltip, notComparableSentence, percentileIsComparable,
-} from '../../src/lib/percentile-copy.ts';
+import { percentileSentenceFor, exactRankTooltipFor } from '../../src/lib/percentile-copy.ts';
 // Shared draft-rank copy (2026-09-05 migration — this file's buildDraftRankLine
 // was added by the cross-surface-parity lane BEFORE src/lib/draft-rank-copy.ts
 // existed (see that module's own header: the panel and the coverage LETTER
@@ -148,11 +146,11 @@ function severityChip(sev: RevisionIssue['severity']): string {
 // gate through the same function, so the two cannot disagree.
 function buildHealthPercentileLine(report: ScriptDoctorReport): string {
   if (typeof report.healthPercentile !== 'number') return '';
-  if (!percentileIsComparable(report.sceneCount, report.wordCount)) {
-    return `<div class="health-percentile">${notComparableSentence()}</div>`;
-  }
-  const tooltip = escapeHtml(exactRankTooltip(report.healthPercentile));
-  return `<div class="health-percentile" title="${tooltip}">${healthPercentileSentence(report.healthPercentile)}</div>`;
+  const sentence = percentileSentenceFor(report.healthPercentile, report.sceneCount, report.wordCount);
+  const tooltip = exactRankTooltipFor(report.healthPercentile, report.sceneCount, report.wordCount);
+  return tooltip
+    ? `<div class="health-percentile" title="${escapeHtml(tooltip)}">${sentence}</div>`
+    : `<div class="health-percentile">${sentence}</div>`;
 }
 
 /** Draft-rank line — "rank among the writer's OWN saved drafts of this
