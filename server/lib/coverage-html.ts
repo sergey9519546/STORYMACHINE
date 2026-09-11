@@ -27,6 +27,14 @@ import { isNamedRootCause } from '../nvm/analyze/cluster.ts';
 import { suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
 // ONE root-cause wording (2026-09-11) — see server/lib/root-cause-pipeline.ts.
 import { rootCauseStatements } from './root-cause-pipeline.ts';
+// The producer tier (2026-09-11) — one printed page above the full report; see
+// server/lib/reader-tier.ts.
+import { buildReaderTier, renderReaderTierHtml } from './reader-tier.ts';
+// ONE priorities heading across the panel, this export, the letter and the tier.
+import { prioritiesHeadingFor } from '../../src/lib/priorities-copy.ts';
+// ONE title and caption for the checks-that-found-nothing section, shared with
+// the coverage letter and the in-app panel — see server/lib/strengths-copy.ts.
+import { STRENGTHS_SECTION_TITLE, STRENGTHS_SECTION_CAPTION } from './strengths-copy.ts';
 // Shared percentile copy (2026-09-04 review — consolidates what used to be
 // four independent hand-copies of ordinal()/percentileBand() across the
 // panel, this file, SnapshotManager.tsx and SlatePanel.tsx into one
@@ -35,7 +43,9 @@ import { rootCauseStatements } from './root-cause-pipeline.ts';
 // server/routes/export.ts's imports of fountain.ts/fdx.ts/docx.ts — so this
 // is an established pattern, not a new one; it does not touch the scoring
 // path (no import edge to/from doctor.ts either direction).
-import { healthPercentileSentence, exactRankTooltip } from '../../src/lib/percentile-copy.ts';
+import {
+  healthPercentileSentence, exactRankTooltip, notComparableSentence, percentileIsComparable,
+} from '../../src/lib/percentile-copy.ts';
 // Shared draft-rank copy (2026-09-05 migration — this file's buildDraftRankLine
 // was added by the cross-surface-parity lane BEFORE src/lib/draft-rank-copy.ts
 // existed (see that module's own header: the panel and the coverage LETTER
@@ -127,8 +137,20 @@ function severityChip(sev: RevisionIssue['severity']): string {
 // independent hand-copies. See that module's header for why four
 // independent copies existed before this and why that was a defect, not a
 // convenience.
+//
+// 2026-09-11 (producer-tier discovery #12): also gated on COMPARABILITY. The
+// percentile read 100 for every real draft because the reference set is twenty
+// samples of 9-10 scenes and 256-337 words, so a longer script ranks top for
+// being longer. Outside those bounds this renders the not-comparable sentence
+// instead of a band — and the exact-rank tooltip goes with it, because an exact
+// ordinal against a set the draft cannot be compared to is the false precision
+// twice over. The producer tier at the top of the same document applies the same
+// gate through the same function, so the two cannot disagree.
 function buildHealthPercentileLine(report: ScriptDoctorReport): string {
   if (typeof report.healthPercentile !== 'number') return '';
+  if (!percentileIsComparable(report.sceneCount, report.wordCount)) {
+    return `<div class="health-percentile">${notComparableSentence()}</div>`;
+  }
   const tooltip = escapeHtml(exactRankTooltip(report.healthPercentile));
   return `<div class="health-percentile" title="${tooltip}">${healthPercentileSentence(report.healthPercentile)}</div>`;
 }
@@ -170,13 +192,34 @@ function buildDraftRankLine(draftRank: DraftRankExportPayload | undefined): stri
 
 // ── Section builders ──────────────────────────────────────────────────────────
 
+/** The document's verdict stamp. Extracted from buildHeaderSection (2026-09-11)
+ *  because the verdict MOVED: the producer tier states it, so printing it in the
+ *  header too would put the same fact twice on the reader's first page. The
+ *  stamp itself is unchanged — same VERDICT_STYLE colours, same PASS
+ *  parenthetical, same markup — it is simply rendered where the tier asks for it
+ *  (renderReaderTierHtml's `verdictStamp` argument) instead of in the header. */
+function verdictStampHtml(verdict: CoverageVerdict | null): string {
+  const style = verdict ? VERDICT_STYLE[verdict] : UNKNOWN_VERDICT_STYLE;
+  return `<span class="stamp" style="background:${style.bg}; border-color:${style.border}; color:${style.text};">${escapeHtml(style.label)}</span>`;
+}
+
+/** IDENTIFICATION ONLY (2026-09-11, producer-tier discovery #11).
+ *
+ *  This header used to carry the logline, the scene/word/page length line AND
+ *  the verdict stamp. All three are findings, and all three are what the producer
+ *  tier immediately below it exists to state — so the reader's first page said
+ *  each of them twice, centimetres apart. The header now answers only "what
+ *  document is this": masthead, title, byline, date, and the excerpt note that
+ *  qualifies what the document covers.
+ *
+ *  Nothing was deleted. The logline, the length line and the stamp all render in
+ *  the tier (server/lib/reader-tier.ts), the stamp through this file's own
+ *  verdictStampHtml so its markup has one implementation. */
 function buildHeaderSection(
-  report: ScriptDoctorReport, safeTitle: string, safeAuthor: string | null, safeLogline: string | null,
+  report: ScriptDoctorReport, safeTitle: string, safeAuthor: string | null,
 ): string {
   const analyzedAt = typeof report.analyzedAt === 'number' ? report.analyzedAt : Date.now();
-  const verdictStyle = report.verdict ? VERDICT_STYLE[report.verdict] : UNKNOWN_VERDICT_STYLE;
   const byline = safeAuthor ? `<div class="byline">Written by ${safeAuthor}</div>` : '';
-  const loglineLine = safeLogline ? `<div class="logline-line">${safeLogline}</div>` : '';
 
   return `
   <header class="report-header">
@@ -185,18 +228,9 @@ function buildHeaderSection(
       <h1 class="title">${safeTitle}</h1>
       ${byline}
       <div class="meta-line">
-        ${formatDate(analyzedAt)} &middot;
-        ${formatNumber(report.sceneCount)} scene${report.sceneCount === 1 ? '' : 's'} &middot;
-        ${formatNumber(report.wordCount)} word${report.wordCount === 1 ? '' : 's'}${report.pageEstimate ? ` &middot;
-        ~${formatNumber(report.pageEstimate.pages)} page${report.pageEstimate.pages === 1 ? '' : 's'} / ~${formatNumber(report.pageEstimate.runtimeMinutes)} min (est.)` : ''}
+        ${formatDate(analyzedAt)}
       </div>${report.excerptNote ? `
       <div class="meta-line" style="font-style:italic;">${escapeHtml(report.excerptNote)}</div>` : ''}
-      ${loglineLine}
-    </div>
-    <div class="stamp-wrap">
-      <div class="stamp" style="background:${verdictStyle.bg}; border-color:${verdictStyle.border}; color:${verdictStyle.text};">
-        ${escapeHtml(verdictStyle.label)}
-      </div>
     </div>
   </header>`;
 }
@@ -286,6 +320,27 @@ function buildDimensionsSection(dimensions: DimensionScore[]): string {
   </section>`;
 }
 
+// 2026-09-11 (producer-tier discovery #8, the half it is safe to fix on main).
+//
+// THE DEFECT: the overall score and the five dimension scores contradict each
+// other in the same paragraph — a draft can read "overall score 84/100" with a
+// dimension at 0/100 — and directly underneath, a section headed "What's
+// Working" listed earned strengths, which a reader takes as the report
+// ARGUING that the draft is working. It is not: doctor.ts's buildStrengths emits
+// one entry per CHECK THAT DID NOT FIRE. "No scene runs over its length budget"
+// is the absence of a finding, not praise.
+//
+// The contradiction itself lives in buildPlainSummary/buildStrengths, both in
+// server/nvm/analyze/doctor.ts — the SCORING PATH, which this lane stops at by
+// instruction (the fix is on scoring/feature-length-defects, commit efc1899d,
+// and needs the owner's measurement). plainSummary is therefore interpolated
+// here exactly as before, byte for byte.
+//
+// What IS fixed on main is the framing: the section is titled what the list
+// actually is, and carries a one-line caption saying so. The caption sits BELOW
+// the decline line (the verdict sentence that opens plainSummary, rendered in
+// buildHealthSection above this section), so every byte above it is unchanged.
+// Every entry is kept.
 function buildStrengthsSection(strengths: string[]): string {
   // Guard: strengths are earned, never padded (doctor.ts's contract) — an
   // empty array means nothing was genuinely earned, so the whole section is
@@ -295,7 +350,8 @@ function buildStrengthsSection(strengths: string[]): string {
   const items = strengths.map(s => `<li>${escapeHtml(s)}</li>`).join('\n');
   return `
   <section class="section">
-    <h2>What&rsquo;s Working</h2>
+    <h2>${escapeHtml(STRENGTHS_SECTION_TITLE)}</h2>
+    <p class="dim-basis" style="margin:0 0 12px;">${STRENGTHS_SECTION_CAPTION}</p>
     <ul class="checklist">
       ${items}
     </ul>
@@ -352,10 +408,16 @@ function buildTopPrioritiesSection(topPrioritiesIn: Array<RevisionIssue & { pass
   // prioritize.ts's suppressContradictoryFindings for the table and the
   // reasoning behind each kept/dropped rule.
   const topPriorities = suppressContradictoryFindings(topPrioritiesIn);
+  // 2026-09-11: the heading comes from the ONE shared implementation
+  // (src/lib/priorities-copy.ts's prioritiesHeadingFor) that the coverage
+  // letter, the in-app panel and the producer tier also use. "Top Priorities"
+  // was plural no matter how many items followed, so a draft with exactly one —
+  // which the 1-scene inert draft in this repository has — promised a list and
+  // delivered a line.
   if (topPriorities.length === 0) {
     return `
   <section class="section">
-    <h2>Top Priorities</h2>
+    <h2>${escapeHtml(prioritiesHeadingFor(0))}</h2>
     <p class="empty-note">Nothing urgent surfaced &mdash; there is no priority fix to flag right now.</p>
   </section>`;
   }
@@ -378,7 +440,7 @@ function buildTopPrioritiesSection(topPrioritiesIn: Array<RevisionIssue & { pass
 
   return `
   <section class="section">
-    <h2>Top Priorities</h2>
+    <h2>${escapeHtml(prioritiesHeadingFor(topPriorities.length))}</h2>
     <ol class="priority-list">
       ${items}
     </ol>
@@ -643,6 +705,14 @@ const STYLES = `
       padding-bottom: 18px;
       margin-bottom: 28px;
     }
+    /* The header's single remaining cell. It was one of two (the other held the
+       verdict stamp, which moved into the producer tier on 2026-09-11) and had
+       no rule of its own because the flex parent positioned it. It gets one now
+       so the header's one child fills the row instead of leaving the old
+       space-between gap on the right, and so no class in this document is
+       rendered without a rule — see the "no dead class selectors" case in
+       tests/core/coverage-html.test.ts, which checks both directions. */
+    .header-main { flex: 1 1 auto; min-width: 0; }
     .masthead {
       font-family: 'Courier New', Courier, monospace;
       font-size: 12px;
@@ -674,10 +744,14 @@ const STYLES = `
       color: #27272a;
       margin-top: 8px;
     }
-    .stamp-wrap {
-      flex: 0 0 auto;
-      padding-top: 4px;
-    }
+    /* The .stamp-wrap rule lived here until 2026-09-11. It was the header's
+       right-hand flex cell for the verdict stamp; the stamp moved into the
+       producer tier (see verdictStampHtml / reader-tier.ts) and the header no
+       longer emits the wrapper, so the rule had no element to style. Removed
+       rather than left behind, with proof: the "no dead class selectors" case in
+       tests/core/coverage-html.test.ts asserts that stamp-wrap appears in
+       NEITHER the stylesheet nor any rendered report, and that every other
+       header and tier class appears in BOTH. */
     .stamp {
       font-family: 'Courier New', Courier, monospace;
       font-weight: 700;
@@ -982,6 +1056,99 @@ const STYLES = `
       border-radius: 3px;
       word-break: break-all;
     }
+    /* ── Producer tier (2026-09-11) ── one printed page above the full report */
+    .reader-tier {
+      border: 2px solid #18181b;
+      padding: 18px 20px 20px;
+      margin-bottom: 22px;
+    }
+    .tier-label {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      color: #52525b;
+    }
+    .tier-caption {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11.5px;
+      color: #52525b;
+      margin: 4px 0 12px;
+    }
+    .tier-facts {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      color: #18181b;
+      display: grid;
+      gap: 6px;
+      margin: 12px 0 10px;
+    }
+    .tier-facts .stamp {
+      font-size: 12px;
+      padding: 3px 9px;
+      border-width: 2px;
+      transform: none;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .tier-key {
+      display: inline-block;
+      min-width: 72px;
+      color: #52525b;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 11px;
+    }
+    .tier-bounds {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11.5px;
+      color: #52525b;
+      margin: 0 0 6px;
+    }
+    .tier-heading {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border-bottom: 1px solid #d4d4d8;
+      padding-bottom: 4px;
+      margin: 14px 0 10px;
+    }
+    .tier-list {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .tier-item { margin-bottom: 10px; }
+    .tier-item-head {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 3px;
+    }
+    .tier-item-where {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .tier-page {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11.5px;
+      color: #52525b;
+      white-space: nowrap;
+    }
+    .tier-item-body { font-size: 13px; }
+    .tier-empty {
+      font-size: 13px;
+      color: #52525b;
+      margin: 0;
+    }
+    .tier-divider {
+      border: 0;
+      border-top: 3px double #18181b;
+      margin: 0 0 24px;
+    }
     /* ── Print ── */
     @page {
       size: letter portrait;
@@ -993,6 +1160,11 @@ const STYLES = `
       .stamp { box-shadow: none; }
       .health-section { border: 1px solid #d4d4d8; }
       .section { page-break-inside: avoid; break-inside: avoid; }
+      /* The tier is its own sheet: the full report starts on page two, so a
+         producer who prints one page gets the whole summary and nothing half of
+         it. The divider is then redundant in print and is hidden. */
+      .reader-tier { break-after: page; page-break-after: always; break-inside: avoid; }
+      .tier-divider { display: none; }
     }
 `;
 
@@ -1048,6 +1220,19 @@ export interface CoverageHtmlOptions {
    *  CoverageBodySchema (server/lib/validation.ts) has accepted them on the
    *  wire since the same round that added them there. */
   draftRank?: DraftRankExportPayload;
+  /** The EXACT Fountain text this report was produced from (2026-09-11).
+   *
+   *  Used for one thing: resolving the producer tier's page references through
+   *  the same paginator the PDF export uses (server/lib/page-refs.ts). This does
+   *  NOT make the function impure — the same report plus the same text always
+   *  renders the same bytes — and it is not re-analyzed: no score, verdict or
+   *  finding is derived from it here.
+   *
+   *  OPTIONAL, and the degradation is stated rather than silent: omitted, the
+   *  tier still renders every other fact and prints NO_PAGE_REFS_NOTE instead of
+   *  page numbers it cannot resolve. Both export routes and the P0 sample
+   *  generator pass it. */
+  fountain?: string;
 }
 
 /** GODMODE analysis section — surfaces the new structural analysis layers
@@ -1238,7 +1423,6 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
     : (opts.titlePageTitle?.trim() || explicitTitle || 'Untitled');
   const safeTitle = escapeHtml(resolvedTitle);
   const safeAuthor = opts.titlePageAuthor?.trim() ? escapeHtml(opts.titlePageAuthor.trim()) : null;
-  const safeLogline = opts.logline?.trim() ? escapeHtml(opts.logline.trim()) : null;
   const dimensions = report.dimensions ?? [];
   const strengths = report.strengths ?? [];
 
@@ -1251,8 +1435,21 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
   const draftRankLine = buildDraftRankLine(opts.draftRank);
   const needsHealthTextBlockStyles = Boolean(healthPercentileLine || draftRankLine);
 
+  // The producer tier (2026-09-11, discovery #11): one printed page — logline,
+  // length, verdict, what to fix first with page references, and the reference
+  // bounds the percentile is measured against — then a divider, then the
+  // complete report, unchanged. `opts.fountain` is what lets every finding carry
+  // a page number; without it the tier still renders and says so (see
+  // buildReaderTier's own degradation note).
+  const readerTier = renderReaderTierHtml(
+    buildReaderTier(report, { logline: opts.logline, fountain: opts.fountain }),
+    escapeHtml,
+    verdictStampHtml,
+  );
+
   const body = [
-    buildHeaderSection(report, safeTitle, safeAuthor, safeLogline),
+    buildHeaderSection(report, safeTitle, safeAuthor),
+    readerTier,
     buildHealthSection(report, healthPercentileLine, draftRankLine),
     buildDimensionsSection(dimensions),
     buildStrengthsSection(strengths),

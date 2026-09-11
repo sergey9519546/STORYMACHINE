@@ -25,6 +25,109 @@
 export const REFERENCE_SET_SIZE = 20;
 export const REFERENCE_SET_LABEL = 'hand-authored synthetic reference set';
 
+// ── The reference set's BOUNDS, and the comparability gate ────────────────────
+//
+// 2026-09-11 (producer-tier discovery #12): the health percentile read 100 for
+// every real draft. Not because real drafts are excellent — because the
+// reference set is twenty samples of 9-10 scenes and 256-337 words each, by
+// deliberate design (corpus.ts's header: band monotonicity is a property of a
+// CONTROLLED-RICHNESS design in which every sample shares a scene and word
+// budget so craft is the only variable). Rank a 9-scene / 1,448-word short
+// against that and it lands at the top of the distribution for being four times
+// longer, not for being better. The percentile was measuring length.
+//
+// So a percentile is only shown when the draft is INSIDE those bounds, and
+// "not comparable" is shown when it is not. That is an honest null result, not a
+// degradation: the number was never a reading about craft outside this band.
+//
+// WHY THE NUMBERS ARE LITERALS HERE. This module is imported by the browser
+// bundle (ScriptDoctorPanel, SnapshotManager, SlatePanel, WhatIfPanel), and
+// deriving the bounds means importing REFERENCE_CORPUS — 1,900 lines of
+// screenplay prose — into that bundle. server/lib/reference-bounds.ts DERIVES
+// them from the corpus with the same analyzer the doctor uses, and
+// tests/core/reference-bounds.test.ts asserts the derived values equal these
+// literals. A corpus edit therefore fails CI here rather than silently leaving
+// this gate measuring the wrong band.
+export const REFERENCE_MIN_SCENES = 9;
+export const REFERENCE_MAX_SCENES = 10;
+export const REFERENCE_MIN_WORDS = 256;
+export const REFERENCE_MAX_WORDS = 337;
+
+export interface ReferenceBoundsShape {
+  samples: number;
+  minScenes: number;
+  maxScenes: number;
+  minWords: number;
+  maxWords: number;
+}
+
+export const REFERENCE_BOUNDS_LITERAL: ReferenceBoundsShape = {
+  samples: REFERENCE_SET_SIZE,
+  minScenes: REFERENCE_MIN_SCENES,
+  maxScenes: REFERENCE_MAX_SCENES,
+  minWords: REFERENCE_MIN_WORDS,
+  maxWords: REFERENCE_MAX_WORDS,
+};
+
+/** A range written the way a reader reads one: "9-10", or "10" when the bound is
+ *  degenerate. Never "10-10". */
+function boundRange(lo: number, hi: number): string {
+  return lo === hi ? `${lo}` : `${lo}\u2013${hi}`;
+}
+
+/** "20 samples / 9–10 scenes / 256–337 words" — the confidence line the producer
+ *  tier prints under its percentile reading, and the parenthetical the
+ *  not-comparable sentence carries. ONE formatter; server/lib/
+ *  reference-bounds.ts calls it with the values it derived from the corpus, so
+ *  the derived line and the bundled line cannot be formatted two ways. */
+export function referenceBoundsLine(
+  bounds: ReferenceBoundsShape = REFERENCE_BOUNDS_LITERAL,
+): string {
+  return `${bounds.samples} samples / ${boundRange(bounds.minScenes, bounds.maxScenes)} scenes / `
+    + `${boundRange(bounds.minWords, bounds.maxWords)} words`;
+}
+
+/**
+ * Is a percentile against the reference set a meaningful reading for a draft of
+ * this size?
+ *
+ * SYMMETRIC, deliberately — BOTH the scene count and the word count have to sit
+ * inside the reference set's bounds. The first cut of this gate checked only the
+ * scene count on one surface and both on the others, which is how
+ * data/screenplays/runoff.fountain (9 scenes, 1,448 words) came to read
+ * "top 30%" in the Versions list and "not comparable" everywhere else: 9 scenes
+ * is inside the band, 1,448 words is four times over it, and the two surfaces
+ * disagreed about the same draft in the same session. One function, both
+ * dimensions, every caller.
+ *
+ * A missing value (null/undefined, or a non-finite number) is NOT comparable.
+ * A snapshot saved before the word count was captured has no basis for a band,
+ * and inventing one from the scene count alone is the exact bug above.
+ */
+export function percentileIsComparable(
+  sceneCount: number | null | undefined,
+  wordCount: number | null | undefined,
+): boolean {
+  if (typeof sceneCount !== 'number' || !Number.isFinite(sceneCount)) return false;
+  if (typeof wordCount !== 'number' || !Number.isFinite(wordCount)) return false;
+  return sceneCount >= REFERENCE_MIN_SCENES && sceneCount <= REFERENCE_MAX_SCENES
+    && wordCount >= REFERENCE_MIN_WORDS && wordCount <= REFERENCE_MAX_WORDS;
+}
+
+/** The sentence that replaces a band when the draft is outside the bounds —
+ *  the same slot healthPercentileSentence fills, so a surface swaps one for the
+ *  other rather than hiding the row and leaving a reader wondering. */
+export function notComparableSentence(): string {
+  return 'Health percentile: not comparable \u2014 this draft is outside the bounds of the '
+    + `${REFERENCE_SET_LABEL} (${referenceBoundsLine()})`;
+}
+
+/** The compact not-comparable note, for the space-constrained list rows
+ *  compactPercentileNote serves. Same slot, same swap. */
+export function compactNotComparableNote(): string {
+  return `not comparable \u2014 outside the ${REFERENCE_SET_LABEL}'s bounds (${referenceBoundsLine()})`;
+}
+
 /** Ordinal suffix ("1st", "2nd", "3rd", "4th"…) — handles the 11-13 teens
  *  exception (11th/12th/13th, not 11st/12nd/13rd). */
 export function ordinal(n: number): string {

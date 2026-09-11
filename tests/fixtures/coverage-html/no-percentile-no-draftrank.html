@@ -34,6 +34,14 @@
       padding-bottom: 18px;
       margin-bottom: 28px;
     }
+    /* The header's single remaining cell. It was one of two (the other held the
+       verdict stamp, which moved into the producer tier on 2026-09-11) and had
+       no rule of its own because the flex parent positioned it. It gets one now
+       so the header's one child fills the row instead of leaving the old
+       space-between gap on the right, and so no class in this document is
+       rendered without a rule — see the "no dead class selectors" case in
+       tests/core/coverage-html.test.ts, which checks both directions. */
+    .header-main { flex: 1 1 auto; min-width: 0; }
     .masthead {
       font-family: 'Courier New', Courier, monospace;
       font-size: 12px;
@@ -65,10 +73,14 @@
       color: #27272a;
       margin-top: 8px;
     }
-    .stamp-wrap {
-      flex: 0 0 auto;
-      padding-top: 4px;
-    }
+    /* The .stamp-wrap rule lived here until 2026-09-11. It was the header's
+       right-hand flex cell for the verdict stamp; the stamp moved into the
+       producer tier (see verdictStampHtml / reader-tier.ts) and the header no
+       longer emits the wrapper, so the rule had no element to style. Removed
+       rather than left behind, with proof: the "no dead class selectors" case in
+       tests/core/coverage-html.test.ts asserts that stamp-wrap appears in
+       NEITHER the stylesheet nor any rendered report, and that every other
+       header and tier class appears in BOTH. */
     .stamp {
       font-family: 'Courier New', Courier, monospace;
       font-weight: 700;
@@ -373,6 +385,99 @@
       border-radius: 3px;
       word-break: break-all;
     }
+    /* ── Producer tier (2026-09-11) ── one printed page above the full report */
+    .reader-tier {
+      border: 2px solid #18181b;
+      padding: 18px 20px 20px;
+      margin-bottom: 22px;
+    }
+    .tier-label {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      color: #52525b;
+    }
+    .tier-caption {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11.5px;
+      color: #52525b;
+      margin: 4px 0 12px;
+    }
+    .tier-facts {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      color: #18181b;
+      display: grid;
+      gap: 6px;
+      margin: 12px 0 10px;
+    }
+    .tier-facts .stamp {
+      font-size: 12px;
+      padding: 3px 9px;
+      border-width: 2px;
+      transform: none;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .tier-key {
+      display: inline-block;
+      min-width: 72px;
+      color: #52525b;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 11px;
+    }
+    .tier-bounds {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11.5px;
+      color: #52525b;
+      margin: 0 0 6px;
+    }
+    .tier-heading {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border-bottom: 1px solid #d4d4d8;
+      padding-bottom: 4px;
+      margin: 14px 0 10px;
+    }
+    .tier-list {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .tier-item { margin-bottom: 10px; }
+    .tier-item-head {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 3px;
+    }
+    .tier-item-where {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .tier-page {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11.5px;
+      color: #52525b;
+      white-space: nowrap;
+    }
+    .tier-item-body { font-size: 13px; }
+    .tier-empty {
+      font-size: 13px;
+      color: #52525b;
+      margin: 0;
+    }
+    .tier-divider {
+      border: 0;
+      border-top: 3px double #18181b;
+      margin: 0 0 24px;
+    }
     /* ── Print ── */
     @page {
       size: letter portrait;
@@ -384,6 +489,11 @@
       .stamp { box-shadow: none; }
       .health-section { border: 1px solid #d4d4d8; }
       .section { page-break-inside: avoid; break-inside: avoid; }
+      /* The tier is its own sheet: the full report starts on page two, so a
+         producer who prints one page gets the whole summary and nothing half of
+         it. The divider is then redundant in print and is hidden. */
+      .reader-tier { break-after: page; page-break-after: always; break-inside: avoid; }
+      .tier-divider { display: none; }
     }
 
 </style>
@@ -397,18 +507,52 @@
       <h1 class="title">The Long Wait</h1>
 
       <div class="meta-line">
-        July 5, 2026 &middot;
-        3 scenes &middot;
-        540 words
-      </div>
-
-    </div>
-    <div class="stamp-wrap">
-      <div class="stamp" style="background:#fffaf0; border-color:#b45309; color:#78350f;">
-        CONSIDER
+        July 5, 2026
       </div>
     </div>
   </header>
+
+  <section class="reader-tier">
+    <div class="tier-label">READER SUMMARY</div>
+    <p class="tier-caption">One page for a reader deciding whether to read the script. The complete report follows.</p>
+    <p class="logline-line">No logline was derived &mdash; no single speaker holds enough of this script&rsquo;s dialogue for one.</p>
+    <div class="tier-facts">
+      <div><span class="tier-key">Length</span> 3 scenes · 540 words</div>
+      <div><span class="tier-key">Verdict</span> <span class="stamp" style="background:#fffaf0; border-color:#b45309; color:#78350f;">CONSIDER</span> &middot; Health 72.5 / 100</div>
+    </div>
+    <p class="tier-bounds">Reference bounds: 20 samples / 9–10 scenes / 256–337 words.</p>
+    <h2 class="tier-heading">The 3 things to fix first</h2>
+    <ol class="tier-list">
+      <li class="tier-item">
+        <div class="tier-item-head">
+          <span class="chip chip-critical">CRITICAL</span>
+          <span class="tier-item-where">Scene 2 (INT. BAR)</span>
+
+        </div>
+        <div class="tier-item-body">Dialogue states the theme directly instead of dramatizing it.</div>
+      </li>
+
+      <li class="tier-item">
+        <div class="tier-item-head">
+          <span class="chip chip-major">MAJOR</span>
+          <span class="tier-item-where">Scene 1 (INT. HOME)</span>
+
+        </div>
+        <div class="tier-item-body">This character&#39;s voice reads flat compared to earlier scenes.</div>
+      </li>
+
+      <li class="tier-item">
+        <div class="tier-item-head">
+          <span class="chip chip-minor">MINOR</span>
+          <span class="tier-item-where">Scene 3 (EXT. STREET)</span>
+
+        </div>
+        <div class="tier-item-body">Filler dialogue slows the scene down.</div>
+      </li>
+    </ol>
+    <p class="tier-bounds">Page numbers are unavailable for this report (it was rendered without the script text).</p>
+  </section>
+  <hr class="tier-divider" />
 
   <section class="section health-section">
     <div class="health-score-block">
@@ -476,7 +620,8 @@
   </section>
 
   <section class="section">
-    <h2>What&rsquo;s Working</h2>
+    <h2>Checks That Found Nothing</h2>
+    <p class="dim-basis" style="margin:0 0 12px;">Each line below is a check that did not fire — the absence of a finding, not a judgment that the draft is working. These do not offset the dimension scores above.</p>
     <ul class="checklist">
       <li>Nothing to fix in Character — clean across all 3 scene(s).</li>
 <li>No fatal flaws surfaced across 3 scenes — nothing here would sink the draft outright.</li>
@@ -496,7 +641,7 @@
 
 
   <section class="section">
-    <h2>Top Priorities</h2>
+    <h2>The 3 things to fix first</h2>
     <ol class="priority-list">
 
     <li class="priority-item">

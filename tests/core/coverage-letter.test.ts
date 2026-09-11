@@ -26,6 +26,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderCoverageLetter } from '../../server/lib/coverage-letter.ts';
+import {
+  healthPercentileSentence, notComparableSentence, percentileIsComparable,
+} from '../../src/lib/percentile-copy.ts';
 import { draftRankDenominatorLabel } from '../../src/lib/draft-rank-copy.ts';
 import type {
   ScriptDoctorReport, CoverageVerdict, DoctorGrade, RootCauseFinding, ReportProvenance,
@@ -301,12 +304,36 @@ describe('renderCoverageLetter — shape and wording', () => {
     assert.match(text, /deterministic read/i);
   });
 
-  it('states the percentile caveat only when healthPercentile is present', () => {
-    const withPct = renderCoverageLetter(buildReport({ healthPercentile: 42 })).markdown;
-    assert.match(withPct, /42(nd|st|rd|th)? percentile/);
+  it('states the percentile reading only when healthPercentile is present', () => {
+    const report = buildReport({ healthPercentile: 42 });
+    const withPct = renderCoverageLetter(report).markdown;
+    const expected = percentileIsComparable(report.sceneCount, report.wordCount)
+      ? healthPercentileSentence(42)
+      : notComparableSentence();
+    assert.ok(withPct.includes(expected), `must state "${expected}"`);
 
     const withoutPct = renderCoverageLetter(buildReport({ healthPercentile: undefined })).markdown;
-    assert.ok(!withoutPct.includes('percentile'));
+    assert.ok(!withoutPct.includes('Health percentile'));
+  });
+
+  // ── #12: ONE WORDING, EXACTLY TWICE ────────────────────────────────────────
+  // The letter carries the percentile in two places — the producer tier at the
+  // top, and the "How to Read This Report" caveat at the bottom. Before
+  // 2026-09-11 those were two different sentences about one number: the tier's
+  // band ("top 20%") and a hand-written ordinal ("ranks in the 82nd percentile
+  // against a fixed, 20-sample …"). They are now the same string, and this test
+  // counts it: two occurrences, no more (a third would mean a renderer added a
+  // copy), no fewer (one would mean a surface dropped it).
+  it('states the percentile in ONE wording, exactly twice — the tier and the caveat', () => {
+    const report = buildReport({ healthPercentile: 42 });
+    const { markdown, text } = renderCoverageLetter(report);
+    const expected = percentileIsComparable(report.sceneCount, report.wordCount)
+      ? healthPercentileSentence(42)
+      : notComparableSentence();
+    for (const [label, doc] of [['markdown', markdown], ['text', text]] as const) {
+      const occurrences = doc.split(expected).length - 1;
+      assert.equal(occurrences, 2, `${label} states the percentile ${occurrences} time(s), expected exactly 2`);
+    }
   });
 
   // ── draftRank (2026-09-04) — second, honest denominator alongside the
@@ -325,7 +352,8 @@ describe('renderCoverageLetter — shape and wording', () => {
       { title: 'X', draftRank: { rank: 2, of: 5 } },
     );
     // Both denominators present — this is additive, not a replacement.
-    assert.match(markdown, /42(nd|st|rd|th)? percentile/);
+    assert.ok(markdown.includes('Health percentile: ') || markdown.includes('Health percentile: not comparable'),
+      'the reference-set reading must still be stated');
     assert.match(markdown, /ranks 2nd of 5 by health/);
     assert.match(markdown, /not to the reference set above or to any other writer/i);
   });
@@ -647,12 +675,23 @@ describe('renderCoverageLetter — honesty (no number outruns the report)', () =
     assert.match(markdown, new RegExp(`${report.sceneCount} scenes?\\b`));
     assert.match(markdown, new RegExp(`${report.wordCount} words?\\b`));
 
-    // Percentile, if stated, must equal Math.round(report.healthPercentile).
-    const pctMatch = markdown.match(/ranks in the (\d+)(?:st|nd|rd|th) percentile/);
-    if (pctMatch) {
-      assert.equal(Number(pctMatch[1]), Math.round(report.healthPercentile as number));
+    // 2026-09-11 (producer-tier discovery #12): the letter states a BAND, or the
+    // not-comparable sentence, never an ORDINAL — the tier at the top of the same
+    // letter says "top 20%", and an ordinal beside it claims a resolution 20
+    // samples cannot support. Asserted as the EXACT sentence
+    // src/lib/percentile-copy.ts produces for this report, which pins the wording
+    // as well as the digits.
+    if (typeof report.healthPercentile === 'number') {
+      const expected = percentileIsComparable(report.sceneCount, report.wordCount)
+        ? healthPercentileSentence(report.healthPercentile)
+        : notComparableSentence();
+      assert.ok(markdown.includes(expected), `letter must state "${expected}"`);
+      assert.doesNotMatch(markdown, /percentile against a fixed/,
+        'the pre-2026-09-11 hand-written ordinal sentence must be gone');
+      assert.doesNotMatch(markdown, /ranks in the \d+(?:st|nd|rd|th) percentile/,
+        'no ordinal percentile anywhere in the letter');
     } else {
-      assert.equal(typeof report.healthPercentile, 'undefined');
+      assert.ok(!markdown.includes('Health percentile'), 'no percentile claim without a percentile');
     }
 
     // Every "Subsumes N issue(s)" figure must equal some rootCauses[].memberCount.

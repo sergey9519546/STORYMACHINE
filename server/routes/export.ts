@@ -416,6 +416,10 @@ router.post('/api/export/coverage', gameLimiter, validate(CoverageBodySchema), a
       titlePageAuthor: titlePage.author,
       logline,
       draftRank,
+      // 2026-09-11: the exact text this report was produced from, so the producer
+      // tier's findings carry PAGE numbers resolved through the same paginator
+      // the PDF export uses (server/lib/page-refs.ts). Not re-analyzed here.
+      fountain,
     });
 
     const filename = `${encodeURIComponent(title)}-coverage.html`;

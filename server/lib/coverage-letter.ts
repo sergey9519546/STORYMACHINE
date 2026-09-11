@@ -73,7 +73,9 @@ import { computeStructuralReliabilityNote } from './structural-reliability.ts';
 // coverage-html.ts's/slate.ts's own percentile-copy.ts imports — so this is
 // an established pattern, not a new one; it does not touch the scoring path
 // (no import edge to/from doctor.ts either direction).
-import { ordinal, REFERENCE_SET_SIZE, REFERENCE_SET_LABEL } from '../../src/lib/percentile-copy.ts';
+import {
+  ordinal, healthPercentileSentence, notComparableSentence, percentileIsComparable,
+} from '../../src/lib/percentile-copy.ts';
 // Shared draft-rank denominator copy (2026-09-05 review round 2) — same
 // established cross-import pattern as percentile-copy.ts above, fixing the
 // same class of bug: this file used to hand-write "your own saved drafts of
@@ -87,6 +89,17 @@ import { ACTION_PROSE_VARIATION_LABEL_LOWER, formatSignalValue } from '../../src
 // ONE root-cause ordering and wording (2026-09-11) — see
 // server/lib/root-cause-pipeline.ts.
 import { rootCauseStatements, topRootCauses } from './root-cause-pipeline.ts';
+// The producer tier (2026-09-11) — see server/lib/reader-tier.ts. The letter gets
+// the SAME tier the exported HTML opens with, built from one ReaderTierData.
+import {
+  buildReaderTier, renderReaderTierMarkdown, renderReaderTierText, type ReaderTierData,
+} from './reader-tier.ts';
+// ONE priorities heading across the panel, the exported HTML, this letter and the
+// tier — see src/lib/priorities-copy.ts.
+import { prioritiesHeadingFor, prioritiesHeadingUpper } from '../../src/lib/priorities-copy.ts';
+// ONE title and caption for the checks-that-found-nothing section, shared with
+// the exported coverage HTML (2026-09-11, discovery #8).
+import { STRENGTHS_SECTION_TITLE, STRENGTHS_SECTION_CAPTION } from './strengths-copy.ts';
 
 export interface CoverageLetterOptions {
   title?: string;
@@ -108,6 +121,19 @@ export interface CoverageLetterOptions {
    *  many OTHER saved records exist with no health at all — a bare `of`
    *  figure silently drops them from the count entirely. */
   draftRank?: { rank: number; of: number; tied?: boolean; unscored?: number };
+  /** 2026-09-11 — the deterministic logline (server/lib/logline.ts's
+   *  buildLogline), for the producer tier this letter now opens with. Caller-
+   *  supplied for the same reason title/author are: this module is report-derived
+   *  and has no Fountain text of its own to build one from. null/omitted and the
+   *  tier states that no logline was derived, rather than dropping the line. */
+  logline?: string | null;
+  /** 2026-09-11 — the EXACT Fountain text the report was produced from, used for
+   *  ONE thing: resolving the tier's page references through the same paginator
+   *  the PDF export uses (server/lib/page-refs.ts). Nothing is re-analyzed and no
+   *  number is re-derived from it, so the letter stays a pure function of the
+   *  report plus its options. Omitted, the tier renders every other fact and says
+   *  page numbers are unavailable. */
+  fountain?: string;
 }
 
 export interface CoverageLetterResult {
@@ -175,6 +201,11 @@ interface ListEntry {
 interface LetterData {
   title: string;
   author: string | null;
+  /** The producer tier (2026-09-11, discovery #11) — the same one-page reader
+   *  summary the exported coverage HTML opens with, rendered from the SAME
+   *  ReaderTierData so the two documents cannot state a different logline,
+   *  length, verdict, percentile or leading finding for one script. */
+  tier: ReaderTierData;
   verdictLine: string;
   headline: string;
   summary: string;
@@ -266,11 +297,25 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
     + 'engine again reproduces the same score and verdict.',
   ];
 
+  // 2026-09-11 (producer-tier discovery #12): this sentence used to state an
+  // ORDINAL ("ranks in the 82nd percentile") while the producer tier at the top of
+  // the same letter — and the in-app panel, and the exported coverage HTML —
+  // stated a BAND ("top 20%"). One reading, two precisions, in one document: the
+  // ordinal claims a resolution 20 samples cannot support, which is exactly the
+  // D5 false-precision finding src/lib/percentile-copy.ts's percentileBand exists
+  // to fix. The caveat now renders the SAME sentence the tier does, so the letter
+  // carries one wording, exactly twice — pinned by
+  // tests/core/coverage-letter.test.ts.
+  //
+  // It also honours the comparability gate: a draft outside the reference set's
+  // bounds gets the not-comparable sentence rather than a band that is really
+  // measuring length (see percentileIsComparable).
   if (typeof report.healthPercentile === 'number') {
+    const reading = percentileIsComparable(report.sceneCount, report.wordCount)
+      ? healthPercentileSentence(report.healthPercentile)
+      : notComparableSentence();
     caveats.push(
-      `Health ranks in the ${ordinal(Math.round(report.healthPercentile))} percentile against a fixed, `
-      + `${REFERENCE_SET_SIZE}-sample, ${REFERENCE_SET_LABEL} — not against other scripts you might send it, `
-      + 'and not a market comparison.',
+      `${reading} — not against other scripts you might send it, and not a market comparison.`,
     );
   }
 
@@ -422,6 +467,7 @@ function buildLetterData(report: ScriptDoctorReport, opts: CoverageLetterOptions
   return {
     title,
     author,
+    tier: buildReaderTier(report, { logline: opts.logline, fountain: opts.fountain }),
     verdictLine,
     headline: buildHeadline(report),
     summary,
@@ -444,6 +490,11 @@ function renderMarkdown(d: LetterData): string {
   lines.push(`# ${d.title}`);
   if (d.author) lines.push(`*Written by ${d.author}*`);
   lines.push('');
+  // The producer tier, then a divider, then the letter unchanged (2026-09-11).
+  lines.push(renderReaderTierMarkdown(d.tier));
+  lines.push('');
+  lines.push('---');
+  lines.push('');
   lines.push(`**Verdict: ${d.verdictLine}**`);
   lines.push('');
   lines.push(d.headline);
@@ -458,7 +509,9 @@ function renderMarkdown(d: LetterData): string {
 
   if (d.strengths.length > 0) {
     lines.push('');
-    lines.push('## What’s Working');
+    lines.push(`## ${STRENGTHS_SECTION_TITLE}`);
+    lines.push('');
+    lines.push(`*${STRENGTHS_SECTION_CAPTION}*`);
     lines.push('');
     for (const s of d.strengths) lines.push(`- ${s}`);
   }
@@ -474,7 +527,7 @@ function renderMarkdown(d: LetterData): string {
 
   if (d.priorities.length > 0) {
     lines.push('');
-    lines.push('## Priorities to Address First');
+    lines.push(`## ${prioritiesHeadingFor(d.priorities.length)}`);
     lines.push('');
     d.priorities.forEach((p, i) => {
       lines.push(`${i + 1}. **${p.heading}** — ${p.body}`);
@@ -501,6 +554,10 @@ function renderText(d: LetterData): string {
   lines.push(d.title.toUpperCase());
   if (d.author) lines.push(`Written by ${d.author}`);
   lines.push('');
+  lines.push(renderReaderTierText(d.tier));
+  lines.push('');
+  lines.push('----------------------------------------');
+  lines.push('');
   lines.push(`VERDICT: ${d.verdictLine}`);
   lines.push(d.headline);
   lines.push('');
@@ -514,8 +571,9 @@ function renderText(d: LetterData): string {
 
   if (d.strengths.length > 0) {
     lines.push('');
-    lines.push('WHAT’S WORKING');
-    lines.push('----------------');
+    lines.push(STRENGTHS_SECTION_TITLE.toUpperCase());
+    lines.push('-'.repeat(STRENGTHS_SECTION_TITLE.length));
+    lines.push(STRENGTHS_SECTION_CAPTION);
     for (const s of d.strengths) lines.push(`- ${s}`);
   }
 
@@ -530,8 +588,8 @@ function renderText(d: LetterData): string {
 
   if (d.priorities.length > 0) {
     lines.push('');
-    lines.push('PRIORITIES TO ADDRESS FIRST');
-    lines.push('----------------------------');
+    lines.push(prioritiesHeadingUpper(d.priorities.length));
+    lines.push('-'.repeat(prioritiesHeadingFor(d.priorities.length).length));
     d.priorities.forEach((p, i) => {
       lines.push(`${i + 1}. ${p.heading} — ${p.body}`);
     });

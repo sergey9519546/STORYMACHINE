@@ -13,10 +13,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { renderCoverageHtml } from '../../server/lib/coverage-html.ts';
+import { prioritiesHeadingFor } from '../../src/lib/priorities-copy.ts';
 import { computeStructuralReliabilityNote } from '../../server/lib/structural-reliability.ts';
 import type {
   ScriptDoctorReport, DimensionScore, CoverageVerdict, DoctorGrade, RootCauseFinding,
@@ -25,6 +26,22 @@ import type { StructureState } from '../../server/nvm/screenplay/structure.ts';
 import type { PassName, RevisionIssue } from '../../server/nvm/revision/passes/types.ts';
 
 const FIXED_ANALYZED_AT = Date.UTC(2026, 6, 5, 12, 0, 0); // 2026-07-05T12:00:00Z
+
+/** Index of the priorities section's heading, whatever count it renders for.
+ *
+ *  The heading is derived from the number of priorities that SURVIVE
+ *  suppressContradictoryFindings, which this test file deliberately does not
+ *  re-implement — so the lookup asks prioritiesHeadingFor for every plausible
+ *  count instead of hardcoding one. Returns -1 when no priorities heading is
+ *  present at all, so an order assertion against it fails rather than passing on
+ *  a coincidence. */
+function prioritiesHeadingIdx(html: string): number {
+  for (let n = 0; n <= 20; n++) {
+    const at = html.indexOf(`<h2>${prioritiesHeadingFor(n)}</h2>`);
+    if (at >= 0) return at;
+  }
+  return -1;
+}
 
 function baseStructure(): StructureState {
   return {
@@ -191,8 +208,12 @@ describe('renderCoverageHtml — full document shape', () => {
     // Scene heatmap tooltip carries the (escaped) scene slug.
     assert.match(html, /INT\. BAR - NIGHT/);
 
-    // Top priorities and per-pass appendix both rendered.
-    assert.match(html, /Top Priorities/);
+    // Top priorities and per-pass appendix both rendered. The heading is the ONE
+    // shared implementation (src/lib/priorities-copy.ts) every renderer uses —
+    // asserted through that function rather than as a literal, so a rename
+    // cannot leave this test matching wording nothing renders any more.
+    assert.ok(html.includes(prioritiesHeadingFor(report.topPriorities!.length)),
+      `missing the shared priorities heading "${prioritiesHeadingFor(report.topPriorities!.length)}"`);
     assert.match(html, /Full Pass Appendix/);
     assert.match(html, /Give the character a distinct verbal tic\./);
   });
@@ -246,11 +267,22 @@ describe('renderCoverageHtml — full document shape', () => {
     assert.ok(!html.includes('class="checklist"'), 'the checklist markup itself must not render when strengths is empty');
   });
 
-  it('includes the "What\'s Working" section when strengths is non-empty', () => {
+  // 2026-09-11 (producer-tier discovery #8): this section was headed "What's
+  // Working", which a reader takes as the report arguing the draft works — in a
+  // document whose own summary can say "overall score 84/100" with a dimension at
+  // 0/100. doctor.ts's buildStrengths emits one entry per CHECK THAT DID NOT
+  // FIRE, so the honest title is what the list is. Every entry is kept; only the
+  // framing changed (the contradiction itself is in buildPlainSummary/
+  // buildStrengths, on the scoring path, and is not this lane's to touch).
+  it('titles the strengths section "Checks That Found Nothing" and captions what the list is', () => {
     const report = buildReport();
     const html = renderCoverageHtml(report, 'Has Strengths');
 
-    assert.ok(html.includes('What&rsquo;s Working'));
+    assert.ok(html.includes('Checks That Found Nothing'));
+    assert.ok(!html.includes('What&rsquo;s Working'), 'the praise framing must be gone');
+    assert.match(html, /a check that did not fire/);
+    assert.match(html, /do not offset the dimension scores above/);
+    // Every entry still rendered — nothing was dropped with the retitle.
     assert.match(html, /Nothing to fix in Character/);
   });
 
@@ -324,10 +356,17 @@ describe('renderCoverageHtml — full document shape', () => {
     assert.ok(!/<script>alert\(1\)<\/script>/.test(html));
   });
 
-  it('omits the logline line entirely when no logline is provided', () => {
+  // 2026-09-11: the logline moved out of the header into the producer tier, and
+  // the tier STATES its absence rather than omitting the slot. A producer reading
+  // a summary with no logline cannot otherwise tell whether the engine failed,
+  // the feature is missing, or the script genuinely has no protagonist — which is
+  // what the dialogue-share gate (server/lib/logline.ts) actually decided.
+  it('states WHY no logline was derived instead of silently dropping the line', () => {
     const report = buildReport();
     const html = renderCoverageHtml(report, 'The Long Wait');
-    assert.ok(!html.includes('class="logline-line"'));
+    assert.ok(html.includes('class="logline-line"'), 'the slot still renders');
+    assert.match(html, /No logline was derived/);
+    assert.match(html, /no single speaker holds enough of this script/);
   });
 
   it('refuses a zero-scene report instead of exporting a fabricated PASS assessment', () => {
@@ -499,12 +538,18 @@ describe('renderCoverageHtml — Root Causes sections', () => {
     assert.ok(!html.includes('Subsumes'), 'no root-cause list markup when nothing clustered');
   });
 
-  it('renders only Root Causes (named) when every rootCause is named, above Top Priorities', () => {
+  // The priorities heading below is looked up through prioritiesHeadingFor
+  // (src/lib/priorities-copy.ts) rather than as a literal "<h2>Top Priorities</h2>":
+  // buildReport()'s topPriorities has 4 entries, and the heading is now derived
+  // from that count, so a literal here would stop matching the moment the shared
+  // wording changed and these ORDER assertions would silently start comparing
+  // against index -1.
+  it('renders only Root Causes (named) when every rootCause is named, above the priorities section', () => {
     const html = renderCoverageHtml(buildReport({ rootCauses: [makeRootCause()] }), 'Named Only');
     assert.match(html, /<h2>Root Causes<\/h2>/);
     assert.ok(!html.includes('<h2>Recurring Issue Clusters</h2>'), 'no generic section when nothing generic clustered');
     const rootCausesIdx = html.indexOf('<h2>Root Causes</h2>');
-    const topPrioritiesIdx = html.indexOf('<h2>Top Priorities</h2>');
+    const topPrioritiesIdx = prioritiesHeadingIdx(html);
     assert.ok(rootCausesIdx >= 0 && topPrioritiesIdx > rootCausesIdx, 'named Root Causes must render BEFORE Top Priorities');
   });
 
@@ -512,7 +557,7 @@ describe('renderCoverageHtml — Root Causes sections', () => {
     const html = renderCoverageHtml(buildReport({ rootCauses: [makeGenericRootCause()] }), 'Generic Only');
     assert.ok(!html.includes('<h2>Root Causes</h2>'), 'no named section when nothing named clustered');
     assert.match(html, /<h2>Recurring Issue Clusters<\/h2>/);
-    const topPrioritiesIdx = html.indexOf('<h2>Top Priorities</h2>');
+    const topPrioritiesIdx = prioritiesHeadingIdx(html);
     const clustersIdx = html.indexOf('<h2>Recurring Issue Clusters</h2>');
     assert.ok(topPrioritiesIdx >= 0 && clustersIdx > topPrioritiesIdx, 'generic clusters must render AFTER Top Priorities');
   });
@@ -544,7 +589,7 @@ describe('renderCoverageHtml — Root Causes sections', () => {
     assert.match(html, /On-the-nose exposition in the office scene/);
 
     const rootCausesIdx = html.indexOf('<h2>Root Causes</h2>');
-    const topPrioritiesIdx = html.indexOf('<h2>Top Priorities</h2>');
+    const topPrioritiesIdx = prioritiesHeadingIdx(html);
     const clustersIdx = html.indexOf('<h2>Recurring Issue Clusters</h2>');
     const appendixIdx = html.indexOf('<h2>Full Pass Appendix</h2>');
     assert.ok(rootCausesIdx >= 0 && topPrioritiesIdx > rootCausesIdx, 'named Root Causes must render before Top Priorities');
@@ -701,14 +746,33 @@ describe('renderCoverageHtml — health percentile and draft rank', () => {
   // adds unconditionally (the exact defect the review found: an always-on
   // `health-text-block` wrapper + two CSS rules, +279 bytes measured on a
   // real export) now fails this test instead of passing silently.
+  //
+  // RE-CAPTURED 2026-09-11. The producer tier (server/lib/reader-tier.ts) adds
+  // markup to every report unconditionally, by design — it is the front page of
+  // the document, not an opt-in field — so the old fixture could not survive it.
+  // The guard is unchanged in what it guards: the fixture is still an INDEPENDENT
+  // byte reference captured from a renderer run with NEITHER healthPercentile nor
+  // draftRank, so an unconditional addition by the percentile/draft-rank feature
+  // still fails here. Re-capture it after an INTENTIONAL renderer change with
+  //
+  //     CAPTURE_COVERAGE_HTML_FIXTURE=1 node --experimental-strip-types \
+  //       tests/core/coverage-html.test.ts
+  //
+  // and read the diff before committing it. CI never sets that variable, so a
+  // drifting renderer fails rather than quietly rewriting its own reference.
   const FIXTURE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'coverage-html');
+  const FIXTURE_FILE = join(FIXTURE_DIR, 'no-percentile-no-draftrank.html');
 
-  it('renders byte-identical output to the pre-feature (main) renderer when the report/opts carry neither healthPercentile nor draftRank', () => {
-    const fixture = readFileSync(join(FIXTURE_DIR, 'no-percentile-no-draftrank.html'), 'utf8');
+  it('renders byte-identical output to the committed reference when the report/opts carry neither healthPercentile nor draftRank', () => {
     const report = buildReport({ healthPercentile: undefined });
-
     const withNoOpts = renderCoverageHtml(report, 'The Long Wait');
-    assert.equal(withNoOpts, fixture, 'no-opts call must match the pre-feature renderer\'s output byte-for-byte');
+    if (process.env.CAPTURE_COVERAGE_HTML_FIXTURE === '1') {
+      writeFileSync(FIXTURE_FILE, withNoOpts, 'utf8');
+      process.stdout.write(`re-captured ${FIXTURE_FILE} (${Buffer.byteLength(withNoOpts, 'utf8')} bytes)\n`);
+    }
+    const fixture = readFileSync(FIXTURE_FILE, 'utf8');
+
+    assert.equal(withNoOpts, fixture, 'no-opts call must match the committed byte reference');
 
     // Still worth asserting: the explicit `{}` form (a caller who spells out
     // "no options") must produce the exact same output as omitting the
@@ -716,7 +780,7 @@ describe('renderCoverageHtml — health percentile and draft rank', () => {
     // are ALSO pinned against the independent fixture above, not just each
     // other.
     const withEmptyOpts = renderCoverageHtml(report, 'The Long Wait', {});
-    assert.equal(withEmptyOpts, fixture, '{} call must also match the pre-feature renderer\'s output byte-for-byte');
+    assert.equal(withEmptyOpts, fixture, '{} call must also match the committed byte reference');
   });
 
   it('the health section renders NO health-text-block wrapper and NO .health-percentile/.health-text-block CSS when neither field is present', () => {
@@ -978,5 +1042,67 @@ describe('renderCoverageHtml — Shape & Rhythm section, unscored (fewer than 2 
     assert.match(html, /mean talk\/action swing 0\.20/);
     assert.match(html, /action-prose variation 0\.55/);
     assert.ok(!html.includes('needs at least two scenes'));
+  });
+});
+
+// ── No dead class selectors in the header/tier area (2026-09-11) ─────────────
+//
+// The producer tier moved three things out of the report header: the logline, the
+// length line and the verdict stamp. A move like that leaves CSS behind — a rule
+// for a class nothing emits any more — and the previous round of this lane was
+// sent back for exactly that (an orphaned `.logline-line` rule).
+//
+// The rule this test enforces is not "delete what looks unused". It is that for
+// every class in the tracked set, being in the STYLESHEET and being in the
+// RENDERED DOCUMENT are the same answer. That catches both directions: a rule for
+// markup that no longer exists, and markup styled by a rule that was deleted.
+describe('renderCoverageHtml — no dead class selectors in the header and tier', () => {
+  // Classes that are unconditional for a report with strengths, priorities, root
+  // causes and a percentile — i.e. the fixture below. Conditional classes
+  // (chip-critical, health-text-block, tier-page, …) are deliberately NOT here:
+  // their absence is a fact about the input, not dead CSS.
+  const TRACKED = [
+    'report-header', 'header-main', 'masthead', 'title', 'meta-line',
+    'logline-line', 'stamp',
+    'reader-tier', 'tier-label', 'tier-caption', 'tier-facts', 'tier-key',
+    'tier-bounds', 'tier-heading', 'tier-list', 'tier-item', 'tier-item-head',
+    'tier-item-where', 'tier-item-body', 'tier-divider',
+  ];
+  // Classes that must appear in NEITHER, because the elements they styled are
+  // gone. Listed explicitly so deleting a rule is a recorded decision rather than
+  // an invisible one.
+  const RETIRED = ['stamp-wrap'];
+
+  function render(): string {
+    return renderCoverageHtml(
+      buildReport({ healthPercentile: 82, rootCauses: [makeRootCause()] }),
+      'The Long Wait',
+      { logline: 'A clerk finds a ledger and cannot put it down.', draftRank: { rank: 2, of: 5 } },
+    );
+  }
+
+  it('every tracked class appears in BOTH the stylesheet and the markup', () => {
+    const html = render();
+    const styles = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+    const markup = html.slice(html.indexOf('<body>'));
+    for (const cls of TRACKED) {
+      assert.ok(styles.includes(`.${cls} `) || styles.includes(`.${cls},`) || styles.includes(`.${cls}{`)
+        || styles.includes(`.${cls} {`),
+        `.${cls} has no rule in the stylesheet`);
+      assert.ok(markup.includes(`class="${cls}`) || markup.includes(` ${cls}"`) || markup.includes(`"${cls}`),
+        `.${cls} is styled but never rendered — dead CSS`);
+    }
+  });
+
+  it('every retired class appears in NEITHER', () => {
+    const html = render();
+    for (const cls of RETIRED) {
+      // A RULE, not the substring: coverage-html.ts's stylesheet carries a comment
+      // recording that `.stamp-wrap` was removed and why, and a test that forbade
+      // the name outright would forbid writing down the decision.
+      assert.ok(!html.includes(`.${cls} {`), `.${cls} still has a rule in the stylesheet`);
+      assert.ok(!html.includes(`.${cls}{`), `.${cls} still has a rule in the stylesheet`);
+      assert.ok(!html.includes(`class="${cls}"`), `.${cls} is still rendered`);
+    }
   });
 });

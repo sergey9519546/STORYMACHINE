@@ -54,6 +54,10 @@ async function main(): Promise<void> {
     titlePageTitle: titlePage.title,
     titlePageAuthor: titlePage.author,
     logline,
+    // Same as the live route (2026-09-11): the script text, so the producer tier's
+    // page references resolve. Keeping this in step with the route is what makes
+    // the committed sample byte-identical to a real export.
+    fountain: sampleFountain,
   });
 
   mkdirSync(OUT_DIR, { recursive: true });

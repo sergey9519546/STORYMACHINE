@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
   ordinal, percentileBand, exactRankTooltip, healthPercentileSentence, compactPercentileNote,
-  percentileColumnHeaderTooltip, slatePercentileCaption,
+  percentileColumnHeaderTooltip, slatePercentileCaption, notComparableSentence,
   REFERENCE_SET_SIZE, REFERENCE_SET_LABEL,
 } from '../../src/lib/percentile-copy.ts';
 import { renderCoverageHtml } from '../../server/lib/coverage-html.ts';
@@ -153,10 +153,22 @@ describe('percentile-copy.ts — no surface re-implements it', () => {
   // every number (wrong for e.g. 82, which reads "82nd") and the exact
   // "synthetic" drop the review flagged. Now uses the shared ordinal() plus
   // REFERENCE_SET_SIZE/REFERENCE_SET_LABEL for both lines.
-  it('coverage-letter.ts renders its percentile line via the shared ordinal()/REFERENCE_SET_SIZE/REFERENCE_SET_LABEL, not a hand-built "Nth percentile" string', () => {
-    assert.match(coverageLetter, /\$\{ordinal\(Math\.round\(report\.healthPercentile\)\)\}\s*percentile/);
-    assert.match(coverageLetter, /\$\{REFERENCE_SET_SIZE\}-sample, \$\{REFERENCE_SET_LABEL\}/);
-    assert.ok(!/\$\{Math\.round\(report\.healthPercentile\)\}th percentile/.test(coverageLetter), 'the old hardcoded "th" suffix must be gone');
+  // 2026-09-11 (producer-tier discovery #12) — the letter moved one step further
+  // off its own copy. It used to compose the sentence itself from the shared
+  // ordinal()/REFERENCE_SET_SIZE/REFERENCE_SET_LABEL pieces, which fixed the "th"
+  // suffix bug but still left the letter stating an ORDINAL where the producer
+  // tier at the top of the SAME letter stated a BAND. It now calls
+  // healthPercentileSentence / notComparableSentence — the whole sentence, not the
+  // pieces — so the letter carries one wording, exactly twice (pinned by
+  // tests/core/coverage-letter.test.ts).
+  it('coverage-letter.ts renders the WHOLE shared percentile sentence, not a composition of its pieces', () => {
+    assert.match(coverageLetter, /healthPercentileSentence\(report\.healthPercentile\)/);
+    assert.match(coverageLetter, /notComparableSentence\(\)/);
+    assert.match(coverageLetter, /percentileIsComparable\(report\.sceneCount, report\.wordCount\)/);
+    assert.ok(!/\$\{ordinal\(Math\.round\(report\.healthPercentile\)\)\}\s*percentile/.test(coverageLetter),
+      'the hand-composed ordinal percentile sentence must be gone');
+    assert.ok(!/\$\{Math\.round\(report\.healthPercentile\)\}th percentile/.test(coverageLetter),
+      'the old hardcoded "th" suffix must be gone');
   });
 });
 
@@ -191,14 +203,29 @@ describe('percentile-copy.ts — end-to-end: the exported coverage HTML actually
     };
   }
 
-  it('the rendered HTML contains healthPercentileSentence(pct) verbatim, for several inputs', () => {
+  // 2026-09-11: the report has to be INSIDE the reference set's bounds for a band
+  // to be a meaningful reading at all — 10 scenes / 300 words is sample-shaped.
+  // The out-of-band case is the next test, and it is the one that matters for real
+  // drafts.
+  it('the rendered HTML contains healthPercentileSentence(pct) verbatim for an in-band draft, for several inputs', () => {
     for (const pct of [0, 10, 42, 82, 100]) {
-      const html = renderCoverageHtml(minimalReport(pct), 'Consistency Check');
+      const report = { ...minimalReport(pct), sceneCount: 10, wordCount: 300 };
+      const html = renderCoverageHtml(report, 'Consistency Check');
       assert.ok(
         html.includes(healthPercentileSentence(pct)),
         `expected the exported HTML to contain "${healthPercentileSentence(pct)}" for healthPercentile=${pct}`,
       );
     }
+  });
+
+  it('the rendered HTML states NOT COMPARABLE, not a band, for a draft outside the bounds', () => {
+    // minimalReport is 3 scenes / 100 words — under the reference band, the same
+    // way every real draft is over it. A band here would be the defect: the
+    // percentile would be measuring length.
+    const html = renderCoverageHtml(minimalReport(100), 'Consistency Check');
+    assert.ok(html.includes(notComparableSentence()), 'must state the not-comparable sentence');
+    assert.ok(!html.includes(healthPercentileSentence(100)), 'must not state a band it cannot support');
+    assert.ok(!html.includes('Exact rank:'), 'and no exact-rank tooltip either');
   });
 });
 
@@ -336,16 +363,40 @@ describe('percentile-copy.ts — end-to-end: the exported coverage LETTER uses t
     };
   }
 
-  it('carries the shared REFERENCE_SET_LABEL ("hand-authored synthetic reference set") and the correct ordinal suffix, for several inputs', () => {
-    // 82 is the case that would have exposed the old hardcoded-"th" bug
-    // ("82th" instead of "82nd") had this test existed before the fix.
+  // 2026-09-11 (producer-tier discovery #12): the letter no longer states an
+  // ORDINAL at all. It states the same BAND sentence the producer tier at the top
+  // of the letter states — or, for a draft outside the reference set's bounds, the
+  // not-comparable sentence. The ordinal was both a false precision on 20 samples
+  // and a second wording for one number in one document.
+  //
+  // letterReport is 3 scenes / 100 words, i.e. OUT of the reference band, which is
+  // the case every real draft is in; the in-band case is asserted below it.
+  it('carries the shared not-comparable sentence for an out-of-band draft, at every percentile', () => {
     for (const pct of [1, 2, 3, 11, 12, 13, 82, 90, 100]) {
       const { markdown } = renderCoverageLetter(letterReport(pct), { title: 'Consistency Check' });
-      const expectedFragment = `ranks in the ${ordinal(pct)} percentile against a fixed, ${REFERENCE_SET_SIZE}-sample, ${REFERENCE_SET_LABEL}`;
       assert.ok(
-        markdown.includes(expectedFragment),
-        `expected the coverage letter to contain "${expectedFragment}" for healthPercentile=${pct} — got: ${markdown}`,
+        markdown.includes(notComparableSentence()),
+        `expected the coverage letter to state the not-comparable sentence for healthPercentile=${pct}`,
       );
+      assert.ok(
+        !/ranks in the \d+(?:st|nd|rd|th) percentile/.test(markdown),
+        'no ordinal percentile anywhere in the letter',
+      );
+    }
+  });
+
+  it('carries the shared BAND sentence, and the correct band, for an in-band draft', () => {
+    for (const pct of [1, 42, 82, 90, 100]) {
+      const report = { ...letterReport(pct), sceneCount: 10, wordCount: 300 };
+      const { markdown } = renderCoverageLetter(report, { title: 'Consistency Check' });
+      assert.ok(
+        markdown.includes(healthPercentileSentence(pct)),
+        `expected "${healthPercentileSentence(pct)}" for healthPercentile=${pct} — got: ${markdown}`,
+      );
+      // The shared label survives the move: this is the qualifier that stops the
+      // percentile reading as a comparison against real scripts.
+      assert.ok(markdown.includes(REFERENCE_SET_LABEL));
+      assert.ok(markdown.includes(`${REFERENCE_SET_SIZE}-sample`));
     }
   });
 });

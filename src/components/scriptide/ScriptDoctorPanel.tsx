@@ -97,6 +97,14 @@ import {
 // server/lib/genre-router.ts); this module is pure, server-free and has no
 // scoring-path edge.
 import { formatSceneList } from "../../../server/lib/scene-ranges.ts";
+// ONE priorities heading across this panel, the exported coverage HTML, the
+// coverage letter and the producer tier (2026-09-11).
+import { prioritiesHeadingFor } from "../../lib/priorities-copy.ts";
+// ONE title and caption for the checks-that-found-nothing section (2026-09-11,
+// discovery #8) — see server/lib/strengths-copy.ts for why the framing changed.
+import {
+  STRENGTHS_SECTION_TITLE, STRENGTHS_SECTION_CAPTION,
+} from "../../../server/lib/strengths-copy.ts";
 import { FindingJump } from "./FindingJump.tsx";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -5377,13 +5385,22 @@ export default function ScriptDoctorPanel({
               </div>
             )}
 
-            {/* What's working — deterministic, earned strengths. Never padded,
-                so this only renders when there's something real to say. */}
+            {/* Checks that found nothing — deterministic, never padded, so this
+                only renders when something real did not fire. 2026-09-11
+                (discovery #8): this was headed "What's Working", which reads as
+                the panel arguing the draft works in a report whose overall score
+                and dimension scores can contradict each other. The title and the
+                caption are the ONE shared wording the exported HTML and the
+                letter use — see server/lib/strengths-copy.ts. Every entry is
+                kept. */}
             {reportIsComplete && report.strengths && report.strengths.length > 0 && (
               <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-[var(--sm-ink-mute)]">
-                  What&rsquo;s Working
+                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-[var(--sm-ink-mute)]">
+                  {STRENGTHS_SECTION_TITLE}
                 </h3>
+                <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug mb-2">
+                  {STRENGTHS_SECTION_CAPTION}
+                </p>
                 {/* a11y fix (2026-09-06, theme-convention gate): this list
                     sits directly on the invariant panel — no dark:bg-
                     ancestor anywhere above it — so the row's own
@@ -5622,11 +5639,17 @@ export default function ScriptDoctorPanel({
               </div>
             )}
 
-            {/* Top priorities */}
+            {/* The things to fix first. 2026-09-11: the heading comes from the
+                ONE shared implementation (src/lib/priorities-copy.ts) the
+                exported coverage HTML, the coverage letter and the producer tier
+                also use. "Top Priorities" was plural no matter how many items
+                followed, so a draft with exactly one — which the 1-scene inert
+                draft in this repository has — promised a list and delivered a
+                line. */}
             {report.topPriorities.length > 0 && (
               <div>
                 <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-[var(--sm-ink-mute)]">
-                  Top Priorities
+                  {prioritiesHeadingFor(report.topPriorities.length)}
                 </h3>
                 <div className="space-y-2">
                   {report.topPriorities.map((issue, i) => (

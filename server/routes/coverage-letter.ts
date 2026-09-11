@@ -39,7 +39,8 @@ import type { ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
 import { runScriptDoctorForRequest } from '../lib/doctor-request.ts';
 import { renderCoverageLetter } from '../lib/coverage-letter.ts';
-import { extractTitlePage } from '../lib/logline.ts';
+import { extractTitlePage, buildLogline } from '../lib/logline.ts';
+import { analyzeFountainText } from '../nvm/analyze/fountain-analyzer.ts';
 import { buildRootCausePipeline } from '../lib/root-cause-pipeline.ts';
 
 const router = express.Router();
@@ -136,9 +137,17 @@ router.post('/api/export/coverage-letter', gameLimiter, validate(CoverageLetterB
     // the panel for the same script.
     const { rootCauses } = buildRootCausePipeline(report, fountain);
 
+    // 2026-09-11: the letter now opens with the same producer tier the exported
+    // coverage HTML does, which needs a logline and the script text (for page
+    // references). buildLogline is the same deterministic builder POST
+    // /api/export/coverage calls, over the same records — so the two documents
+    // cannot open with different loglines for one script.
+    const { records } = analyzeFountainText(fountain);
+    const logline = buildLogline(report, records, fountain);
+
     const { markdown, text } = renderCoverageLetter(
       { ...report, rootCauses },
-      { title: resolvedTitle, author: resolvedAuthor, draftRank },
+      { title: resolvedTitle, author: resolvedAuthor, draftRank, logline, fountain },
     );
 
     res.json({ markdown, text, contentHash: report.contentHash ?? null });
