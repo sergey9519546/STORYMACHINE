@@ -53,10 +53,57 @@ describe('buildReaderTier — the facts it states', () => {
     assert.equal(tier.healthLine, `Health ${report.health.toFixed(1)} / 100`);
   });
 
-  it('always carries the reference bounds, derived from the calibration corpus', () => {
-    const tier = buildReaderTier(report);
+  // ROUND 2 (2026-09-11) — the bounds are stated ONCE per page, and never zero
+  // times. The not-comparable sentence already ends in
+  // "(20 samples / 9-10 scenes / 256-337 words)", so the separate "Reference
+  // bounds:" line under it put the identical string on the producer's first page
+  // twice, a centimetre apart — round-1 item 2 ("no fact rendered twice on the
+  // producer's first page") broken by the code that implements the confidence
+  // line. MEASURED: 0 of the 20 CC0 shorts are inside the band, so the doubled
+  // path was the one every real draft took.
+  it('states the bounds ONCE: via the percentile sentence when that already carries them', () => {
+    const outOfBand = { ...report, sceneCount: 231, wordCount: 19293, healthPercentile: 100 };
+    const tier = buildReaderTier(outOfBand);
+    assert.equal(tier.percentileLine, notComparableSentence());
+    assert.ok(tier.percentileLine!.includes(referenceBoundsLine()), 'the sentence carries the bounds');
+    assert.equal(tier.boundsLine, null, 'so the separate line must not render');
+    for (const doc of [
+      renderReaderTierMarkdown(tier), renderReaderTierText(tier), renderReaderTierHtml(tier, identity),
+    ]) {
+      assert.equal(doc.split(referenceBoundsLine()).length - 1, 1,
+        'the bounds string must appear exactly once in the tier');
+      assert.ok(!doc.includes('Reference bounds:'), 'and the labelled line must be gone');
+    }
+  });
+
+  it('states the bounds ONCE: via its own line when the percentile sentence does not carry them', () => {
+    const inBand = { ...report, sceneCount: 10, wordCount: 300, healthPercentile: 42 };
+    const tier = buildReaderTier(inBand);
+    assert.equal(tier.percentileLine, healthPercentileSentence(42));
+    assert.ok(!tier.percentileLine!.includes(referenceBoundsLine()));
     assert.equal(tier.boundsLine, referenceBoundsLine());
-    assert.match(tier.boundsLine, /^\d+ samples \/ .+ scenes \/ .+ words$/);
+    for (const doc of [
+      renderReaderTierMarkdown(tier), renderReaderTierText(tier), renderReaderTierHtml(tier, identity),
+    ]) {
+      assert.equal(doc.split(referenceBoundsLine()).length - 1, 1,
+        'the bounds string must appear exactly once in the tier');
+      assert.ok(doc.includes('Reference bounds:'), 'stated by the labelled line here');
+    }
+  });
+
+  it('states the bounds even with no percentile at all — never zero times', () => {
+    const tier = buildReaderTier({ ...report, healthPercentile: undefined });
+    assert.equal(tier.percentileLine, null);
+    assert.equal(tier.boundsLine, referenceBoundsLine());
+    assert.equal(
+      renderReaderTierText(tier).split(referenceBoundsLine()).length - 1, 1,
+      'a report with no percentile still states what the reference set is',
+    );
+  });
+
+  it('the bounds line, when it renders, is the derived one', () => {
+    const tier = buildReaderTier({ ...report, healthPercentile: undefined });
+    assert.match(tier.boundsLine!, /^\d+ samples \/ .+ scenes \/ .+ words$/);
   });
 
   it('leads with at most TIER_PRIORITY_COUNT findings, in the report’s own order', () => {
@@ -154,7 +201,7 @@ describe('renderReaderTier* — one data object, two renderers', () => {
     for (const doc of [md, txt, html]) {
       assert.ok(doc.includes(tier.lengthLine), 'length line');
       assert.ok(doc.includes(tier.healthLine), 'health line');
-      assert.ok(doc.includes(tier.boundsLine), 'bounds line');
+      assert.ok(doc.includes(referenceBoundsLine()), 'the bounds, from one place or the other');
       assert.ok(doc.includes('A clerk finds a ledger.'), 'logline');
       for (const finding of tier.priorities) assert.ok(doc.includes(finding.description));
     }

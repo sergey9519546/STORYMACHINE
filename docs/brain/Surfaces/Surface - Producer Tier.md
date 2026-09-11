@@ -58,6 +58,19 @@ which the tier states. They moved: the header now identifies the document and
 the tier states the findings. See [[Surface - Coverage HTML]] for the
 dead-selector guard that came out of that move.
 
+**Round 2 (2026-09-11) — the bounds are stated once.** The confidence line and the
+not-comparable percentile sentence both carried
+`20 samples / 9–10 scenes / 256–337 words`, so the producer's first page printed
+the identical string twice, a centimetre apart — the render-a-fact-once rule broken
+by the code that implements the confidence line, on the path every real draft takes
+(MEASURED: 0 of the 20 CC0 shorts are inside the band). `buildReaderTier` now sets
+`boundsLine` to null when the percentile sentence already contains it, decided by
+string containment rather than by re-asking `percentileIsComparable`, so if a future
+edit removes that parenthetical the line comes back by itself. The bounds are never
+absent: with no percentile at all, the labelled line renders.
+`tests/core/reader-tier.test.ts` asserts exactly-once in all three renderings on
+both paths, and never-zero on the third.
+
 ## Sources
 
 - `server/lib/reader-tier.ts`; `server/lib/page-refs.ts`; `server/lib/reference-bounds.ts`

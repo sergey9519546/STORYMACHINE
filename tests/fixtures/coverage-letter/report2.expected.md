@@ -12,8 +12,6 @@
 
 Health percentile: not comparable — this draft is outside the bounds of the hand-authored synthetic reference set (20 samples / 9–10 scenes / 256–337 words)
 
-*Reference bounds: 20 samples / 9–10 scenes / 256–337 words.*
-
 ### The 3 things to fix first
 
 1. **MAJOR — Scene 4 (midpoint)** — Midpoint suspense pressure is flat — the story lacks a dramatic pivot
@@ -55,7 +53,7 @@ CONSIDER — scored in the middle band, above the decline line but short of what
 ## How to Read This Report
 
 This is a deterministic read: the engine scored this draft using rule-based analysis alone — no generative AI wrote or judged any part of it. Running the identical script text through the engine again reproduces the same score and verdict.
-Health percentile: not comparable — this draft is outside the bounds of the hand-authored synthetic reference set (20 samples / 9–10 scenes / 256–337 words) — not against other scripts you might send it, and not a market comparison.
+Health percentile: not comparable — this draft is outside the bounds of the hand-authored synthetic reference set (20 samples / 9–10 scenes / 256–337 words). A percentile against that set would be measuring this draft's length, not its craft.
 It does not read for market fit, casting, or budget — those require a human reader’s judgment this engine has no basis for.
 
 ---

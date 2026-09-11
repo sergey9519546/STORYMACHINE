@@ -169,8 +169,22 @@ describe('percentile-copy.ts — no surface re-implements it', () => {
   // healthPercentileSentence / notComparableSentence — the whole sentence, not the
   // pieces — so the letter carries one wording, exactly twice (pinned by
   // tests/core/coverage-letter.test.ts).
-  it('coverage-letter.ts renders the WHOLE shared gated sentence, not a composition of its pieces', () => {
-    assert.match(coverageLetter, /percentileSentenceFor\(report\.healthPercentile, report\.sceneCount, report\.wordCount\)/);
+  // ROUND 2 (2026-09-11): one step further again. The letter's only percentile use
+  // is its how-to-read caveat, and the CLAUSE that qualifies the reading has to be
+  // branched too — "not against other scripts you might send it" modifies
+  // "ranks … against", which the not-comparable sentence does not contain, so on
+  // the path 100% of real drafts take it dangled off nothing. The whole
+  // sentence-plus-qualification now comes from one gated helper.
+  it('coverage-letter.ts renders the WHOLE shared gated caveat, not a composition of its pieces', () => {
+    assert.match(coverageLetter, /percentileCaveatSentenceFor\(\s*report\.healthPercentile, report\.sceneCount, report\.wordCount,?\s*\)/);
+    // Scoped to CODE, not comments: the letter records the defect it had, and a
+    // test that forbade the phrase outright would forbid writing the decision down
+    // — the same lesson as the retired-CSS case in coverage-html.test.ts.
+    const codeLines = coverageLetter.split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l));
+    assert.ok(
+      !codeLines.some(l => l.includes('not against other scripts you might send it')),
+      'the qualifying clause must live in percentile-copy.ts, branched, not be welded on here',
+    );
     assert.ok(!/\$\{ordinal\(Math\.round\(report\.healthPercentile\)\)\}\s*percentile/.test(coverageLetter),
       'the hand-composed ordinal percentile sentence must be gone');
     assert.ok(!/\$\{Math\.round\(report\.healthPercentile\)\}th percentile/.test(coverageLetter),

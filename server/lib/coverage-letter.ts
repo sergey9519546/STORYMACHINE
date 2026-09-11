@@ -73,7 +73,7 @@ import { computeStructuralReliabilityNote } from './structural-reliability.ts';
 // coverage-html.ts's/slate.ts's own percentile-copy.ts imports — so this is
 // an established pattern, not a new one; it does not touch the scoring path
 // (no import edge to/from doctor.ts either direction).
-import { ordinal, percentileSentenceFor } from '../../src/lib/percentile-copy.ts';
+import { ordinal, percentileCaveatSentenceFor } from '../../src/lib/percentile-copy.ts';
 // Shared draft-rank denominator copy (2026-09-05 review round 2) — same
 // established cross-import pattern as percentile-copy.ts above, fixing the
 // same class of bug: this file used to hand-write "your own saved drafts of
@@ -308,11 +308,26 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
   // It also honours the comparability gate: a draft outside the reference set's
   // bounds gets the not-comparable sentence rather than a band that is really
   // measuring length (see percentileIsComparable).
+  //
+  // ROUND 2 (2026-09-11) — THE TRAILING CLAUSE IS BRANCHED, because it did not
+  // parse on the path every real draft takes. It read:
+  //
+  //   Health percentile: not comparable — this draft is outside the bounds of the
+  //   hand-authored synthetic reference set (20 samples / 9–10 scenes /
+  //   256–337 words) — not against other scripts you might send it, and not a
+  //   market comparison.
+  //
+  // "not against other scripts you might send it" modifies "ranks ... AGAINST",
+  // which the band sentence has and the not-comparable sentence does not — so the
+  // clause dangled off a sentence with nothing for it to attach to, in all three
+  // committed goldens, on 100% of real drafts (0 of the 20 CC0 shorts are inside
+  // the band). The band path keeps the clause, where it is both grammatical and
+  // useful. The not-comparable path gets the sentence that is actually true of it:
+  // WHY no percentile is stated. Registered in docs/CLAIMS_REGISTER.md.
   if (typeof report.healthPercentile === 'number') {
-    const reading = percentileSentenceFor(report.healthPercentile, report.sceneCount, report.wordCount);
-    caveats.push(
-      `${reading} — not against other scripts you might send it, and not a market comparison.`,
-    );
+    caveats.push(percentileCaveatSentenceFor(
+      report.healthPercentile, report.sceneCount, report.wordCount,
+    ));
   }
 
   // 2026-09-04 — a second, honest denominator alongside the reference-set

@@ -323,12 +323,85 @@ export function findApparentGoal(fountain: string, protagonist: string): string 
       currentSpeaker = normalizeCueName(text);
     } else if (b.type === 'dialogue') {
       if (currentSpeaker !== protagonist) continue;
-      if (WANT_PATTERNS.some(re => re.test(text))) {
-        return truncate(text, MAX_CLAUSE_LEN);
-      }
+      const wanted = wantSentence(text);
+      if (wanted) return truncate(wanted, MAX_CLAUSE_LEN);
     }
   }
   return null;
+}
+
+/** ONE SENTENCE, and the RIGHT one — the sentence that actually voices the want.
+ *
+ *  ROUND 2 (2026-09-11). This channel used to return `truncate(block, 140)`: the
+ *  whole dialogue BLOCK a want pattern appeared anywhere in, cut at 140
+ *  characters. A screenplay speech is routinely several sentences, so the logline
+ *  quoted a paragraph with its last word chopped in half. Shipped, as the first
+ *  line of the producer tier for data/screenplays/runoff.fountain:
+ *
+ *    SARA must contend with “Creek Mile 14, Tuesday morning. Turbidity source
+ *    appears to originate above the new construction pad at the tree line. The
+ *    upstream contrac…”.
+ *
+ *  That is product-discovery finding #7 ("the producer's report opens with a
+ *  machine-mangled logline") still firing after the round-1 fix, because round 1
+ *  applied the one-sentence rule to findIncitingIncident and left its sibling
+ *  here — one concept, two implementations, which is exactly the defect the rest
+ *  of this lane is about.
+ *
+ *  WHY NOT `firstSentence`, the obvious symmetry: the want pattern is frequently
+ *  NOT in the first sentence. dead-frequency.fountain's protagonist says "I got a
+ *  call at the station. Three cars, this bridge, before sunrise. I want to know
+ *  what you can see from here" — the want is the third sentence, so quoting the
+ *  first would drop the only thing that made this block a goal at all and attribute
+ *  a want to a line that does not voice one. This returns the sentence CONTAINING
+ *  the earliest want match, which is the same "quote one sentence" rule applied to
+ *  the signal this channel actually detects.
+ *
+ *  It can never lose a block the old code would have matched: the fallback is the
+ *  whole block, for the case where a pattern straddles a sentence boundary.
+ *  MEASURED on the 32 real committed scripts (keyless, 2026-09-11): 7 goal clauses
+ *  before, 7 after — NONE LOST; 1 truncated mid-word before (runoff), 0 after; and
+ *  6 of the 7 become a shorter, on-point quote instead of a multi-sentence speech.
+ *  runoff's goes from the 140-character fragment above to "I'm going to need their
+ *  discharge permit." — a want, from the same block, in one sentence.
+ *  dead-frequency's goes from three sentences to "I want to know what you can see
+ *  from here.", which is the sentence the detector fired on. */
+function wantSentence(block: string): string | null {
+  let earliest = -1;
+  for (const re of WANT_PATTERNS) {
+    const m = re.exec(block);
+    if (m?.index !== undefined && (earliest < 0 || m.index < earliest)) earliest = m.index;
+  }
+  if (earliest < 0) return null;
+
+  for (const { start, end, text } of sentenceSpans(block)) {
+    if (earliest >= start && earliest < end) return text;
+  }
+  // A pattern that straddles a sentence boundary: keep the whole block rather
+  // than drop a real signal. Never reached by any committed script.
+  return block.trim();
+}
+
+/** Sentence spans of a block, with offsets, so a caller can ask which sentence a
+ *  match landed in. Splits on sentence-final punctuation followed by whitespace —
+ *  the SAME rule firstSentence uses, factored out here so the two cannot diverge
+ *  (firstSentence is now this function's first entry). */
+function sentenceSpans(text: string): Array<{ start: number; end: number; text: string }> {
+  const out: Array<{ start: number; end: number; text: string }> = [];
+  const re = /(.+?[.!?])(?:\s|$)/gs;
+  let m: RegExpExecArray | null;
+  let consumed = 0;
+  while ((m = re.exec(text)) !== null) {
+    out.push({ start: m.index, end: m.index + m[0].length, text: m[1].trim() });
+    consumed = m.index + m[0].length;
+    if (m[0].length === 0) break;
+  }
+  // Trailing text with no sentence-final punctuation is still a sentence.
+  if (consumed < text.length) {
+    const tail = text.slice(consumed);
+    if (tail.trim()) out.push({ start: consumed, end: text.length, text: tail.trim() });
+  }
+  return out;
 }
 
 /** INCITING INCIDENT — the opening scene's dramaticTurn (preferred) or
@@ -346,8 +419,8 @@ export function findIncitingIncident(records: ScreenplaySceneRecord[]): string |
   const text = scene.dramaticTurn || scene.revelation;
   if (!text) return null;
   // 2026-09-11: ONE SENTENCE, the same discipline frameSceneText applies to the
-  // obstacle clause (see firstSentence's own comment). `truncate` alone let a
-  // two-sentence opening beat through and then cut it mid-word at 140
+  // obstacle clause and wantSentence applies to the goal clause. `truncate` alone
+  // let a two-sentence opening beat through and then cut it mid-word at 140
   // characters, so the assembled logline read
   //
   //   When Floor-to-ceiling glass over a city skyline gone dark except for the
@@ -355,11 +428,16 @@ export function findIncitingIncident(records: ScreenplaySceneRecord[]): string |
   //   WREN is the most-present speaker across 10 scenes.
   //
   // — a subordinate clause containing a sentence break and an ellipsis, then a
-  // comma, then the main clause. MEASURED on the 32 real committed scripts: 4
-  // loglines carried a mid-clause "…" before this change (code-blue, counter-offer,
-  // mise, the-ledger-bad) and 0 after; no script
-  // loses its inciting clause, because every beat that had text still has a
-  // first sentence.
+  // comma, then the main clause.
+  //
+  // MEASURED on the 32 real committed scripts, NARROWED TO THIS CHANNEL (round 2,
+  // 2026-09-11 — the earlier wording quoted 4 before / 0 after as if it were the
+  // whole logline, and it was not: a fifth script, runoff, was still shipping a
+  // mid-word truncation from the GOAL channel, which is the defect wantSentence
+  // fixes). This channel: 4 of 32 inciting clauses were truncated mid-word before
+  // (code-blue, counter-offer, mise, the-ledger-bad), 0 after, none lost — every
+  // beat that had text still has a first sentence. Across the WHOLE logline, both
+  // channels together: 5 of 32 before, 0 after.
   //
   // KNOWN LIMIT, left undone deliberately and recorded rather than papered over:
   // this clause is still spliced in UNQUOTED after "When", and the beat it comes
@@ -506,10 +584,17 @@ function frameSceneText(r: ScreenplaySceneRecord, sceneDialogue: readonly string
 
 /** First sentence only — tier (c) text is frequently a multi-sentence speech,
  *  and a logline states one thing. Splits on sentence-final punctuation
- *  followed by whitespace, so decimals and abbreviations mid-clause survive. */
+ *  followed by whitespace, so decimals and abbreviations mid-clause survive.
+ *
+ *  ROUND 2 (2026-09-11): delegates to sentenceSpans rather than carrying its own
+ *  regex, so this module has ONE definition of where a sentence ends. The goal
+ *  channel needs sentence OFFSETS (it has to find the sentence a want match landed
+ *  in, which is not always the first — see wantSentence), and two splitters that
+ *  disagreed about a boundary would put the two clauses of one logline on different
+ *  rules. */
 function firstSentence(text: string): string {
-  const m = /^(.+?[.!?])(?:\s|$)/s.exec(text.trim());
-  return (m ? m[1] : text).trim();
+  const trimmed = text.trim();
+  return sentenceSpans(trimmed)[0]?.text ?? trimmed;
 }
 
 /** Assembles the four possible clauses into one sentence. Every branch uses

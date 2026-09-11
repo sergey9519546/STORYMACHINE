@@ -157,6 +157,37 @@ export function compactPercentileNoteFor(
     : compactNotComparableNote();
 }
 
+/**
+ * The full how-to-read CAVEAT sentence, gated — the reading plus the clause that
+ * qualifies it.
+ *
+ * ROUND 2 (2026-09-11). The coverage letter used to append one fixed clause to
+ * whichever reading it got: `… — not against other scripts you might send it, and
+ * not a market comparison.` That clause modifies "ranks … AGAINST", which the band
+ * sentence has and the not-comparable sentence does not, so on the not-comparable
+ * path it dangled off a sentence with nothing to attach to — shipped in all three
+ * committed letter goldens, on 100% of real drafts (0 of the 20 CC0 shorts are
+ * inside the band).
+ *
+ * Two readings, two qualifications, one decision point, here:
+ *   in band  — the original clause, where it is grammatical and useful;
+ *   out of band — the thing that is actually true of that state, which is WHY no
+ *   percentile is stated rather than what the absent percentile is not.
+ *
+ * Lives here rather than in the letter so no surface keeps its own copy of the
+ * comparability branch (see percentileIsComparable's own note on the surface that
+ * kept half of it).
+ */
+export function percentileCaveatSentenceFor(
+  pct: number, sceneCount: number | null | undefined, wordCount: number | null | undefined,
+): string {
+  return percentileIsComparable(sceneCount, wordCount)
+    ? `${healthPercentileSentence(pct)} — not against other scripts you might send it, `
+      + 'and not a market comparison.'
+    : `${notComparableSentence()}. A percentile against that set would be measuring this `
+      + "draft's length, not its craft.";
+}
+
 /** The narrow TABLE-CELL form: the band alone, or "not comparable".
  *
  *  For the Slate triage table, which shows one reading per row and has no room

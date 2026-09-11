@@ -54,7 +54,9 @@ import { fileURLToPath } from 'node:url';
 import { startTestServer, type TestServer } from './helpers.ts';
 import { sceneLineSpans } from '../../server/nvm/analyze/locate.ts';
 import { clusterIssues } from '../../server/nvm/analyze/cluster.ts';
-import { rootCauseStatements, topRootCauses } from '../../server/lib/root-cause-pipeline.ts';
+import {
+  rootCauseStatements, topRootCauses, SCENE_SPAN_DRIFT_MEASUREMENT,
+} from '../../server/lib/root-cause-pipeline.ts';
 import { formatSceneList } from '../../server/lib/scene-ranges.ts';
 import type { LocatedIssue, RootCauseFinding } from '../../server/nvm/analyze/types.ts';
 
@@ -69,6 +71,10 @@ interface Surfaces {
   /** The same route's located issues — the input half of the pipeline, used by
    *  the reversion probe at the bottom of this file. */
   locatedIssues: LocatedIssue[];
+  /** The headline report facts the doctor route publishes, so the
+   *  SCENE_SPAN_DRIFT_MEASUREMENT block can re-measure them rather than trust a
+   *  comment (round 2, 2026-09-11). */
+  report: { sceneCount: number; wordCount: number; health: number; verdict: string };
   /** POST /api/scriptide/diagnose — the live JSON payload the editor polls. */
   diagnoseRootCauses: RootCauseFinding[];
   /** POST /api/export/coverage — the shareable HTML artifact. */
@@ -161,6 +167,7 @@ before(async () => {
   assert.equal(doctorRes.status, 200);
   const doctorBody = await doctorRes.json() as {
     contentHash: string; rootCauses: RootCauseFinding[]; locatedIssues: LocatedIssue[];
+    sceneCount: number; wordCount: number; health: number; verdict: string;
   };
 
   const diagnoseRes = await fetch(`${server.baseUrl}/api/scriptide/diagnose`, {
@@ -200,6 +207,10 @@ before(async () => {
     contentHash: doctorBody.contentHash,
     doctorRootCauses: doctorBody.rootCauses,
     locatedIssues: doctorBody.locatedIssues,
+    report: {
+      sceneCount: doctorBody.sceneCount, wordCount: doctorBody.wordCount,
+      health: doctorBody.health, verdict: doctorBody.verdict,
+    },
     diagnoseRootCauses: diagnoseBody.rootCauses,
     coverageHtml,
     letterMarkdown: letterBody.markdown,
@@ -369,5 +380,73 @@ describe('root-cause parity — REVERSION PROBE (this test must be able to fail)
       'no finding named fewer scenes without spans — the measured defect (a 58-scene finding '
       + 'reported as "Scene 1" in the producer\'s export) is not reproduced by this probe',
     );
+  });
+});
+
+// ── The measured table, re-measured (round 2, 2026-09-11) ────────────────────
+//
+// server/lib/root-cause-pipeline.ts's header used to carry a hand-typed table of
+// what omitting `sceneSpans` costs. One of its three rows was wrong in both
+// columns — it read `1, 2–12` / `1, 2–9` where the real values are `Scenes 2–12`
+// and `Scenes 2–4, 6–9` — so it understated its own finding (the without-spans
+// list is GAPPY, not a contiguous run) while being unreproducible, and a brain
+// note quoted it. A measured claim that only a human re-types has no gate under
+// it.
+//
+// The numbers are now SCENE_SPAN_DRIFT_MEASUREMENT, and this block is the gate:
+// every field is re-derived from a live doctor + clusterIssues run on the named
+// fixture, and the brain note is required to quote the same strings. A cluster.ts
+// change that moves any of them fails here rather than making the module comment
+// and the vault both silently wrong.
+describe('the scene-span drift measurement is re-measured, not re-typed', () => {
+  const M = SCENE_SPAN_DRIFT_MEASUREMENT;
+
+  it('the fixture it names is the fixture it was measured on', () => {
+    assert.equal(M.fixture, 'tests/fixtures/feature-length/assembled-feature.fountain');
+    assert.ok(FIXTURE.endsWith(M.fixture.replace(/^tests\//, '')),
+      `this suite loads ${FIXTURE}, which is not the fixture the measurement names`);
+  });
+
+  it('every column comes from ONE contentHash, and the report facts match', () => {
+    assert.ok(s.contentHash.startsWith(M.contentHash12),
+      `live hash ${s.contentHash.slice(0, 12)} !== recorded ${M.contentHash12}`);
+    assert.equal(s.report.sceneCount, M.sceneCount);
+    assert.equal(s.report.wordCount, M.wordCount);
+    assert.equal(s.locatedIssues.length, M.issueCount);
+    assert.equal(s.report.health, M.health);
+    assert.equal(s.report.verdict, M.verdict);
+  });
+
+  it('the WITH-spans column matches a live run', () => {
+    const withSpans = clusterIssues(s.locatedIssues, sceneLineSpans(FEATURE));
+    assert.equal(withSpans.length, M.withSpans.rootCauses);
+    assert.equal(formatSceneList(withSpans[0].sceneIdxs), M.withSpans.topFindingScenes);
+    assert.equal(formatSceneList(withSpans[2].sceneIdxs), M.withSpans.thirdFindingScenes);
+  });
+
+  it('the WITHOUT-spans column matches a live run, gaps included', () => {
+    const withoutSpans = clusterIssues(s.locatedIssues);
+    assert.equal(withoutSpans.length, M.withoutSpans.rootCauses);
+    assert.equal(formatSceneList(withoutSpans[0].sceneIdxs), M.withoutSpans.topFindingScenes);
+    assert.equal(formatSceneList(withoutSpans[2].sceneIdxs), M.withoutSpans.thirdFindingScenes);
+    // The row that was wrong: the without-spans top finding is SCATTERED. If this
+    // ever collapses to a single run, the measurement is describing a different
+    // defect and the comment above it needs rewriting, not just the number.
+    assert.ok(M.withoutSpans.topFindingScenes.includes(', '),
+      'the without-spans top finding must still be a gappy list, not one range');
+  });
+
+  it('the brain note quotes the same six values', () => {
+    const note = fs.readFileSync(
+      path.join(__dirname, '../../docs/brain/Surfaces/Surface - Root Cause Pipeline.md'),
+      'utf-8',
+    );
+    for (const value of [
+      String(M.withSpans.rootCauses), String(M.withoutSpans.rootCauses),
+      M.withSpans.topFindingScenes, M.withoutSpans.topFindingScenes,
+      M.withSpans.thirdFindingScenes, M.withoutSpans.thirdFindingScenes,
+    ]) {
+      assert.ok(note.includes(value), `the brain note does not quote "${value}"`);
+    }
   });
 });

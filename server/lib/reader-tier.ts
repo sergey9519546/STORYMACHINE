@@ -28,10 +28,20 @@
 //    holding a PDF. server/lib/page-refs.ts resolves it through the same
 //    paginator the PDF export uses; an unresolved reference is omitted, never
 //    guessed.
-// 4. THE CONFIDENCE LINE IS ALWAYS PRESENT. A percentile against a 20-sample
-//    reference set of 9-10-scene samples is not a reading about a feature, and
-//    the tier says so rather than printing a reassuring band (see
-//    src/lib/percentile-copy.ts's percentileIsComparable).
+// 4. THE REFERENCE BOUNDS ARE STATED, AND STATED ONCE. A percentile against a
+//    20-sample reference set of 9-10-scene samples is not a reading about a
+//    feature, so the tier prints the bounds the percentile is measured against
+//    rather than a reassuring band (see src/lib/percentile-copy.ts's
+//    percentileIsComparable). ONCE, though: the not-comparable sentence already
+//    carries the bounds in its own parenthetical, so a separate "Reference
+//    bounds:" line beside it put the same string on the producer's first page
+//    twice — which is rule 2 broken by the code that implements rule 4. Round 2
+//    (2026-09-11) makes `boundsLine` null in exactly that case. It is never
+//    absent from the page: when the percentile line states the bounds, that IS
+//    the statement; when there is no percentile line at all (a legacy or
+//    incomplete report), the bounds line renders, so the reference frame is
+//    stated either way. MEASURED: 0 of the 20 CC0 shorts are inside the band, so
+//    the doubled path was the one every real draft took.
 //
 // Pure: no I/O, no clock of its own (analyzedAt comes off the report), no
 // randomness — the same report plus the same script text renders byte-identical
@@ -79,8 +89,11 @@ export interface ReaderTierData {
   /** The percentile BAND, or the not-comparable sentence. One of the two is
    *  always present when the report carries a percentile at all. */
   percentileLine: string | null;
-  /** "20 samples / 9–10 scenes / 256–337 words" — always present. */
-  boundsLine: string;
+  /** "20 samples / 9–10 scenes / 256–337 words", or null when `percentileLine`
+   *  already carries the same string in its own parenthetical (the
+   *  not-comparable case, which is every real draft). Exactly one of the two
+   *  states the bounds — see rule 4 in this file's header. */
+  boundsLine: string | null;
   prioritiesHeading: string;
   priorities: ReaderTierFinding[];
   /** True when no script text was supplied, so no page references could be
@@ -168,6 +181,17 @@ export function buildReaderTier(
     };
   });
 
+  // ONE statement of the bounds on this page. The not-comparable sentence ends in
+  // "(20 samples / 9-10 scenes / 256-337 words)", so a "Reference bounds:" line
+  // under it is the identical string twice, a centimetre apart — exactly the
+  // render-a-fact-once rule this tier exists to enforce. Decided by STRING
+  // CONTAINMENT rather than by re-asking percentileIsComparable, so the two can
+  // never disagree about whether the bounds are already on the page: if a future
+  // edit takes the parenthetical out of that sentence, this line comes back by
+  // itself.
+  const boundsLine = derivedReferenceBoundsLine();
+  const boundsAlreadyStated = percentileLine !== null && percentileLine.includes(boundsLine);
+
   return {
     logline: opts.logline?.trim() ? opts.logline.trim() : null,
     lengthLine,
@@ -175,7 +199,7 @@ export function buildReaderTier(
     verdictLabel: report.verdict ? VERDICT_WORD[report.verdict] : 'N/A',
     healthLine: `Health ${report.health.toFixed(1)} / 100`,
     percentileLine,
-    boundsLine: derivedReferenceBoundsLine(),
+    boundsLine: boundsAlreadyStated ? null : boundsLine,
     prioritiesHeading: prioritiesHeadingFor(priorities.length),
     priorities,
     pageRefsUnavailable: fountain === '',
@@ -221,8 +245,10 @@ export function renderReaderTierMarkdown(data: ReaderTierData): string {
     lines.push('');
     lines.push(data.percentileLine);
   }
-  lines.push('');
-  lines.push(`*Reference bounds: ${data.boundsLine}.*`);
+  if (data.boundsLine) {
+    lines.push('');
+    lines.push(`*Reference bounds: ${data.boundsLine}.*`);
+  }
   lines.push('');
   lines.push(`### ${data.prioritiesHeading}`);
   lines.push('');
@@ -252,7 +278,7 @@ export function renderReaderTierText(data: ReaderTierData): string {
   lines.push(`Length: ${data.lengthLine}`);
   lines.push(`Verdict: ${data.verdictLabel} · ${data.healthLine}`);
   if (data.percentileLine) lines.push(data.percentileLine);
-  lines.push(`Reference bounds: ${data.boundsLine}.`);
+  if (data.boundsLine) lines.push(`Reference bounds: ${data.boundsLine}.`);
   lines.push('');
   lines.push(data.prioritiesHeading.toUpperCase());
   lines.push('-'.repeat(data.prioritiesHeading.length));
@@ -323,7 +349,8 @@ export function renderReaderTierHtml(
         : escape(data.verdictLabel)} &middot; ${escape(data.healthLine)}</div>
     </div>${data.percentileLine ? `
     <p class="tier-bounds">${escape(data.percentileLine)}</p>` : ''}
-    <p class="tier-bounds">Reference bounds: ${escape(data.boundsLine)}.</p>
+${data.boundsLine ? `
+    <p class="tier-bounds">Reference bounds: ${escape(data.boundsLine)}.</p>` : ''}
     <h2 class="tier-heading">${escape(data.prioritiesHeading)}</h2>
     ${prioritiesBlock}
   </section>

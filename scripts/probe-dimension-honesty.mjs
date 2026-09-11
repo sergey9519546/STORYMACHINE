@@ -23,18 +23,30 @@
 // drop the Structure & Pacing dimension, is making a claim the engine cannot
 // support.
 //
-// CITATION CORRECTED 2026-09-11. This used to quote "The climax is where it
-// belongs — the story's single most intense scene lands in the final stretch"
-// at sample-coverage-report.html line 376. That sentence is from the RETIRED
-// "The Second Key" stimulus (swapped out 2026-08-04 — see
-// docs/user-validation/P0_QUICK_START.md) and appears nowhere in the committed
-// artifact at any line, so the citation pointed a reader at nothing. The live
-// sample's equivalent claims are in its "Checks That Found Nothing" section
-// (renamed from "What's Working" on 2026-09-11 — server/lib/strengths-copy.ts,
-// docs/CLAIMS_REGISTER.md row 86), e.g. "The opening earns attention immediately"
-// and "This draft keeps generating real turns". The probe's question is unchanged:
-// does the dimension that carries such a claim actually move when the structure
-// it describes is damaged?
+// CITATION CORRECTED 2026-09-11, then corrected AGAIN the same day — the first
+// attempt replaced a stale citation with a wrong provenance story, which is worse.
+// The record, from git rather than from memory:
+//
+//   * This header used to quote "The climax is where it belongs — the story's
+//     single most intense scene lands in the final stretch" at
+//     sample-coverage-report.html LINE 376. That was CORRECT when written:
+//     `git show 272943f9:docs/user-validation/sample-coverage-report.html` has that
+//     exact sentence at exactly line 376.
+//   * It was REMOVED FROM THIS ARTIFACT BY 99fb0159 ("fix(p0): Category A + B
+//     honesty fixes — soften two overstated claims, add feature-scale caveat",
+//     2026-07-28) — i.e. the claim was softened as an honesty fix, a week BEFORE
+//     the 2026-08-04 stimulus swap, which is not what removed it.
+//   * The round-1 correction said the sentence was "from the RETIRED 'The Second
+//     Key' stimulus (swapped out 2026-08-04)" and "appears nowhere in the committed
+//     artifact at any line". The present tense was true; the attribution and the
+//     date were not.
+//
+// The probe's question is unchanged, and does not need the quotation: does the
+// dimension that carries a structural claim actually move when the structure it
+// describes is damaged? The live sample's equivalent claims are in its "Checks
+// That Found Nothing" section (renamed from "What's Working" on 2026-09-11 —
+// server/lib/strengths-copy.ts, docs/CLAIMS_REGISTER.md row 86), e.g. "The opening
+// earns attention immediately" and "This draft keeps generating real turns".
 //
 // This is a MEASUREMENT INSTRUMENT. It does not modify the engine.
 //

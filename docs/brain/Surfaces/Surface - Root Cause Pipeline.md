@@ -31,8 +31,19 @@ omitting it also reorders the list a writer is told to fix first.
 | | with spans | without spans |
 | --- | --- | --- |
 | root causes | 70 | 69 |
-| top finding's scenes | 1, 2–12 | 1, 2–9 |
+| top finding's scenes | Scenes 2–12 | Scenes 2–4, 6–9 |
 | 3rd finding's scenes | Scenes 1–58 | Scene 1 |
+
+Read the second row carefully: without the spans the top finding's scenes are
+**gappy**, not a shorter contiguous run, so the producer's document was naming a
+different SET of scenes rather than a narrower span of them.
+
+These six values are not maintained by hand. They are
+`SCENE_SPAN_DRIFT_MEASUREMENT` in `server/lib/root-cause-pipeline.ts`, and
+`tests/routes/root-cause-parity.test.ts` re-derives every one of them from a live
+run on the fixture and asserts that this note quotes the same strings — added in
+round 2, after the second row was found to be wrong in both columns in both the
+module comment and here.
 
 **Files:** `server/lib/root-cause-pipeline.ts` (`buildRootCausePipeline`
 derives the spans from the same `fountain` string it derives the anchors from,
@@ -48,6 +59,13 @@ exported letter — and asserts identical rendered scene ranges, cluster counts,
 priority order and top-three text, scraping both exports out of their shipped
 bytes. Its last three cases are a reversion probe, so weakening the parity
 claims fails too.
+
+**Round 2 (2026-09-11) — the measured table is measured by a test.** Its six values
+are `SCENE_SPAN_DRIFT_MEASUREMENT` in `server/lib/root-cause-pipeline.ts`, and
+`tests/routes/root-cause-parity.test.ts` re-derives each from a live run on the
+fixture and asserts this note quotes the same strings. Added after the round-1
+review found the top-finding row wrong in both columns here and in the module
+comment.
 
 ## Sources
 

@@ -61,6 +61,18 @@ product for the same script, and all three now come from shared modules:
   `server/lib/strengths-copy.ts`, shared with [[Surface - Coverage HTML]] and
   [[Surface - Script Doctor Panel]] (row 86).
 
+**Round 2 (2026-09-11) — the how-to-read caveat parses again.** The letter appended
+one fixed clause to whichever percentile reading it got:
+`— not against other scripts you might send it, and not a market comparison.` That
+modifies "ranks … against", which the band sentence contains and the
+not-comparable sentence does not — so on the path 100% of real drafts take, the
+clause dangled off a sentence with nothing to attach to, in all three committed
+goldens. `src/lib/percentile-copy.ts`'s `percentileCaveatSentenceFor` now owns both
+readings AND both qualifications: the in-band path keeps the original clause
+verbatim, the out-of-band path says why no percentile is given
+(`docs/CLAIMS_REGISTER.md` row 93). The three letter goldens were re-locked, and
+the duplicated reference-bounds line in the tier went with them.
+
 ## Sources
 
 - `server/lib/coverage-letter.ts`

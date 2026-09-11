@@ -32,6 +32,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { renderP0SampleReport, OUT_FILE } from '../../scripts/generate-p0-sample-report.ts';
+import { referenceBoundsLine } from '../../src/lib/percentile-copy.ts';
 
 /** Blank the three values that CANNOT be stable between two runs, and nothing
  *  else.
@@ -42,7 +43,7 @@ import { renderP0SampleReport, OUT_FILE } from '../../scripts/generate-p0-sample
  *  The datetime pattern is replaced FIRST so the date pattern cannot eat half of
  *  it.
  *
- *  3. THE ENGINE COMMIT. The verify block publishes
+ *  3. THE ENGINE COMMIT, IN BOTH OF ITS FORMS. The verify block publishes
  *  `report.provenance.engineCommit`, which server/lib/build-info.ts resolves from
  *  `git rev-parse HEAD` when GIT_SHA is unset. It is therefore a different 40-hex
  *  string at every commit, including every commit that does not touch the
@@ -55,12 +56,23 @@ import { renderP0SampleReport, OUT_FILE } from '../../scripts/generate-p0-sample
  *  which commit produced the committed bytes, which is a true and useful fact that
  *  a later render legitimately disagrees with. The check here is about the
  *  RENDERER's output, and scripts/check-doctor-output-identity.mjs handles the
- *  identical problem the same way by pinning GIT_SHA across both of its runs. */
+ *  identical problem the same way by pinning GIT_SHA across both of its runs.
+ *
+ *  ROUND 2 (2026-09-11): `'dev'` is masked as well as the 40-hex form.
+ *  server/lib/build-info.ts resolves engineCommit to the literal string `'dev'`
+ *  when GIT_SHA is unset AND there is no `.git` to ask — which is exactly the tree
+ *  a reviewer works in, because `git archive <sha> | tar -x` is the workflow this
+ *  repository's own output-identity harness prescribes. A 40-hex-only mask left
+ *  this suite failing 1 of 3 there with `generator: dev / committed:
+ *  <ENGINE_COMMIT>`: a trap that fires only for the reviewer, which is the worst
+ *  population to fail for. Matched narrowly, as a whole word inside the verify
+ *  block's own `<code>` element, so the word "dev" in ordinary prose is untouched. */
 function maskVolatile(html: string): string {
   return html
     .replace(/[A-Z][a-z]+ \d{1,2}, \d{4} at \d{2}:\d{2}:\d{2} [AP]M [A-Z]+/g, '<TIMESTAMP>')
     .replace(/[A-Z][a-z]+ \d{1,2}, \d{4}/g, '<DATE>')
-    .replace(/\b[0-9a-f]{40}\b/g, '<ENGINE_COMMIT>');
+    .replace(/\b[0-9a-f]{40}\b/g, '<ENGINE_COMMIT>')
+    .replace(/<code>dev<\/code>/g, '<code><ENGINE_COMMIT></code>');
 }
 
 describe('the committed P0 sample report matches the generator', () => {
@@ -99,6 +111,14 @@ describe('the committed P0 sample report matches the generator', () => {
     const changedContent = 'Generated September 11, 2026 at 02:17:32 AM UTC\nhealth 91.2\ncommit af26e356d9caae03e29b99f567c70da7d100ef72\n';
     assert.equal(maskVolatile(base), maskVolatile(laterClock), 'the clock must be masked');
     assert.equal(maskVolatile(base), maskVolatile(laterCommit), 'the engine commit must be masked');
+    // And its `.git`-less form, which is what a `git archive` review tree produces.
+    assert.equal(
+      maskVolatile('<dt>Engine commit</dt><dd><code>dev</code></dd>'),
+      maskVolatile('<dt>Engine commit</dt><dd><code>af26e356d9caae03e29b99f567c70da7d100ef72</code></dd>'),
+      "'dev' and a real SHA must mask to the same thing",
+    );
+    assert.ok(maskVolatile('a developer wrote this').includes('developer'),
+      'the word "dev" in prose must survive');
     assert.notEqual(maskVolatile(base), maskVolatile(changedContent), 'a real change must NOT be masked');
     // And the content hash — 64 hex, not 40 — must survive the commit mask.
     const forgedHash = base.replace('health 78.3', 'health 78.3\nhash ' + 'a'.repeat(64));
@@ -109,8 +129,28 @@ describe('the committed P0 sample report matches the generator', () => {
     const committed = readFileSync(OUT_FILE, 'utf8');
     assert.ok(committed.includes('class="reader-tier"'), 'the producer tier');
     assert.ok(committed.includes('Checks That Found Nothing'), 'the retitled checks section');
-    assert.ok(committed.includes('Reference bounds: 20 samples'), 'the confidence line');
     assert.ok(!committed.includes('What&rsquo;s Working'), 'the old praise framing must be gone');
     assert.ok(!committed.includes('class="stamp-wrap"'), 'the retired header stamp wrapper must be gone');
+  });
+
+  // ROUND 2 (2026-09-11): this block used to assert the sample carried
+  // `Reference bounds: 20 samples`. That labelled line is now SUPPRESSED whenever
+  // the percentile sentence already carries the bounds in its own parenthetical,
+  // which is the path the sample (12 scenes / 1,830 words, outside the reference
+  // band) takes — so the old assertion was pinning the duplication the round-1
+  // review sent back. What matters is the invariant, not which line states it.
+  it('the committed sample states the reference bounds exactly once on its first page', () => {
+    const committed = readFileSync(OUT_FILE, 'utf8');
+    const dividerAt = committed.indexOf('<hr class="tier-divider"');
+    assert.ok(dividerAt > 0, 'the tier and its divider must render');
+    const firstPage = committed.slice(0, dividerAt);
+    assert.equal(
+      firstPage.split(referenceBoundsLine()).length - 1, 1,
+      'the bounds string must appear exactly once above the divider',
+    );
+    assert.ok(firstPage.includes('Health percentile: not comparable'),
+      'and the line that states them is the percentile reading, for a draft outside the band');
+    assert.ok(!firstPage.includes('Reference bounds:'),
+      'so the separate labelled line must not render beside it');
   });
 });

@@ -26,17 +26,25 @@
 // because the final sort key is `memberCount` — the ORDER the writer is told
 // to fix things in.
 //
-// MEASURED on tests/fixtures/feature-length/assembled-feature.fountain
-// (231 scenes, 19,293 words, 899 issues, contentHash 6c27c8693c40…):
+// MEASURED on tests/fixtures/feature-length/assembled-feature.fountain. The
+// numbers are NOT written out in this comment — they are the exported constant
+// SCENE_SPAN_DRIFT_MEASUREMENT at the bottom of this file, and
+// tests/routes/root-cause-parity.test.ts re-measures every one of them against a
+// live run on that fixture, plus the brain note that quotes them.
 //
-//                              with spans   without spans
-//   root causes                       70              69
-//   top finding's scenes         1, 2–12          1, 2–9
-//   3rd finding's scenes        Scenes 1–58      Scene 1
+// Round 2 (2026-09-11): this used to be a hand-typed table here, and one of its
+// three rows was wrong in both columns at once — it read
+// `top finding's scenes | 1, 2–12 | 1, 2–9`, where the real values are
+// `Scenes 2–12` and `Scenes 2–4, 6–9`. There is no scene 1 in either, and the
+// without-spans list is GAPPY rather than the contiguous run the table showed, so
+// the table understated its own finding while being unreproducible. A measured
+// table that only a human re-types is a claim with no gate under it; this one now
+// has one.
 //
-// The producer's report named ONE scene where the writer's screen named
-// fifty-eight, and the two documents carried a different number of findings
-// in a different order — from one hash, one engine, one script.
+// The headline it records: the producer's report named ONE scene where the
+// writer's screen named fifty-eight, and the two documents carried a different
+// number of findings in a different order — from one hash, one engine, one
+// script.
 //
 // Every call site now goes through buildRootCausePipeline(). There is no
 // `sceneSpans` argument to forget: the function derives the spans from the
@@ -183,3 +191,45 @@ export function topRootCauses(
 ): RootCauseFinding[] {
   return rootCauses.slice(0, Math.max(0, count));
 }
+
+// ── The measurement, as data ──────────────────────────────────────────
+
+/**
+ * What omitting `sceneSpans` actually costs, on the one feature-length input this
+ * repository owns.
+ *
+ * EXPORTED AND TESTED, not narrated. Every field here is re-derived from a live
+ * `runScriptDoctor` + `clusterIssues` run on the named fixture by
+ * tests/routes/root-cause-parity.test.ts, which also asserts that
+ * `docs/brain/Surfaces/Surface - Root Cause Pipeline.md` quotes the same values —
+ * so the module, the test and the brain note cannot drift apart, and a cluster.ts
+ * change that moves any of them fails there instead of quietly making this file
+ * wrong.
+ *
+ * `topFindingScenes` / `thirdFindingScenes` are `formatSceneList` renderings of
+ * findings [0] and [2] in canonical order. Two things in them are the finding:
+ * index 2 names 58 scenes with the spans and ONE without, and index 0's
+ * without-spans value is a GAPPY list — the producer's document was naming a
+ * different SET of scenes, not a narrower span of them.
+ */
+export const SCENE_SPAN_DRIFT_MEASUREMENT = {
+  fixture: 'tests/fixtures/feature-length/assembled-feature.fountain',
+  sceneCount: 231,
+  wordCount: 19293,
+  issueCount: 899,
+  /** First 12 hex of the report's contentHash — the whole point is that BOTH
+   *  columns below come from this one hash. */
+  contentHash12: '6c27c8693c40',
+  health: 84.4,
+  verdict: 'CONSIDER',
+  withSpans: {
+    rootCauses: 70,
+    topFindingScenes: 'Scenes 2–12',
+    thirdFindingScenes: 'Scenes 1–58',
+  },
+  withoutSpans: {
+    rootCauses: 69,
+    topFindingScenes: 'Scenes 2–4, 6–9',
+    thirdFindingScenes: 'Scene 1',
+  },
+} as const;

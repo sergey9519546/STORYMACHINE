@@ -22,13 +22,14 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   percentileIsComparable, percentileSentenceFor, compactPercentileNoteFor,
   exactRankTooltipFor, percentileCellFor, healthPercentileSentence,
   notComparableSentence, compactNotComparableNote, percentileBand,
+  referenceBoundsLine, percentileCaveatSentenceFor,
 } from '../../src/lib/percentile-copy.ts';
 import { renderCoverageHtml } from '../../server/lib/coverage-html.ts';
 import { renderCoverageLetter } from '../../server/lib/coverage-letter.ts';
@@ -37,6 +38,8 @@ import { buildSlateEntry, rankSlate, renderSlateHtml } from '../../server/lib/sl
 import { snapshotTrend } from '../../src/lib/snapshot-trend.ts';
 import { SnapshotSchema } from '../../server/lib/validation.ts';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
+import { analyzeFountainText } from '../../server/nvm/analyze/fountain-analyzer.ts';
+import { buildLogline, findApparentGoal } from '../../server/lib/logline.ts';
 import type { Snapshot } from '../../src/components/scriptide/SnapshotManager.tsx';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -146,7 +149,10 @@ describe('no surface keeps its own comparability decision', () => {
   // against the same set's per-dimension distributions.
   const SURFACES: Array<[string, string]> = [
     ['server/lib/coverage-html.ts', 'percentileSentenceFor'],
-    ['server/lib/coverage-letter.ts', 'percentileSentenceFor'],
+    // Round 2: the letter's only percentile use is its how-to-read caveat, whose
+    // trailing clause is branched on comparability too — so it calls the gated
+    // sentence-PLUS-qualification helper rather than the bare gated sentence.
+    ['server/lib/coverage-letter.ts', 'percentileCaveatSentenceFor'],
     ['server/lib/reader-tier.ts', 'percentileSentenceFor'],
     ['server/lib/slate.ts', 'percentileCellFor'],
     ['src/components/SlatePanel.tsx', 'percentileCellFor'],
@@ -165,4 +171,144 @@ describe('no surface keeps its own comparability decision', () => {
       );
     });
   }
+});
+
+// ── Round 2 (2026-09-11): the two copy defects the review found in SHIPPED bytes
+//
+// Both were on the path 100% of real drafts take — 0 of the 20 CC0 shorts are
+// inside the reference band — which is why "it only shows on an out-of-band draft"
+// is not a mitigation here but the whole population.
+
+describe('the reference bounds are stated once per page, not twice', () => {
+  it('the exported HTML first page carries the bounds exactly once for a real draft', async () => {
+    const report = await runScriptDoctor(RUNOFF);
+    const html = renderCoverageHtml(report, 'Runoff', { fountain: RUNOFF });
+    const firstPage = html.slice(0, html.indexOf('<hr class="tier-divider"'));
+    assert.ok(firstPage.length > 0, 'sanity: the tier and its divider render');
+    assert.equal(
+      firstPage.split(referenceBoundsLine()).length - 1, 1,
+      'the bounds string must appear exactly once above the divider',
+    );
+    // The specific reproduction: "20 samples" and "256" each appeared 2x.
+    assert.equal(firstPage.split('20 samples').length - 1, 1);
+    assert.equal(firstPage.split('256').length - 1, 1);
+    assert.ok(!firstPage.includes('Reference bounds:'),
+      'the labelled line is the one that goes, because the sentence already states them');
+  });
+
+  it('the letter tier carries them once too, and the whole letter twice — one per section', async () => {
+    const report = await runScriptDoctor(RUNOFF);
+    const { markdown, text } = renderCoverageLetter(report, { title: 'Runoff', fountain: RUNOFF });
+    // The tier ends where the letter proper begins — at its verdict line. NOT at
+    // the first "---": the plain-text renderer underlines its own section headings
+    // with dashes, so that would cut the tier off at its second line.
+    for (const [label, doc, verdictMarker] of [
+      ['markdown', markdown, '**Verdict: '], ['text', text, 'VERDICT: '],
+    ] as const) {
+      const tierEnd = doc.indexOf(verdictMarker);
+      assert.ok(tierEnd > 0, `${label}: could not find where the tier ends`);
+      const tierBlock = doc.slice(0, tierEnd);
+      assert.equal(tierBlock.split(referenceBoundsLine()).length - 1, 1,
+        `${label}: the tier states the bounds once`);
+      // Twice in the whole document: the tier, and the how-to-read caveat. The
+      // committed goldens carried it THREE times before this round.
+      assert.equal(doc.split(referenceBoundsLine()).length - 1, 2,
+        `${label}: the whole letter states the bounds exactly twice`);
+    }
+  });
+});
+
+describe("the letter's percentile caveat parses on the path every real draft takes", () => {
+  it('a not-comparable letter does NOT carry the dangling "not against other scripts" clause', async () => {
+    const report = await runScriptDoctor(RUNOFF);
+    const { markdown, text } = renderCoverageLetter(report, { title: 'Runoff', fountain: RUNOFF });
+    for (const [label, doc] of [['markdown', markdown], ['text', text]] as const) {
+      assert.ok(doc.includes(notComparableSentence()), `${label}: states the not-comparable reading`);
+      assert.ok(
+        !doc.includes('not against other scripts you might send it'),
+        `${label}: that clause modifies "ranks ... against", which this sentence does not contain`,
+      );
+      assert.ok(
+        doc.includes("A percentile against that set would be measuring this draft's length, not its craft."),
+        `${label}: and it says what IS true of this state`,
+      );
+    }
+  });
+
+  it('an in-band letter DOES carry it — the clause was not deleted, it was branched', () => {
+    const inBand = {
+      ...JSON.parse(readFileSync(
+        path.join(REPO_ROOT, 'tests/fixtures/coverage-letter/report1.json'), 'utf8',
+      )),
+      sceneCount: 10, wordCount: 300, healthPercentile: 42,
+    };
+    const { markdown } = renderCoverageLetter(inBand, { title: 'In Band' });
+    assert.ok(markdown.includes(healthPercentileSentence(42)));
+    assert.ok(markdown.includes('not against other scripts you might send it, and not a market comparison.'));
+    assert.ok(!markdown.includes("measuring this draft's length"));
+  });
+
+  it('percentileCaveatSentenceFor is the one decision point for both', () => {
+    assert.equal(
+      percentileCaveatSentenceFor(42, 10, 300),
+      `${healthPercentileSentence(42)} \u2014 not against other scripts you might send it, `
+      + 'and not a market comparison.',
+    );
+    assert.equal(
+      percentileCaveatSentenceFor(100, 9, 1448),
+      `${notComparableSentence()}. A percentile against that set would be measuring this `
+      + "draft's length, not its craft.",
+    );
+  });
+});
+
+describe("the producer tier's logline is one sentence, never a truncated speech", () => {
+  // ROUND 2: runoff.fountain's shipped tier opened with
+  //   SARA must contend with "Creek Mile 14, Tuesday morning. Turbidity source
+  //   appears to originate above the new construction pad at the tree line. The
+  //   upstream contrac…"
+  // — three sentences, cut mid-word, as the first line of the producer's page, which
+  // is product-discovery finding #7 verbatim. findIncitingIncident had been given
+  // the one-sentence rule; its sibling findApparentGoal had not.
+  it('runoff.fountain\u2019s tier logline carries no mid-clause truncation', async () => {
+    const report = await runScriptDoctor(RUNOFF);
+    const { records } = analyzeFountainText(RUNOFF);
+    const logline = buildLogline(report, records, RUNOFF);
+    assert.ok(logline, 'runoff still has a protagonist and still gets a logline');
+    assert.ok(!logline!.includes('\u2026'), `still truncated: ${logline}`);
+    assert.ok(!logline!.includes('The upstream contrac'), 'the mangled fragment must be gone');
+    // And the clause it quotes is the one that voices the want, not the first
+    // sentence of the block (which is a location stamp).
+    // As SHIPPED: assembleLogline strips the clause's trailing period before
+    // quoting it, so this asserts the bytes the producer reads, not the raw
+    // sentence findApparentGoal returned.
+    assert.ok(logline!.includes("I'm going to need their discharge permit"),
+      `expected the want sentence, got: ${logline}`);
+  });
+
+  it('the quoted want is the matching sentence, not merely the first one', () => {
+    // dead-frequency's protagonist voices the want in the THIRD sentence; quoting
+    // the first would drop the only thing that made the block a goal.
+    const fountain = readFileSync(path.join(REPO_ROOT, 'data/screenplays/dead-frequency.fountain'), 'utf8');
+    const goal = findApparentGoal(fountain, 'MAYA');
+    assert.equal(goal, 'I want to know what you can see from here.');
+  });
+
+  it('no goal clause is lost to the one-sentence rule — 7 of 32 before, 7 after', async () => {
+    // The cost of the change, asserted rather than asserted-to-have-been-measured.
+    const dir = path.join(REPO_ROOT, 'data/screenplays');
+    let withGoal = 0;
+    for (const file of readdirSync(dir).filter(f => f.endsWith('.fountain')).sort()) {
+      const fountain = readFileSync(path.join(dir, file), 'utf8');
+      const report = await runScriptDoctor(fountain);
+      const goal = findApparentGoal(fountain, report.characters?.[0] ?? '');
+      if (goal) {
+        withGoal += 1;
+        assert.ok(!goal.includes('\u2026'), `${file}: goal clause is truncated mid-word`);
+      }
+    }
+    // 5 of the 20 CC0 shorts voice a want the lexicon detects (the other 2 of the
+    // 7 measured across all 32 are blind-pair fixtures).
+    assert.equal(withGoal, 5, 'the CC0 shorts that voice a detectable want');
+  });
 });
