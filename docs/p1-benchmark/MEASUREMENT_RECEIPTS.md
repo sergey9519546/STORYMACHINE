@@ -2154,3 +2154,106 @@ that nobody mistakes one for the other.
   its output, and I did **not** run `npm run measure-real` — the private corpus
   is not present in this environment, and no AUC-24 value is claimed anywhere
   in this entry.
+
+### 2026-09-11 — FEATURE-LENGTH SATURATION ALONE: `scarcityPenalty` saturates at 12 scenes, and nothing else changes (PENDING OWNER MEASUREMENT — no real-corpus run happened)
+
+**Branch:** `scoring/feature-length-saturation-only`, three commits on `main` @
+`ad3f6fa7`. **This is a scoring-path change and its AUC-24 is not known.**
+`node scripts/check-scoring-receipt.mjs main..HEAD` exits **1** on this entry,
+which is the intended state: the entry is an honest ledger row, not a receipt.
+
+**Why this branch exists.** It is ONE HALF of
+`scoring/feature-length-defects`, cherry-picked so the owner can land that half
+alone. The other branch changes two things in `doctor.ts` — the sub-1 density
+curve's steepness (`SUB_DENSITY_STEEPNESS` 50 → 2, inside `densityPenalty`) and
+the scarcity term's saturation (`140/min(sceneCount, 12)`, inside
+`scarcityPenalty`) — and they are independently landable because they are two
+different functions. If `measure-real` rejects the steepness change, the
+saturation can still land, because it is the half that fixes the staple
+pathology and the only half with any effect at feature length. Measure
+`scoring/feature-length-defects` FIRST; this branch is the fallback, not the
+first choice. The decision tree is in
+`docs/brain/Owner/Owner - R5 Measurement and Merge.md`.
+
+- **Command:** `npm run benchmark:public` · `npm run benchmark:public -- --lock`
+  (once, in the commit that changed the formula) · `npm run test:metamorphic` ·
+  `node --experimental-strip-types tests/core/script-doctor.test.ts` ·
+  `node --experimental-strip-types tests/core/calibration.test.ts` ·
+  `node --experimental-strip-types tests/core/public-benchmark.test.ts` ·
+  `npm run lint` · `npm run check-docs` · `npm run check-brain`. Every one was
+  run in the foreground in this worktree and its output read. **`npm run
+  measure-real` was NOT among them** — see the attestation below.
+- **Corpus fingerprint:** none for AUC-24 — no private corpus was read, and no
+  AUC-24 value appears anywhere in this entry. The corpus that WAS read is the
+  32 committed distributable screenplays the public benchmark scores (20 CC0 in
+  `data/screenplays/` + the 12 blind-pair fixtures), locked by sha256 per file
+  in `tests/fixtures/public-corpus-manifest.json` and
+  `tests/fixtures/public-benchmark-split.json`.
+- **Git SHA:** `main` @ `ad3f6fa7` is the baseline; the measurements in this
+  entry were taken at this branch's tip. The per-branch table is in
+  `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §11.
+- **Measured AUC-24:** **PENDING** — the private 761-script corpus is not
+  present in this environment, so this branch has no AUC-24 number and claims
+  none.
+
+**What changed.** One constant and one witness. `scarcityPenalty` becomes
+`140/min(sceneCount, 12)` instead of `140/sceneCount`, and the
+`stapled_shorts` metamorphic case is promoted to `hard` and made ordering-free
+(it asserts the maximum health over 14 seeded orderings of its twelve parts,
+not one arrangement). `tests/core/script-doctor.test.ts` gains the arithmetic as
+a property: the term is `140/min(n, 12)` for every scene count from 2 to 400,
+flat above 12 and strictly decreasing below, and the residue the saturation does
+NOT remove is exactly `140/bestPartScenes − 140/12`.
+
+**What moved on the public benchmark.** Both PRIMARY (matched-pair) statistics
+are byte-identical to `main`'s — shuffle-drop **0.5313**, climax-relocate
+**0.4219** — and all eleven `CLIMAX_RELOCATE` exact ties remain, because the
+saturation cannot move a document of 12 scenes or fewer and this corpus is 9-14
+intact / 6-10 degraded. Only the all-pairs pair moves: 0.5586 → **0.5493** and
+0.4673 → **0.4746**, from the six 13-and-14-scene scripts paying 0.898-1.667
+points more. Two floors were re-locked from this branch's own run, one DOWN
+(`PUBLIC_SHUFFLE_DROP_FLOOR` 0.5386 → 0.5293) and one UP (`PUBLIC_ORDER_FLOOR`
+0.4473 → 0.4546). `AUC24_FLOOR` is untouched at 0.622. Calibration is
+byte-identical: all 20 samples are 9-10 scenes.
+
+**THE COST, STATED FIRST.** The mean health gap under the drop gets WORSE on
+this branch: −1.93125 → **−2.15**. The saturation alone does not fix the
+deletion reward; the steepness change is what does that, and this branch leaves
+it out. And the staple witness passes at a margin of exactly **0.0** — the worst
+of the 14 orderings ties the best part at 78.3 — because at a saturation point
+of 12 the scarcity term contributes exactly zero to that comparison and, without
+the steepness change, the density penalty is pinned at its 10-point ceiling for
+both documents (they sit 0.013 apart). The invariant holds by construction here
+and never strictly. On `scoring/feature-length-defects` the same witness passes
+by 1.8 points.
+
+**WHAT THE OWNER'S RUN CAN AND CANNOT SETTLE ON THIS BRANCH.** Two separable
+things happen to a feature-length script, and only one can move a matched-pair
+rank statistic. (a) A near-uniform LEVEL SHIFT: at the private corpus's median
+118 scenes the term goes from `140/118 = 1.186` to `140/12 = 11.667`, so every
+script loses **10.480 points** (9.92 at 80 scenes, 10.97 at 200). That moves
+verdicts, grades and every row of the 72-row
+`tests/fixtures/real-corpus-manifest.json`, and it is rank-preserving within a
+matched pair, so by itself it cannot move AUC-24 at all. (b) THE SCARCITY
+CHANNEL'S DEGRADATION DELTA GOING TO EXACTLY ZERO, which is the AUC-relevant
+change: for a 118-scene script the drop recipe leaves ~79 scenes, and the term
+contributed `140/79 − 140/118 = +0.586` points of separation before and
+`140/12 − 140/12 = 0.000` after. For every script of roughly 22 scenes or more —
+essentially the whole private corpus — the channel `doctor.ts`'s own
+measurements credit with AUC 0.938 now contributes nothing to this degradation.
+So AUC-24 on this branch measures exactly one thing: whether health still orders
+an intact feature above a shuffle-dropped copy of itself with the scarcity
+channel contributing zero. It cannot settle the ~10.5-point level shift (that is
+a calibration question the manifest re-lock answers) and it says nothing about
+craft. If it falls, that is a real finding about this change: do not answer it by
+moving the floor in `scripts/lib/auc.ts`.
+
+**Runner attestation:** I ran every command listed above myself, in this
+worktree, in the foreground, and read each one's output; every number in this
+entry came out of one of those runs and none is transcribed from another
+document or from any prior measurement. I did **not** run `npm run
+measure-real`, and I could not: the private 761-script corpus is not present in
+this environment. No AUC-24 value is claimed anywhere in this entry, and this
+entry is therefore marked PENDING and is not a receipt for this range. The
+conversion recipe — all three of `pendingReason`'s scans, not just the heading —
+is in `docs/brain/Owner/Owner - R5 Measurement and Merge.md`.

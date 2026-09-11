@@ -222,14 +222,58 @@ describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
   });
 
   it('approaches, but does not necessarily hit, 100 for zero issues at a well-evidenced scene count', () => {
-    // Zero issues still carries a small scarcityPenalty (SCARCITY_SCALE /
-    // sceneCount = 140/25 = 5.6) — a deliberate residual (see doctor.ts's
-    // craftPenalty comment): a report is never "0 issues, therefore
-    // literally 100" purely from a big denominator, it's the scarcity
-    // correction fading toward (not to) zero as scenes accumulate.
+    // Zero issues still carries a scarcityPenalty, and since the saturation
+    // fix that term no longer fades: 140/min(25, 12) = 11.667, not 140/25 =
+    // 5.6, so 100 - 11.667 = 88.3. The residual is deliberate for the reason
+    // it always was (a report is never "0 issues, therefore literally 100"
+    // purely from a big denominator) and now for a second one: the term used
+    // to fade to nothing, so length alone bought health without bound.
     const health = computeHealthScore({ critical: 0, major: 0, minor: 0 }, 25, 2000);
-    assert.equal(health, 94.4);
-    assert.equal(gradeForHealth(health), 'excellent');
+    assert.equal(health, 88.3);
+    assert.equal(gradeForHealth(health), 'strong');
+  });
+
+  // ── The saturation point, as a property rather than a spot value, and the
+  // residue it does NOT remove. Identical in substance to the assertions on
+  // `scoring/feature-length-defects`; this branch carries them because it
+  // carries the saturation, and they are what make the metamorphic witness's
+  // claim checkable for every scene count rather than for one script set.
+  const scarcityTermAt = (sceneCount: number): number =>
+    100 - computeHealthScore({ critical: 0, major: 0, minor: 0 }, sceneCount, 2000);
+  const SATURATION_SCENES = 12;
+
+  it('the scarcity term is exactly 140/min(sceneCount, 12) at every scene count from 2 to 400', () => {
+    // n starts at 2: at 1 scene the term is 140 and health clamps to 0, so the
+    // penalty is no longer readable through the displayed score.
+    for (let n = 2; n <= 400; n++) {
+      const expected = Math.round((140 / Math.min(n, SATURATION_SCENES)) * 10) / 10;
+      assert.equal(Math.round(scarcityTermAt(n) * 10) / 10, expected, `scarcity term at ${n} scene(s)`);
+    }
+  });
+
+  it('scene count buys NOTHING at or above the saturation point, and the witness margin rests on that', () => {
+    assert.equal(scarcityTermAt(139), scarcityTermAt(SATURATION_SCENES));
+    for (let n = SATURATION_SCENES; n <= 400; n += 7) {
+      assert.equal(scarcityTermAt(n), scarcityTermAt(SATURATION_SCENES), `flat at ${n}`);
+    }
+    for (let n = 2; n < SATURATION_SCENES; n++) {
+      assert.ok(scarcityTermAt(n) > scarcityTermAt(n + 1), `must still decrease from ${n} to ${n + 1}`);
+    }
+  });
+
+  it('states the residue the saturation does NOT remove — length still buys health below 12 scenes', () => {
+    for (const bestPartScenes of [2, 4, 8, 9, 11]) {
+      const residue = scarcityTermAt(bestPartScenes) - scarcityTermAt(SATURATION_SCENES);
+      assert.ok(residue > 0, `a ${bestPartScenes}-scene best part still loses ${residue} points to a long staple`);
+      assert.ok(
+        Math.abs(residue - (140 / bestPartScenes - 140 / SATURATION_SCENES)) < 0.11,
+        `the residue must be 140/${bestPartScenes} - 140/12 to within rounding; got ${residue}`,
+      );
+    }
+    assert.equal(Math.round((140 / 9 - 140 / 12) * 1000) / 1000, 3.889);
+    for (const bestPartScenes of [12, 13, 20, 118]) {
+      assert.equal(scarcityTermAt(bestPartScenes) - scarcityTermAt(SATURATION_SCENES), 0);
+    }
   });
 
   it('does NOT return 100 for zero issues at a tiny scene/word count — small-script sanity', () => {

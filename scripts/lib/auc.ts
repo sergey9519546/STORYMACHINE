@@ -123,9 +123,25 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  *    on the instrument rather than evidence about the score.
  *
  * THE TWO MEASUREMENT CHANNELS ARE NEAR CHANCE, AND THAT IS THE CURRENT
- * TRUTH, NOT A TARGET. Measured on this tree, 2026-09-06 — shuffle-drop
- * 0.5586 all-pairs / 0.5313 matched-pair; climax-relocate 0.4673 / 0.4219.
- * Every one of those four intervals contains 0.5. On this corpus the doctor
+ * TRUTH, NOT A TARGET. Measured on this tree, 2026-09-11 (branch
+ * `scoring/feature-length-saturation-only`) — shuffle-drop 0.5493 all-pairs /
+ * 0.5313 matched-pair; climax-relocate 0.4746 / 0.4219.
+ * Every one of those four intervals contains 0.5.
+ *
+ * WHAT THIS BRANCH IS, AND WHY ITS NUMBERS BARELY MOVE. It carries ONE of the
+ * two halves of `scoring/feature-length-defects`: the scarcity term's
+ * saturation (`140/min(sceneCount, 12)`), without that branch's sub-1 density
+ * steepness change. The saturation is what fixes the STAPLE pathology, and on
+ * a 9-14-scene corpus it does almost nothing else — the two measurement
+ * channels' PRIMARY (matched-pair) statistics are byte-identical to `main`'s
+ * 0.5313 and 0.4219, and only the all-pairs pair moves, because six scripts at
+ * 13-14 scenes now pay 0.898-1.667 points more while their 6-10-scene degraded
+ * copies pay the same as before. That is also why the mean health gap under
+ * the drop gets slightly WORSE here, -1.93125 -> -2.15: the saturation alone
+ * does NOT fix the deletion reward, and nothing on this branch claims it does.
+ * Two of the six floors were re-locked from this branch's own run — all-pairs
+ * shuffle-drop DOWN 0.5386 -> 0.5293, all-pairs climax-relocate UP 0.4473 ->
+ * 0.4546 — and `AUC24_FLOOR` is untouched at 0.622. On this corpus the doctor
  * does not reliably prefer an intact script to a mechanically damaged copy of
  * itself under either recipe. A floor at a near-chance measurement is a
  * ratchet against getting WORSE at something the engine is already bad at,
@@ -141,7 +157,7 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * short-script shuffle-drop benchmark would look ~10x MORE separable. It does
  * not. Measured decomposition over these 32 scripts: the scarcity penalty
  * does rise by a mean of +5.693 points, and the DENSITY penalty falls by a
- * mean of 7.625 points at the same time, because dropping a third of the
+ * mean of 7.632 points at the same time, because dropping a third of the
  * scenes removes a larger share of the weighted issues than of the words and
  * `density = weightedIssues / wordCount^0.7` is convex. Net mean health
  * MOVES UP 1.93 points under degradation. The prediction was right about the
@@ -164,9 +180,9 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * every one of them is still reachable by it.
  */
 export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5113;
-export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.5386;
+export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.5293;
 export const PUBLIC_ORDER_PAIRED_FLOOR = 0.4019;
-export const PUBLIC_ORDER_FLOOR = 0.4473;
+export const PUBLIC_ORDER_FLOOR = 0.4546;
 export const PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR = 0.98;
 export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.9273;
 

@@ -643,3 +643,55 @@ the logistic's 10-point ceiling absorbs most of that; R5 removes the ceiling.
 The result is not a new inversion — `main`'s own mean gap is already −1.93 with
 15 of 32 inverted — it is the same inversion unmasked and amplified: 29 of 32
 inverted, mean gap −15.78.
+
+## 11. Addendum — `scoring/feature-length-saturation-only` (2026-09-11)
+
+*This section is appended rather than rewritten, for the same reason the rest of
+this document is not rewritten: §§0-10 are the record of what `main` measured.
+It is here because `tests/core/public-benchmark.test.ts` asserts that this
+document quotes every floor and every measured AUC the code currently produces.*
+
+**Reproduce:** `npm run benchmark:public` on
+`scoring/feature-length-saturation-only`. The floors were written by
+`npm run benchmark:public -- --lock` in the same commit as the scoring change.
+
+| degradation | N | AUC matched-pair (PRIMARY) | 95% CI | floor | AUC all-pairs | 95% CI | floor | ordered/inverted/tied |
+|---|---|---|---|---|---|---|---|---|
+| `SHUFFLE_DROP` | 32 | **0.5313** | [0.3750, 0.6875] | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` = **0.5113** | 0.5493 | [0.4165, 0.6865] | `PUBLIC_SHUFFLE_DROP_FLOOR` = **0.5293** | 17/15/0 |
+| `CLIMAX_RELOCATE` | 32 | **0.4219** | [0.2813, 0.5625] | `PUBLIC_ORDER_PAIRED_FLOOR` = **0.4019** | 0.4746 | [0.4199, 0.5181] | `PUBLIC_ORDER_FLOOR` = **0.4546** | 8/13/11 |
+| `DIALOGUE_FLATTEN` *(control)* | 32 | **1.0000** | [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR` = **0.98** | 0.9473 | [0.8779, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_FLOOR` = **0.9273** | 32/0/0 |
+
+**What this branch is.** One of the two halves of
+`scoring/feature-length-defects`: the scarcity term's saturation at 12 scenes,
+WITHOUT that branch's sub-1 density steepness change. It exists so the owner can
+land the half that fixes the staple pathology if `measure-real` rejects the other
+half. `scoring/feature-length-defects` is the branch to measure first.
+
+**What changed, and what did not.** Both PRIMARY statistics are byte-identical to
+`main`'s (0.5313 and 0.4219) and all eleven `CLIMAX_RELOCATE` exact ties remain,
+because the saturation cannot move any document of 12 scenes or fewer and this
+corpus is 9-14 intact / 6-10 degraded. Only the all-pairs pair moves: 0.5586 →
+**0.5493** and 0.4673 → **0.4746**, from the six 13-and-14-scene scripts paying
+0.898-1.667 points more. Two floors were re-locked from this run, one DOWN
+(all-pairs shuffle-drop 0.5386 → 0.5293) and one UP (all-pairs climax-relocate
+0.4473 → 0.4546). `AUC24_FLOOR` is untouched at 0.622.
+
+**The cost, stated first.** The mean health gap under the drop gets WORSE here:
+−1.93125 → **−2.15**. The saturation alone does not fix the deletion reward — the
+steepness change is what does that, and it is the half this branch leaves out. On
+this corpus the damaged copy still scores higher on average, by slightly more
+than it did on `main`.
+
+**What it does fix, and how thinly.** The `stapled_shorts` metamorphic witness
+passes over all 14 seeded orderings — but at a margin of exactly **0.0**: the
+worst ordering ties the best part at 78.3. The arithmetic says why, and it is
+worth reading before trusting it. At a saturation point of 12 the scarcity term
+contributes exactly zero to that comparison, so the margin is the staple's own
+density disadvantage plus its deductions; without the steepness change the
+density penalty is PINNED at its 10-point ceiling for both documents (they sit
+0.013 apart), so the density disadvantage rounds to zero and the whole margin is
+the deduction term, which is non-negative but often exactly 0. The invariant
+therefore holds by construction on this branch and never strictly. On
+`scoring/feature-length-defects`, where the steepness change un-pins the density
+term, the same witness passes by 1.8 points. If the owner lands this branch
+alone, that is the residual to know about.

@@ -486,7 +486,7 @@ function scarcityPenalty(sceneCount: number): number {
   // benchmark (9-14 scenes intact, 6-10 degraded) and the whole calibration
   // corpus (9-10 scenes) are untouched by this line. Its only in-repo
   // evidence is the stapled witness and the four synthetic length fixtures.
-  const SCARCITY_SATURATION_SCENES = 15;
+  const SCARCITY_SATURATION_SCENES = 12;
   return SCARCITY_SCALE / Math.min(Math.max(sceneCount, 1), SCARCITY_SATURATION_SCENES);
 }
 

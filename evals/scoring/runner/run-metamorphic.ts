@@ -27,6 +27,10 @@ const WRITE_BASELINE = process.env.METAMORPHIC_WRITE_BASELINE === '1' || process
 
 const baseReport = await runScriptDoctor(BASE);
 const results: MetamorphicResult[] = [];
+/** Per-case variant-set spread, for cases judged on a MAXIMUM over variants —
+ *  printed on pass as well as on failure, because the whole point of the
+ *  variant set is that the margin must be read against the spread. */
+const spreads = new Map<string, string>();
 for (const c of METAMORPHIC_CASES) {
   // A case with `parts` does not transform the shared base script: its
   // comparison point is the MAXIMUM health over the parts it names, and the
@@ -40,10 +44,21 @@ for (const c of METAMORPHIC_CASES) {
     }
     baseHealth = max;
   }
-  const variant = c.transform(BASE);
-  const vr = await runScriptDoctor(variant);
-  const { passed, reason } = check(c, baseHealth, vr.health);
-  results.push({ id: c.id, category: c.category, baseHealth, variantHealth: vr.health, delta: +(vr.health - baseHealth).toFixed(2), passed, reason });
+  // A case with `variants` is judged on the MAXIMUM health over its whole
+  // variant set, not on one arrangement — see MetamorphicCase.variants. The
+  // spread is printed beside it so a thin margin cannot hide behind a point
+  // estimate again.
+  let variantHealth: number;
+  if (c.variants) {
+    const healths: number[] = [];
+    for (const v of c.variants()) healths.push((await runScriptDoctor(v)).health);
+    variantHealth = Math.max(...healths);
+    spreads.set(c.id, `[n=${healths.length}, min ${Math.min(...healths).toFixed(1)}, max ${variantHealth.toFixed(1)}, range ${(variantHealth - Math.min(...healths)).toFixed(1)}]`);
+  } else {
+    variantHealth = (await runScriptDoctor(c.transform(BASE))).health;
+  }
+  const { passed, reason } = check(c, baseHealth, variantHealth);
+  results.push({ id: c.id, category: c.category, baseHealth, variantHealth, delta: +(variantHealth - baseHealth).toFixed(2), passed, reason });
 }
 
 const pass = results.filter(r => r.passed).length;
@@ -55,12 +70,12 @@ for (const r of results) {
   const tag = KNOWN_FAILING_CASE_IDS.has(r.id)
     ? (r.passed ? 'UNEXPECTED PASS' : 'KNOWN FAIL')
     : (r.passed ? 'PASS' : 'HARD FAIL');
-  console.log(r.id.padEnd(20), r.category.padEnd(12), (''+r.baseHealth).padStart(4), (''+r.variantHealth).padStart(4), (''+r.delta).padStart(6), '  ', tag, r.passed ? '' : `(${r.reason})`);
+  console.log(r.id.padEnd(20), r.category.padEnd(12), (''+r.baseHealth).padStart(4), (''+r.variantHealth).padStart(4), (''+r.delta).padStart(6), '  ', tag, r.passed ? '' : `(${r.reason})`, spreads.get(r.id) ?? '');
 }
 console.log(`\n${pass}/${results.length} cases passed raw; hard passes ${hardPasses}; known-failing witnesses ${knownFailures.length}.`);
 
 console.log(`KNOWN FAILING POLICY (not a CI hard fail): ${[...KNOWN_FAILING_CASE_IDS].join(', ')} — the documented verbosity bias (VERBOSITY_BIAS_2026-07-11.md). stapled_shorts was the second witness and was promoted to HARD on 2026-09-07 once the length pathology it measures was fixed (FEATURE_LENGTH_DEFECTS_2026-09-07.md).`);
-console.log('NOTE: a `parts` case (stapled_shorts) reports base = the MAXIMUM health over its parts, not the shared base script.');
+console.log('NOTE: a `parts` case (stapled_shorts) reports base = the MAXIMUM health over its parts, not the shared base script, and a `variants` case reports var = the MAXIMUM health over its variant set (14 seeded orderings), not one arrangement.');
 if (knownFailures.length > 0) {
   console.log(`CURRENT WITNESS: ${knownFailures.map(r => r.id).join(', ')} still fails as documented.`);
 }
