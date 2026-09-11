@@ -93,6 +93,10 @@ before every push. CI runs lint + test + build on every branch, plus a
   deduction path in `doctor.ts` — never rely on issue-count density, which
   is provably blind to document-scale scene-order collapse at feature-scale
   issue volume.
+- The sandbox is rebuilt without warning (2026-09-07: every worktree, the
+  scratch directory, local tags and an unpushed reviewed lane were erased).
+  Lanes push `lane/<name>` after every commit; reviews are committed under
+  `docs/audits/` before the merge; see `docs/LANE_STANDARD.md` §7.
 - Parallel sessions ship concurrently: pull the integration branch and check
   `git log` before starting any implementation work. Do not assume `main` or
   any other branch name; use the current session's designated branch.

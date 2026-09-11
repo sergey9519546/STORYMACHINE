@@ -92,3 +92,28 @@ resolvable after the rebase rewrites it; the 2026-09-05 batch did not, and
 21 of its cited round commits are unreachable. The review verdict is
 recorded with the merge. Concurrency is capped at three live agents (lanes
 plus reviewers) so that one failed suite under load is not everyone's.
+
+## 7. Nothing durable lives only in the sandbox
+
+The sandbox is rebuilt without warning: on 2026-09-07 a rebuild erased every
+worktree, the session's scratch directory, every local `audit/*` tag, and a
+reviewed-MERGE lane whose two commits had never been pushed. The rules that
+follow from that, each already cheap:
+
+1. A lane works on a named branch `lane/<name>` created from the current
+   main, and runs `git push -u origin lane/<name>` after EVERY commit. A
+   commit that exists only in a worktree is not work that exists. The
+   orchestrator still merges only `--ff-only` and only on MERGE; the
+   branch is deleted from origin after the merge.
+2. A reviewer writes its review INTO the repository —
+   `docs/audits/<date>-<batch>/<lane>-review.md`, scratch paths replaced by
+   `<session scratch>` — before returning its verdict, and the orchestrator
+   commits it with the merge. Scratch-only reviews are what the 2026-09-07
+   batch lost: five lanes, nine rounds, two discovery reports.
+3. Audit tags cannot be pushed from the sandbox (the proxy refuses tag
+   pushes), so the reviewed SHA is written into the review's first line and
+   into the audit README as well as tagged; the tag is a convenience, the
+   pushed lane branch is the record.
+4. Anything the orchestrator drafts for a session record or a README is
+   drafted in the repository (uncommitted is fine; committed is better),
+   not in scratch.

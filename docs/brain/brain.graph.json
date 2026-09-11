@@ -49,6 +49,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-07 Innovation Batch",
+      "path": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
       "type": "branch",
       "title": "Branch — Advice-Rule-Fixes",
@@ -750,6 +756,26 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md",
       "to": "docs/brain/Patterns.md"
     },
     {
