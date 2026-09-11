@@ -23,12 +23,14 @@ into the repository before the merge, and lanes push after every commit.
 | public benchmark (P1 instrument) | REVISE 7 → MERGE (+2 notes) → MERGE | b79759a6 · 120ffaae · 9b199b72 | 685349f4, ecfd0f0c, 9b199b72 (main) |
 | `npm run verify-report` (P3 closed) | REVISE 5 → MERGE (+1 built) | 16bfec58 · 42206178 | 42206178, 81ec1652 (main) |
 | feature-length loop (P2/P0) | REVISE 2 (+6 non-blocking, all built) → MERGE | bff55e39 · dd57251d | dd57251d (main) |
-| producer's exports (P3) | REVISE 8 → MERGE (+4 follow-ups) → **objects lost**; rebuilt on `lane/exports-producer-tier` and re-reviewed (see `exports-review.md`) | 80824d48 · 0ad69536 (unreachable) | see `exports-review.md` |
+| producer's exports (P3) | REVISE 8 → MERGE (+4 follow-ups) → **objects lost**; rebuilt on `lane/exports-producer-tier` under §7 and re-reviewed: REVISE 5 → MERGE (`exports-review.md`) | 80824d48 · 0ad69536 (unreachable) · 8165c168 · b7d45017 (rebased as 2deeb478) | 2deeb478 (main) |
 | scoring: feature-length defects (P1, owner-gated) | REVISE 9 → REVISE 4 → MERGE-READY-FOR-OWNER (`scoring-review.md`, three rounds after the rebuild) | 4643d590 (pre-rebase) · 13d64bb5 · bcc96f85 on `scoring/feature-length-defects`; efd1a463 on `scoring/feature-length-saturation-only` | never merged here; the owner's `measure-real` decides, in the order the owner note gives |
 
-Full review files survive for none of the first four rounds' lanes; the
-surviving review of record for the scoring branch is complete (it was written
-after the rebuild, into this directory).
+Full review files survive for none of the lost rounds; the reviews of record
+for the rebuilt exports lane and the scoring branch are complete (written after
+the rebuild, into this directory, before their merges). `lane/exports-producer-tier`
+still exists on `origin` because the sandbox proxy refuses branch deletes as it
+refuses tag pushes — the owner can delete it; it is fully merged.
 
 What the reviews caught that the lanes' own gates had passed: a benchmark
 that read chance on both channels and had no control proving it could read

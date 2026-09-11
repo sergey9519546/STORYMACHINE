@@ -535,6 +535,12 @@
       "path": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md"
     },
     {
+      "id": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "type": "session",
+      "title": "Session — 2026-09-07: The Innovation Batch, and the Rebuild",
+      "path": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md"
+    },
+    {
       "id": "docs/brain/Surfaces/Surface - Collab Room.md",
       "type": "surface",
       "title": "Surface — Collab Room",
@@ -1805,6 +1811,38 @@
     {
       "from": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md",
       "to": "docs/brain/Owner/Owner - Make Repo Private.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",

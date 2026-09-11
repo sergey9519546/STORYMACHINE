@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-06, main @ 08722bbe (seven session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-11, main @ c181dfe1 (eight session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -34,6 +34,155 @@ Product-surface verification was covered by the orchestrator's own full
 browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
+
+**2026-09-07 — the innovation batch, and the rebuild that cost it its
+record.** The owner asked for the project to be *pushed forward* — what
+needs building, what needs improving — and not to steer away from what
+STORYMACHINE is. Two read-only discoveries set the direction before any lane
+was cut. The innovation discovery found that the repository already held
+every piece of a real discrimination benchmark that could run in CI on
+distributable text except three committed artifacts, and that the only
+always-on discrimination signal was a `knownFailing` wrapper recording the
+doctor ordering one of six blind pairs. The product discovery assembled a
+146-scene feature from the CC0 shorts — deliberately incoherent, and the
+most informative input of the session — and ranked twelve findings, every
+one anchored to a phase gate. Five build lanes followed, each through
+`docs/LANE_STANDARD.md`'s independent review. **None passed on the first
+pass:**
+
+- **The public benchmark** (P1's instrument, three rounds). `npm run
+  benchmark:public` and an always-on test compute a degradation AUC over
+  the 32 distributable scripts on every CI run: a pre-registered
+  sha256-derived split, a hash-locked manifest, seeded bootstrap intervals,
+  and floors in `scripts/lib/auc.ts` separate from the AUC-24 ratchet. The
+  reviewer reproduced every statistic on a scorer of their own and then
+  found the instrument could not yet prove it read anything: shuffle-drop
+  and climax-relocate both sat at chance, so a dialogue-flatten positive
+  control was added and reads 1.000 paired. The more flattering of two
+  computed statistics had been the only one ratcheted; both are now. Two
+  smaller catches: `--lock` exited 0 on a refusal, and the gate reporter's
+  VERIFIED row did not run its suite. The measured finding that matters:
+  dropping a third of a draft's scenes removes more weighted issues than
+  words, so under the current sub-density term **the health formula pays a
+  writer to delete a third of their scenes** — a scoring change, queued to
+  the scoring lane below, never made on main.
+- **`npm run verify-report`** (P3 closed, two rounds). The one P3 gap was a
+  verifier a producer could run offline; the CLI reads an HTML report, a
+  letter or a JSON export, extracts its claims, re-runs the doctor on the
+  script, and prints a verdict. The reviewer's first round showed it
+  printing `VERIFIED` at exit 0 on a forged report in two of three shapes:
+  a health claim the parser could not read as a number became `NaN`, which
+  compares unequal to nothing; and a body whose headline had been edited
+  while its verify block stayed genuine passed untouched. The route's own
+  zod schema now stands in front of the shared comparator, and the body is
+  cross-checked against its verify block. Four genuine artifacts from a
+  live keyless server were checked in the failure direction first. A 2 s
+  timeout on the git fallback in `build-info.ts` closed a hang the review
+  found.
+- **The feature-length loop** (two rounds). There was no feature-length
+  script anywhere in the repository, so nothing was ever exercised at the
+  length the product is for. A 231-scene fixture is now assembled
+  deterministically from the twenty CC0 shorts (provenance in a boneyard,
+  outside the output-identity set by construction) and the loop was run on
+  it: typing a new scene after running coverage threw React's infinite
+  render loop — root-caused to a same-value state write with an update
+  pending, fixed at the cause with an idempotent-state hook and a DOM test
+  that fails on the old tree; every located finding got one jump control
+  through one resolver; root-cause cards stopped contradicting their own
+  expanders. The reviewer reproduced every number, then showed the browser
+  step's "fail-first" was not deterministic (the lane had called that
+  intrinsic) and made it 3/3 by delivering keystrokes without a drain gap;
+  and that the shape-guard's lowered threshold subtracted real protection
+  from 75 pre-existing rows — it is two tiers now, the old floor restored
+  and a feature tier derived from its own generator. Tab stops fell from
+  1,640 to 1,295 on the fixture with reading order unchanged.
+- **The producer's exports** (two rounds, then the object was lost and the
+  lane rebuilt and reviewed again — REVISE 5 → MERGE). The writer's screen and
+  the producer's exports disagreed about where the problem was from the same
+  content hash, because the export route omitted scene spans: on the
+  231-scene fixture that is 70 root causes against 69, and a third finding
+  reading "Scenes 1–58" against "Scene 1". One shared root-cause pipeline
+  now serves all eight call sites, with a parity test that drives four live
+  surfaces from one hash and fails when any one is reverted. The report's
+  opening line is gated on evidence: a logline only when the most-present
+  speaker has a clean dialogue-share gap (the gate costs one draft in
+  thirty-three — the incoherent assembly), and a "turn" only when it is a
+  line spoken in a dialogue block of the climax scene (runoff's stage
+  direction stops being quoted; off-season's spoken turn stays). A
+  one-page producer tier opens the coverage report and the letter — logline,
+  length, verdict, the things to fix first with page numbers that match the
+  PDF's printed labels, and the reference bounds the percentile is valid
+  within — measured to fit a printed page, with a character budget CI pins.
+  The percentile reads "not comparable" on every surface for a draft outside
+  the reference set, with one symmetric predicate and the word count plumbed
+  to every surface that applies it. Scene lists collapsed from a 1,231-char
+  worst case to 28. The summary contradiction (#8) was stopped at the
+  scoring seam and belongs to the branch below. The
+  rebuild's reviewer reproduced the parity mutation, the print-media fit,
+  the page-reference agreement with the PDF and the logline counts, and
+  returned REVISE on five statements in shipped bytes: a measured table
+  quoting a row that did not exist; the reference bounds stated twice on the
+  producer's first page; a caveat clause that no longer parsed on the
+  not-comparable path every real draft takes; a "0 after" claim for
+  mid-clause ellipses whose counter-example was the lane's own showcase
+  script (a sibling function had kept the old truncation); and a
+  before-count one short. Round 2 built all five and the three notes — the
+  drift table is re-derived from a live run so the class is gone, the goal
+  clause is the sentence containing the want, and a probe's provenance was
+  corrected from git twice over — and returned MERGE.
+- **The scoring branch** (`scoring/feature-length-defects`, two rounds,
+  not merged — the owner's `measure-real` decides). The three feature-length
+  defects — the voice channel abstaining on every feature, character names
+  and the title of the script scored as critical clues, and length beating
+  coherence — became seven commits measured on the new instrument, plus the
+  order-sensitive candidate `meanAbsDialogueShareDelta`, which measured a
+  null once cast-size was normalised and stays exposed, not wired. On the
+  public benchmark the matched-pair shuffle-drop reading moved from 0.5313
+  to 0.8750, the damaged copy stopped scoring higher than the intact one
+  (mean gap −1.93 → +1.89), climax-relocate's eleven exact ties fell to one,
+  and the blind pairs went from one of six to four of six — with the
+  calibration corpus untouched sample for sample. The reviewer reproduced
+  every headline number and returned REVISE on what the branch *said*: the
+  staple witness had passed by pinning one favourable ordering (six of
+  twelve random orderings still outscored the best part); the slope table
+  named the wrong population and omitted the four scripts where the damaged
+  copy still wins; the owner-facing framing pointed at the rank-preserving
+  half of the scarcity change, which AUC-24 cannot see. Round 2 made the
+  witness hold over every ordering (saturation 15 → 12, the only value at
+  which the term contributes nothing to the comparison, one floor re-locked
+  *down*), split the formula change so the saturation half is landable on
+  its own (`scoring/feature-length-saturation-only`), corrected the owner
+  note's reason, and found that main's own feature fixture was being
+  rejected by the branch's voice bound. A clue-guard narrowing that read
+  better on every statistic was reverted when the full suite showed it had
+  put a character into the clue channel — floors restored to the byte.
+  The reviewer's round 2 found four one-line untruths left (a comment
+  claiming a floor was not re-locked in the commit that re-locked it; a
+  receipt count stale a second time and naming only the orphaned pre-rebase
+  tip; a fifth copy of a rejected quotient; a misquoted margin) and, on its
+  own 58 orderings, could not break the witness. Round 3, on those four
+  fixes: MERGE-READY-FOR-OWNER at bcc96f85 — nothing on the branch is
+  untrue, and what the owner is deciding about is the lane's own
+  disclosures.
+
+**The rebuild.** Between the exports lane's MERGE verdict and its merge, the
+sandbox hit a usage limit and was rebuilt. Every worktree, the scratch
+directory, every local audit tag and the exports lane's two unpushed
+commits were erased; five lanes' review files and both discovery reports
+went with them. What survived is what had been pushed and what the
+reviewers said in their final messages, which are now committed verbatim
+under `docs/audits/2026-09-07-innovation/` and labelled as reconstructed.
+`docs/LANE_STANDARD.md` §7 is the rule: lanes push `lane/<name>` after
+every commit, reviewers write into the repository before returning a
+verdict. The exports lane was rebuilt from its two verdicts under that rule
+and re-reviewed.
+
+Main moved from 9b199b72 to c181dfe1. Still owner-only: `measure-real` on
+`scoring/stacked-r5-plus-advice` and on `scoring/feature-length-defects`
+(alternatives, not a stack — the branch's own measurement), the AUC-24 lock
+before 2026-10-01, the Actions account block, the licence, the visibility
+toggle, and the Node 24 base image. The `audit/2026-09-07/*` tags no longer
+exist anywhere.
 
 **2026-09-06 — current, synced, upgraded.** The owner asked for everything
 still open to be taken care of and the project brought current. Three
