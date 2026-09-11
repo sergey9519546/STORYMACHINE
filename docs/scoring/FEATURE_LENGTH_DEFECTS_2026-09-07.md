@@ -263,13 +263,24 @@ and the third is why the existing one was nearly inert:
    was true of the intent, not of the code. The cue set now comes from
    `s.characters` and `dialogueLines[].speaker`.
 
-The name test is `EVERY word must be a name word`, never `any` — `BRASS KEY`
-beside a character called KEY stays a clue, because `brass` is not a name
-word. To make that strict test reach `ramon delgado` (cue `DELGADO`, `ramon`
-unknown), the guard first learns full names from the screenplay's own
-introduction convention: one pass over the caps tokens, and any token
-containing an already-known cue word teaches its other words. One pass, not a
-fixed point, so the set cannot chain outward through unrelated props.
+The name test is `EVERY word must be a name word`, never `any`. To make that
+strict test reach `ramon delgado` (cue `DELGADO`, `ramon` unknown), the guard
+first learns full names from the screenplay's own introduction convention: one
+pass over the caps tokens, and any token containing an already-known cue word
+teaches its other words.
+
+*(CORRECTED 2026-09-11, round 2 item 3. This paragraph claimed that "`BRASS
+KEY` beside a character called KEY stays a clue, because `brass` is not a name
+word", and that "the set cannot chain outward through unrelated props". Both
+were false as shipped: the learning pass above read the caps run "BRASS KEY",
+found the cue word `key` in it, added `brass`, and excluded the prop — the
+example offered as the justification was the counterexample — and it chained one
+step outward into a prop, which is all it takes to delete that prop. A third
+shape, a script titled after its own central object, lost that object to the
+title guard. §12 records all three with their measured id lists, the two causes,
+and the fixtures; the learning pass now requires the introduction marker (a
+comma or an opening parenthesis immediately after the caps run) and the title
+guard only excludes a token that occurs nowhere outside the title page.)*
 
 **The measured before/after, on the 139-scene stapled document:**
 

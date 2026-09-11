@@ -369,14 +369,40 @@ test('the normalised channel is order-SENSITIVE (a permutation moves it), unlike
   );
 });
 
-test('NOT WIRED: no score reads the normalised channel', () => {
+test('NOT WIRED: no score reads the normalised channel', async () => {
   // The claim the field comment makes, asserted rather than trusted. If a
   // later change wires it, this fails and the change owes a measurement.
-  const src = readFileSync(path.join(REPO_ROOT, 'server/nvm/analyze/doctor.ts'), 'utf8');
+  //
+  // WIDENED 2026-09-11 (round 2, item 9b). This grepped `doctor.ts` ALONE, and
+  // a deduction added in `server/nvm/revision/passes/**` — or in any other
+  // module doctor.ts's import graph reaches — would read the channel without
+  // doctor.ts ever naming it, and the guard would pass. It now reads the whole
+  // scoring-path file set, taken from the one place that defines it:
+  // `scripts/check-scoring-receipt.mjs`'s own classifier. A second,
+  // hand-maintained list here would drift from that one, which is the defect
+  // this widening is the opposite of.
+  const { scoringPathFiles } = await import('../../../scripts/check-scoring-receipt.mjs');
+  const files = scoringPathFiles(REPO_ROOT);
   assert.ok(
-    !src.includes('meanAbsDialogueShareDeltaNormalised'),
-    'doctor.ts now references the normalised channel — wiring it needs the CLIMAX_RELOCATE measurement in '
-    + 'docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md §7 re-run first (it read 16 of 32, exactly chance)',
+    files.length >= 20 && files.includes('server/nvm/analyze/doctor.ts'),
+    `the scoring-path set must be real and must contain doctor.ts, or this guard is vacuous; got ${files.length} files`,
+  );
+  // The module under test DEFINES the field, so it is the one exclusion, named
+  // rather than pattern-matched. Everything else on the scoring path is read.
+  const DEFINING_MODULE = 'server/nvm/analyze/structural-signals.ts';
+  assert.ok(files.includes(DEFINING_MODULE), 'sanity: the defining module must itself be on the scoring path');
+  const offenders = files.filter((rel) => {
+    if (rel === DEFINING_MODULE) return false;
+    const abs = path.join(REPO_ROOT, rel);
+    if (!existsSync(abs)) return false;
+    return readFileSync(abs, 'utf8').includes('meanAbsDialogueShareDeltaNormalised');
+  });
+  assert.deepEqual(
+    offenders,
+    [],
+    `${offenders.join(', ')} now reference the normalised channel — wiring it needs the CLIMAX_RELOCATE `
+    + 'measurement in docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md §7 re-run first (it read 16 of 32, '
+    + 'exactly chance). The guard reads every scoring-path file, not just doctor.ts.',
   );
 });
 

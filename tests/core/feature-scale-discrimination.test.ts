@@ -254,10 +254,16 @@ describe('Feature-scale discrimination — dialogueDeduction moves health', () =
       `both fixtures must produce a verdict (intact ${String(intact.verdict)}, ` +
       `flattened ${String(flattened.verdict)})`,
     );
-    // The GRADE tier still separates, and it is asserted here because it is
-    // the tier check that survives the 2026-09-07 recalibration (see the
-    // verdict-tier `todo` immediately below). Measured on this tree: intact
-    // 81.4 `strong`, flattened 60.5 `solid`.
+    // The GRADE tier still separates. Asserted here, and labelled honestly
+    // (round 2, item 9a): this is the THINNER of the two tier checks in this
+    // file, not an equal partner to the verdict-tier one below. The grade
+    // boundary it crosses is 75, and with the 20.0-point delta gate two lines
+    // up enforced, any intact score below 95 makes a grade drop arithmetically
+    // implied — so on these fixtures it adds little beyond the gate. It is kept
+    // because the two checks read DIFFERENT thresholds (grade 75, verdict 60)
+    // and a future fixture could cross one without the other, not because it is
+    // strong evidence on its own. Measured on this tree: intact 79 `strong`,
+    // flattened 58.2 `solid`.
     assert.ok(
       GRADE_RANK[flattened.grade] < GRADE_RANK[intact.grade],
       `a draft whose dialogue has collapsed to one repeated word must not hold the same ` +
@@ -266,26 +272,27 @@ describe('Feature-scale discrimination — dialogueDeduction moves health', () =
     );
   });
 
-  // RE-OPENED as `todo` 2026-09-07 (branch scoring/feature-length-defects).
-  // This assertion lived inside the test above and was a hard check. It now
-  // fails on a threshold, not on a signal, and the honest fix is a `todo`
-  // carrying the number rather than a deleted or widened assertion.
+  // RE-OPENED as `todo` 2026-09-07 and CLOSED AGAIN 2026-09-11 (round 2), on
+  // its own merits and not by moving anything.
   //
-  // MEASURED on this tree: intact 81.4 CONSIDER, flattened 60.5 CONSIDER. The
-  // health delta is 20.9, comfortably over the 20.0 gate the test above still
-  // enforces, so the dialogue deduction is doing its job at full strength —
-  // the flattened draft simply lands 0.5 points above the PASS line (health
-  // < 60) instead of below it. That branch's density recalibration lifts
-  // short-and-mid-length scripts generally (the sub-1 curve is no longer a
-  // near-step function), and this 21-scene fixture crossed back over 60 with
-  // them.
+  // The history, because a re-opened-then-closed assertion is worth less than
+  // the record of why. Round 1 of this branch recalibrated the sub-1 density
+  // curve, which lifted short-and-mid-length scripts generally, and this
+  // 21-scene fixture crossed back over the PASS line: intact 81.4 CONSIDER,
+  // flattened 60.5 CONSIDER — a 20.9-point drop that landed 0.5 points ABOVE
+  // health 60. The delta gate and the grade drop still passed, so the honest
+  // move was a `todo` carrying the number rather than a deleted assertion, a
+  // widened gate, or a moved PASS line. The comment said what would close it:
+  // "the flattened fixture scoring below 60 again on its own merits".
   //
-  // Do NOT close this by moving the PASS line or by weakening the delta gate.
-  // What closes it is the flattened fixture scoring below 60 again on its own
-  // merits — re-measure before flipping it off todo.
+  // That is what happened. Round 2 moved the scarcity saturation point from 15
+  // scenes to 12 and fixed three false suppressions in the clue guard, and the
+  // fixture now measures intact 79 CONSIDER / flattened 58.2 PASS — a
+  // 20.8-point drop that crosses the line by 1.8. Neither change was made for
+  // this assertion and neither threshold moved: health 60 is still the PASS
+  // ceiling and the delta gate is still 20.0. Re-measure before touching it.
   it(
     'flattening every line of dialogue drops the VERDICT tier too',
-    { todo: 'RE-OPENED 2026-09-07: intact 81.4 CONSIDER, flattened 60.5 CONSIDER — a 20.9-point drop that lands 0.5 above the PASS line. The delta gate (>= 20.0) and the grade-tier drop both still pass; only the verdict threshold is no longer crossed.' },
     async () => {
       const intact = await runScriptDoctor(INTACT);
       const flattened = await runScriptDoctor(DIALOGUE_FLATTENED);
