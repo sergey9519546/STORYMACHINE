@@ -839,3 +839,59 @@ segmenter changes what `npm run lock-auc24` will measure on the owner's corpus.
 
 The same four statements are in `scripts/lib/auc.ts`'s header, `CLAUDE.md`'s
 "Which floor, exactly" section, and `docs/brain/Gates/Gate - AUC-24 Ratchet.md`.
+
+---
+
+## 12. Addendum — re-locked 2026-09-07 on `scoring/feature-length-defects`
+
+**Nothing above this line was edited.** Sections 0-10 are the 2026-09-06
+measurement of `main`, and they stay as the record of what the score did
+before this branch. This section is what the same commands print now, on the
+branch, and it is here because
+`tests/core/public-benchmark.test.ts` asserts that this document quotes every
+floor and every measured AUC the code currently produces — a measurement doc
+that has drifted from the measurement is worse than no doc, and so is one that
+quietly overwrites its own history.
+
+**Reproduce:** `npm run benchmark:public` on
+`scoring/feature-length-defects`. The floors below were written by
+`npm run benchmark:public -- --lock` in the same commit as the scoring change,
+and its before → after print is quoted verbatim in
+`docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md` §8.
+
+| degradation | N | AUC matched-pair (PRIMARY) | 95% CI | floor | AUC all-pairs | 95% CI | floor | ordered/inverted/tied |
+|---|---|---|---|---|---|---|---|---|
+| `SHUFFLE_DROP` | 32 | **0.8750** | [0.7500, 0.9688] | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` = **0.855** | 0.8306 | [0.7236, 0.9277] | `PUBLIC_SHUFFLE_DROP_FLOOR` = **0.8106** | 28/4/0 |
+| `CLIMAX_RELOCATE` | 32 | **0.5469** | [0.3750, 0.7188] | `PUBLIC_ORDER_PAIRED_FLOOR` = **0.5269** | 0.5151 | [0.4551, 0.5767] | `PUBLIC_ORDER_FLOOR` = **0.4951** | 17/14/1 |
+| `DIALOGUE_FLATTEN` *(control)* | 32 | **1.0000** | [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR` = **0.98** | 1.0000 | [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_FLOOR` = **0.98** | 32/0/0 |
+
+**What changed, and what did not.**
+
+* `SHUFFLE_DROP` 0.5313 → 0.8750 matched-pair. The sign counts carry the
+  meaning: 17/15/0 → 28/4/0, and the mean health gap moves from **−1.93** (the
+  DAMAGED copy scored higher) to **+2.10**. §10 of this document handed the
+  scoring lane a finding — "on 9-14-scene scripts the health formula pays you
+  to delete a third of your scenes" — and this is that finding closed.
+* `CLIMAX_RELOCATE` 0.4219 → 0.5469 matched-pair, and **its exact ties fall
+  from 11 of 32 to 1**. §4.1's warning that "a third of `CLIMAX_RELOCATE`'s N
+  cannot move" no longer applies: zero scripts sit pinned at health 76.0. The
+  point estimate now rests on 31 movable scripts instead of 21. **Its interval
+  still contains 0.5.** With scene count held constant the doctor still does
+  not reliably detect reordering; it now reads chance honestly instead of
+  reading chance through a saturated formula, which is a smaller claim than
+  the AUC alone suggests.
+* The control is unchanged in kind, cleaner in degree (all-pairs 0.9473 →
+  1.0000). It still proves the instrument reads, never that the score is
+  valid.
+* **The holdout is still spent.** All six floors above were re-locked from all
+  32 scripts, the five holdout files included, exactly as in §4.1. This
+  addendum does not turn the split into a held-out evaluation.
+* **Every limitation in §8 still applies unchanged**: N=32 at 9-14 scenes, the
+  feature-scale deductions never fire, twenty of the scripts are
+  agent-authored, and mechanical damage is not bad writing.
+
+**The craft measurement moved too, and it is the one to watch.** The blind
+matched pairs go from 1 of 6 ordered (mean gap −0.02) to **4 of 6 (mean gap
++0.3833)**, with no script left pinned at a shared health value. On six pairs
+that is inside what chance produces, and it is recorded as a number to
+re-measure on more pairs, not as a result.

@@ -410,6 +410,47 @@ export function doctorCacheAdopt(
 // a low-confidence zone where no corpus sample or discrimination pair landed;
 // the new curve is smooth across that region. See tests/core/monotonicity.test.ts
 // for property-based invariants enforcing this contract.
+// ── THE DELETION REWARD, and what was done about it (2026-09-07) ───────────
+// MEASURED, on the 32 committed public-benchmark scripts, intact against a
+// shuffle-drop copy of each (`npm run benchmark:public`; the decomposition is
+// reproduced by the probe recorded in
+// docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md §2): dropping every third
+// scene retains 72.5% of the words but only ~51% of the weighted issues, so
+// `density = weightedIssues / wordCount^0.7` falls to ~0.62 of its intact
+// value. Against a near-step logistic (steepness 50 about midpoint 0.52) that
+// gave back the ENTIRE 10-point range in one step, while the scarcity term
+// rose only +5.693. Net: the damaged copy scored 1.9 points HIGHER on
+// average, `counter-offer` gained 4.0 points for losing a third of its
+// scenes and `room-12` gained 36.5.
+//
+// TWO changes, each with one job, measured separately (the leave-one-out
+// table is in the doc's §8):
+//   * SUB_DENSITY_STEEPNESS 50 -> 2, so the sub-1 curve cannot hand back
+//     more than the scarcity term takes. Carries BOTH measurement channels:
+//     shuffle-drop 0.5781 -> 0.8750 matched-pair, and it un-pins the scripts
+//     sitting on the old ceiling (climax-relocate's exact ties 17 -> 1).
+//   * SCARCITY SATURATION in scarcityPenalty below. Carries the STAPLE
+//     witness, and nothing else — it cannot move any script of 15 scenes
+//     or fewer.
+//
+// THE CANDIDATES MEASURED AND NOT TAKEN (numbers in the doc's §8):
+//   (a) R5's scene-opportunity denominator, `weightedIssues/(sceneCount*30)^0.7`.
+//       Paired shuffle-drop 0.0938 — an INVERSION, and worse than doing
+//       nothing. The reason is arithmetic: a scene drop shrinks that
+//       denominator by (2/3)^0.7 = 0.752 while weighted issues fall to ~0.51,
+//       so density lands at ~0.68 of intact and the penalty falls further
+//       than the scarcity term rises. It normalises by the wrong thing.
+//   (b) A CREDIT CAP tied to scene count (`credit <= 10 * min(1,
+//       sceneCount/15)`). It measured WELL on the benchmark — paired
+//       shuffle-drop 0.8750 unchanged, all-pairs 0.8306 -> 0.8564, mean gap
+//       +2.10 -> +2.59 — and was rejected anyway, because it introduces a NEW
+//       saturation exactly where this branch is removing one: at 7 scenes it
+//       floors the density penalty at 10 - 10*(7/15) = 5.33, and five of the
+//       six synthetic discrimination pairs' good halves land pinned at
+//       health 74.7 as a result. Trading the 76.0 pin for a 74.7 pin to buy
+//       0.026 of a secondary statistic is not a trade this branch makes.
+//   (c) Steeper gentle curves (k = 4, 5, 8) measure marginally better on
+//       shuffle-drop and all VIOLATE the slope constraint above.
 /** The word-density half of craftPenalty, factored out on its own (Wave
  *  18-β) so a caller can apply it WITHOUT the scarcity term below — see
  *  computeDimensionScore's comment for why the per-dimension scores need
@@ -426,6 +467,7 @@ export function doctorCacheAdopt(
 function densityPenalty(
   bySeverity: { critical: number; major: number; minor: number },
   wordCount: number,
+  sceneCount: number,
 ): number {
   const WORD_COUNT_EXPONENT = 0.7;
   const DENSITY_POWER = 3.75;
@@ -446,16 +488,59 @@ function densityPenalty(
   // scripts are scored more harshly, but never rewarded for crossing the seam.
   const SUB_DENSITY_SCALE = 10;
   const SUB_DENSITY_MIDPOINT = 0.52;
-  const SUB_DENSITY_STEEPNESS = 50;
+  // ── 2026-09-07: 50 -> 2 (see the DELETION REWARD block above
+  // densityPenalty). It stays function-local for the TDZ reason this
+  // function's own doc comment gives.
+  //
+  // WHY 2, and not a value that measures better. The constraint is "the
+  // sub-1 curve's derivative must not exceed the scarcity slope", stated
+  // per script as (rise in scarcityPenalty under the drop) / (fall in
+  // density under the drop). Measured over all 32 public-corpus scripts on
+  // this tree, the BINDING script is `the-deposit-excellent` at 11.41. Any
+  // curve that must rise SUB_DENSITY_SCALE points across a unit of density
+  // has MEAN slope SUB_DENSITY_SCALE, so its maximum is at least 10 — the
+  // constraint is very nearly infeasible by construction, and it admits
+  // only near-linear curves. The largest steepness that satisfies it is
+  // k = 2.6335 (max slope 11.410); the largest INTEGER one is 2 (10.823),
+  // which is what is used, with the 5% headroom left rather than spent.
+  // k = 4, 5, 8 all measure marginally better on the public benchmark's
+  // shuffle-drop channel and all VIOLATE the constraint, so they were not
+  // taken — the numbers for each are in
+  // docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md.
+  const SUB_DENSITY_STEEPNESS = 2;
 
   const weightedIssues = 4 * bySeverity.critical + 1.5 * bySeverity.major + 0.5 * bySeverity.minor;
   const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
   const density = weightedIssues / Math.max(opportunityWords, 1e-10);
 
-  if (density < 1) {
-    return SUB_DENSITY_SCALE / (1 + Math.exp(-SUB_DENSITY_STEEPNESS * (density - SUB_DENSITY_MIDPOINT)));
-  }
-  return SUB_DENSITY_SCALE + DENSITY_SCALE * (Math.pow(density, DENSITY_POWER) - 1);
+  // sceneCount is accepted but deliberately UNUSED here — see the
+  // "candidate (b)" paragraph in the DELETION REWARD block above for the
+  // measurement that rejected the scene-count credit cap, and why the
+  // parameter is kept on the signature rather than the cap kept in the
+  // formula.
+  void sceneCount;
+  return density < 1
+    // Anchored so the branch still meets the power branch exactly at
+    // density = 1. The bare logistic reached SUB_DENSITY_SCALE only
+    // asymptotically and got away with it at steepness 50 (it is within
+    // 1e-10 of 10 by density 1); at steepness 2 it is nowhere near, so the
+    // curve is rescaled to hit 0 at density 0 and SUB_DENSITY_SCALE at
+    // density 1. Monotone increasing on [0, 1] and continuous with the
+    // power branch, which is what tests/core/monotonicity.test.ts pins.
+    ? subDensityCurve(density, SUB_DENSITY_SCALE, SUB_DENSITY_MIDPOINT, SUB_DENSITY_STEEPNESS)
+    : SUB_DENSITY_SCALE + DENSITY_SCALE * (Math.pow(density, DENSITY_POWER) - 1);
+}
+
+/** The sub-1 density branch, anchored to 0 at density 0 and to `scale` at
+ *  density 1 so it meets the power branch exactly. Split out (2026-09-07) so
+ *  the anchoring arithmetic is stated once and is independently testable;
+ *  its constants are passed in rather than declared here, for the same TDZ
+ *  reason densityPenalty's own comment gives. */
+function subDensityCurve(density: number, scale: number, midpoint: number, steepness: number): number {
+  const sig = (x: number) => 1 / (1 + Math.exp(-x));
+  const lo = sig(steepness * (0 - midpoint));
+  const hi = sig(steepness * (1 - midpoint));
+  return scale * (sig(steepness * (density - midpoint)) - lo) / (hi - lo);
 }
 
 /** The scene-scarcity half of craftPenalty, factored out on its own (Wave
@@ -677,7 +762,7 @@ function craftPenalty(
   sceneCount: number,
   wordCount: number,
 ): number {
-  return densityPenalty(bySeverity, wordCount) + scarcityPenalty(sceneCount);
+  return densityPenalty(bySeverity, wordCount, sceneCount) + scarcityPenalty(sceneCount);
 }
 
 /** 100 − craftPenalty, with NO clamping — can go deeply negative for a
