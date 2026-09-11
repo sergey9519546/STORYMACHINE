@@ -23,7 +23,7 @@
       "sha256": "3c8d0d03dec9ea0658dc9f44ad785dc3b9dcf5a54b870962bbb077bf036ac977",
       "sceneCount": 13,
       "words": 824,
-      "health": 78.6,
+      "health": 77.7,
       "verdict": "CONSIDER"
     },
     {
@@ -31,7 +31,7 @@
       "sha256": "8ca30768cbf966c88b4cd6565898aa04fc67a9c097036cb17fa185b5cbaad605",
       "sceneCount": 13,
       "words": 840,
-      "health": 78.7,
+      "health": 77.8,
       "verdict": "CONSIDER"
     },
     {
@@ -39,7 +39,7 @@
       "sha256": "29967a197f68a02b5ab0ee06714122e9b03bc9c3efdd7c8d4e8aee6cbdbc3f33",
       "sceneCount": 14,
       "words": 951,
-      "health": 79.5,
+      "health": 77.8,
       "verdict": "CONSIDER"
     },
     {
@@ -63,7 +63,7 @@
       "sha256": "4c48ab402fc6568742abfdd0cd22e576db6da94b7f62d916630ebaa37fd0ab61",
       "sceneCount": 13,
       "words": 934,
-      "health": 79.2,
+      "health": 78.3,
       "verdict": "CONSIDER"
     },
     {
@@ -95,7 +95,7 @@
       "sha256": "f730ade5917e5205309b85148bd56e05a9d1d34544c2ad0ef6456e7f22f0c903",
       "sceneCount": 14,
       "words": 982,
-      "health": 78.3,
+      "health": 76.7,
       "verdict": "CONSIDER"
     },
     {
@@ -167,7 +167,7 @@
       "sha256": "8524023d834abbc9d0edaf772a40600048c5bac61de5c73e37d1fb0a37480a50",
       "sceneCount": 13,
       "words": 1006,
-      "health": 79.6,
+      "health": 78.7,
       "verdict": "CONSIDER"
     },
     {

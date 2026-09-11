@@ -80,9 +80,13 @@ describe('plainSummary cannot contradict the dimension scores', () => {
     );
     assert.match(
       summaryOf(r),
-      /at 2 scene\(s\) that term alone removes 70 point\(s\)/,
+      /adds the scene-count term — 70 point\(s\) at 2 scene\(s\)/,
       'the paragraph must name what actually drove the score, with the number',
     );
+    // The gap is quoted too (round 2 item 6): on THIS document the term and
+    // the gap coincide at 70, which is exactly why the old single-number
+    // sentence looked sound here and was wrong on longer documents.
+    assert.match(summaryOf(r), /lowest: [^)]*? at 100\/100, 70 point\(s\) above it\)/);
     assert.ok(
       !/lowest-scoring diagnostic dimension/.test(summaryOf(r)),
       `no dimension may be called "lowest-scoring" when every one is above the overall — got: ${summaryOf(r)}`,
@@ -96,8 +100,25 @@ describe('plainSummary cannot contradict the dimension scores', () => {
 
     assert.ok(shownLowest > shownHealth, `premise: the lowest dimension (${shownLowest}) must sit above the overall (${shownHealth})`);
     assert.match(summaryOf(r), /Every diagnostic dimension scores at or above the overall/);
-    assert.match(summaryOf(r), /at 139 scene\(s\) that term alone removes 9 point\(s\)/);
+    assert.match(summaryOf(r), /adds the scene-count term — 12 point\(s\) at 139 scene\(s\)/);
     assert.ok(!/lowest-scoring diagnostic dimension/.test(summaryOf(r)));
+
+    // ROUND 2, item 6 — the regression this test could NOT catch before. The
+    // sentence used to end "The gap is the length of the draft, not the
+    // dimensions" and quoted the term as if it were the gap. Here the gap is
+    // 4 displayed points and the term is 12: three times the thing it was
+    // offered as the explanation of. So assert BOTH numbers, and assert that
+    // the false causal clause is gone — on this document it is provably false.
+    const quoted = /lowest: .*? at (\d+)\/100, (\d+) point\(s\) above it\)/.exec(summaryOf(r));
+    assert.ok(quoted, `the sentence must quote the gap as well as the dimension; got: ${summaryOf(r)}`);
+    assert.equal(Number(quoted![1]), shownLowest, 'the quoted lowest dimension must be the real one');
+    assert.equal(Number(quoted![2]), shownLowest - shownHealth, 'the quoted gap must be the real displayed gap');
+    const term = Number(/scene-count term — (\d+) point\(s\)/.exec(summaryOf(r))![1]);
+    assert.ok(term > Number(quoted![2]) * 2, `premise of this regression: the term (${term}) must dwarf the gap (${quoted![2]}) here, or the fixture no longer exercises it`);
+    assert.ok(
+      !/The gap is the length of the draft/.test(summaryOf(r)),
+      'the sentence may not assert that the gap IS the scene-count term on a document where it demonstrably is not',
+    );
   });
 
   it('NO-FIRE on a short whose dimensions straddle the overall: the ordinary sentence is unchanged', async () => {
@@ -132,18 +153,45 @@ describe('plainSummary cannot contradict the dimension scores', () => {
       'high-voltage', 'mise', 'off-season', 'quiet-season', 'red-line', 'room-12', 'runoff',
       'same-page', 'soft-launch', 'the-defense-rests', 'the-detour', 'the-key-under-the-mat',
       'transfer-window', 'two-lane', 'undertow'];
-    let checked = 0;
+    // WIDENED 2026-09-11 (round 2): this used to require that at least 10 of
+    // the 20 take the "lowest-scoring" branch, which made the property
+    // hostage to where the scarcity term happens to sit — the saturation move
+    // from 15 to 12 scenes lowered every 13-14-scene script by 0.9-1.7 points
+    // and flipped four of them to the disclosure branch, so the old floor
+    // failed on a change that made nothing less honest. Every script now has
+    // to take EXACTLY ONE of the two branches and satisfy that branch's own
+    // invariant, so the property covers all 20 regardless of which way each
+    // one falls.
+    let phrase = 0;
+    let disclosure = 0;
     for (const name of names) {
       const r = await runScriptDoctor(readFileSync(path.join(dir, `${name}.fountain`), 'utf8'));
-      const m = /is the lowest-scoring diagnostic dimension, at (\d+)\/100/.exec(summaryOf(r));
-      if (!m) continue;
-      checked++;
+      const summary = summaryOf(r);
+      const m = /is the lowest-scoring diagnostic dimension, at (\d+)\/100/.exec(summary);
+      const d = /Every diagnostic dimension scores at or above the overall \(lowest: .*? at (\d+)\/100, (\d+) point\(s\) above it\)/.exec(summary);
       assert.ok(
-        Number(m[1]) <= Math.round(r.health),
-        `${name}: paragraph quotes ${m[1]}/100 as the lowest dimension beside an overall of ${Math.round(r.health)}`,
+        (m === null) !== (d === null),
+        `${name}: the paragraph must take exactly one of the two branches; got: ${summary}`,
       );
+      if (m) {
+        phrase++;
+        assert.ok(
+          Number(m[1]) <= Math.round(r.health),
+          `${name}: paragraph quotes ${m[1]}/100 as the lowest dimension beside an overall of ${Math.round(r.health)}`,
+        );
+      } else {
+        disclosure++;
+        const shownLowest = Math.min(...(r.dimensions ?? []).map(x => Math.round(x.score)));
+        assert.equal(Number(d![1]), shownLowest, `${name}: the disclosure must quote the real lowest dimension`);
+        assert.equal(
+          Number(d![2]), shownLowest - Math.round(r.health),
+          `${name}: the disclosure must quote the real displayed gap`,
+        );
+        assert.ok(shownLowest > Math.round(r.health), `${name}: the disclosure fired while the dimensions do not sit above the overall`);
+      }
     }
-    assert.ok(checked >= 10, `only ${checked} of 20 scripts used the phrase — too few for this property to mean anything`);
+    assert.equal(phrase + disclosure, names.length, 'every script must be accounted for');
+    assert.ok(phrase >= 1 && disclosure >= 1, `both branches must be exercised by the corpus: ${phrase} phrase / ${disclosure} disclosure`);
   });
 });
 

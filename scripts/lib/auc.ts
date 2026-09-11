@@ -108,7 +108,12 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * WHY THREE DEGRADATIONS.
  *
  *  - SHUFFLE_DROP is the AUC-24 recipe: it drops every third scene and so
- *    moves `scarcityPenalty = 140/sceneCount` (doctor.ts:465-467) directly.
+ *    moves `scarcityPenalty` directly — but ONLY below that term's saturation
+ *    point. Since 2026-09-11 it is `140/min(sceneCount, 12)`, so on a document
+ *    whose intact AND dropped scene counts both exceed 12 the term contributes
+ *    exactly zero to this channel. That is the whole private-corpus case (see
+ *    WHAT SATURATION DOES TO AUC-24 below); on this 32-script corpus, where
+ *    every document is 6-14 scenes, the term still moves.
  *  - CLIMAX_RELOCATE preserves scene count exactly (measured: mean scarcity
  *    delta 0.000 over all 32 scripts), so that term cancels and what is left
  *    is order-sensitivity alone.
@@ -117,23 +122,40 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  *    detect, a reader cannot tell "the score is blind to mechanical damage"
  *    from "the harness never worked". The score catches this one on 32 of 32
  *    scripts with zero ties, through a scoring channel neither other
- *    degradation touches (~17-18 of its 29.30-point gap comes from outside
- *    the density/scarcity craft formula). The engine ships a deduction built
+ *    degradation touches (~17-18 of its 26.40-point mean gap comes from
+ *    outside the density/scarcity craft formula; that gap read 29.30 on
+ *    `main @ 9b199b72` and the figure was carried forward unrefreshed until
+ *    round 2). The engine ships a deduction built
  *    for exactly this manipulation, which is what makes it a liveness check
  *    on the instrument rather than evidence about the score.
  *
- * WHERE THE NUMBERS STAND, 2026-09-07 (branch scoring/feature-length-defects,
- * re-locked by `npm run benchmark:public -- --lock` in the same commit as the
- * scoring change). Shuffle-drop 0.8750 matched-pair / 0.8306 all-pairs;
+ * WHERE THE NUMBERS STAND, 2026-09-11 (branch scoring/feature-length-defects,
+ * round 2; re-locked by `npm run benchmark:public -- --lock` in the same commit
+ * as the scoring change). Shuffle-drop 0.8750 matched-pair / 0.8291 all-pairs;
  * climax-relocate 0.5469 / 0.5151; control 1.0000 / 1.0000. Read each of
  * those against what it was and against what it means:
  *
  *  - SHUFFLE-DROP moved 0.5313 -> 0.8750 matched-pair, and the sign counts
  *    moved with it: 17 ordered / 15 inverted / 0 tied -> 28 / 4 / 0, with the
- *    mean health gap going from -1.93 (the DAMAGED copy scored higher) to
- *    +2.10. That is not a tuning: the formula stopped paying a writer to
- *    delete a third of their scenes. See the DELETION REWARD block above
- *    doctor.ts's densityPenalty.
+ *    mean health gap going from -1.93125 (the DAMAGED copy scored higher) to
+ *    +1.89375. (Round 1 of this branch read +2.109375 and wrote it "+2.10",
+ *    truncated rather than rounded; round 2's scarcity saturation at 12 rather
+ *    than 15 scenes costs the six 13-and-14-scene scripts 0.898-1.667 points
+ *    each, which is where the rest of the difference went.) That is not a
+ *    tuning: it is the formula no longer paying the AVERAGE writer to delete a
+ *    third of their scenes. It is NOT "no writer": FOUR of the 32 are still
+ *    inverted, and they are named here because a narrative beside a disclosed
+ *    28/4/0 should not need a reader to go looking —
+ *      transfer-window          64.1 -> 73.0  (+8.9 for the damaged copy)
+ *      room-12                  63.9 -> 72.3  (+8.4)
+ *      the-key-under-the-mat    72.5 -> 74.1  (+1.6)
+ *      quiet-season             73.8 -> 73.9  (+0.1)
+ *    All four sit on the density POWER branch (intact density > 1), which the
+ *    sub-1 slope constraint provably cannot reach — see §8.2 of
+ *    docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md, which states that
+ *    constraint's population (the 16 scripts sub-1 at both ends) rather than
+ *    implying all 32. See also the DELETION REWARD block above doctor.ts's
+ *    densityPenalty.
  *  - CLIMAX-RELOCATE moved 0.4219 -> 0.5469 matched-pair and its exact ties
  *    collapsed from 11 of 32 to 1. That second number matters more than the
  *    first: the channel's N is no longer a third frozen, so the estimate now
@@ -159,7 +181,7 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * short-script shuffle-drop benchmark would look ~10x MORE separable. It did
  * not, and the reason WAS the defect. Measured decomposition over these 32
  * scripts on `main @ 9b199b72`: the scarcity penalty rose by a mean of +5.693
- * points while the DENSITY penalty fell by a mean of 7.625 at the same time,
+ * points while the DENSITY penalty fell by a mean of 7.632 at the same time,
  * because dropping a third of the scenes removes a larger share of the
  * weighted issues than of the words. Net mean health MOVED UP 1.93 points
  * under degradation. The 2026-09-07 change closes exactly that gap, which is
@@ -167,12 +189,45 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * that every floor here is set from a measurement rather than from the
  * arithmetic.
  *
+ * WHAT SATURATION DOES TO AUC-24, stated so the owner reads the right half.
+ * Two different things happen to a feature-length script and only one of them
+ * can move a matched-pair rank statistic:
+ *
+ *  - A NEAR-UNIFORM LEVEL SHIFT, which cannot. At the private corpus's median
+ *    118 scenes the term goes from 140/118 = 1.186 to 140/12 = 11.667, i.e.
+ *    every script loses 10.480 points (9.92 at 80 scenes, 10.97 at 200). That
+ *    WILL move verdicts, grades and the 72-row real-corpus manifest, and the
+ *    owner note asks for exactly that re-lock. It is rank-preserving within a
+ *    matched pair, so by itself it cannot move AUC-24 at all.
+ *  - THE SCARCITY CHANNEL'S DEGRADATION DELTA GOING TO EXACTLY ZERO, which
+ *    can. This is the AUC-relevant change and it is the one to read. For a
+ *    118-scene script the drop recipe leaves ~79 scenes; before saturation the
+ *    term contributed 140/79 - 140/118 = +0.586 points of separation, and
+ *    after it contributes 140/12 - 140/12 = 0.000 exactly. For EVERY script of
+ *    roughly 22 scenes or more — i.e. essentially the whole private corpus —
+ *    the channel main's own measurements credit with AUC 0.938 now contributes
+ *    nothing to this degradation.
+ *
+ * So AUC-24 CAN settle whether health still orders an intact feature above a
+ * shuffle-dropped copy of itself once scarcity contributes zero and the sub-1
+ * density curve is near-linear. It CANNOT settle which of the two changes is
+ * responsible (they are separately landable — see
+ * `scoring/feature-length-saturation-only` — but neither half has its own
+ * AUC-24 receipt), and it says nothing about craft.
+ *
  * HOW THEY ARE SET AND RE-SET. floor = round4(measured - PUBLIC_FLOOR_MARGIN).
  * `npm run benchmark:public -- --lock` rewrites all six constant lines below
  * (and the two committed fixtures) from a fresh run and prints every
  * before -> after. Do that ONLY after a scoring change you intended, and read
  * the resulting diff: a re-lock following an unintended regression silently
  * lowers the ratchet, which is the one way this machinery can be defeated.
+ * ONE floor has ever moved DOWN here: round 2's re-lock took
+ * PUBLIC_SHUFFLE_DROP_FLOOR from 0.8106 to 0.8091 (measured 0.8306 ->
+ * 0.8291), because the saturation point moved from 15 scenes to 12 and one of
+ * the 1,024 all-pairs comparisons went with it. The PRIMARY floor and the
+ * other four did not move, AUC24_FLOOR did not move, and the change was
+ * intended and measured before it was locked — which is the only condition
+ * under which a downward re-lock is allowed to happen at all.
  * The values, intervals, N and per-script pairs are in
  * docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md and in the PUBLIC-CORPUS
  * section of docs/p1-benchmark/MEASUREMENT_RECEIPTS.md.
@@ -183,7 +238,7 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * every one of them is still reachable by it.
  */
 export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.855;
-export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.8106;
+export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.8091;
 export const PUBLIC_ORDER_PAIRED_FLOOR = 0.5269;
 export const PUBLIC_ORDER_FLOOR = 0.4951;
 export const PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR = 0.98;

@@ -408,8 +408,11 @@ export function doctorCacheAdopt(
 // construction: adding any severity-weighted issue can only increase the
 // penalty. The old sub-1 branch's flat ~10-point penalty in [0.65, 1.0) was
 // a low-confidence zone where no corpus sample or discrimination pair landed;
-// the new curve is smooth across that region. See tests/core/monotonicity.test.ts
-// for property-based invariants enforcing this contract.
+// the new curve is smooth across that region. See
+// tests/core/script-doctor.test.ts's "P0.1: adding severity-weighted issues
+// never improves health (monotonicity)" for the property that enforces this
+// contract. (Both references here used to name a tests/core/monotonicity.test.ts
+// that does not exist in this tree — corrected 2026-09-11, round 2.)
 // ── THE DELETION REWARD, and what was done about it (2026-09-07) ───────────
 // MEASURED, on the 32 committed public-benchmark scripts, intact against a
 // shuffle-drop copy of each (`npm run benchmark:public`; the decomposition is
@@ -437,9 +440,15 @@ export function doctorCacheAdopt(
 //   (a) R5's scene-opportunity denominator, `weightedIssues/(sceneCount*30)^0.7`.
 //       Paired shuffle-drop 0.0938 — an INVERSION, and worse than doing
 //       nothing. The reason is arithmetic: a scene drop shrinks that
-//       denominator by (2/3)^0.7 = 0.752 while weighted issues fall to ~0.51,
-//       so density lands at ~0.68 of intact and the penalty falls further
-//       than the scarcity term rises. It normalises by the wrong thing.
+//       denominator by (2/3)^0.7 = 0.752 while weighted issues fall to the
+//       measured ratio, so density lands BELOW intact and the penalty falls
+//       further than the scarcity term rises. It normalises by the wrong
+//       thing. The ratio differs by tree and both are given rather than one
+//       of them being implied to be universal: 0.5018 on `main @ 9b199b72`
+//       (density -> 0.5018/0.752 = 0.667 of intact) and 0.5460 on this branch
+//       (-> 0.726). §8.2 of the measurement doc derives it on the branch
+//       figure; this block used to derive it on main's and the two arrived at
+//       0.68 and 0.73 without saying why (round 2 cosmetic).
 //   (b) A CREDIT CAP tied to scene count (`credit <= 10 * min(1,
 //       sceneCount/15)`). It measured WELL on the benchmark — paired
 //       shuffle-drop 0.8750 unchanged, all-pairs 0.8306 -> 0.8564, mean gap
@@ -467,7 +476,6 @@ export function doctorCacheAdopt(
 function densityPenalty(
   bySeverity: { critical: number; major: number; minor: number },
   wordCount: number,
-  sceneCount: number,
 ): number {
   const WORD_COUNT_EXPONENT = 0.7;
   const DENSITY_POWER = 3.75;
@@ -513,12 +521,13 @@ function densityPenalty(
   const opportunityWords = Math.pow(Math.max(wordCount, 1), WORD_COUNT_EXPONENT);
   const density = weightedIssues / Math.max(opportunityWords, 1e-10);
 
-  // sceneCount is accepted but deliberately UNUSED here — see the
-  // "candidate (b)" paragraph in the DELETION REWARD block above for the
-  // measurement that rejected the scene-count credit cap, and why the
-  // parameter is kept on the signature rather than the cap kept in the
-  // formula.
-  void sceneCount;
+  // NOTE (2026-09-11, round 2 cosmetic): this function briefly took a
+  // `sceneCount` parameter it immediately discarded with `void sceneCount`, to
+  // hold the SHAPE of the rejected scene-count credit cap (candidate (b) in
+  // the DELETION REWARD block above). The comment was honest about it and the
+  // signature was not — a caller reading the parameter list would conclude
+  // the density term is scene-count-aware, which it is not. The parameter is
+  // gone; the rejected candidate stays recorded where it belongs, in prose.
   return density < 1
     // Anchored so the branch still meets the power branch exactly at
     // density = 1. The bare logistic reached SUB_DENSITY_SCALE only
@@ -526,7 +535,8 @@ function densityPenalty(
     // 1e-10 of 10 by density 1); at steepness 2 it is nowhere near, so the
     // curve is rescaled to hit 0 at density 0 and SUB_DENSITY_SCALE at
     // density 1. Monotone increasing on [0, 1] and continuous with the
-    // power branch, which is what tests/core/monotonicity.test.ts pins.
+    // power branch, which is what script-doctor.test.ts's P0.1 monotonicity
+    // property pins.
     ? subDensityCurve(density, SUB_DENSITY_SCALE, SUB_DENSITY_MIDPOINT, SUB_DENSITY_STEEPNESS)
     : SUB_DENSITY_SCALE + DENSITY_SCALE * (Math.pow(density, DENSITY_POWER) - 1);
 }
@@ -559,19 +569,86 @@ function scarcityPenalty(sceneCount: number): number {
   // and docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md.
   //
   // Scarcity is a DEFICIENCY penalty — "there is not enough script here to
-  // judge" — so it must stop paying once there is enough. The saturation
-  // point is anchored to ARC_DED_MIN_SCENES / CLIMAX_DED_MIN_SCENES (both
-  // 15, this file): below 15 scenes the doctor's own structural deductions
-  // do not fire and scene count is the only proxy it has for "is there
-  // enough here"; at and above 15 it reads structure directly and scene
-  // count stops being that proxy.
+  // judge" — so it must stop paying once there is enough.
   //
-  // Note what this does NOT do: for every script of 15 scenes or fewer the
-  // term is byte-identical to before, so the whole 32-script public
-  // benchmark (9-14 scenes intact, 6-10 degraded) and the whole calibration
-  // corpus (9-10 scenes) are untouched by this line. Its only in-repo
-  // evidence is the stapled witness and the four synthetic length fixtures.
-  const SCARCITY_SATURATION_SCENES = 15;
+  // ── WHY 12 AND NOT 15 (2026-09-11, round 2 item 1) ───────────────────
+  // This constant shipped at 15, anchored to ARC_DED_MIN_SCENES /
+  // CLIMAX_DED_MIN_SCENES (both 15, this file) on the argument that below 15
+  // scenes the doctor's structural deductions do not fire and scene count is
+  // the only proxy it has for "is there enough here". The anchor is tidy and
+  // it did not close the defect. An independent review measured the staple
+  // witness over 14 orderings of its own twelve parts and found 7 of them
+  // still outscoring the best part, by up to +0.7 — the shipped alphabetical
+  // order passed by 2.0 while the construction's own order-sensitivity was
+  // 3.4 points wide.
+  //
+  // THE ARITHMETIC, which decides this and leaves nothing to taste. The
+  // staple comparison is (139-scene document) against (best part, 12 scenes),
+  // so this term's contribution to it is
+  //   140/min(139, S) - 140/min(12, S)
+  // which is 0 for every S <= 12 and strictly NEGATIVE (i.e. a length bonus)
+  // for every S >= 13: at S = 15 it hands the long document 11.667 - 9.333 =
+  // 2.333 points for nothing. S = 12 is therefore the LARGEST saturation
+  // point at which scene count contributes NOTHING to that comparison.
+  //
+  // IT IS NOT the largest value that passes the witness, and the difference is
+  // the whole reason for choosing it. Measured over the same 14 orderings:
+  //   S = 12  max ordering 80.2 vs best part 81.8  ->  margin 1.6, 0/14 fail
+  //   S = 13  max ordering 81.1 vs best part 81.8  ->  margin 0.7, 0/14 fail
+  //   S = 14  max ordering 81.9 vs best part 81.8  ->  margin -0.1, 1/14 fail
+  //   S = 15  max ordering 82.5 vs best part 81.8  ->  margin -0.7, 7/14 fail
+  // So 13 passes too. It passes by 0.7 points against a set whose own spread
+  // is 3.4 points wide, and 14 orderings are a sample of 12! of them — which
+  // is exactly the reasoning the round-1 version of this witness was faulted
+  // for. At 12 the margin is not a residual left over after a length bonus: it
+  // is the staple's own density disadvantage plus its deductions, because the
+  // scarcity term has been removed from the comparison by arithmetic rather
+  // than out-measured in it. That is why 12 and not 13.
+  //
+  // It is measured against the pathology, not derived from another constant —
+  // which is the honest description, and the reason the anchor sentence above
+  // is gone rather than reworded.
+  //
+  // WHAT IT COSTS, measured, all six floored public-benchmark statistics held:
+  //   SHUFFLE_DROP    paired 0.8750 unchanged (28/4/0, 0 ties); all-pairs
+  //                   0.8306 -> 0.8291 (floor 0.8106, unchanged, NOT re-locked)
+  //   CLIMAX_RELOCATE paired 0.5469 / all-pairs 0.5151, both unchanged
+  //   DIALOGUE_FLATTEN control 1.0000 / 1.0000 unchanged
+  //   mean health gap under the drop  +2.11 -> +1.89
+  //   calibration     byte-identical (all 20 samples are 9-10 scenes, so
+  //                   min(sceneCount, 12) is sceneCount for every one)
+  //   metamorphic     scene_dup_padding RECOVERS -2.1 -> -4.4 (doubling a
+  //                   9-scene script's scenes now buys 3.889 points of
+  //                   scarcity instead of 6.222)
+  //   every script of 13 or 14 scenes pays 0.898 / 1.667 points more than at
+  //   S = 15; at and above 15 every script pays exactly 2.333 more, which is
+  //   a rank-preserving shift (see the receipt entry: it cannot move a
+  //   matched-pair statistic, and it is NOT what the owner's AUC-24 run is
+  //   being asked about)
+  //
+  // WHAT IS STILL NOT CLOSED, stated exactly. Below the saturation point the
+  // term is still decreasing, so a staple whose best part has FEWER than 12
+  // scenes still collects `140/min(bestPartScenes, 12) - 140/12` for length
+  // alone — 3.889 points for a 9-scene best part. The general property the
+  // formula now supports is: scene count buys NOTHING at or above
+  // SCARCITY_SATURATION_SCENES, and the residue otherwise is exactly that
+  // expression. Closing it for all part lengths would mean flattening the
+  // term everywhere, which would delete the deficiency signal it exists to
+  // carry. tests/core/script-doctor.test.ts pins both halves of that
+  // statement, and the witness asserts the 12-scene case it actually covers.
+  //
+  // Note what this does NOT do: for every script of 12 scenes or fewer the
+  // term is byte-identical to before 2026-09-07, so the whole calibration
+  // corpus (9-10 scenes) and every DEGRADED member of the public benchmark
+  // (6-10 scenes) are untouched by this line.
+  //
+  // DECOUPLED FROM 15 DELIBERATELY: between 12 and 14 scenes a document now
+  // gets neither a varying scene-count proxy (saturated) nor the
+  // feature-scale deductions (gated at 15). That band is strictly SAFER than
+  // the alternative — it withholds a length bonus rather than granting one
+  // unexamined — but it is a real decoupling of two constants that used to
+  // be one, and it is recorded here rather than left for a reader to notice.
+  const SCARCITY_SATURATION_SCENES = 12;
   return SCARCITY_SCALE / Math.min(Math.max(sceneCount, 1), SCARCITY_SATURATION_SCENES);
 }
 
@@ -762,7 +839,7 @@ function craftPenalty(
   sceneCount: number,
   wordCount: number,
 ): number {
-  return densityPenalty(bySeverity, wordCount, sceneCount) + scarcityPenalty(sceneCount);
+  return densityPenalty(bySeverity, wordCount) + scarcityPenalty(sceneCount);
 }
 
 /** 100 − craftPenalty, with NO clamping — can go deeply negative for a
@@ -1990,15 +2067,34 @@ function buildPlainSummary(
   );
 
   if (dimensionsSitAbove) {
-    // The honest sentence: name the term, and say the dimensions cannot see
-    // it. Never call the smallest dimension "lowest-scoring" here — it is
+    // The honest sentence: name the term, name the gap it is quoted beside,
+    // and never call the smallest dimension "lowest-scoring" here — it is
     // above the overall, so the phrase would send the writer to the wrong
     // place.
+    //
+    // CORRECTED 2026-09-11 (round 2 item 6). This sentence used to end "The
+    // gap is the length of the draft, not the dimensions", and quoted the
+    // scene-count term as though it were the gap. It is not, on any document
+    // where the feature-scale deductions fire or where the per-dimension
+    // density curve differs materially from the document-scale one — i.e. on
+    // every document longer than 15 scenes. Measured on the 139-scene staple:
+    // the displayed gap is 2 points while the quoted term is 12, because
+    //   gap = doc densityPenalty + scarcityPenalty + deductions
+    //         - that dimension's OWN (differently-curved) density penalty
+    // and on that document those four are 8.37 + 11.67 + 2.49 - 18.0. Each
+    // number was individually true and the causal claim was false; a reader
+    // who subtracted the quoted term from 100 got a number the report did not
+    // print. The sentence now states the gap, names every term that makes it,
+    // and claims only what is true of all of them: these are two different
+    // statistics and the dimensions do not sum to the overall.
+    const shownGap = shownWeakest - shownHealth;
     sentences.push(
-      `Every diagnostic dimension scores at or above the overall (lowest: ${weakest.score.label} at ${shownWeakest}/100), `
-      + `because the dimensions read issue density alone while the overall also carries the scene-count term — `
-      + `at ${sceneCount} scene(s) that term alone removes ${Math.round(sceneTermPoints)} point(s). `
-      + 'The gap is the length of the draft, not the dimensions.',
+      `Every diagnostic dimension scores at or above the overall (lowest: ${weakest.score.label} at ${shownWeakest}/100, `
+      + `${shownGap} point(s) above it). They are different statistics, not two views of one: a dimension reads issue `
+      + `density inside a single craft family, on its own curve, while the overall reads density across all of them, `
+      + `adds the scene-count term — ${Math.round(sceneTermPoints)} point(s) at ${sceneCount} scene(s) — and subtracts `
+      + 'any document-scale structural deductions. So the dimension scores rank the craft families against each other; '
+      + 'they do not add up to the overall, and the gap is not a number to fix inside any one of them.',
     );
   } else {
     // weakest.mix === null only when every dimension cleared — a dimension can
