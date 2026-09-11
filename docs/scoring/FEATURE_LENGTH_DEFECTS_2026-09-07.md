@@ -346,7 +346,11 @@ belong to; the misattribution is recorded here rather than quietly fixed,
 because "which commit broke it" is the part a reviewer cannot re-derive later.
 
 **Commit 4 — the length pathology. `SUB_DENSITY_STEEPNESS` 50 → 2, and
-`scarcityPenalty` saturates at 15 scenes.**
+`scarcityPenalty` saturates at 15 scenes.** *(Round 2 split this into two
+commits — steepness and saturation, in that order reversed so each leaves a
+green tree — and moved the saturation point to 12 scenes. The block below is
+the round-1 measurement as it stood; §8.3's cost table and §8.2's sensitivity
+table carry round 2's.)*
 
 ```
 SHUFFLE_DROP     matched-pair 0.8750 [0.7500, 0.9688] floor 0.855  · all-pairs 0.8306 [0.7236, 0.9277] floor 0.8106 · 28/4/0
@@ -368,7 +372,12 @@ the residual `health − (100 − densityPenalty − scarcityPenalty)` is
 deduction fires at 9-14 scenes; the two rows marked ✓harness were re-run
 through `npm run benchmark:public` end to end and agree.
 
-| candidate | DROP paired | DROP all-pairs | DROP mean gap | CLIMAX paired | CLIMAX ties | blind | calibration | control | staple |
+Read the `staple` column with its round-2 caveat: every value in it is the
+health of ONE stapled ordering (alphabetical) against the best part. That is the
+measurement round 1 made and it is not the property the witness claims — see
+§8.3. The chosen row's ordering-free value is given below the table.
+
+| candidate | DROP paired | DROP all-pairs | DROP mean gap | CLIMAX paired | CLIMAX ties | blind | calibration | control | staple (1 ordering) |
 |---|---|---|---|---|---|---|---|---|---|
 | `main @ 9b199b72` | 0.5313 | 0.5586 | −1.93 | 0.4219 | 11/32 | 1/6 | MONO, gap 25.32 | 1.0000 | +8.2 FAIL |
 | commit 3 (clue guard) ✓harness | 0.5781 | 0.6196 | +1.18 | 0.5156 | 17/32 | 0/6 | MONO, gap 25.32 | 1.0000 | +7.0 FAIL |
@@ -378,7 +387,14 @@ through `npm run benchmark:public` end to end and agree.
 | (c) steepness 2 alone | 0.8750 | 0.8306 | +2.10 | 0.5625 | 0/32 | 4/6 | MONO, gap 25.32 | 1.0000 | +6.4 FAIL |
 | (d) saturation alone (`sat=15`) | 0.5781 | 0.6196 | +1.18 | 0.5156 | 17/32 | 0/6 | MONO, gap 25.32 | 1.0000 | −1.3 PASS |
 | (b)+(c)+(d) | 0.8750 | 0.8564 | +2.59 | 0.5625 | 2/32 | 4/6 | MONO, gap 25.32 | 1.0000 | −1.9 PASS |
-| **CHOSEN: (c)+(d)** ✓harness | **0.8750** | 0.8306 | +2.10 | **0.5469** | **1/32** | **4/6** | MONO, gap 25.32 | 1.0000 | **−2.0 PASS** |
+| (c)+(d at `sat=15`) ✓harness | **0.8750** | 0.8306 | +2.109 | **0.5469** | **1/32** | **4/6** | MONO, gap 25.32 | 1.0000 | −2.0 PASS, but **+0.7 FAIL** over orderings |
+| **CHOSEN (round 2): (c)+(d at `sat=12`)** ✓harness | **0.8750** | 0.8291 | +1.894 | **0.5469** | **1/32** | **4/6** | MONO, gap 25.32 | 1.0000 | **−1.6 PASS over all 14 orderings** |
+
+The last two rows are the round-2 correction in one line: `sat=15` passes the
+witness on the shipped ordering by 2.0 and FAILS it on 7 of 14 orderings of the
+same twelve parts (max ordering 82.5 against a best part of 81.8); `sat=12`
+passes on every one of the 14, by 1.6 at the worst. The cost is the two
+all-pairs-and-mean-gap cells and one secondary floor — §8.3.
 
 **Why (a) inverts, understood before anything was chosen.** R5 replaces the
 denominator `wordCount^0.7` with `(sceneCount·30)^0.7`. Under the shuffle-drop
@@ -411,35 +427,95 @@ Trading the 76.0 pin for a 74.7 pin to buy 0.026 of a secondary statistic is
 not a trade worth making in a branch whose whole diagnosis is that saturation
 is the defect.
 
-**Why steepness 2 and not a value that measures better.** The brief's stated
-constraint is that the sub-1 curve's derivative must not exceed the scarcity
-slope. Stated per script as `Δscarcity / |Δdensity|` under the drop recipe,
-and measured over all 32 scripts on the commit-3 tree, the eight tightest are:
+**Why steepness 2 and not a value that measures better.**
+*(REWRITTEN 2026-09-11, round 2 item 2. The version below this heading in
+round 1 claimed its table was "measured over all 32 scripts", listed
+`the-deposit-excellent 11.41` as BINDING under that population, printed two
+rows that do not reproduce, and omitted the four scripts the constraint cannot
+reach — which are exactly the four whose damaged copy still wins. All four
+errors are corrected here and the reproduction command is given.)*
+
+The constraint is that the sub-1 density curve's derivative must not exceed the
+scarcity slope, stated per script as `Δscarcity / |Δdensity|` under the drop
+recipe.
+
+**The population is not all 32.** The quantity being constrained is the
+derivative of the SUB-1 branch, so the only scripts it governs are those whose
+density stays below 1 at BOTH ends of the degradation — 16 of the 32. Over all
+32 the minimum ratio is **6.67** (`transfer-window`), and under that reading no
+admissible curve exists at all: a curve rising `SUB_DENSITY_SCALE = 10` points
+across a unit of density has mean slope 10 and therefore maximum slope ≥ 10, so
+even a straight line violates 6.67. Round 1 stated the wrong population and
+then satisfied the right one; the filter was applied and unstated.
+
+Reproduce: `node --experimental-strip-types` on the probe recorded in §11.4.
+All sixteen rows of the governed population, sorted, measured on this tree
+(identical on the commit-3 tree — the degradation and the densities do not
+depend on the formula change):
 
 ```
-the-deposit-excellent    Δscarcity 6.000  |Δdensity| 0.5257  ratio 11.41   <- BINDING
-low-tide-excellent       Δscarcity 6.000  |Δdensity| 0.4747  ratio 12.64
-signal-drift-bad         Δscarcity 6.000  |Δdensity| 0.4686  ratio 12.80
-night-shift-bad          Δscarcity 6.000  |Δdensity| 0.4645  ratio 12.92
-fence-line-bad           Δscarcity 6.000  |Δdensity| 0.4562  ratio 13.15
-signal-drift-excellent   Δscarcity 6.000  |Δdensity| 0.4410  ratio 13.61
-the-deposit-bad          Δscarcity 6.000  |Δdensity| 0.4214  ratio 14.24
-quiet-season             Δscarcity 6.000  |Δdensity| 0.3905  ratio 15.36
+the-deposit-excellent    Δscarcity 6.000  |Δdensity| 0.5256  ratio  11.42  <- BINDING
+low-tide-excellent       Δscarcity 6.000  |Δdensity| 0.4746  ratio  12.64
+signal-drift-bad         Δscarcity 6.000  |Δdensity| 0.4686  ratio  12.80
+night-shift-bad          Δscarcity 6.000  |Δdensity| 0.4646  ratio  12.91
+fence-line-bad           Δscarcity 6.000  |Δdensity| 0.4562  ratio  13.15
+the-deposit-bad          Δscarcity 6.000  |Δdensity| 0.4214  ratio  14.24
+fence-line-excellent     Δscarcity 6.000  |Δdensity| 0.3836  ratio  15.64
+night-shift-excellent    Δscarcity 6.000  |Δdensity| 0.3829  ratio  15.67
+the-ledger-bad           Δscarcity 6.000  |Δdensity| 0.3715  ratio  16.15
+low-tide-bad             Δscarcity 6.000  |Δdensity| 0.3597  ratio  16.68
+off-season               Δscarcity 7.778  |Δdensity| 0.4284  ratio  18.15
+counter-offer            Δscarcity 6.000  |Δdensity| 0.3050  ratio  19.67
+the-defense-rests        Δscarcity 5.833  |Δdensity| 0.2336  ratio  24.97
+runoff                   Δscarcity 7.778  |Δdensity| 0.2746  ratio  28.33
+the-ledger-excellent     Δscarcity 6.000  |Δdensity| 0.1826  ratio  32.86
+dead-frequency           Δscarcity 5.833  |Δdensity| 0.0748  ratio  78.03
 ```
+
+**Two rows round 1 printed do not reproduce on any tree in this branch**, and
+both are scripts that are outside the governed population anyway:
+`signal-drift-excellent` was printed as `|Δdensity| 0.4410 → ratio 13.61` and
+measures **0.4849 → 12.37** (intact density 1.0439, i.e. power branch);
+`quiet-season` was printed as `0.3905 → 15.36` and measures **0.5705 → 10.52**
+(intact density 1.1800, power branch). They are removed rather than corrected
+in place, because neither belongs in a table of the sub-1 population.
+
+**The four scripts the constraint cannot reach are the four that still invert.**
+This is the load-bearing omission, not a cosmetic one. The scripts missing from
+round 1's table are precisely those whose damaged copy still scores HIGHER:
+
+```
+transfer-window          dIntact 1.5946  ratio  6.67    intact 64.1 -> degraded 73.0  (+8.9)
+room-12                  dIntact 1.5996  ratio  7.10    intact 63.9 -> degraded 72.3  (+8.4)
+the-key-under-the-mat    dIntact 1.3315  ratio  9.39    intact 72.5 -> degraded 74.1  (+1.6)
+quiet-season             dIntact 1.1800  ratio 10.52    intact 73.8 -> degraded 73.9  (+0.1)
+```
+
+What that means, plainly: all four sit on the density POWER branch, which this
+change does not touch at all, so no choice of `SUB_DENSITY_STEEPNESS` can fix
+them. The 28/4/0 sign count IS reported (§8.1 and the benchmark's own table),
+so nothing was hidden — but a reader of the constraint table could not find out
+which four the constraint fails to reach, because those were the dropped rows.
+`scripts/lib/auc.ts` now names all four beside its 28/4/0 narrative for the
+same reason. **A writer of a dense 10-scene script can still gain up to 8.9
+points by deleting a third of their scenes.** That is the residue of this
+branch, it is on the power branch, and it is the next thing to fix.
 
 **The constraint is very nearly infeasible, and that is a finding.** Any curve
-that must rise `SUB_DENSITY_SCALE = 10` points across a unit of density has
-MEAN slope 10, so its maximum is at least 10 — against a binding ratio of
-11.41 there is almost no room. Measured maximum slope by steepness:
+rising 10 points across a unit of density has mean slope 10, so its maximum is
+at least 10 — against a binding ratio of 11.42 there is almost no room.
+Measured maximum slope by steepness (full precision; round 1 rounded the last
+two rows to three places and printed 13.140 and 20.760):
 
 ```
-k -> 0 (a straight line)  10.000  satisfies
-k = 2                     10.823  satisfies      <- CHOSEN
-k = 2.6335                11.410  satisfies (the exact boundary)
-k = 3                     11.815  VIOLATES
-k = 4                     13.140  VIOLATES
-k = 8                     20.760  VIOLATES
-k = 50 (main)            125.000  VIOLATES by 11x
+k -> 0 (a straight line)  10.0000  satisfies
+k = 2                     10.8232  satisfies      <- CHOSEN
+k = 2.6335                11.4100  satisfies (the exact boundary)
+k = 3                     11.8146  VIOLATES
+k = 4                     13.1392  VIOLATES
+k = 5                     14.7460  VIOLATES
+k = 8                     20.7557  VIOLATES
+k = 50 (main)            125.0000  VIOLATES by 11x
 ```
 
 k = 4, 5 and 8 all measure marginally better on shuffle-drop
@@ -447,36 +523,170 @@ k = 4, 5 and 8 all measure marginally better on shuffle-drop
 constraint, so none was taken. k = 2 is the largest integer that satisfies it,
 with the 5% headroom left rather than spent — and it is also the value at which
 `CLIMAX_RELOCATE`'s exact ties reach **zero** offline, i.e. the corpus is fully
-un-pinned.
+un-pinned. The saturation point moving from 15 scenes to 12 in round 2 does not
+move this table: every governed script's intact scene count is 9-12, so
+`min(sceneCount, 12)` equals `min(sceneCount, 15)` for all sixteen of them and
+every Δscarcity above is unchanged.
 
-**Why saturation at 15 scenes.** `SCARCITY_SCALE / sceneCount` decays to zero,
-so length alone buys health without bound; §2 measures the whole of the staple
-gap as that term. Scarcity is a DEFICIENCY penalty — "there is not enough
-script here to judge" — so it must stop paying once there is enough. 15 is not
-a fitted number: it is `ARC_DED_MIN_SCENES` and `CLIMAX_DED_MIN_SCENES`
-(`doctor.ts`, both 15), the scene count at which the doctor's own structural
-deductions begin to read a script's shape at all. Below it, scene count is the
-only proxy the engine has for "is there enough here"; at and above it the
-engine reads structure directly. Sensitivity, measured:
+**Why saturation at 12 scenes, and what round 1 got wrong about 15.**
+`SCARCITY_SCALE / sceneCount` decays to zero, so length alone buys health
+without bound; §2 measures the whole of the staple gap as that term. Scarcity
+is a DEFICIENCY penalty — "there is not enough script here to judge" — so it
+must stop paying once there is enough.
+
+Round 1 put the saturation point at 15 and justified it by anchoring: 15 is
+`ARC_DED_MIN_SCENES` and `CLIMAX_DED_MIN_SCENES` (`doctor.ts`, both 15), the
+count at which the doctor's own structural deductions begin to read shape.
+Tidy, and it did not close the defect. The independent review measured the
+witness over **14 orderings of its own twelve parts** and found 7 of them still
+outscoring the best part, by up to +0.7 — the shipped alphabetical ordering
+passed by 2.0 while the construction's own order-sensitivity is 3.4 points
+wide. Round 1's sensitivity table measured the single shipped ordering and
+therefore reported a margin the property does not have.
+
+**What the ordering-dependence rides on, measured before choosing.** Every
+ordering has the identical scene count (139) and word count (11,412), so
+scarcity and the word denominator are constant across the whole set. Decomposed
+at `SCARCITY_SATURATION_SCENES = 15`:
 
 ```
-sat=10  staple -4.3 PASS   sat=15  staple -1.9 PASS   sat=20  staple +0.4 FAIL
-sat=12  staple -4.2 PASS   sat=16  staple -1.3 PASS   sat=24  staple +1.6 FAIL
-sat=14  staple -2.6 PASS   sat=18  staple -0.3 PASS   none    staple +6.4 FAIL
+ordering       health  base(100-dens-scar)  deductions  dens   scar
+alphabetical     79.8               82.30        2.50   8.37  9.333
+reversed         82.4               82.40        0.00   8.27  9.333
+perm1..perm12    79.1-82.5     81.80-82.70  0.00-2.90  7.97-8.87  9.333
 ```
 
-The witness admits anything up to 18; 15 was chosen for the anchor, not for
-the margin, and the margin it happens to give is 1.9 points.
+So the ordering moves TWO things: the feature-scale deductions (0.00 to 2.90 —
+arc incoherence, which is the order-sensitive channel) and, slightly, the
+weighted-issue count feeding density (0.9 points of spread). Nothing in the
+scarcity term moves. And the staple's `base` is ABOVE the best part's 81.8 in
+every single ordering, so at `sat = 15` the invariant is carried entirely by
+a deduction that is sometimes zero. That is the defect: not a number too small,
+a margin resting on a term that can vanish.
 
-**What saturation provably does NOT touch.** For any script of 15 scenes or
-fewer the term is byte-identical to before. The entire 32-script public
-benchmark (9-14 scenes intact, 6-10 degraded) and the entire 20-sample
-calibration corpus (9-10 scenes) are untouched by that line — confirmed by the
-`sat=15 alone` row above, which moves nothing except the staple. Its only
-in-repo evidence is the staple witness and the four `synthetic/*-scenes`
-fixtures, which lose 6.5-7.6 points each. **On the private corpus, whose median
-is 118 scenes, it will move every script by roughly 8 points and that is the
-single largest thing the owner's run has to check.**
+**The arithmetic that decides the constant.** The comparison is a 139-scene
+document against a 12-scene best part, so this term's contribution to it is
+`140/min(139, S) − 140/min(12, S)`: exactly 0 for every `S ≤ 12`, and a length
+BONUS for every `S ≥ 13` (2.333 points at S = 15). Measured over the same 14
+orderings:
+
+```
+sat   best part   max ordering   margin   failing orderings
+ 10        79.4           77.9     -1.5               0 / 14
+ 11        80.7           79.1     -1.6               0 / 14
+ 12        81.8           80.2     -1.6               0 / 14   <- CHOSEN
+ 13        81.8           81.1     -0.7               0 / 14
+ 14        81.8           81.9     +0.1               1 / 14
+ 15        81.8           82.5     +0.7               7 / 14
+ 16        81.8           83.1     +1.3              10 / 14
+ 18        81.8           84.1     +2.3              12 / 14
+ 20        81.8           84.9     +3.1              13 / 14
+ 24        81.8           86.0     +4.2              14 / 14
+none       81.8           90.8     +9.0              14 / 14
+```
+
+**13 also passes, and is not chosen.** It passes by 0.7 points against a
+14-member sample whose own spread is 3.4 points, out of 12! possible orderings
+— which is the same reasoning round 1 was faulted for. At 12 the margin is not
+a residual left after a length bonus: it is the staple's own density
+disadvantage (1.6-2.3 points, because a longer document at the same issue rate
+is scored MORE harshly by `weightedIssues / wordCount^0.7`) plus whatever
+deductions fire, and the scarcity term is removed from the comparison by
+arithmetic rather than out-measured in it. That is a structural margin, and it
+is why 12 and not 13.
+
+**What this does NOT prove, stated exactly.** Below the saturation point the
+term still decreases, so a staple whose best part has FEWER than 12 scenes
+still collects `140/min(bestPartScenes, 12) − 140/12` for length alone —
+**3.889 points** for a 9-scene best part. The general property the formula now
+supports is narrower than "length cannot buy health":
+
+> Scene count buys nothing at or above 12 scenes. Below it, the amount length
+> can buy is exactly `140/bestPartScenes − 140/12`, which is zero if and only
+> if the best part is itself at or past the saturation point.
+
+Closing it for all part lengths would mean flattening the term everywhere,
+which deletes the deficiency signal it exists to carry. Both halves of that
+statement are asserted in `tests/core/script-doctor.test.ts` (the term equals
+`140/min(n, 12)` for every n from 2 to 400; the residue equals that expression
+for n < 12 and zero for n ≥ 12), and the witness asserts the 12-scene case it
+actually covers. **There is no sentence anywhere on this branch claiming the
+build fails "if length alone ever buys health again"** — round 1's promotion
+comment said that and it was not true.
+
+**What the move from 15 to 12 costs, measured.** All six floored
+public-benchmark statistics hold; one secondary floor was re-locked downward.
+
+```
+SHUFFLE_DROP     paired 0.8750 unchanged (28/4/0, 0 ties)
+                 all-pairs 0.8306 -> 0.8291;  floor 0.8106 -> 0.8091 (DOWN 0.0015)
+                 mean gap +2.109375 -> +1.89375
+CLIMAX_RELOCATE  paired 0.5469, all-pairs 0.5151 — both unchanged, 17/14/1
+DIALOGUE_FLATTEN control 1.0000 / 1.0000 unchanged, 32/0/0
+calibration      byte-identical: every sample is 9-10 scenes, so min(n,12) = n
+manifest         6 of 32 rows move, all 13-or-14-scene scripts, -0.9 or -1.7
+                 points; ZERO verdict flips
+metamorphic      scene_dup_padding RECOVERS -2.1 -> -4.4; scene_shuffle -1.6 and
+                 scene_reverse -0.4 unchanged
+AUC24_FLOOR      untouched at 0.622
+```
+
+**What saturation provably does NOT touch.** For any script of 12 scenes or
+fewer the term is byte-identical to before 2026-09-07. The entire 20-sample
+calibration corpus (9-10 scenes) and every DEGRADED member of the public
+benchmark (6-10 scenes) are untouched by that line. Its in-repo evidence is the
+staple witness, the four `synthetic/*-scenes` fixtures (which lose 6.5-7.6
+points each at sat=15 and more at sat=12), and the six 13-and-14-scene public
+scripts, which lose 0.9-1.7 points with no verdict flip.
+
+### 8.2a What the owner's AUC-24 run can and cannot settle
+
+*(REWRITTEN 2026-09-11, round 2 item 7. Round 1 told the owner that the
+saturation "will move every script by roughly 8 points and that is the single
+largest thing the owner's run has to check". The 8 points was arithmetically
+right — `140/15 − 140/118 = 8.147` — and it pointed the owner at the half of the
+change AUC-24 cannot see.)*
+
+Two different things happen to a feature-length script, and only one of them can
+move a matched-pair rank statistic.
+
+**(a) A near-uniform level shift, which cannot move AUC-24.** At the private
+corpus's median 118 scenes the term goes from `140/118 = 1.186` to
+`140/12 = 11.667`: every script loses **10.480 points** (9.92 at 80 scenes,
+10.97 at 200 — near-uniform, not uniform). This is what will move verdicts,
+grades, and every row of the 72-row `real-corpus-manifest.json`. It is also
+rank-preserving within a matched pair — both halves of the pair lose the same
+amount — so by itself it cannot change AUC-24 at all.
+
+**(b) The scarcity channel's degradation delta going to exactly zero, which
+can.** This is the AUC-relevant change, and it is the one to read:
+
+```
+per-script scarcity contribution to the shuffle-drop signal, n = 118 -> n_drop ~ 79
+  main:    140/79  - 140/118 = 1.772 - 1.186 = +0.586 points of separation
+  round 1: min(79,15) = min(118,15) = 15     ->     0.000, exactly
+  round 2: min(79,12) = min(118,12) = 12     ->     0.000, exactly
+```
+
+For every script of roughly 22 scenes or more — essentially the whole private
+corpus — the channel that `doctor.ts`'s own measurement credits with AUC 0.938
+now contributes **nothing** to this degradation. `main`'s own `auc.ts` comment
+already named that quantity ("0.58 points at the private corpus's median 118
+scenes"); what changed is that it is now zero, and that is what the owner's run
+is actually testing.
+
+**So, stated plainly.** `npm run measure-real` CAN settle whether health still
+orders an intact feature above a shuffle-dropped copy of itself once the
+scarcity channel contributes nothing and the sub-1 density curve is near-linear.
+It CANNOT settle:
+
+* which of the two changes is responsible. They are separately landable —
+  `scoring/feature-length-saturation-only` carries the saturation without the
+  steepness — but neither half has its own AUC-24 receipt, so a single number
+  on this branch cannot apportion the result.
+* anything about craft. Every degradation in reach is mechanical damage.
+* whether the ~10.5-point level shift is right. That is a calibration question
+  the manifest re-lock and the band averages answer, not an AUC.
 
 ### 8.3 The floor re-lock — the reviewable artifact
 
@@ -501,6 +711,29 @@ record of what `main` did — and a §11 addendum carries the new table, because
 `tests/core/public-benchmark.test.ts` asserts that document quotes every floor
 and every measured AUC the code currently produces.
 
+**Round 2's re-lock, also verbatim, and ONE floor moves DOWN:**
+
+```
+locked tests/fixtures/public-benchmark-split.json
+locked tests/fixtures/public-corpus-manifest.json
+locked scripts/lib/auc.ts — six floor constants:
+  PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR         0.855 ->   0.855   (measured 0.8750, PRIMARY, unchanged)
+  PUBLIC_SHUFFLE_DROP_FLOOR               0.8106 ->  0.8091   (measured 0.8291)
+  PUBLIC_ORDER_PAIRED_FLOOR               0.5269 ->  0.5269   (measured 0.5469, PRIMARY, unchanged)
+  PUBLIC_ORDER_FLOOR                      0.4951 ->  0.4951   (measured 0.5151, unchanged)
+  PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR      0.98 ->    0.98   (measured 1.0000, PRIMARY, unchanged)
+  PUBLIC_DIALOGUE_FLATTEN_FLOOR             0.98 ->    0.98   (measured 1.0000, unchanged)
+```
+
+`PUBLIC_SHUFFLE_DROP_FLOOR` fell 0.0015, because the all-pairs point estimate
+fell 0.8306 → 0.8291 when the saturation point moved from 15 scenes to 12: one
+of the 1,024 intact × degraded comparisons changed sign. A downward re-lock is
+the one way this machinery can be defeated, so the conditions are stated rather
+than assumed — the change was intended, measured before it was locked, and the
+diff read; both PRIMARY floors, the other four floors and `AUC24_FLOOR` are
+untouched. Round 2's manifest moves 6 of 32 health values (the 13-and-14-scene
+scripts, −0.9 or −1.7 points) with zero verdict flips.
+
 ### 8.4 What this cost, in full
 
 Four assertions moved. None was widened to fit a number.
@@ -513,9 +746,14 @@ Four assertions moved. None was widened to fit a number.
    change that reintroduces the saturation fails here.
 2. **`tests/core/script-doctor.test.ts`, the formula spot-check** — three
    values re-run against `computeHealthScore`, each with the mechanism
-   restated (`86 → 82.7`, `94.4 → 90.7`, `65 → 57.7`), plus a NEW assertion
-   that a 200-scene clean script scores no better than a 15-scene one while an
-   8-scene one still scores worse.
+   restated, plus a NEW assertion that a long clean script scores no better
+   than one at the saturation point while a shorter one still scores worse.
+   *(CORRECTED 2026-09-11, round 2 item 4: this entry read `86 → 82.7`,
+   `94.4 → 90.7`, `65 → 57.7`. Two of those three were the REJECTED
+   credit-cap variant's numbers — the same class of residue §9.3 records. What
+   shipped in round 1 was `86 → 84.6`, `94.4 → 90.7`, `65 → 65`; round 2's
+   saturation move takes the middle one to `88.3`. The current assertions are
+   84.6 / 88.3 / 65 and each is re-run against `computeHealthScore`.)*
 3. **`tests/core/discrimination.test.ts`, two of six synthetic craft pairs** —
    `dramatized-vs-told-exposition` inverts (−0.2) and
    `composite-reviewer-scenario`'s margin is +1.4 against a 5.0 floor. **Both
@@ -542,9 +780,13 @@ short distributable scripts and 45 in-repo fixtures. The feature-scale
 deductions (`ARC_DED_MIN_SCENES` / `CLIMAX_DED_MIN_SCENES`, both 15) never
 fire on the public corpus, so it measures a strictly smaller engine, and
 `AUC-24` on the private 761-script corpus is untouched and unmeasured. The
-scarcity saturation in particular will move every feature-length script by
-roughly 8 points, and nothing in this repository can tell you whether AUC-24
-stays above its 0.622 floor. That is the owner's run.
+scarcity saturation does two separable things to a feature-length script — a
+~10.5-point near-uniform level shift, which is rank-preserving and cannot move
+a matched-pair statistic, and the scarcity channel's per-script degradation
+delta going from +0.586 to exactly 0.000, which is the part AUC-24 measures.
+§8.2a states which of the owner's questions that run can and cannot settle.
+Nothing in this repository can tell you whether AUC-24 stays above its 0.622
+floor. That is the owner's run.
 
 
 ## 7. `meanAbsDialogueShareDelta`, normalised — a null result, measured

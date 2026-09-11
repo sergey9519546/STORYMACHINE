@@ -385,7 +385,7 @@ against each variant's own `bySeverity` / `sceneCount` / `wordCount`, with
 | term, `SHUFFLE_DROP`, mean over N=32 | value |
 |---|---|
 | extra **scarcity** PENALTY from losing scenes | **+5.693** points |
-| change in **density** PENALTY | **−7.625** points |
+| change in **density** PENALTY | **−7.632** points |
 | net change in penalty = mean health **gap** (intact − degraded) | **−1.931** |
 | net change in **health** | **+1.931** — health goes UP under degradation |
 
@@ -861,17 +861,32 @@ and its before → after print is quoted verbatim in
 
 | degradation | N | AUC matched-pair (PRIMARY) | 95% CI | floor | AUC all-pairs | 95% CI | floor | ordered/inverted/tied |
 |---|---|---|---|---|---|---|---|---|
-| `SHUFFLE_DROP` | 32 | **0.8750** | [0.7500, 0.9688] | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` = **0.855** | 0.8306 | [0.7236, 0.9277] | `PUBLIC_SHUFFLE_DROP_FLOOR` = **0.8106** | 28/4/0 |
-| `CLIMAX_RELOCATE` | 32 | **0.5469** | [0.3750, 0.7188] | `PUBLIC_ORDER_PAIRED_FLOOR` = **0.5269** | 0.5151 | [0.4551, 0.5767] | `PUBLIC_ORDER_FLOOR` = **0.4951** | 17/14/1 |
+| `SHUFFLE_DROP` | 32 | **0.8750** | [0.7500, 0.9688] | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` = **0.855** | 0.8291 | [0.7222, 0.9268] | `PUBLIC_SHUFFLE_DROP_FLOOR` = **0.8091** | 28/4/0 |
+| `CLIMAX_RELOCATE` | 32 | **0.5469** | [0.3750, 0.7188] | `PUBLIC_ORDER_PAIRED_FLOOR` = **0.5269** | 0.5151 | [0.4473, 0.5820] | `PUBLIC_ORDER_FLOOR` = **0.4951** | 17/14/1 |
 | `DIALOGUE_FLATTEN` *(control)* | 32 | **1.0000** | [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR` = **0.98** | 1.0000 | [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_FLOOR` = **0.98** | 32/0/0 |
 
 **What changed, and what did not.**
 
 * `SHUFFLE_DROP` 0.5313 → 0.8750 matched-pair. The sign counts carry the
-  meaning: 17/15/0 → 28/4/0, and the mean health gap moves from **−1.93** (the
-  DAMAGED copy scored higher) to **+2.10**. §10 of this document handed the
-  scoring lane a finding — "on 9-14-scene scripts the health formula pays you
-  to delete a third of your scenes" — and this is that finding closed.
+  meaning: 17/15/0 → 28/4/0, and the mean health gap moves from **−1.93125**
+  (the DAMAGED copy scored higher) to **+1.89375**. §10 of this document handed
+  the scoring lane a finding — "on 9-14-scene scripts the health formula pays
+  you to delete a third of your scenes" — and this is that finding closed **for
+  28 of the 32, not for all of them**. The four still inverted are
+  `transfer-window` (+8.9 for the damaged copy), `room-12` (+8.4),
+  `the-key-under-the-mat` (+1.6) and `quiet-season` (+0.1); all four sit on the
+  density POWER branch, which the sub-1 slope constraint cannot reach. They are
+  named here because the 28/4/0 sign count is reported two rows up and a reader
+  should not have to reconstruct which four.
+* **ROUND 2 (2026-09-11) moved two of these numbers and one floor.** The
+  all-pairs point estimate went 0.8306 → **0.8291** and the mean gap
+  +2.109375 → **+1.89375**, because the scarcity term's saturation point moved
+  from 15 scenes to 12 (the round-1 value did not close the length pathology —
+  7 of 14 orderings of the staple witness's own parts still outscored its best
+  part). `PUBLIC_SHUFFLE_DROP_FLOOR` was re-locked **downward**, 0.8106 →
+  0.8091. Every other floor, both PRIMARY floors and `AUC24_FLOOR` are
+  unchanged. Round 1 wrote the mean gap as "+2.10", truncated rather than
+  rounded; both figures above are the full values.
 * `CLIMAX_RELOCATE` 0.4219 → 0.5469 matched-pair, and **its exact ties fall
   from 11 of 32 to 1**. §4.1's warning that "a third of `CLIMAX_RELOCATE`'s N
   cannot move" no longer applies: zero scripts sit pinned at health 76.0. The
