@@ -782,56 +782,141 @@ export function relockFloorSource(
  * in one file next to the number cannot be left behind when the number is
  * copied somewhere else.
  */
-export const PUBLIC_BENCHMARK_LIMITS = [
-  'WHAT THIS BENCHMARK CAN SHOW',
-  '  * That the doctor still separates an intact script from a mechanically damaged copy of',
-  '    ITSELF, recomputed from committed text on every CI run, by anyone, with no corpus mount.',
-  '  * That a scoring change did or did not move that separation — as a numeric diff, with a',
-  '    seeded bootstrap interval, on a pre-registered split.',
-  '  * The scene-count question, directly rather than by arithmetic: (a) changes scene count and',
-  '    (b) does not, so the two numbers can be read against each other. On this corpus that',
-  '    comparison refuted the prediction that (a) would be inflated — see the header of',
-  '    PUBLIC_DEGRADATIONS for the measured decomposition (+5.693 scarcity, -7.625 density).',
-  '  * That the HARNESS works, separately from what it reads. DIALOGUE_FLATTEN is a positive',
-  '    control: the score catches it on 32 of 32 scripts with zero ties (matched-pair AUC',
-  '    1.0000, +29.30 points). So a near-chance reading on the other two channels is the',
-  '    SCORE being blind, not the instrument being broken — the one hypothesis a benchmark',
-  '    with only null readings can never rule out.',
-  '',
-  'WHAT IT SAYS TODAY (2026-09-12, this tree; matched-pair is the primary statistic)',
-  '  * Shuffle-drop 0.5313 matched-pair [0.3750, 0.6875] / 0.5586 all-pairs [0.4219, 0.6973].',
-  '    Climax-relocate 0.4063 [0.2656, 0.5469] / 0.4443 [0.3662, 0.5112]. ALL FOUR intervals',
-  '    contain 0.5: on this corpus the doctor does not reliably prefer an intact script to a',
-  '    mechanically damaged copy of itself. Control: 1.0000 / 0.9473.',
-  '',
-  'WHAT IT CANNOT SHOW',
-  '  * A moving reading on a third of the CLIMAX_RELOCATE sample. Ten of the 32 scripts sit',
-  '    pinned at exactly health 76.0 (a saturated density penalty at 10.0 plus a 14.0 scarcity',
-  '    term), so 10 of 32 pairs are EXACT ties that contribute 0.5 apiece by construction (9 of',
-  '    those 10 are the pinned scripts; it was 11 ties of 32, 10 of them pinned, before the',
-  '    2026-09-12 position-one fix). That channel\'s point estimate rests on 22 movable scripts,',
-  '    and its narrower interval reflects pinning, not precision. Do not read it as the more',
-  '    precise of the two.',
-  '  * A held-out result. The split is PRE-REGISTERED AND REPORTED, not used for evaluation:',
-  '    every floor was locked from all 32 scripts, the five holdout files included, so no',
-  '    held-out evaluation has taken place and that holdout is already spent against these',
-  '    floors. ROADMAP P1 asks for held-out evaluation by name; this is not it. The split earns',
-  '    its keep the first time a future change is tuned on exploration and checked on holdout',
-  '    against floors re-locked from exploration alone.',
-  '  * That health tracks CRAFT. Mechanical damage is not bad writing. The blind-pairs result',
-  '    (1 of 6 ordered, tests/core/blind-pairs-discrimination.test.ts) is the craft question,',
-  '    and it is a different, failing measurement.',
-  '  * That any number here transfers to feature-length real writing. N=32, 9-14 scenes each.',
-  '    ARC_DED_MIN_SCENES is 15 (doctor.ts:2104), so THE one feature-scale deduction that is',
-  '    wired into health never fires on this corpus at all — this benchmark measures a strictly',
-  '    smaller engine than the AUC-24 ratchet does. (This line named CLIMAX_DED_MIN_SCENES too,',
-  '    until 2026-09-12. That constant gates climaxZoneDecayDeduction, which is EXPORTED and',
-  '    wired into nothing — doctor.ts:2127-2131 records the revert: it over-fired on real scripts',
-  '    with naturally flat climaxes. Saying it "never fires at this length" implied it fires at',
-  '    some length. It fires at no length.)',
-  '  * Anything about the AUC-24 >= 0.622 ratchet. Different corpus, different denominator,',
-  '    different script length. The owner\'s `npm run measure-real` run is what confirms or',
-  '    refutes transfer; nothing in this repository can.',
-  '  * Craft validity of the SOURCE TEXT. Twenty of the 32 scripts are agent-authored and the',
-  '    other twelve are one human author\'s, unlabelled by independent readers.',
-].join('\n');
+/** The count of scripts sitting EXACTLY on the density penalty's 10-point cap
+ *  plus a 14.0 scarcity term — health 76.0 — which is what made a third of
+ *  CLIMAX_RELOCATE's pairs exact ties before 2026-09-07. Computed from the run
+ *  rather than written down, because it is the number that went stale first. */
+export const PINNED_HEALTH = 76.0;
+
+export function pinnedScriptCount(result: BenchmarkResult): number {
+  return result.scripts.filter((r) => r.health === PINNED_HEALTH).length;
+}
+
+/** The blind-pairs craft reading, recomputed from the SAME intact healths this
+ *  benchmark already scored: six `<name>-excellent` / `<name>-bad` pairs, and
+ *  how many of them the doctor orders the right way round. It is a different
+ *  question from every degradation here (craft, not mechanical damage), and it
+ *  is quoted in the caveats, so it is derived from the run instead of being
+ *  retyped. */
+export function blindPairOrdering(result: BenchmarkResult): { ordered: number; of: number; meanGap: number } {
+  const health = new Map(result.scripts.map((r) => [r.file, r.health]));
+  const stems = [...new Set(
+    result.scripts
+      .map((r) => /blind-pairs\/(.+)-(excellent|bad)\.fountain$/.exec(r.file)?.[1])
+      .filter((x): x is string => typeof x === 'string'),
+  )].sort();
+  let ordered = 0;
+  let gapSum = 0;
+  for (const stem of stems) {
+    const good = health.get(`tests/fixtures/blind-pairs/${stem}-excellent.fountain`);
+    const bad = health.get(`tests/fixtures/blind-pairs/${stem}-bad.fountain`);
+    if (good === undefined || bad === undefined) continue;
+    if (good > bad) ordered++;
+    gapSum += good - bad;
+  }
+  return { ordered, of: stems.length, meanGap: stems.length === 0 ? NaN : gapSum / stems.length };
+}
+
+/**
+ * The caveats, rendered FROM the measurement rather than written beside it.
+ *
+ * WHY THIS IS A FUNCTION (2026-09-11, round 2 item 5). It used to be a frozen
+ * string constant, and an independent reviewer found `npm run benchmark:public`
+ * printing five numbers its own table contradicted forty lines above in the
+ * same output: "Shuffle-drop 0.5313 / 0.5586" under a table reading
+ * 0.8750 / 0.8306, "ALL FOUR intervals contain 0.5" when the shuffle-drop
+ * intervals no longer did, "Control: 1.0000 / 0.9473" against a measured
+ * 1.0000 / 1.0000, "Ten of the 32 scripts sit pinned ... 11 of 32 pairs are
+ * EXACT ties" against 0 pinned and 1 tie, and "1 of 6" blind pairs against 4
+ * of 6. This file's own header promises the caveats "cannot drift away from
+ * the number they qualify"; as a constant, nothing held it to that.
+ *
+ * Every live number below is now interpolated from the `BenchmarkResult`, so
+ * drift is not possible by construction, and
+ * tests/core/public-benchmark.test.ts additionally parses the rendered text
+ * and asserts that every four-decimal figure and every "N of 32" / "N of 6"
+ * count in it is a value the same run produced.
+ */
+export function publicBenchmarkLimits(result: BenchmarkResult): string {
+  const by = new Map(result.degradations.map((d) => [d.id, d]));
+  const shuffle = by.get('SHUFFLE_DROP');
+  const order = by.get('CLIMAX_RELOCATE');
+  const control = by.get('DIALOGUE_FLATTEN');
+  const f4 = (n: number | undefined): string => (n === undefined ? 'n/a' : n.toFixed(4));
+  const iv = (i: Interval | undefined): string => (i === undefined ? '[n/a]' : `[${i.lo.toFixed(4)}, ${i.hi.toFixed(4)}]`);
+  const contains = (i: Interval | undefined): boolean => i !== undefined && i.lo <= 0.5 && i.hi >= 0.5;
+  const measurementIntervals = [shuffle?.ciPaired, shuffle?.ciAllPairs, order?.ciPaired, order?.ciAllPairs];
+  const crossing = measurementIntervals.filter(contains).length;
+  const pinned = pinnedScriptCount(result);
+  const blind = blindPairOrdering(result);
+  const orderTied = order?.tied ?? 0;
+  const orderMovable = (order?.n ?? 0) - orderTied;
+  const labelled: Array<[string, Interval | undefined]> = [
+    ['shuffle-drop matched-pair', shuffle?.ciPaired],
+    ['shuffle-drop all-pairs', shuffle?.ciAllPairs],
+    ['climax-relocate matched-pair', order?.ciPaired],
+    ['climax-relocate all-pairs', order?.ciAllPairs],
+  ];
+  const crossingNames = labelled.filter(([, i]) => contains(i)).map(([n]) => n);
+  const intervalVerdict = crossing === measurementIntervals.length
+    ? 'ALL FOUR of the measurement intervals contain 0.5: on this corpus the doctor does not'
+      + ' reliably prefer\n    an intact script to a mechanically damaged copy of itself.'
+    : crossing === 0
+      ? 'NONE of the four measurement intervals contains 0.5.'
+      : `${crossing} of the four measurement intervals still contain 0.5 — ${crossingNames.join(', ')}`
+        + ' —\n    so whatever those channels measure is not yet separated from chance.';
+  return [
+    'WHAT THIS BENCHMARK CAN SHOW',
+    '  * That the doctor still separates an intact script from a mechanically damaged copy of',
+    '    ITSELF, recomputed from committed text on every CI run, by anyone, with no corpus mount.',
+    '  * That a scoring change did or did not move that separation — as a numeric diff, with a',
+    '    seeded bootstrap interval, on a pre-registered split.',
+    '  * The scene-count question, directly rather than by arithmetic: (a) changes scene count and',
+    '    (b) does not, so the two numbers can be read against each other. On this corpus that',
+    '    comparison refuted the prediction that (a) would be inflated — see the header of',
+    '    PUBLIC_DEGRADATIONS for the measured decomposition (+5.693 scarcity, -7.632 density).',
+    '  * That the HARNESS works, separately from what it reads. DIALOGUE_FLATTEN is a positive',
+    `    control: the score catches it on ${control?.ordered ?? 0} of ${control?.n ?? 0} scripts with ${control?.tied ?? 0} ties (matched-pair AUC`,
+    `    ${f4(control?.aucPaired)}, ${(control?.meanGap ?? 0).toFixed(2)} points). So a near-chance reading on the other two channels is the`,
+    '    SCORE being blind, not the instrument being broken — the one hypothesis a benchmark',
+    '    with only null readings can never rule out.',
+    '',
+    'WHAT IT SAYS TODAY (this tree, this run; matched-pair is the primary statistic)',
+    `  * Shuffle-drop ${f4(shuffle?.aucPaired)} matched-pair ${iv(shuffle?.ciPaired)} / ${f4(shuffle?.aucAllPairs)} all-pairs ${iv(shuffle?.ciAllPairs)}.`,
+    `    Climax-relocate ${f4(order?.aucPaired)} ${iv(order?.ciPaired)} / ${f4(order?.aucAllPairs)} ${iv(order?.ciAllPairs)}.`,
+    `    ${intervalVerdict}`,
+    `    Control: ${f4(control?.aucPaired)} / ${f4(control?.aucAllPairs)}.`,
+    '',
+    'WHAT IT CANNOT SHOW',
+    `  * A moving reading on every CLIMAX_RELOCATE pair. ${pinned} of the ${result.scripts.length} scripts sit pinned at exactly`,
+    `    health ${PINNED_HEALTH.toFixed(1)} (density penalty at its 10-point cap plus a 14.0 scarcity term), and ${orderTied} of`,
+    `    ${order?.n ?? 0} pairs ${orderTied === 1 ? 'is an EXACT tie' : 'are EXACT ties'}, contributing 0.5 apiece by construction. That channel's point`,
+    `    estimate rests on ${orderMovable} movable scripts, and a narrow interval there can reflect pinning`,
+    '    rather than precision. Do not read it as the more precise of the two.',
+    '  * A held-out result. The split is PRE-REGISTERED AND REPORTED, not used for evaluation:',
+    '    every floor was locked from all 32 scripts, the five holdout files included, so no',
+    '    held-out evaluation has taken place and that holdout is already spent against these',
+    '    floors. ROADMAP P1 asks for held-out evaluation by name; this is not it. The split earns',
+    '    its keep the first time a future change is tuned on exploration and checked on holdout',
+    '    against floors re-locked from exploration alone.',
+    '  * That health tracks CRAFT. Mechanical damage is not bad writing. The blind-pairs result',
+    `    (${blind.ordered} of ${blind.of} ordered, mean gap ${blind.meanGap.toFixed(4)}, tests/core/blind-pairs-discrimination.test.ts) is the`,
+    '    craft question, and it is a different measurement on six pairs — inside what chance',
+    '    produces either way, so it is a number to re-measure on more pairs, not a result.',
+    '  * That any number here transfers to feature-length real writing. N=32, 9-14 scenes each.',
+    '    ARC_DED_MIN_SCENES is 15 (doctor.ts), so THE one feature-scale deduction that is wired',
+    '    into health never fires on this corpus at all — this benchmark measures a strictly',
+    '    smaller engine than the AUC-24 ratchet does. (This line named CLIMAX_DED_MIN_SCENES too,',
+    '    until 2026-09-12. That constant gates climaxZoneDecayDeduction, which is EXPORTED and',
+    '    wired into nothing — doctor.ts records the revert: it over-fired on real scripts with',
+    '    naturally flat climaxes. Saying it "never fires at this length" implied it fires at some',
+    '    length. It fires at no length.) Since 2026-09-11 the scarcity term also',
+    '    saturates at 12 scenes, which on THIS corpus still moves (every document is 6-14',
+    '    scenes) and on a feature-length corpus contributes exactly zero to shuffle-drop.',
+    '  * Anything about the AUC-24 >= 0.622 ratchet. Different corpus, different denominator,',
+    "    different script length. The owner's `npm run measure-real` run is what confirms or",
+    '    refutes transfer; nothing in this repository can.',
+    '  * Craft validity of the SOURCE TEXT. Twenty of the 32 scripts are agent-authored and the',
+    "    other twelve are one human author's, unlabelled by independent readers.",
+  ].join('\n');
+}
