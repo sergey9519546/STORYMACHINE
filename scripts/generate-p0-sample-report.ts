@@ -27,9 +27,26 @@ import { buildRootCausePipeline } from '../server/lib/root-cause-pipeline.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = path.join(__dirname, '../docs/user-validation');
-const OUT_FILE = path.join(OUT_DIR, 'sample-coverage-report.html');
+export const OUT_FILE = path.join(OUT_DIR, 'sample-coverage-report.html');
 
-async function main(): Promise<void> {
+/**
+ * Render the committed P0 sample exactly as POST /api/export/coverage would.
+ *
+ * EXPORTED (2026-09-11) so the drift guard — tests/core/p0-sample-drift.test.ts —
+ * can call the SAME function this script writes the file with, rather than
+ * re-assembling the pipeline and then proving only that two copies of the
+ * assembly agree. The guard's whole value is that it compares the committed bytes
+ * against what the generator produces today; a second assembly would let the
+ * generator and the sample drift together.
+ *
+ * VERIFIED byte-identical to the live keyless route on 2026-09-11: a real
+ * POST /api/export/coverage of the same sample returned 226,783 bytes differing
+ * from this output on exactly one line — the footer's "Generated <timestamp>",
+ * which is `analyzedAt`, a wall clock the doctor refreshes on every call. That is
+ * the same single field scripts/check-doctor-output-identity.mjs excludes, and the
+ * drift guard masks it for the same reason.
+ */
+export async function renderP0SampleReport(): Promise<{ html: string; contentHash: string; report: Awaited<ReturnType<typeof runScriptDoctor>> }> {
   // Mirror POST /api/export/coverage (server/routes/export.ts) exactly so the
   // committed artifact is byte-identical to what a real export would produce.
   const report = await runScriptDoctor(sampleFountain);
@@ -60,6 +77,12 @@ async function main(): Promise<void> {
     fountain: sampleFountain,
   });
 
+  return { html, contentHash, report };
+}
+
+async function main(): Promise<void> {
+  const { html, contentHash, report } = await renderP0SampleReport();
+
   mkdirSync(OUT_DIR, { recursive: true });
   writeFileSync(OUT_FILE, html, 'utf8');
 
@@ -82,7 +105,16 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((err: unknown) => {
-  process.stderr.write(`generate-p0-sample-report failed: ${(err as Error).message}\n`);
-  process.exitCode = 1;
-});
+// Only when RUN, never when imported (2026-09-11). tests/core/p0-sample-drift.test.ts
+// imports renderP0SampleReport to compare the committed bytes against a fresh
+// render; without this guard that import would also REWRITE the file it is meant
+// to be checking, and the guard could never fail.
+const invokedDirectly = process.argv[1] !== undefined
+  && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (invokedDirectly) {
+  main().catch((err: unknown) => {
+    process.stderr.write(`generate-p0-sample-report failed: ${(err as Error).message}\n`);
+    process.exitCode = 1;
+  });
+}

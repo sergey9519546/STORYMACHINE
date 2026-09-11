@@ -87,6 +87,33 @@ render path, so for **live-flow** sessions the operating kit's pre-session
 > generated report artifact; P0 remains fielding-authorized with **zero valid
 > human sessions** and **no outcome verdict**.
 
+> **Current artifact provenance (2026-09-11) — and the staleness this found.**
+> Regenerated with `npm run generate-p0-sample`: health **78.3**, verdict
+> **CONSIDER**, sceneCount **12**, contentHash
+> `09e8b0381f1fc862619630b5684458bbec6f2c7910d4c0aee7a77ec2c1ec7cb0`,
+> `sample-coverage-report.html` **226,783 bytes**.
+>
+> The contentHash above is not the one every line of this file before it cites.
+> The committed artifact carried
+> `a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca` at 207,742
+> bytes, and the sample's own text changed on 2026-09-04 (`c21fdc5b`, which
+> stopped scoring the fixtures' provenance headers) without the artifact being
+> regenerated. Measured: running the generator on `dd57251d` — before any of
+> this lane's changes — already produced hash `09e8b038…` at 220,456
+> bytes. So the file shown to P0 participants stated a hash that did not match the
+> script it claimed to be a report of, and had done since 2026-09-04. The
+> remaining 6,327 bytes are this lane's producer tier and copy changes.
+>
+> Byte identity is now a checked claim rather than a comment: a real keyless
+> `POST /api/export/coverage` of the same sample returns 226,783 bytes differing
+> from the generator's output on exactly one line, the footer's
+> `Generated <timestamp>` (that is `analyzedAt`, a wall clock the doctor refreshes
+> on every call — the same single field
+> `scripts/check-doctor-output-identity.mjs` excludes). And
+> `tests/core/p0-sample-drift.test.ts` fails the build whenever the committed bytes
+> stop matching what the generator produces, with the clock masked and nothing
+> else, so this cannot silently go stale again.
+
 **Exposure caveat:** the static HTML is the *report artifact only*. If your
 session shows only this file (not the live StartScreen → Doctor → export flow),
 record exposure as **static report, not live flow** per the operating kit's

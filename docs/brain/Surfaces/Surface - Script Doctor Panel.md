@@ -1,7 +1,7 @@
 ---
 type: surface
-updated: 2026-09-06
-sources: [src/components/scriptide/ScriptDoctorPanel.tsx, src/lib/finding-jump.ts, server/nvm/analyze/doctor.ts, tests/core/script-doctor.test.ts, tests/core/finding-jump.test.ts]
+updated: 2026-09-11
+sources: [src/components/scriptide/ScriptDoctorPanel.tsx, src/lib/finding-jump.ts, server/nvm/analyze/doctor.ts, tests/core/script-doctor.test.ts, tests/core/finding-jump.test.ts, src/lib/priorities-copy.ts, server/lib/strengths-copy.ts, server/lib/scene-ranges.ts]
 status: active
 ---
 
@@ -131,6 +131,25 @@ the only suite in the repository that runs at product length);
 against a live keyless server and asserts the sentence, the Retry, and the
 recovery.
 
+**Three wordings this panel used to own alone (2026-09-11).** Each was the
+panel's own copy of a fact two exported documents also stated, and each had
+drifted:
+
+- the root-cause scene label (`scene${s} 1, 2, 3`) is now
+  `formatSceneList` from `server/lib/scene-ranges.ts` — see
+  [[Surface - Root Cause Pipeline]] and `docs/CLAIMS_REGISTER.md` row 91.
+- the priorities heading ("Top Priorities") is now `prioritiesHeadingFor` from
+  `src/lib/priorities-copy.ts`, which also stops the heading promising a list
+  over a single item (row 87).
+- the strengths section's title and caption come from
+  `server/lib/strengths-copy.ts` (row 86).
+
+Both headline-percentile sites also moved to the GATED helpers in
+`src/lib/percentile-copy.ts`, so the panel says "not comparable" — and
+withholds the exact-rank tooltip — for a draft outside the calibration
+reference set's scene and word band, exactly as every other surface does
+(row 88).
+
 ## Sources
 
 - `src/components/scriptide/ScriptDoctorPanel.tsx`,
@@ -142,4 +161,5 @@ recovery.
   `tests/routes/doctor-analysis-budget.test.ts`,
   `tests/core/finding-jump.test.ts`,
   `tests/core/scriptide-render-loop-guard.test.ts`
-- `docs/CLAIMS_REGISTER.md` rows 9, 32-33, 36-38, 49, 72-73, 80-81 (this panel's claims)
+- `src/lib/priorities-copy.ts`; `server/lib/strengths-copy.ts`; `server/lib/scene-ranges.ts`
+- `docs/CLAIMS_REGISTER.md` rows 9, 32-33, 36-38, 49, 72-73, 80-81, 86-88, 91 (this panel's claims)

@@ -34,6 +34,14 @@
       padding-bottom: 18px;
       margin-bottom: 28px;
     }
+    /* The header's single remaining cell. It was one of two (the other held the
+       verdict stamp, which moved into the producer tier on 2026-09-11) and had
+       no rule of its own because the flex parent positioned it. It gets one now
+       so the header's one child fills the row instead of leaving the old
+       space-between gap on the right, and so no class in this document is
+       rendered without a rule — see the "no dead class selectors" case in
+       tests/core/coverage-html.test.ts, which checks both directions. */
+    .header-main { flex: 1 1 auto; min-width: 0; }
     .masthead {
       font-family: 'Courier New', Courier, monospace;
       font-size: 12px;
@@ -65,10 +73,14 @@
       color: #27272a;
       margin-top: 8px;
     }
-    .stamp-wrap {
-      flex: 0 0 auto;
-      padding-top: 4px;
-    }
+    /* The .stamp-wrap rule lived here until 2026-09-11. It was the header's
+       right-hand flex cell for the verdict stamp; the stamp moved into the
+       producer tier (see verdictStampHtml / reader-tier.ts) and the header no
+       longer emits the wrapper, so the rule had no element to style. Removed
+       rather than left behind, with proof: the "no dead class selectors" case in
+       tests/core/coverage-html.test.ts asserts that stamp-wrap appears in
+       NEITHER the stylesheet nor any rendered report, and that every other
+       header and tier class appears in BOTH. */
     .stamp {
       font-family: 'Courier New', Courier, monospace;
       font-weight: 700;
@@ -170,9 +182,25 @@
       color: #3f3f46;
     }
     .dim-summary { grid-area: summary; font-size: 13px; color: #3f3f46; }
-    .dim-basis { grid-area: basis; font-size: 11px; color: #a3a3a3; }
+    /* a11y fix (2026-09-05, client-hunter B-15): #a3a3a3 measured 2.25-2.48:1
+       against every background this class actually renders on in this
+       document (page #fffdf9, body #f4f2ec) — the WCAG AA text minimum is
+       4.5:1. This class carries the report's provenance sentences ("Based
+       on N issues across M passes…", "The N findings below…") — the exact
+       lines ROADMAP P3's third-party-verifiability claim rests on, so an
+       unreadable provenance line undercuts the whole point of a shareable
+       report. #6b6b6b clears 4.5:1 on both backgrounds (4.76-5.25:1) while
+       staying visually muted/secondary next to the primary #1a1a1a/#3f3f46
+       ink this document uses for body text. */
+    .dim-basis { grid-area: basis; font-size: 11px; color: #6b6b6b; }
     /* ── Checklist ── */
     .checklist { margin: 0; padding-left: 0; list-style: none; }
+    /* a11y fix (2026-09-05): buildGodmodeSection's .issue-minor <li> rows
+       now sit inside a real <ul> (axe's listitem rule); this only resets
+       the default UA list margin/padding to sit flush with the
+       .metric-row divs alongside it, since neither carried any spacing
+       styling before. */
+    .issue-minor-list { margin: 4px 0 8px; padding-left: 20px; }
     .checklist li {
       position: relative;
       padding-left: 26px;
@@ -188,7 +216,14 @@
       font-family: 'Courier New', Courier, monospace;
     }
     /* ── Heatmap ── */
-    .heat-row { display: flex; flex-wrap: wrap; gap: 5px; }
+    /* a11y/overflow fix (2026-09-05, client-hunter B-15): flex-wrap already
+       keeps individual cells from forcing this row wider than its column —
+       measured with 42 scenes, it never was the export's overflow source
+       (see the .issue-fix fix below for what actually was). overflow-x:auto
+       is added anyway as a defensive floor: if a future change ever grows
+       .heat-cell past its column width, this row scrolls internally
+       instead of taking the whole exported page sideways with it. */
+    .heat-row { display: flex; flex-wrap: wrap; gap: 5px; overflow-x: auto; }
     .heat-cell {
       width: 30px;
       height: 30px;
@@ -200,6 +235,24 @@
       font-size: 11px;
       font-weight: 700;
     }
+    /* ── Structural-signal strip (unwired diagnostics) ── */
+    /* Same defensive overflow-x:auto floor as .heat-row above, same reason. */
+    .sig-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-end; overflow-x: auto; }
+    .sig-cell {
+      width: 26px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9px;
+      color: #57606a;
+    }
+    .sig-bar { height: 40px; display: flex; flex-direction: column; justify-content: flex-end; border: 1px solid #d0d7de; border-radius: 3px; overflow: hidden; }
+    .sig-talk { background: #6e7781; }
+    .sig-act { background: #d8dee4; flex: 1 1 auto; }
+    .sig-idx { text-align: center; padding-top: 2px; }
+    .sig-note { font-size: 11px; color: #57606a; margin: 8px 0 0; }
+    .sig-legend { font-size: 11px; color: #57606a; margin: 0 0 10px; }
     /* ── Priorities / appendix ── */
     .priority-list, .appendix-list {
       margin: 0;
@@ -228,10 +281,23 @@
       letter-spacing: 0.04em;
     }
     .issue-description { font-size: 13.5px; }
+    /* overflow fix (2026-09-05, client-hunter B-15): this class also carries
+       the root-cause member-count / member-rules line, where each rule constant
+       (ARC_REVELATION_RELATIONAL_AFTERMATH_VOID and friends) is one
+       unbroken 30-45 character token with no space or hyphen for the
+       browser to wrap on. Measured live on a real "Try sample coverage"
+       report: one of these tokens alone forced this div — and every
+       ancestor up through <body>/<html> — 91px wider than its column,
+       which is the exact mechanism behind the exported report's 375px
+       horizontal overflow (documentElement.scrollWidth 418 vs clientWidth
+       375). overflow-wrap:anywhere lets a token break mid-word ONLY when it
+       has nowhere else to break, so normal prose (the OTHER use of this
+       class, suggested-fix text) is unaffected. */
     .issue-fix {
       font-size: 13px;
       color: #3f3f46;
       margin-top: 2px;
+      overflow-wrap: anywhere;
     }
     .pass-block { margin-bottom: 20px; }
     .pass-block h3 {
@@ -319,6 +385,99 @@
       border-radius: 3px;
       word-break: break-all;
     }
+    /* ── Producer tier (2026-09-11) ── one printed page above the full report */
+    .reader-tier {
+      border: 2px solid #18181b;
+      padding: 18px 20px 20px;
+      margin-bottom: 22px;
+    }
+    .tier-label {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      color: #52525b;
+    }
+    .tier-caption {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11.5px;
+      color: #52525b;
+      margin: 4px 0 12px;
+    }
+    .tier-facts {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      color: #18181b;
+      display: grid;
+      gap: 6px;
+      margin: 12px 0 10px;
+    }
+    .tier-facts .stamp {
+      font-size: 12px;
+      padding: 3px 9px;
+      border-width: 2px;
+      transform: none;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .tier-key {
+      display: inline-block;
+      min-width: 72px;
+      color: #52525b;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 11px;
+    }
+    .tier-bounds {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11.5px;
+      color: #52525b;
+      margin: 0 0 6px;
+    }
+    .tier-heading {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border-bottom: 1px solid #d4d4d8;
+      padding-bottom: 4px;
+      margin: 14px 0 10px;
+    }
+    .tier-list {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .tier-item { margin-bottom: 10px; }
+    .tier-item-head {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 3px;
+    }
+    .tier-item-where {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .tier-page {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11.5px;
+      color: #52525b;
+      white-space: nowrap;
+    }
+    .tier-item-body { font-size: 13px; }
+    .tier-empty {
+      font-size: 13px;
+      color: #52525b;
+      margin: 0;
+    }
+    .tier-divider {
+      border: 0;
+      border-top: 3px double #18181b;
+      margin: 0 0 24px;
+    }
     /* ── Print ── */
     @page {
       size: letter portrait;
@@ -330,6 +489,22 @@
       .stamp { box-shadow: none; }
       .health-section { border: 1px solid #d4d4d8; }
       .section { page-break-inside: avoid; break-inside: avoid; }
+      /* The tier is its own sheet: the full report starts on page two, so a
+         producer who prints one page gets the whole summary and nothing half of
+         it. The divider is then redundant in print and is hidden. */
+      .reader-tier { break-after: page; page-break-after: always; break-inside: avoid; }
+      .tier-divider { display: none; }
+    }
+
+    .health-text-block {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .health-percentile {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10.5px;
+      color: #52525b;
+      margin-top: 6px;
     }
 
 </style>
@@ -343,19 +518,52 @@
       <h1 class="title">Dead Frequency</h1>
 
       <div class="meta-line">
-        August 11, 2026 &middot;
-        12 scenes &middot;
-        1,831 words &middot;
-        ~8 pages / ~8 min (est.)
-      </div>
-      <div class="logline-line">MAYA must contend with “I got a call at the station. Three cars, this bridge, before sunrise. I want to know what you can see from here” before the revelation “I knew it”.</div>
-    </div>
-    <div class="stamp-wrap">
-      <div class="stamp" style="background:#fffaf0; border-color:#b45309; color:#78350f;">
-        CONSIDER
+        September 11, 2026
       </div>
     </div>
   </header>
+
+  <section class="reader-tier">
+    <div class="tier-label">READER SUMMARY</div>
+    <p class="tier-caption">One page for a reader deciding whether to read the script. The complete report follows.</p>
+    <p class="logline-line">MAYA must contend with “I got a call at the station. Three cars, this bridge, before sunrise. I want to know what you can see from here” before the revelation “I knew it”.</p>
+    <div class="tier-facts">
+      <div><span class="tier-key">Length</span> 12 scenes · 1,830 words · ~8 pages / ~8 min (est.)</div>
+      <div><span class="tier-key">Verdict</span> <span class="stamp" style="background:#fffaf0; border-color:#b45309; color:#78350f;">CONSIDER</span> &middot; Health 78.3 / 100</div>
+    </div>
+    <p class="tier-bounds">Health percentile: not comparable — this draft is outside the bounds of the hand-authored synthetic reference set (20 samples / 9–10 scenes / 256–337 words)</p>
+    <p class="tier-bounds">Reference bounds: 20 samples / 9–10 scenes / 256–337 words.</p>
+    <h2 class="tier-heading">The 3 things to fix first</h2>
+    <ol class="tier-list">
+      <li class="tier-item">
+        <div class="tier-item-head">
+          <span class="chip chip-critical">CRITICAL</span>
+          <span class="tier-item-where">Scene 9 (climax peak)</span>
+          <span class="tier-page">p. 5</span>
+        </div>
+        <div class="tier-item-body">Peak-intensity climax scene (suspense 4.0) shows no protagonist engagement — neutral emotion, no clock pressure, no discovery. The protagonist is absent from their own story&#39;s highest moment.</div>
+      </li>
+
+      <li class="tier-item">
+        <div class="tier-item-head">
+          <span class="chip chip-critical">CRITICAL</span>
+          <span class="tier-item-where">Conflict layer</span>
+
+        </div>
+        <div class="tier-item-body">An 8+ scene story with zero suspense-dip reversals detected — this reads only for a sharp scene-level drop in the engine&#39;s danger/tension language (suspenseDelta &lt; -1), not for a betrayal, broken deal, or backfire conveyed without that tension-language signature. Reread before treating this as &quot;no conflict texture.&quot;</div>
+      </li>
+
+      <li class="tier-item">
+        <div class="tier-item-head">
+          <span class="chip chip-major">MAJOR</span>
+          <span class="tier-item-where">Scene 7 (midpoint)</span>
+          <span class="tier-page">p. 4</span>
+        </div>
+        <div class="tier-item-body">Midpoint suspense pressure is flat — the story lacks a dramatic pivot</div>
+      </li>
+    </ol>
+  </section>
+  <hr class="tier-divider" />
 
   <section class="section health-section">
     <div class="health-score-block">
@@ -363,7 +571,11 @@
       <div class="health-outof">/ 100</div>
       <div class="health-grade" style="background:#2f855a; color:#fff;">Strong</div>
     </div>
-    <p class="plain-summary">CONSIDER — the engine&#39;s intermediate threshold-based verdict; overall engine score 78/100. Theme &amp; Originality is the highest-scoring diagnostic dimension, at 100/100. Plot Logic &amp; Payoff is the lowest-scoring diagnostic dimension, at 88/100 — most of the trouble is around revelation unearned. Start with the highest-priority fix: Peak-intensity climax scene (suspense 4.0) shows no protagonist engagement — neutral emotion, no clock pressure, no discovery. The protagonist is absent from their own story&#39;s highest moment.</p>
+    <div class="health-text-block">
+      <p class="plain-summary">CONSIDER — scored in the middle band, above the decline line but short of what the recommend line requires; overall score 78/100. This is the engine&#39;s deterministic, threshold-based verdict, not a human read. Theme &amp; Originality is the highest-scoring diagnostic dimension, at 100/100. Plot Logic &amp; Payoff is the lowest-scoring diagnostic dimension, at 88/100 — most of the trouble is around revelation unearned. Start with the highest-priority fix: Peak-intensity climax scene (suspense 4.0) shows no protagonist engagement — neutral emotion, no clock pressure, no discovery. The protagonist is absent from their own story&#39;s highest moment.</p>
+      <div class="health-percentile">Health percentile: not comparable — this draft is outside the bounds of the hand-authored synthetic reference set (20 samples / 9–10 scenes / 256–337 words)</div>
+
+    </div>
   </section>
 
   <section class="section">
@@ -393,11 +605,11 @@
     <div class="dim-row">
       <div class="dim-label">Dialogue &amp; Voice</div>
       <div class="dim-bar-track">
-        <div class="dim-bar-fill" style="width:98.4%; background:#1a7f37;"></div>
+        <div class="dim-bar-fill" style="width:98.5%; background:#1a7f37;"></div>
       </div>
-      <div class="dim-score">98/100</div>
+      <div class="dim-score">99/100</div>
       <div class="dim-summary">Dialogue &amp; Voice is in good shape — a handful of minor notes, mostly around question dodge.</div>
-      <div class="dim-basis">Based on 22 issues across 2 passes (Dialogue, Voice).</div>
+      <div class="dim-basis">Based on 21 issues across 2 passes (Dialogue, Voice).</div>
     </div>
 
     <div class="dim-row">
@@ -423,34 +635,135 @@
   </section>
 
   <section class="section">
-    <h2>What&rsquo;s Working</h2>
+    <h2>Checks That Found Nothing</h2>
+    <p class="dim-basis" style="margin:0 0 12px;">Each line below is a check that did not fire — the absence of a finding, not a judgment that the draft is working. These do not offset the dimension scores above.</p>
     <ul class="checklist">
       <li>Deadline pressure (clock-raising language) appears in both halves of the draft — the engine flags it as early as Scene 1 and as late as Scene 11 (detected positions), so the stakes aren&#39;t set once and dropped.</li>
 <li>The opening earns attention immediately — the very first scene already turns, and real stakes are on the table before the first quarter is out.</li>
 <li>This draft keeps generating real turns, not just one per act — dramatic turning points land repeatedly in both the front half (Scenes 2, 4, 6) and the back half (Scenes 9, 10, 12) of the document.</li>
     </ul>
   </section>
+<section class="section"><h2>Structural Analysis</h2><div class="metrics-grid"><div class="metric-row"><span class="metric-label">Graph Health</span><span class="metric-value">37/100</span></div>
+<div class="metric-row sub"><span class="metric-label">→ Health deduction</span><span class="metric-value">−9</span></div>
+<ul class="issue-minor-list">
+<li class="issue-minor">Promise-payment ratio is 0.08 — 12 unpaid setup(s) may feel like plot holes.</li>
+<li class="issue-minor">Escalation monotonicity is 0.00 — tension does not consistently rise across acts.</li>
+<li class="issue-minor">Arc coherence is low — tension progression may not track with story position.</li>
+<li class="issue-minor">12 isolated scene(s) with no causal connections to the story.</li>
+</ul>
+<div class="metric-row"><span class="metric-label">Disclosure Violations</span><span class="metric-value">0</span></div>
+<div class="metric-row"><span class="metric-label">Character Functions</span><span class="metric-value">MAYA: ally (30%) · DAN: ally (30%) · CALLER: ally (30%) · SHERIFF PELLEW: ally (30%)</span></div>
+<div class="metric-row"><span class="metric-label">Subplots</span><span class="metric-value">13 (12 unresolved, 12 intersections)</span></div>
+<ul class="issue-minor-list">
+<li class="issue-minor">Mystery thread &quot;maya-okonkwo&quot; unresolved (seeded scene 0)</li>
+<li class="issue-minor">Mystery thread &quot;kqrs&quot; late payoff (seeded scene 0)</li>
+<li class="issue-minor">Mystery thread &quot;detective-ray-okonkwo&quot; unresolved (seeded scene 1)</li>
+<li class="issue-minor">Mystery thread &quot;killed&quot; unresolved (seeded scene 1)</li>
+<li class="issue-minor">Mystery thread &quot;line&quot; unresolved (seeded scene 1)</li>
+</ul></div></section>
 
   <section class="section heatmap-section">
     <h2>Scene Heatmap</h2>
     <div class="heat-row">
-      <div class="heat-cell" style="background:#d97706; color:#fff;" title="INT. KQRS RADIO STUDIO - NIGHT — 2 issues">1</div>
-<div class="heat-cell" style="background:#fde68a; color:#78350f;" title="INT. STATION NEWSROOM - CONTINUOUS — 1 issue">2</div>
+      <div class="heat-cell" style="background:#1a7f37; color:#fff;" title="INT. KQRS RADIO STUDIO - NIGHT — 0 issues">1</div>
+<div class="heat-cell" style="background:#b45309; color:#fff;" title="INT. STATION NEWSROOM - CONTINUOUS — 3 issues">2</div>
 <div class="heat-cell" style="background:#1a7f37; color:#fff;" title="EXT. ROUTE 9 - MILLER BRIDGE - PRE-DAWN — 0 issues">3</div>
 <div class="heat-cell" style="background:#1a7f37; color:#fff;" title="INT. KQRS STUDIO - NIGHT — 0 issues">4</div>
-<div class="heat-cell" style="background:#d97706; color:#fff;" title="INT. SHERIFF&#39;S OFFICE - BULLPEN - DAY — 3 issues">5</div>
-<div class="heat-cell" style="background:#d97706; color:#fff;" title="INT. MAYA&#39;S HOUSE - KITCHEN - NIGHT — 1 issue">6</div>
-<div class="heat-cell" style="background:#d97706; color:#fff;" title="INT. KQRS STUDIO - NIGHT — 3 issues">7</div>
+<div class="heat-cell" style="background:#b45309; color:#fff;" title="INT. SHERIFF&#39;S OFFICE - BULLPEN - DAY — 3 issues">5</div>
+<div class="heat-cell" style="background:#b45309; color:#fff;" title="INT. MAYA&#39;S HOUSE - KITCHEN - NIGHT — 1 issue">6</div>
+<div class="heat-cell" style="background:#b45309; color:#fff;" title="INT. KQRS STUDIO - NIGHT — 3 issues">7</div>
 <div class="heat-cell" style="background:#1a7f37; color:#fff;" title="EXT. COUNTY 4 - GRAIN ELEVATOR - NIGHT — 0 issues">8</div>
 <div class="heat-cell" style="background:#b91c1c; color:#fff;" title="INT. GRAIN ELEVATOR - UPPER LEVEL - CONTINUOUS — 4 issues">9</div>
-<div class="heat-cell" style="background:#d97706; color:#fff;" title="INT. SHERIFF&#39;S OFFICE - EVIDENCE LOCKER - DAY — 3 issues">10</div>
-<div class="heat-cell" style="background:#d97706; color:#fff;" title="INT. KQRS STUDIO - NIGHT — 2 issues">11</div>
+<div class="heat-cell" style="background:#b45309; color:#fff;" title="INT. SHERIFF&#39;S OFFICE - EVIDENCE LOCKER - DAY — 3 issues">10</div>
+<div class="heat-cell" style="background:#b45309; color:#fff;" title="INT. KQRS STUDIO - NIGHT — 2 issues">11</div>
 <div class="heat-cell" style="background:#1a7f37; color:#fff;" title="EXT. SHERIFF&#39;S OFFICE - NIGHT — 0 issues">12</div>
     </div>
   </section>
 
   <section class="section">
-    <h2>Top Priorities</h2>
+    <h2>Structural Signals (new, unwired diagnostics)</h2>
+    <p class="sig-legend">One bar per scene. The filled lower portion is that scene&rsquo;s share of dialogue words; the pale remainder is action. Hover a bar for that scene&rsquo;s full reading.</p>
+    <div class="sig-row">
+<div class="sig-cell" title="INT. KQRS RADIO STUDIO - NIGHT — 135 words (z -0.09) · dialogue 27% (Δ +0.00) · 1 speaker(s), 1 turn(s), 36.0 words/turn · lead share 100% · new pairings 0 · open/close shift 0.30"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:27%;"></div></div><div class="sig-idx">1</div></div>
+<div class="sig-cell" title="INT. STATION NEWSROOM - CONTINUOUS — 109 words (z -0.75) · dialogue 24% (Δ -0.03) · 2 speaker(s), 4 turn(s), 6.5 words/turn · lead share 58% · new pairings 1 · open/close shift 0.42"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:24%;"></div></div><div class="sig-idx">2</div></div>
+<div class="sig-cell" title="EXT. ROUTE 9 - MILLER BRIDGE - PRE-DAWN — 153 words (z 0.38) · dialogue 61% (Δ +0.38) · 2 speaker(s), 4 turn(s), 23.5 words/turn · lead share 59% · new pairings 1 · open/close shift 0.39"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:61%;"></div></div><div class="sig-idx">3</div></div>
+<div class="sig-cell" title="INT. KQRS STUDIO - NIGHT — 97 words (z -1.06) · dialogue 15% (Δ -0.46) · 1 speaker(s), 1 turn(s), 15.0 words/turn · lead share 100% · new pairings 0 · open/close shift 0.19"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:15%;"></div></div><div class="sig-idx">4</div></div>
+<div class="sig-cell" title="INT. SHERIFF&#39;S OFFICE - BULLPEN - DAY — 197 words (z 1.50) · dialogue 75% (Δ +0.59) · 3 speaker(s), 8 turn(s), 18.4 words/turn · lead share 12% · new pairings 2 · open/close shift 0.64"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:75%;"></div></div><div class="sig-idx">5</div></div>
+<div class="sig-cell" title="INT. MAYA&#39;S HOUSE - KITCHEN - NIGHT — 164 words (z 0.66) · dialogue 82% (Δ +0.08) · 2 speaker(s), 4 turn(s), 33.8 words/turn · lead share 56% · new pairings 0 · open/close shift 0.06"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:82%;"></div></div><div class="sig-idx">6</div></div>
+<div class="sig-cell" title="INT. KQRS STUDIO - NIGHT — 78 words (z -1.54) · dialogue 55% (Δ -0.27) · 2 speaker(s), 6 turn(s), 7.2 words/turn · lead share 47% · new pairings 0 · open/close shift 0.26"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:55%;"></div></div><div class="sig-idx">7</div></div>
+<div class="sig-cell" title="EXT. COUNTY 4 - GRAIN ELEVATOR - NIGHT — 85 words (z -1.37) · dialogue 20% (Δ -0.35) · 2 speaker(s), 2 turn(s), 8.5 words/turn · lead share 24% · new pairings 0 · open/close shift 0.65"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:20%;"></div></div><div class="sig-idx">8</div></div>
+<div class="sig-cell" title="INT. GRAIN ELEVATOR - UPPER LEVEL - CONTINUOUS — 169 words (z 0.79) · dialogue 61% (Δ +0.41) · 2 speaker(s), 3 turn(s), 34.3 words/turn · lead share 46% · new pairings 0 · open/close shift 0.12"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:61%;"></div></div><div class="sig-idx">9</div></div>
+<div class="sig-cell" title="INT. SHERIFF&#39;S OFFICE - EVIDENCE LOCKER - DAY — 187 words (z 1.25) · dialogue 84% (Δ +0.24) · 2 speaker(s), 6 turn(s), 26.3 words/turn · lead share 30% · new pairings 0 · open/close shift 0.77"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:84%;"></div></div><div class="sig-idx">10</div></div>
+<div class="sig-cell" title="INT. KQRS STUDIO - NIGHT — 115 words (z -0.60) · dialogue 63% (Δ -0.22) · 2 speaker(s), 3 turn(s), 24.0 words/turn · lead share 88% · new pairings 0 · open/close shift 0.74"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:63%;"></div></div><div class="sig-idx">11</div></div>
+<div class="sig-cell" title="EXT. SHERIFF&#39;S OFFICE - NIGHT — 171 words (z 0.84) · dialogue 51% (Δ -0.11) · 2 speaker(s), 3 turn(s), 29.3 words/turn · lead share 44% · new pairings 0 · open/close shift 0.09"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:51%;"></div></div><div class="sig-idx">12</div></div>
+    </div>
+    <p class="sig-note">scene-length variation 0.28 &middot; mean talk/action swing 0.28 &middot; talk/action range 0.69 &middot; new-pairing scenes 25% &middot; mean words/turn 20.8 &middot; lead share 55% (trend -0.30) &middot; action-prose variation 0.64</p>
+    <p class="sig-note">These readings are computed from document structure alone &mdash; word, line, sentence, turn and speaker counts &mdash; with no word list involved. They are <strong>diagnostic only and are not part of the score</strong>: no health, grade, verdict, dimension or priority above is derived from any number in this section.</p>
+  </section>
+
+  <section class="section">
+    <h2>Root Causes</h2>
+    <p class="dim-basis" style="margin:0 0 12px;">The 6 findings below name the specific underlying craft problem behind several issues at once &mdash; read these first.</p>
+    <ol class="priority-list">
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-major">MAJOR</span>
+        <span class="issue-location">The middle has no engine</span>
+      </div>
+      <div class="issue-description">Two independent checks agree that Scene 7 is the story&#39;s dead center: midpoint suspense pressure is flat, and the midpoint scene itself carries no emotional or tension shift. That&#39;s not two problems, it&#39;s one missing pivot — give this single scene a reversal, a revelation, or a point-of-no-return decision, and both symptoms clear together.</div>
+      <div class="issue-fix">Subsumes 2 issues &mdash; Scene 7 &mdash; rules: WEAK_MIDPOINT, MIDPOINT_EMOTIONAL_FLATLINE</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-major">MAJOR</span>
+        <span class="issue-location">The reveal comes from nowhere and changes nothing</span>
+      </div>
+      <div class="issue-description">Scene 5 delivers a revelation with no prior misinformation for it to overturn, and the very next scene shows no emotional, relational, or suspense ripple from it either — the truth is weak going in and inert coming out. Plant a false belief a scene or two earlier that this moment overturns, and let the following scene visibly react to it — one fix seeds both ends of the reveal.</div>
+      <div class="issue-fix">Subsumes 2 issues &mdash; Scene 5 &mdash; rules: REVELATION_WITHOUT_REACTION, REVELATION_UNEARNED</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-major">MAJOR</span>
+        <span class="issue-location">Planted material never pays off</span>
+      </div>
+      <div class="issue-description">Early clues are named as never fired, and separately the script plants far more setups than it ever resolves — the same broken promise seen at two grains: specific guns on the mantel and the overall ledger of seeds versus payoffs. Pick the two or three planted threads that matter most and give each one a scene that cashes it in; the ledger and the named guns clear together.</div>
+      <div class="issue-fix">Subsumes 2 issues &mdash; Scenes 1–6 &mdash; rules: CHEKHOV_GUN_UNFIRED, SETUP_PAYOFF_IMBALANCE</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-minor">MINOR</span>
+        <span class="issue-location">Stakes-raising scenes are bunched, not spread</span>
+      </div>
+      <div class="issue-description">13 separate checks agree on the same thing: the scenes where this story raises the stakes are bunched into one quarter of the structure and absent from another. Escalation should arrive throughout the piece, not in one cluster and then a long silence; move at least one stakes-raising beat into the empty quarter this convergence names.</div>
+      <div class="issue-fix">Subsumes 14 issues &mdash; Scenes 4–6 &mdash; rules: STRUCTURE_STAKES_ZONE_IMBALANCE, CAUSALITY_STAKES_ZONE_IMBALANCE, INTENTION_STAKES_ZONE_IMBALANCE, BELIEF_STAKES_ZONE_IMBALANCE, CONFLICT_STAKES_ZONE_IMBALANCE, ARC_STAKES_ZONE_IMBALANCE, DIALOGUE_STAKES_ZONE_IMBALANCE, STAKES_ZONE_IMBALANCE, RHYTHM_STAKES_ZONE_IMBALANCE, PACING_STAKES_ZONE_IMBALANCE, ORIGINALITY_STAKES_ZONE_IMBALANCE, PAYOFF_STAKES_ZONE_IMBALANCE, VOICE_STAKES_ZONE_IMBALANCE, RELATIONAL_STAKES_ZONE_IMBALANCE</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-minor">MINOR</span>
+        <span class="issue-location">Deadline pressure is bunched, not spread</span>
+      </div>
+      <div class="issue-description">8 separate checks agree on the same thing: the scenes that raise a ticking clock are bunched into one quarter of the structure and absent from another. Deadline pressure should be felt throughout the piece, not concentrated in one stretch and forgotten elsewhere; introduce time pressure into at least one scene in the empty quarter this convergence names.</div>
+      <div class="issue-fix">Subsumes 8 issues &mdash; Scenes 4–6 &mdash; rules: STRUCTURE_CLOCK_ZONE_IMBALANCE, CAUSALITY_CLOCK_ZONE_IMBALANCE, INTENTION_CLOCK_ZONE_IMBALANCE, CONFLICT_CLOCK_ZONE_IMBALANCE, ARC_CLOCK_ZONE_IMBALANCE, DIALOGUE_CLOCK_ZONE_IMBALANCE, PAYOFF_CLOCK_ZONE_IMBALANCE, RELATIONAL_CLOCK_ZONE_IMBALANCE</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-minor">MINOR</span>
+        <span class="issue-location">Seeded threads carry no feeling</span>
+      </div>
+      <div class="issue-description">3 separate checks agree on the same thing: the scenes where this script plants its clues and threads (and, more broadly, where the protagonist takes initiative) are emotionally neutral. A thread planted in a scene that also carries some feeling — dread, hope, grief — is imprinted on the audience; one planted in a flat scene is catalogued as information and forgotten before it can pay off. Move at least one seed into (or right after) a scene where a character is already feeling something, rather than treating every plant as pure mechanism.</div>
+      <div class="issue-fix">Subsumes 4 issues &mdash; rules: PROACTIVE_EMOTION_DECOUPLED, SEED_EMOTIONAL_DECOUPLED, ARC_SEED_EMOTIONAL_AFTERMATH_VOID, CLUE_SEED_EMOTION_FLAT</div>
+    </li>
+    </ol>
+  </section>
+
+  <section class="section">
+    <h2>The 9 things to fix first</h2>
     <ol class="priority-list">
 
     <li class="priority-item">
@@ -536,16 +849,6 @@
     <li class="priority-item">
       <div class="priority-head">
         <span class="chip chip-major">MAJOR</span>
-        <span class="issue-location">Story structure — climax layer</span>
-        <span class="issue-pass">Structure</span>
-      </div>
-      <div class="issue-description">No scene carries purpose &quot;climax&quot; — the structure has no designated highest moment. The story may generate suspense but never formally commits to a climax scene. Without a structural climax, the audience has no clear peak against which all other scenes are measured.</div>
-      <div class="issue-fix"><strong>Suggested fix:</strong> Identify the story&#39;s highest-stakes confrontation and designate it as the structural climax: the scene where the central conflict is directly engaged and the protagonist&#39;s situation is irrevocably changed. The climax is not just the most intense scene — it is the one the entire story has been building toward.</div>
-    </li>
-
-    <li class="priority-item">
-      <div class="priority-head">
-        <span class="chip chip-major">MAJOR</span>
         <span class="issue-location">Overall causal arc</span>
         <span class="issue-pass">Causality</span>
       </div>
@@ -556,26 +859,71 @@
   </section>
 
   <section class="section">
-    <h2>Root Causes</h2>
-    <p class="dim-basis" style="margin:0 0 12px;">The 17 findings below cluster the detailed issue list into named underlying problems &mdash; read this before the full appendix.</p>
+    <h2>Recurring Issue Clusters</h2>
+    <p class="dim-basis" style="margin:0 0 12px;">The 16 findings below cluster the detailed issue list by where they land in the script &mdash; read after Top Priorities, alongside the full appendix.</p>
     <ol class="priority-list">
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-critical">CRITICAL</span>
+        <span class="issue-location">Recurring pre climax lull trouble in Scenes 7–12</span>
+      </div>
+      <div class="issue-description">13 issues converge here, mostly around pre climax lull — concentrated in Scenes 7–12 (lines 116-228).</div>
+      <div class="issue-fix">Subsumes 13 issues &mdash; Scenes 7–12 &mdash; rules: PRE_CLIMAX_LULL, ACT2B_SUSPENSE_DECAY, ACT2B_EMOTIONAL_FLATLINE, UNRELIEVED_TENSION_ASCENT, SUSPENSE_MIDPOINT_TROUGH, CLICHE_PHRASE, DARK_NIGHT_ABSENT, PROTAGONIST_PASSIVITY_CLIMAX, CLIMAX_AFTERMATH_FLAT, REVELATION_RUN, REVELATION_UNEARNED, REVELATION_CLUSTERING, REVELATION_CONSECUTIVE_FLOOD</div>
+    </li>
 
     <li class="priority-item">
       <div class="priority-head">
         <span class="chip chip-critical">CRITICAL</span>
         <span class="issue-location">Widespread Plot Logic &amp; Payoff concerns</span>
       </div>
-      <div class="issue-description">42 issues across 4 pass(es) in Plot Logic &amp; Payoff point to the same underlying problem, mostly around escalation plateau.</div>
-      <div class="issue-fix">Subsumes 42 issues &mdash; rules: GOAL_WITHOUT_OPPOSITION, ESCALATION_PLATEAU, REVELATION_CASCADE, DRAMATIC_TURN_CLUSTER, EMOTIONAL_NEUTRAL_RUN, CLOCK_RAISED_NO_EMOTION, DRAMATIC_TURN_NO_EMOTION, SUSPENSE_SPIKE_NO_EMOTION, REVELATION_RELATIONSHIP_VOID, CLOCK_RAISE_RELATIONSHIP_VOID, DRAMATIC_TURN_RELATIONSHIP_VOID, SEED_SCENE_EMOTION_VOID, CAUSALITY_STAKES_ZONE_IMBALANCE, CAUSALITY_CLOCK_DELTA_ZONE_IMBALANCE, CAUSALITY_CLOCK_ZONE_IMBALANCE, EXPOSITION_DUMP, REVELATION_CLUSTERING, REVELATION_BELIEF_PROPAGATION_ABSENT, ASSERTION_VOID, REVELATION_RELATIONSHIP_DECOUPLED, REVELATION_EMOTIONAL_AFTERMATH_FLAT, BELIEF_STAKES_ZONE_IMBALANCE, FLAT_SUSPENSE_ARC, NO_REVERSALS_LONG_STORY, TOO_MANY_OPEN_CONFLICTS, UNRELIEVED_TENSION_ASCENT, CONFLICT_CLOCK_DECOUPLED, CONFLICT_DRAMATIC_TURN_VOID, CONFLICT_CLOCK_AFTERMATH_VOID, CONFLICT_STAKES_ZONE_IMBALANCE, CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE, CONFLICT_CLOCK_ZONE_IMBALANCE, CONFLICT_STAGING_BACK_LOADED, PAYOFF_ORPHAN_RATE, CLUE_SEED_RELATIONSHIP_DECOUPLED, CLUE_SEED_FRONT_LOADED, CLUE_SEED_CONSECUTIVE_RUN, SEED_EMOTIONAL_AFTERMATH_ABSENT, PAYOFF_STAKES_ZONE_IMBALANCE, PAYOFF_CLOCK_ZONE_IMBALANCE, PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE</div>
+      <div class="issue-description">12 issues across 2 pass(es) in Plot Logic &amp; Payoff point to the same underlying problem, mostly around flat suspense arc.</div>
+      <div class="issue-fix">Subsumes 12 issues &mdash; rules: FLAT_SUSPENSE_ARC, NO_REVERSALS_LONG_STORY, TOO_MANY_OPEN_CONFLICTS, ESCALATION_PLATEAU, CONFLICT_CLOCK_DECOUPLED, CONFLICT_DRAMATIC_TURN_VOID, CONFLICT_CLOCK_AFTERMATH_VOID, CONFLICT_STAGING_BACK_LOADED, PAYOFF_ORPHAN_RATE, CLUE_SEED_RELATIONSHIP_DECOUPLED, CLUE_SEED_FRONT_LOADED, SEED_EMOTIONAL_AFTERMATH_ABSENT</div>
     </li>
 
     <li class="priority-item">
       <div class="priority-head">
-        <span class="chip chip-critical">CRITICAL</span>
-        <span class="issue-location">Recurring protagonist passivity climax trouble in Scene 9</span>
+        <span class="chip chip-major">MAJOR</span>
+        <span class="issue-location">Recurring act1 revelation absent trouble in Scenes 1–6</span>
       </div>
-      <div class="issue-description">4 issues converge here, mostly around protagonist passivity climax — concentrated in Scene 9 (lines 153-169).</div>
-      <div class="issue-fix">Subsumes 4 issues &mdash; Scene 9 &mdash; rules: PROTAGONIST_PASSIVITY_CLIMAX, CLIMAX_AFTERMATH_FLAT, REVELATION_UNEARNED, REVELATION_CONSECUTIVE_FLOOD</div>
+      <div class="issue-description">13 issues converge here, mostly around act1 revelation absent — concentrated in Scenes 1–6 (lines 7-115).</div>
+      <div class="issue-fix">Subsumes 13 issues &mdash; Scenes 1–6 &mdash; rules: ACT1_REVELATION_ABSENT, EMOTIONAL_OPENING_NEUTRAL, ACT1_WARMTH_ABSENT, DRAMATIC_TURN_CLUSTER, EMOTIONAL_NEUTRAL_RUN, SEED_RUN_ISOLATED, EXPOSITION_DUMP, ARC_OPENING_VOID, CLUE_SEED_CONSECUTIVE_RUN, CLUE_SEED_CLUSTER, ENTROPY_SPIKE_MISPLACED, SETUP_BURST, DIALOGUE_ASSERTION_RUN</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-major">MAJOR</span>
+        <span class="issue-location">Recurring arc clock delta zone imbalance trouble in Scenes 4–9</span>
+      </div>
+      <div class="issue-description">13 issues converge here, mostly around arc clock delta zone imbalance — concentrated in Scenes 4–9 (lines 59-171).</div>
+      <div class="issue-fix">Subsumes 13 issues &mdash; Scenes 4–9 &mdash; rules: ARC_CLOCK_DELTA_ZONE_IMBALANCE, DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE, PACING_CLOCK_DELTA_ZONE_IMBALANCE, ORIGINALITY_CLOCK_DELTA_ZONE_IMBALANCE, PAYOFF_CLOCK_DELTA_ZONE_IMBALANCE, TONAL_REGISTER_COLLAPSE_ACT2, VOICE_CLOCK_DELTA_ZONE_IMBALANCE, RELATIONAL_CLOCK_DELTA_ZONE_IMBALANCE, ACT2_DEAD_ZONE, DRAMATIC_TURN_AFTERMATH_VOID, ARC_POSITIVE_MIDPOINT_ABSENT, TALKING_HEADS, REVELATION_UNEARNED</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-major">MAJOR</span>
+        <span class="issue-location">Recurring question dodge trouble in Scenes 3–9</span>
+      </div>
+      <div class="issue-description">11 issues converge here, mostly around question dodge — concentrated in Scenes 3–9 (lines 42-171).</div>
+      <div class="issue-fix">Subsumes 11 issues &mdash; Scenes 3–9 &mdash; rules: QUESTION_DODGE, ACTION_CONSECUTIVE_LONG_RUN, ACTION_DENSITY_PEAK_LATE, SECOND_ACT_INVERSION, ACT2A_EMOTIONAL_FLATLINE, STRUCTURE_CLOCK_DELTA_ZONE_IMBALANCE, CAUSALITY_CLOCK_DELTA_ZONE_IMBALANCE, ESCALATION_ENTROPY_FLAT, INTENTION_CLOCK_DELTA_ZONE_IMBALANCE, CONFLICT_CLOCK_DELTA_ZONE_IMBALANCE, ARC_STALL_IN_ACT2</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-major">MAJOR</span>
+        <span class="issue-location">Recurring revelation unearned trouble in Scenes 10–12</span>
+      </div>
+      <div class="issue-description">11 issues converge here, mostly around revelation unearned — concentrated in Scenes 10–12 (lines 172-228).</div>
+      <div class="issue-fix">Subsumes 11 issues from 10 rules &mdash; Scenes 10–12 &mdash; rules: DENOUEMENT_OVERLONG, ACT3_EMOTIONAL_FLATLINE, REVELATION_UNEARNED, ARC_FINAL_ACT_CHARACTER_STATIC, QUESTION_DODGE, TALKING_HEADS, DIALOGUE_DENSITY_INVERSION, CLUE_GLUT, CONCURRENT_THREAD_OVERLOAD, REVELATION_UNPREPARED_CLIMAX</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-major">MAJOR</span>
+        <span class="issue-location">Widespread Plot Logic &amp; Payoff concerns</span>
+      </div>
+      <div class="issue-description">10 issues across 1 pass(es) in Plot Logic &amp; Payoff point to the same underlying problem, mostly around goal without opposition.</div>
+      <div class="issue-fix">Subsumes 10 issues &mdash; rules: GOAL_WITHOUT_OPPOSITION, ESCALATION_PLATEAU, REVELATION_CASCADE, CLOCK_RAISED_NO_EMOTION, DRAMATIC_TURN_NO_EMOTION, SUSPENSE_SPIKE_NO_EMOTION, REVELATION_RELATIONSHIP_VOID, CLOCK_RAISE_RELATIONSHIP_VOID, DRAMATIC_TURN_RELATIONSHIP_VOID, SEED_SCENE_EMOTION_VOID</div>
     </li>
 
     <li class="priority-item">
@@ -583,8 +931,8 @@
         <span class="chip chip-major">MAJOR</span>
         <span class="issue-location">Widespread Structure &amp; Pacing concerns</span>
       </div>
-      <div class="issue-description">40 issues across 3 pass(es) in Structure &amp; Pacing point to the same underlying problem, mostly around no reversals.</div>
-      <div class="issue-fix">Subsumes 40 issues &mdash; rules: NO_REVERSALS, DARK_NIGHT_ABSENT, ACT2_DEAD_ZONE, SECOND_ACT_INVERSION, ACT1_REVELATION_ABSENT, DENOUEMENT_OVERLONG, PRE_CLIMAX_LULL, ACT2B_SUSPENSE_DECAY, PURPOSE_CLIMAX_ABSENT, EMOTIONAL_ARC_UNIFORM, EMOTIONAL_OPENING_NEUTRAL, ACT3_EMOTIONAL_FLATLINE, ACT1_WARMTH_ABSENT, ACT2A_EMOTIONAL_FLATLINE, ACT2B_EMOTIONAL_FLATLINE, CURIOSITY_RUN, STRUCTURE_STAKES_ZONE_IMBALANCE, STRUCTURE_CLOCK_ZONE_IMBALANCE, STRUCTURE_CLOCK_DELTA_ZONE_IMBALANCE, SIMULTANEOUS_ACTION_ABSENT, VISUAL_TEXTURE_ABSENT, ACTION_PARENTHESIS_ASIDE, COLON_IN_ACTION, TRIADIC_LIST_OVERLOAD, ACTION_SHORT_MULTICLAUSAL, ACTION_SENTENCE_BURST_RUN, STAKES_ZONE_IMBALANCE, RHYTHM_STAKES_ZONE_IMBALANCE, RHYTHM_SOLO_VOICE_DROUGHT_RUN, RHYTHM_SOLO_VOICE_ZONE_CLUSTER, ENERGY_MONOTONE, ENERGY_PLACEMENT_MISMATCH, SUSPENSE_EMOTIONAL_AFTERMATH_FLAT, REVELATION_EMOTIONAL_AFTERMATH_FLAT, CLOCK_AFTERMATH_EMOTION_FLAT, TURN_AFTERMATH_EMOTION_FLAT, SEED_AFTERMATH_EMOTION_FLAT, PACING_STAKES_ZONE_IMBALANCE, PACING_CLOCK_DELTA_ZONE_IMBALANCE, PACING_OPEN_THREAD_FRONT_LOADED</div>
+      <div class="issue-description">8 issues across 1 pass(es) in Structure &amp; Pacing point to the same underlying problem, mostly around energy monotone.</div>
+      <div class="issue-fix">Subsumes 8 issues &mdash; rules: ENERGY_MONOTONE, ENERGY_PLACEMENT_MISMATCH, SUSPENSE_EMOTIONAL_AFTERMATH_FLAT, REVELATION_EMOTIONAL_AFTERMATH_FLAT, CLOCK_AFTERMATH_EMOTION_FLAT, TURN_AFTERMATH_EMOTION_FLAT, SEED_AFTERMATH_EMOTION_FLAT, PACING_OPEN_THREAD_FRONT_LOADED</div>
     </li>
 
     <li class="priority-item">
@@ -592,17 +940,26 @@
         <span class="chip chip-major">MAJOR</span>
         <span class="issue-location">Widespread Character concerns</span>
       </div>
-      <div class="issue-description">32 issues across 3 pass(es) in Character point to the same underlying problem, mostly around goal inversion absent.</div>
-      <div class="issue-fix">Subsumes 32 issues &mdash; rules: GOAL_INVERSION_ABSENT, ESCALATION_ENTROPY_FLAT, STAKES_NEVER_PERSONAL, PROACTIVE_RELATIONSHIP_VOID, PROACTIVE_EMOTIONAL_RECOIL_ABSENT, SEED_RUN_ISOLATED, PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT, REVELATION_RUN, SEED_FRONTLOADED, INTENTION_STAKES_ZONE_IMBALANCE, INTENTION_CLOCK_DELTA_ZONE_IMBALANCE, INTENTION_CLOCK_ZONE_IMBALANCE, ARC_STALL_IN_ACT2, ARC_OPENING_VOID, ARC_FINAL_ACT_CHARACTER_STATIC, ARC_POSITIVE_MIDPOINT_ABSENT, ARC_REVELATION_UNINCORPORATED, ARC_EMOTIONAL_FLATLINE, ARC_SUSPENSE_EMOTION_DECOUPLED, ARC_TURN_EMOTION_ABSENT, ARC_CURIOSITY_EMOTION_DECOUPLED, ARC_REVELATION_EMOTION_ABSENT, ARC_REVELATION_RELATIONAL_AFTERMATH_VOID, ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID, ARC_STAKES_ZONE_IMBALANCE, ARC_CLOCK_DELTA_ZONE_IMBALANCE, ARC_CLOCK_ZONE_IMBALANCE, RELATIONSHIP_ACT1_VOID, RELATIONSHIP_REVELATION_SILENT, RELATIONAL_STAKES_ZONE_IMBALANCE, RELATIONAL_CLOCK_ZONE_IMBALANCE, RELATIONAL_CLOCK_DELTA_ZONE_IMBALANCE</div>
+      <div class="issue-description">8 issues across 1 pass(es) in Character point to the same underlying problem, mostly around arc revelation unincorporated.</div>
+      <div class="issue-fix">Subsumes 8 issues &mdash; rules: ARC_REVELATION_UNINCORPORATED, ARC_EMOTIONAL_FLATLINE, ARC_SUSPENSE_EMOTION_DECOUPLED, ARC_TURN_EMOTION_ABSENT, ARC_CURIOSITY_EMOTION_DECOUPLED, ARC_REVELATION_EMOTION_ABSENT, ARC_REVELATION_RELATIONAL_AFTERMATH_VOID, ARC_DRAMATIC_TURN_EMOTIONAL_AFTERMATH_VOID</div>
     </li>
 
     <li class="priority-item">
       <div class="priority-head">
         <span class="chip chip-major">MAJOR</span>
-        <span class="issue-location">Widespread Dialogue &amp; Voice concerns</span>
+        <span class="issue-location">Widespread Character concerns</span>
       </div>
-      <div class="issue-description">16 issues across 2 pass(es) in Dialogue &amp; Voice point to the same underlying problem, mostly around dialogue density inversion.</div>
-      <div class="issue-fix">Subsumes 16 issues &mdash; rules: DIALOGUE_DENSITY_INVERSION, INTERRUPTION_VOID, DIALOGUE_SELF_CORRECTION_ABSENT, LONG_SPEECH_DOMINANCE, DIALOGUE_WITHIN_LINE_WORD_ECHO, DIALOGUE_NEGATION_FLOOD, DIALOGUE_STAKES_ZONE_IMBALANCE, DIALOGUE_CLOCK_ZONE_IMBALANCE, DIALOGUE_CLOCK_DELTA_ZONE_IMBALANCE, TONAL_REGISTER_COLLAPSE_ACT2, SENTENCE_FRAGMENT_STARVATION, DIALOGUE_SHOUT_CAPS, DIALOGUE_TRIADIC_FLOOD, DIALOGUE_NEGATION_RUN, VOICE_STAKES_ZONE_IMBALANCE, VOICE_CLOCK_DELTA_ZONE_IMBALANCE</div>
+      <div class="issue-description">8 issues across 2 pass(es) in Character point to the same underlying problem, mostly around goal inversion absent.</div>
+      <div class="issue-fix">Subsumes 8 issues &mdash; rules: GOAL_INVERSION_ABSENT, STAKES_NEVER_PERSONAL, PROACTIVE_RELATIONSHIP_VOID, PROACTIVE_EMOTIONAL_RECOIL_ABSENT, PROACTIVE_RELATIONSHIP_AFTERMATH_ABSENT, SEED_FRONTLOADED, RELATIONSHIP_ACT1_VOID, RELATIONSHIP_REVELATION_SILENT</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-major">MAJOR</span>
+        <span class="issue-location">Widespread Structure &amp; Pacing concerns</span>
+      </div>
+      <div class="issue-description">4 issues across 1 pass(es) in Structure &amp; Pacing point to the same underlying problem, mostly around no reversals.</div>
+      <div class="issue-fix">Subsumes 4 issues &mdash; rules: NO_REVERSALS, PURPOSE_CLIMAX_ABSENT, EMOTIONAL_ARC_UNIFORM, CURIOSITY_RUN</div>
     </li>
 
     <li class="priority-item">
@@ -610,98 +967,35 @@
         <span class="chip chip-major">MAJOR</span>
         <span class="issue-location">Widespread Theme &amp; Originality concerns</span>
       </div>
-      <div class="issue-description">6 issues across 1 pass(es) in Theme &amp; Originality point to the same underlying problem, mostly around scene shape templating.</div>
-      <div class="issue-fix">Subsumes 6 issues &mdash; rules: SCENE_SHAPE_TEMPLATING, CAPS_EMPHASIS_OVERUSE, VOICEOVER_CRUTCH, DIALOGUE_LONG_SPEECH_FLOOD, ORIGINALITY_STAKES_ZONE_IMBALANCE, ORIGINALITY_CLOCK_DELTA_ZONE_IMBALANCE</div>
-    </li>
-
-    <li class="priority-item">
-      <div class="priority-head">
-        <span class="chip chip-major">MAJOR</span>
-        <span class="issue-location">Recurring revelation unearned trouble in Scene 10</span>
-      </div>
-      <div class="issue-description">5 issues converge here, mostly around revelation unearned — concentrated in Scene 10 (lines 170-191).</div>
-      <div class="issue-fix">Subsumes 5 issues &mdash; Scene 10 &mdash; rules: REVELATION_UNEARNED, QUESTION_DODGE, TALKING_HEADS, CLUE_GLUT, CONCURRENT_THREAD_OVERLOAD</div>
-    </li>
-
-    <li class="priority-item">
-      <div class="priority-head">
-        <span class="chip chip-major">MAJOR</span>
-        <span class="issue-location">The middle has no engine</span>
-      </div>
-      <div class="issue-description">Two independent checks agree that Scene 7 is the story&#39;s dead center: midpoint suspense pressure is flat, and the midpoint scene itself carries no emotional or tension shift. That&#39;s not two problems, it&#39;s one missing pivot — give this single scene a reversal, a revelation, or a point-of-no-return decision, and both symptoms clear together.</div>
-      <div class="issue-fix">Subsumes 2 issues &mdash; Scene 7 &mdash; rules: WEAK_MIDPOINT, MIDPOINT_EMOTIONAL_FLATLINE</div>
-    </li>
-
-    <li class="priority-item">
-      <div class="priority-head">
-        <span class="chip chip-major">MAJOR</span>
-        <span class="issue-location">The reveal comes from nowhere and changes nothing</span>
-      </div>
-      <div class="issue-description">Scene 5 delivers a revelation with no prior misinformation for it to overturn, and the very next scene shows no emotional, relational, or suspense ripple from it either — the truth is weak going in and inert coming out. Plant a false belief a scene or two earlier that this moment overturns, and let the following scene visibly react to it — one fix seeds both ends of the reveal.</div>
-      <div class="issue-fix">Subsumes 2 issues &mdash; Scene 5 &mdash; rules: REVELATION_WITHOUT_REACTION, REVELATION_UNEARNED</div>
-    </li>
-
-    <li class="priority-item">
-      <div class="priority-head">
-        <span class="chip chip-major">MAJOR</span>
-        <span class="issue-location">Planted material never pays off</span>
-      </div>
-      <div class="issue-description">Early clues are named as never fired, and separately the script plants far more setups than it ever resolves — the same broken promise seen at two grains: specific guns on the mantel and the overall ledger of seeds versus payoffs. Pick the two or three planted threads that matter most and give each one a scene that cashes it in; the ledger and the named guns clear together.</div>
-      <div class="issue-fix">Subsumes 2 issues &mdash; rules: CHEKHOV_GUN_UNFIRED, SETUP_PAYOFF_IMBALANCE</div>
-    </li>
-
-    <li class="priority-item">
-      <div class="priority-head">
-        <span class="chip chip-major">MAJOR</span>
-        <span class="issue-location">Recurring clue seed cluster trouble in Scene 1</span>
-      </div>
-      <div class="issue-description">2 issues converge here, mostly around clue seed cluster — concentrated in Scene 1 (lines 5-15).</div>
-      <div class="issue-fix">Subsumes 2 issues &mdash; Scene 1 &mdash; rules: CLUE_SEED_CLUSTER, ENTROPY_SPIKE_MISPLACED</div>
-    </li>
-
-    <li class="priority-item">
-      <div class="priority-head">
-        <span class="chip chip-major">MAJOR</span>
-        <span class="issue-location">Recurring revelation unearned trouble in Scene 11</span>
-      </div>
-      <div class="issue-description">2 issues converge here, mostly around revelation unearned — concentrated in Scene 11 (lines 192-207).</div>
-      <div class="issue-fix">Subsumes 2 issues &mdash; Scene 11 &mdash; rules: REVELATION_UNEARNED, REVELATION_UNPREPARED_CLIMAX</div>
+      <div class="issue-description">4 issues across 1 pass(es) in Theme &amp; Originality point to the same underlying problem, mostly around scene shape templating.</div>
+      <div class="issue-fix">Subsumes 4 issues &mdash; rules: SCENE_SHAPE_TEMPLATING, CAPS_EMPHASIS_OVERUSE, VOICEOVER_CRUTCH, DIALOGUE_LONG_SPEECH_FLOOD</div>
     </li>
 
     <li class="priority-item">
       <div class="priority-head">
         <span class="chip chip-minor">MINOR</span>
-        <span class="issue-location">Seeded threads carry no feeling</span>
+        <span class="issue-location">Widespread Structure &amp; Pacing concerns</span>
       </div>
-      <div class="issue-description">3 separate checks agree on the same thing: the scenes where this script plants its clues and threads (and, more broadly, where the protagonist takes initiative) are emotionally neutral. A thread planted in a scene that also carries some feeling — dread, hope, grief — is imprinted on the audience; one planted in a flat scene is catalogued as information and forgotten before it can pay off. Move at least one seed into (or right after) a scene where a character is already feeling something, rather than treating every plant as pure mechanism.</div>
-      <div class="issue-fix">Subsumes 4 issues &mdash; rules: PROACTIVE_EMOTION_DECOUPLED, SEED_EMOTIONAL_DECOUPLED, ARC_SEED_EMOTIONAL_AFTERMATH_VOID, CLUE_SEED_EMOTION_FLAT</div>
+      <div class="issue-description">9 issues across 1 pass(es) in Structure &amp; Pacing point to the same underlying problem, mostly around simultaneous action absent.</div>
+      <div class="issue-fix">Subsumes 9 issues &mdash; rules: SIMULTANEOUS_ACTION_ABSENT, VISUAL_TEXTURE_ABSENT, ACTION_PARENTHESIS_ASIDE, COLON_IN_ACTION, TRIADIC_LIST_OVERLOAD, ACTION_SHORT_MULTICLAUSAL, ACTION_SENTENCE_BURST_RUN, RHYTHM_SOLO_VOICE_DROUGHT_RUN, RHYTHM_SOLO_VOICE_ZONE_CLUSTER</div>
     </li>
 
     <li class="priority-item">
       <div class="priority-head">
         <span class="chip chip-minor">MINOR</span>
-        <span class="issue-location">Recurring action density peak late trouble in Scene 2</span>
+        <span class="issue-location">Widespread Dialogue &amp; Voice concerns</span>
       </div>
-      <div class="issue-description">3 issues converge here, mostly around action density peak late — concentrated in Scene 2 (lines 16-45).</div>
-      <div class="issue-fix">Subsumes 3 issues &mdash; Scene 2 &mdash; rules: ACTION_DENSITY_PEAK_LATE, SETUP_BURST, DIALOGUE_ASSERTION_RUN</div>
+      <div class="issue-description">8 issues across 2 pass(es) in Dialogue &amp; Voice point to the same underlying problem, mostly around interruption void.</div>
+      <div class="issue-fix">Subsumes 8 issues &mdash; rules: INTERRUPTION_VOID, DIALOGUE_SELF_CORRECTION_ABSENT, LONG_SPEECH_DOMINANCE, DIALOGUE_WITHIN_LINE_WORD_ECHO, DIALOGUE_NEGATION_FLOOD, DIALOGUE_SHOUT_CAPS, DIALOGUE_TRIADIC_FLOOD, DIALOGUE_NEGATION_RUN</div>
     </li>
 
     <li class="priority-item">
       <div class="priority-head">
         <span class="chip chip-minor">MINOR</span>
-        <span class="issue-location">Recurring action shortest outlier trouble in Scene 7</span>
+        <span class="issue-location">Widespread Plot Logic &amp; Payoff concerns</span>
       </div>
-      <div class="issue-description">3 issues converge here, mostly around action shortest outlier — concentrated in Scene 7 (lines 114-137).</div>
-      <div class="issue-fix">Subsumes 3 issues &mdash; Scene 7 &mdash; rules: ACTION_SHORTEST_OUTLIER, SUSPENSE_MIDPOINT_TROUGH, CLICHE_PHRASE</div>
-    </li>
-
-    <li class="priority-item">
-      <div class="priority-head">
-        <span class="chip chip-minor">MINOR</span>
-        <span class="issue-location">Recurring dramatic turn aftermath void trouble in Scene 5</span>
-      </div>
-      <div class="issue-description">2 issues converge here, mostly around dramatic turn aftermath void — concentrated in Scene 5 (lines 67-97).</div>
-      <div class="issue-fix">Subsumes 2 issues &mdash; Scene 5 &mdash; rules: DRAMATIC_TURN_AFTERMATH_VOID, TALKING_HEADS</div>
+      <div class="issue-description">4 issues across 1 pass(es) in Plot Logic &amp; Payoff point to the same underlying problem, mostly around revelation belief propagation absent.</div>
+      <div class="issue-fix">Subsumes 4 issues &mdash; rules: REVELATION_BELIEF_PROPAGATION_ABSENT, ASSERTION_VOID, REVELATION_RELATIONSHIP_DECOUPLED, REVELATION_EMOTIONAL_AFTERMATH_FLAT</div>
     </li>
 
     <li class="priority-item">
@@ -709,8 +1003,8 @@
         <span class="chip chip-minor">MINOR</span>
         <span class="issue-location">Recurring intention invisible trouble for MAYA</span>
       </div>
-      <div class="issue-description">2 issues converge on MAYA, mostly around intention invisible — first raised at line 11.</div>
-      <div class="issue-fix">Subsumes 2 issues &mdash; rules: INTENTION_INVISIBLE, SPEAKER_MONOPOLY</div>
+      <div class="issue-description">2 issues converge on MAYA, mostly around intention invisible — first raised at line 13.</div>
+      <div class="issue-fix">Subsumes 2 issues &mdash; Scene 1 &mdash; rules: INTENTION_INVISIBLE, SPEAKER_MONOPOLY</div>
     </li>
     </ol>
   </section>
@@ -949,7 +1243,7 @@
           <span class="chip chip-major">MAJOR</span>
           <span class="issue-location">Scenes 1–6 (setup zone)</span>
         </div>
-        <div class="issue-description">9 clue(s) seeded in the first half (storymachine, maya-okonkwo, detective-ray-okonkwo) have no matching payoff anywhere in the story — Chekhov&#39;s gun shown but never fired</div>
+        <div class="issue-description">8 clue(s) seeded in the first half (maya-okonkwo, detective-ray-okonkwo, killed) have no matching payoff anywhere in the story — Chekhov&#39;s gun shown but never fired</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Either fire the gun: add a payoff scene that calls back each planted clue. Or remove the clue from Act 1 if you don&#39;t intend to resolve it.</div>
       </li>
 
@@ -967,7 +1261,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Setup/payoff distribution</span>
         </div>
-        <div class="issue-description">14 causal threads are seeded across the story but only 1 payoff(s) close them — the story plants 14 guns and fires almost none. The audience accumulates a growing load of unfulfilled promises.</div>
+        <div class="issue-description">13 causal threads are seeded across the story but only 1 payoff(s) close them — the story plants 13 guns and fires almost none. The audience accumulates a growing load of unfulfilled promises.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Audit the seeded clues and add payoff scenes that close each major thread. Alternatively, cut threads you don&#39;t intend to resolve — every seeded clue is a promise, and every unfired gun is a broken one.</div>
       </li>
 
@@ -983,9 +1277,9 @@
       <li class="appendix-item">
         <div class="priority-head">
           <span class="chip chip-minor">MINOR</span>
-          <span class="issue-location">Scene 1 (INT. KQRS RADIO STUDIO - NIGHT)</span>
+          <span class="issue-location">Scene 2 (INT. STATION NEWSROOM - CONTINUOUS)</span>
         </div>
-        <div class="issue-description">Scene 1 plants 3 distinct clues at once (storymachine, maya-okonkwo, kqrs) — too many threads launched in a single beat. The audience can&#39;t tell which setup matters, and each one registers more faintly for being crowded.</div>
+        <div class="issue-description">Scene 2 plants 4 distinct clues at once (detective-ray-okonkwo, killed, line, …) — too many threads launched in a single beat. The audience can&#39;t tell which setup matters, and each one registers more faintly for being crowded.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Distribute the setups across several scenes so each clue lands with its own moment of attention. A clue planted alone is remembered; three planted together blur into background detail.</div>
       </li>
 
@@ -1160,9 +1454,9 @@
       <li class="appendix-item">
         <div class="priority-head">
           <span class="chip chip-major">MAJOR</span>
-          <span class="issue-location">Scene 1 (INT. KQRS RADIO STUDIO - NIGHT)</span>
+          <span class="issue-location">Scene 2 (INT. STATION NEWSROOM - CONTINUOUS)</span>
         </div>
-        <div class="issue-description">The story&#39;s highest-momentum scene (Scene 1, entropy 6.0) lands in Act 1 rather than near the climax — the most informationally dense moment is in the setup, so the story front-loads its peak and has nowhere left to build</div>
+        <div class="issue-description">The story&#39;s highest-momentum scene (Scene 2, entropy 6.0) lands in Act 1 rather than near the climax — the most informationally dense moment is in the setup, so the story front-loads its peak and has nowhere left to build</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Redistribute momentum so the entropy peak lands in the back half: dial down the Act 1 spike, or escalate the climax so the densest concentration of suspense, relationship turns, and revelations arrives when the stakes are highest</div>
       </li>
 
@@ -1444,7 +1738,7 @@
           <span class="chip chip-major">MAJOR</span>
           <span class="issue-location">Conflict — unresolved threads</span>
         </div>
-        <div class="issue-description">13 planted conflicts/clues remain unresolved — the story feels scattered rather than escalating</div>
+        <div class="issue-description">12 planted conflicts/clues remain unresolved — the story feels scattered rather than escalating</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Converge 2-3 open threads into a single confrontation scene</div>
       </li>
 
@@ -1688,7 +1982,7 @@
       <li class="appendix-item">
         <div class="priority-head">
           <span class="chip chip-minor">MINOR</span>
-          <span class="issue-location">Line 53 (MAYA)</span>
+          <span class="issue-location">Line 55 (MAYA)</span>
         </div>
         <div class="issue-description">MAYA dodges DAN&#39;s question — no subject from the question appears in the reply</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Either answer the question, explicitly deflect it, or have the asker notice the dodge</div>
@@ -1697,7 +1991,7 @@
       <li class="appendix-item">
         <div class="priority-head">
           <span class="chip chip-minor">MINOR</span>
-          <span class="issue-location">Line 181 (DAN)</span>
+          <span class="issue-location">Line 183 (DAN)</span>
         </div>
         <div class="issue-description">DAN dodges MAYA&#39;s question — no subject from the question appears in the reply</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Either answer the question, explicitly deflect it, or have the asker notice the dodge</div>
@@ -1706,7 +2000,7 @@
       <li class="appendix-item">
         <div class="priority-head">
           <span class="chip chip-minor">MINOR</span>
-          <span class="issue-location">Lines 82–96</span>
+          <span class="issue-location">Lines 84–98</span>
         </div>
         <div class="issue-description">5 consecutive dialogue exchanges carrying 88 words with no action beat — characters lack physical presence in the scene</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Insert at least one action line every 3-4 exchanges to keep characters grounded in physical space</div>
@@ -1715,7 +2009,7 @@
       <li class="appendix-item">
         <div class="priority-head">
           <span class="chip chip-minor">MINOR</span>
-          <span class="issue-location">Lines 174–190</span>
+          <span class="issue-location">Lines 176–192</span>
         </div>
         <div class="issue-description">6 consecutive dialogue exchanges carrying 158 words with no action beat — characters lack physical presence in the scene</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Insert at least one action line every 3-4 exchanges to keep characters grounded in physical space</div>
@@ -1822,7 +2116,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Action lines throughout</span>
         </div>
-        <div class="issue-description">44 action lines contain no simultaneous-action language (&quot;while&quot;, &quot;even as&quot;, &quot;at the same time&quot;) — every action is strictly sequential. Film captures two things happening at once in the frame; a scene with no simultaneity misses the visual layering that distinguishes screenplay from a prose sequence of events.</div>
+        <div class="issue-description">48 action lines contain no simultaneous-action language (&quot;while&quot;, &quot;even as&quot;, &quot;at the same time&quot;) — every action is strictly sequential. Film captures two things happening at once in the frame; a scene with no simultaneity misses the visual layering that distinguishes screenplay from a prose sequence of events.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Add at least one simultaneous layer: &quot;While he talks, she reads the room.&quot; or &quot;Even as he smiles, his hands are shaking.&quot; Simultaneous action creates visual depth and reveals character through contradiction.</div>
       </li>
 
@@ -1831,7 +2125,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Action lines throughout</span>
         </div>
-        <div class="issue-description">44 action lines contain no texture or material descriptor — the screenplay world has no tactile surface. Nothing is rough, worn, cracked, gleaming, or stained. Texture words are what make described objects feel real; their absence gives the visual world a blank, set-photograph quality.</div>
+        <div class="issue-description">48 action lines contain no texture or material descriptor — the screenplay world has no tactile surface. Nothing is rough, worn, cracked, gleaming, or stained. Texture words are what make described objects feel real; their absence gives the visual world a blank, set-photograph quality.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Add at least 2-3 texture descriptors to the action: the worn armrest, the cracked plastic casing, the polished floor that reflects the overhead light. Texture is how the world tells the audience how old it is, how it has been used, and what it costs to be in it.</div>
       </li>
 
@@ -1840,7 +2134,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Action lines throughout</span>
         </div>
-        <div class="issue-description">6 action lines contain parenthetical asides. Parentheses in action prose are a novelist&#39;s whisper — author commentary delivered past the scene — and the camera has no equivalent register for them. Each aside pulls the reader out of the visual flow to receive a private footnote.</div>
+        <div class="issue-description">7 action lines contain parenthetical asides. Parentheses in action prose are a novelist&#39;s whisper — author commentary delivered past the scene — and the camera has no equivalent register for them. Each aside pulls the reader out of the visual flow to receive a private footnote.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Unpack each aside: if the parenthetical content matters, promote it to its own sentence; if it is a wink or qualifier, cut it. &quot;She picks up the gun (her father&#39;s)&quot; becomes &quot;She picks up the gun. Her father&#39;s.&quot; — same information, delivered in the scene instead of beside it.</div>
       </li>
 
@@ -1849,7 +2143,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Action lines throughout</span>
         </div>
-        <div class="issue-description">5 action lines use a colon as a dramatic-reveal device (&quot;He turns: she&#39;s already gone.&quot;). The colon engineers a beat of suspense on the page with punctuation alone. The camera achieves the same reveal with a cut or a hold; encoding the reveal as a colon means the writer is typographically directing the reader&#39;s experience rather than trusting the image to land on its own.</div>
+        <div class="issue-description">7 action lines use a colon as a dramatic-reveal device (&quot;He turns: she&#39;s already gone.&quot;). The colon engineers a beat of suspense on the page with punctuation alone. The camera achieves the same reveal with a cut or a hold; encoding the reveal as a colon means the writer is typographically directing the reader&#39;s experience rather than trusting the image to land on its own.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Convert the colon beat into a visual one: split the line at the colon into two separate sentences. &quot;He turns. She&#39;s already gone.&quot; — the white space between them does the colon&#39;s dramatic work while keeping the prose cinematic.</div>
       </li>
 
@@ -1865,18 +2159,18 @@
       <li class="appendix-item">
         <div class="priority-head">
           <span class="chip chip-minor">MINOR</span>
-          <span class="issue-location">Action lines near line 55 — consecutive long-line run (9 lines ≥15w)</span>
+          <span class="issue-location">Action lines near line 57 — consecutive long-line run (9 lines ≥15w)</span>
         </div>
         <div class="issue-description">9 consecutive action lines each contain 15 or more words — a dense-prose avalanche with no rhythmic relief between them. Dense action lines demand sustained reading effort; when five or more stack without a short punctuating beat, the reader is forced through a wall of description with nowhere to breathe. Good screenplay prose alternates density: a long image or staging note followed by a shorter beat that lets it settle before the next dense line arrives. The consecutive long-line run also signals that the writer is not consciously shaping rhythm in this passage — lines are being generated at uniform density rather than sculpted for pace.</div>
-        <div class="issue-fix"><strong>Suggested fix:</strong> Insert a short action beat (1–5 words) somewhere within the run of 9 long lines near line 55: a reaction, a pause, a single image in sharp focus. The short line does not have to carry much information — &quot;A beat.&quot; or &quot;She stops.&quot; is enough — but it breaks the density and gives the reader&#39;s eye a place to exhale before the next dense line arrives.</div>
+        <div class="issue-fix"><strong>Suggested fix:</strong> Insert a short action beat (1–5 words) somewhere within the run of 9 long lines near line 57: a reaction, a pause, a single image in sharp focus. The short line does not have to carry much information — &quot;A beat.&quot; or &quot;She stops.&quot; is enough — but it breaks the density and gives the reader&#39;s eye a place to exhale before the next dense line arrives.</div>
       </li>
 
       <li class="appendix-item">
         <div class="priority-head">
           <span class="chip chip-minor">MINOR</span>
-          <span class="issue-location">Action line 38 (in final 25%) — longest at 52 words</span>
+          <span class="issue-location">Action line 42 (in final 25%) — longest at 52 words</span>
         </div>
-        <div class="issue-description">The script&#39;s longest action line (action line 38, 52 words) falls in the final 25% of action prose, while 22 long lines (≥12 words) appear in the first three-quarters. The most elaborate action description arrives at the climax rather than in the earlier acts. Script pace is supposed to tighten toward the ending: scenes get shorter, action beats more economical, staging more pointed. When the longest, most densely written action line falls in the finale, it works against this rhythm — the prose requires the reader to slow down exactly where the story should be accelerating. The climax deserves the most precise and specific staging, but precision is achieved through selection, not through length.</div>
+        <div class="issue-description">The script&#39;s longest action line (action line 42, 52 words) falls in the final 25% of action prose, while 21 long lines (≥12 words) appear in the first three-quarters. The most elaborate action description arrives at the climax rather than in the earlier acts. Script pace is supposed to tighten toward the ending: scenes get shorter, action beats more economical, staging more pointed. When the longest, most densely written action line falls in the finale, it works against this rhythm — the prose requires the reader to slow down exactly where the story should be accelerating. The climax deserves the most precise and specific staging, but precision is achieved through selection, not through length.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Trim or redistribute the finale&#39;s longest action line — break it into shorter separate beats (each one a cut), move its richest descriptive work to an earlier act where pacing can afford elaboration, or distill it to its three or four most specific images and cut the rest. The first act can absorb long descriptive lines as world-building; the climax should work with economy.</div>
       </li>
 
@@ -1901,9 +2195,9 @@
       <li class="appendix-item">
         <div class="priority-head">
           <span class="chip chip-minor">MINOR</span>
-          <span class="issue-location">action line 134: &quot;Pellew.&quot;</span>
+          <span class="issue-location">action line 5: &quot;*/&quot;</span>
         </div>
-        <div class="issue-description">The script&#39;s shortest action line has only 1 word — less than 5% of the script&#39;s 20-word average. In a prose context where the average action line runs 20 words, a line collapsing to 1 creates a radical discontinuity: a point-of-shock outlier that can land as a powerful, deliberate impact beat or as an under-written placeholder. The contrast ratio flags it as anomalously short relative to the script&#39;s own register. An extreme floor outlier draws attention proportional to the gap; it should be there because it earns that weight.</div>
+        <div class="issue-description">The script&#39;s shortest action line has only 1 word — less than 5% of the script&#39;s 19-word average. In a prose context where the average action line runs 19 words, a line collapsing to 1 creates a radical discontinuity: a point-of-shock outlier that can land as a powerful, deliberate impact beat or as an under-written placeholder. The contrast ratio flags it as anomalously short relative to the script&#39;s own register. An extreme floor outlier draws attention proportional to the gap; it should be there because it earns that weight.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Read the 1-word line in context. If it is a deliberate staccato impact beat — a single action that ends a sequence, a response to a blow — the brevity may be intentional. If it reads as a placeholder or an incomplete beat, expand it to carry the scene&#39;s weight. If the gap from the rest of the prose feels unearned, adding a clause or detail brings it into the script&#39;s register.</div>
       </li>
 
@@ -2066,7 +2360,7 @@
       <li class="appendix-item">
         <div class="priority-head">
           <span class="chip chip-minor">MINOR</span>
-          <span class="issue-location">Line 116</span>
+          <span class="issue-location">Line 118</span>
         </div>
         <div class="issue-description">Cliché phrase detected: &quot;phone rings&quot;</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Replace with a specific, unexpected formulation unique to this character and moment</div>
@@ -2077,7 +2371,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Action line emphasis</span>
         </div>
-        <div class="issue-description">8 of 31 action lines (26%) shout an ALL-CAPS word mid-sentence for emphasis (&quot;He SLAMS the door&quot;) — caps belong to cues, sounds, and first appearances, not to punching up ordinary action.</div>
+        <div class="issue-description">8 of 33 action lines (24%) shout an ALL-CAPS word mid-sentence for emphasis (&quot;He SLAMS the door&quot;) — caps belong to cues, sounds, and first appearances, not to punching up ordinary action.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Strip the emphasis caps and let a stronger verb carry the force: &quot;He SLAMS the door&quot; → &quot;He slams the door&quot; reads no weaker, and &quot;He kicks it shut&quot; reads stronger. Save caps for the page&#39;s rare true accents.</div>
       </li>
 
@@ -2128,7 +2422,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Around Scene 10</span>
         </div>
-        <div class="issue-description">By Scene 10 the audience is tracking 13 open clues at once — too many simultaneous unresolved threads overload working memory, and the mysteries start to blur together.</div>
+        <div class="issue-description">By Scene 10 the audience is tracking 12 open clues at once — too many simultaneous unresolved threads overload working memory, and the mysteries start to blur together.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Resolve or consolidate some threads before opening new ones. Pay off an early clue to free up the audience&#39;s attention before planting the next, so each mystery has room to register.</div>
       </li>
 
@@ -2146,7 +2440,7 @@
           <span class="chip chip-major">MAJOR</span>
           <span class="issue-location">Scene 10 (peak open threads)</span>
         </div>
-        <div class="issue-description">At Scene 10 the story holds 13 planted-but-unresolved threads open simultaneously — the audience is asked to track 13 live questions at once. Beyond roughly five concurrent threads, individual mysteries blur together and each eventual payoff loses its charge.</div>
+        <div class="issue-description">At Scene 10 the story holds 12 planted-but-unresolved threads open simultaneously — the audience is asked to track 12 live questions at once. Beyond roughly five concurrent threads, individual mysteries blur together and each eventual payoff loses its charge.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Close some threads before opening new ones: pay off or fold together a few of the early clues so the concurrent open-thread count stays manageable. Suspense comes from a few sharp questions held in focus, not from a dozen blurred ones.</div>
       </li>
 
@@ -2155,7 +2449,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Setup/payoff ledger</span>
         </div>
-        <div class="issue-description">13 of 14 planted clues (93%) are never paid off — the majority of the story&#39;s setup investments go unrewarded. A high orphan rate depletes the audience&#39;s trust in the setup engine.</div>
+        <div class="issue-description">12 of 13 planted clues (92%) are never paid off — the majority of the story&#39;s setup investments go unrewarded. A high orphan rate depletes the audience&#39;s trust in the setup engine.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Either pay off the orphaned clues, or fold them into a shared payoff scene that resolves multiple threads at once. The audience remembers what the story promised — they need resolution, not abandonment.</div>
       </li>
 
@@ -2182,7 +2476,7 @@
           <span class="chip chip-minor">MINOR</span>
           <span class="issue-location">Setup distribution</span>
         </div>
-        <div class="issue-description">10 of 14 planted clues (71%) are seeded in the first half of the story — the setup engine front-loads its work. The back half introduces few new threads, so the midpoint-onward stretch coasts on early plants and the audience stops actively processing new setups precisely when the story should be deepening.</div>
+        <div class="issue-description">9 of 13 planted clues (69%) are seeded in the first half of the story — the setup engine front-loads its work. The back half introduces few new threads, so the midpoint-onward stretch coasts on early plants and the audience stops actively processing new setups precisely when the story should be deepening.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Move some clue plants into the second half: a new thread seeded at the midpoint or in Act 2b keeps the audience processing fresh setups and gives the climax something recently planted to pay off. A setup engine that goes quiet after the midpoint leaves the back half with nothing new to anticipate.</div>
       </li>
 
@@ -2234,7 +2528,7 @@
     </div>
 
     <div class="pass-block">
-      <h3>Voice &mdash; 8 issues</h3>
+      <h3>Voice &mdash; 7 issues</h3>
       <ul class="appendix-list">
 
       <li class="appendix-item">
@@ -2244,15 +2538,6 @@
         </div>
         <div class="issue-description">All 6 Act 2 scenes carry the same emotional register (&quot;neutral&quot;) — the middle of the story has no tonal modulation. Act 2a and Act 2b blur into a single undifferentiated stretch.</div>
         <div class="issue-fix"><strong>Suggested fix:</strong> Give Act 2 tonal shape: a moment of false hope or dark comedy in Act 2a, a turn toward crisis in Act 2b. The midpoint should feel like a register shift, not just a midpoint.</div>
-      </li>
-
-      <li class="appendix-item">
-        <div class="priority-head">
-          <span class="chip chip-minor">MINOR</span>
-          <span class="issue-location">Action line rhythm</span>
-        </div>
-        <div class="issue-description">Only 0 of 31 action lines (0%) are short declarative fragments (≤ 4 words) — the prose has no staccato rhythm. Every sentence is a full clause; the urgency of fragment shots (&quot;The door. Open. Silence.&quot;) is entirely absent.</div>
-        <div class="issue-fix"><strong>Suggested fix:</strong> Introduce short declarative fragments at moments of tension, revelation, or visual punctuation. A two-word action line can carry more weight than a sentence: &quot;Nothing moves.&quot; reads louder than &quot;Nobody in the room is moving at all.&quot;</div>
       </li>
 
       <li class="appendix-item">
@@ -2369,7 +2654,7 @@
       Running this engine again on the same script text reproduces the same score and verdict.
     </div>
 
-    <div class="footer-hash">Script-text hash (SHA-256, first 12 characters): <code>a1b44eff859d</code></div>
+    <div class="footer-hash">Script-text hash (SHA-256, first 12 characters): <code>09e8b0381f1f</code></div>
     <div class="verify-block">
       <div class="verify-heading">Verify this report</div>
       <div class="verify-body">
@@ -2378,18 +2663,20 @@
         deterministic analysis:
       </div>
       <ol class="verify-steps">
-        <li>Open any Story Machine instance and go to <code>#verify</code> (the &ldquo;Verify a report&rdquo; link on the start screen), or POST the script text to <code>/api/export/verify</code>.</li>
-        <li>Paste the original script text and the expected values below.</li>
-        <li>The service recomputes the hash and re-runs the analysis; every value must match.</li>
+        <li><strong>On your own machine</strong> (the script never leaves your computer): <code>npm run verify-report -- report.html script.fountain</code>.</li>
+        <li><strong>Or, hosted:</strong> open any Story Machine instance and go to <code>#verify</code> (the &ldquo;Verify a report&rdquo; link on the start screen), or POST the script text to <code>/api/export/verify</code> &mdash; paste the original script text and the values below.</li>
+        <li>Either way, the tool recomputes the hash and re-runs the analysis; every value must match.</li>
       </ol>
       <dl class="verify-claims">
-        <div><dt>Script-text hash (SHA-256, full)</dt><dd><code>a1b44eff859da29988dbd81354056b2574655302d63180022e679a7c942cf3ca</code></dd></div>
+        <div><dt>Script-text hash (SHA-256, full)</dt><dd><code>09e8b0381f1fc862619630b5684458bbec6f2c7910d4c0aee7a77ec2c1ec7cb0</code></dd></div>
         <div><dt>Health</dt><dd><code>78.3</code></dd></div>
         <div><dt>Verdict</dt><dd><code>CONSIDER</code></dd></div>
-        <div><dt>Total issues</dt><dd><code>174</code></dd></div>
+        <div><dt>Total issues</dt><dd><code>173</code></dd></div>
+        <div><dt>Engine commit</dt><dd><code>af26e356d9caae03e29b99f567c70da7d100ef72</code></dd></div>
+        <div><dt>Rulebook count</dt><dd><code>3217</code></dd></div>
       </dl>
     </div>
-    <div class="footer-generated">Generated August 11, 2026 at 02:58:54 PM UTC</div>
+    <div class="footer-generated">Generated September 11, 2026 at 02:21:01 AM UTC</div>
   </footer>
   </div>
 </body>

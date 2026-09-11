@@ -1,7 +1,7 @@
 ---
 type: surface
-updated: 2026-09-06
-sources: [server/routes/export.ts, server/routes/coverage-letter.ts, server/lib/verify-compare.ts, server/lib/build-info.ts, scripts/verify-report.mjs, tests/routes/export-verify.test.ts]
+updated: 2026-09-11
+sources: [server/routes/export.ts, server/routes/coverage-letter.ts, server/lib/verify-compare.ts, server/lib/build-info.ts, scripts/verify-report.mjs, tests/routes/export-verify.test.ts, server/lib/root-cause-pipeline.ts, server/lib/reader-tier.ts]
 status: active
 ---
 
@@ -47,6 +47,21 @@ any checkout carries a real 40-hex commit (`tests/core/build-info.test.ts`;
 explicitly on their test steps, the same env-var contract the Dockerfile's
 `ARG GIT_SHA` bakes).
 
+**One pipeline behind the two coverage documents (2026-09-11).** Both
+`POST /api/export/coverage` and `POST /api/export/coverage-letter` used to
+hand-assemble the root-cause pipeline with `clusterIssues`' scene-spans argument
+missing, so the producer's documents named different scenes, counted a different
+number of findings and ordered them differently from the writer's screen for the
+same `contentHash`. Both now call `buildRootCausePipeline` — see
+[[Surface - Root Cause Pipeline]] for the measurement and
+`tests/routes/root-cause-parity.test.ts` for the four-surface proof.
+
+Both also now pass the exact Fountain text into the renderer, for one purpose:
+resolving [[Surface - Producer Tier]]'s page references through the same
+paginator the PDF export uses. Nothing is re-analyzed and no number is derived
+from it there.
+
+
 ## Sources
 
 - `server/routes/export.ts`
@@ -56,4 +71,6 @@ explicitly on their test steps, the same env-var contract the Dockerfile's
 - `tests/routes/export-verify.test.ts`
 - `tests/scripts/verify-report.test.ts`
 - `tests/core/build-info.test.ts`
-- `docs/CLAIMS_REGISTER.md` rows 10, 74-75
+- `server/lib/root-cause-pipeline.ts`; `server/lib/reader-tier.ts`
+- `tests/routes/root-cause-parity.test.ts`
+- `docs/CLAIMS_REGISTER.md` rows 10, 74-75, 82, 87-92

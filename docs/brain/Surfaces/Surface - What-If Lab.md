@@ -1,7 +1,7 @@
 ---
 type: surface
-updated: 2026-09-05
-sources: [src/components/WhatIfPanel.tsx, server/nvm/whatif/materialize.ts, tests/routes/nvm-whatif-doctor.test.ts]
+updated: 2026-09-11
+sources: [src/components/WhatIfPanel.tsx, server/nvm/whatif/materialize.ts, tests/routes/nvm-whatif-doctor.test.ts, src/lib/percentile-copy.ts, server/routes/nvm/twin-whatif.ts]
 status: active
 ---
 
@@ -26,8 +26,21 @@ the current draft first, so it can be restored from Versions (row 45).
 **Browser suite:** `scripts/verify-p2-p3-surfaces.mjs`'s `P2-whatif` phase
 (labelling assertion, promote-snapshots-first, applies-exactly-once).
 
+**The percentile gate reaches this panel too (2026-09-11).**
+`server/routes/nvm/twin-whatif.ts`'s `presentReport` now forwards `sceneCount`
+and `wordCount` under the same `complete` flag it already gates
+health/verdict/percentile on, so a branch readout has both dimensions the
+comparability gate needs instead of having to guess. The readout calls
+`compactPercentileNoteFor`/`exactRankTooltipFor` from
+`src/lib/percentile-copy.ts`, so a branch outside the calibration reference
+set's band reads "not comparable" and carries no exact-rank tooltip
+(`docs/CLAIMS_REGISTER.md` row 88). A promoted branch also carries its word
+count into [[Surface - Versions and Snapshots]], so it is not the one row there
+that can never show a reading.
+
 ## Sources
 
 - `src/components/WhatIfPanel.tsx`
 - `tests/routes/nvm-whatif-doctor.test.ts`; `tests/routes/nvm-whatif-room.test.ts`
-- `docs/CLAIMS_REGISTER.md` rows 13-14, 42-45, 54
+- `src/lib/percentile-copy.ts`; `server/routes/nvm/twin-whatif.ts`
+- `docs/CLAIMS_REGISTER.md` rows 13-14, 42-45, 54, 88

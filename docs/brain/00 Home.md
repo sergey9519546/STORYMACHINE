@@ -70,6 +70,11 @@ decision, repo visibility. Each has its own note under `Owner/`; start at
   [[Gate - Receipt Gate]].
 - **"What does surface X actually show, and where does the number come
   from?"** → `Surfaces/` — start at [[Surface - Script Doctor Panel]].
+  When a number appears on more than one surface, the note for the shared
+  module is the authority: [[Surface - Root Cause Pipeline]] for the scene
+  ranges, cluster counts and priority order every document states, and
+  [[Surface - Producer Tier]] for the one printed page both coverage exports
+  now open with.
 - **"What happened in session N?"** → `Sessions/` — start at
   [[Session - 2026-08-24 Five Landings]].
 - **"What did audit N find?"** → `Audits/` — start at
