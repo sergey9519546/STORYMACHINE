@@ -518,17 +518,51 @@ function ssrfSafeUrlField() {
 //     19,900 pairs): analyzeVoices alone went from 42,062 ms to 191 ms, and
 //     a deliberately extreme 520-name / 249,600-word cast (weight
 //     129,792,000, 433x this bound) now costs 563 ms.
-// WHAT WAS DELIBERATELY NOT DONE: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT was NOT
-// raised to match. Every payload this file's suite pins as rejected stays
-// rejected, and no cost bound is loosened as a side effect of a scoring
-// change. The cost of that conservatism is stated rather than hidden: the
-// suite's own synthetic "realistic 150-name feature" now sits at 1.2x
-// headroom (eligible weight 259,200 against 300,000) where it previously
-// never reached the bound at all, so a legitimate ensemble feature somewhat
-// larger than that fixture would now be rejected for a cost the measurements
-// above put in the tens of milliseconds. Re-deriving this constant from the
-// new rate is real, owner-facing work for a lane whose review is about this
-// guard — it is not a scoring lane's to do unilaterally.
+// (3) 2026-09-11, ROUND 2 — THE BOUND IS NOW RE-DERIVED FROM THE NEW RATE,
+//     because leaving it was no longer a conservative choice but a wrong
+//     answer on a committed fixture. This branch's round 1 deliberately did
+//     NOT raise MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT ("not a scoring lane's to
+//     do unilaterally", and the suite's synthetic 150-name feature was left
+//     at 1.2x headroom). Rebasing onto main @ ad3f6fa7 settled it: main's own
+//     `tests/fixtures/feature-length/assembled-feature.fountain` — a 2,927-
+//     line legitimate feature, 58 eligible characters pooling 7,655 words,
+//     eligible weight 443,990 — is REJECTED by the 300,000 bound. A guard
+//     that refuses a feature the repository itself ships as "what a real
+//     draft looks like" is a defect, not caution, and `does not reject
+//     tests/fixtures/feature-length/assembled-feature.fountain` failed on
+//     the rebased tree before this change (that is the fail-first evidence).
+//
+//     RE-DERIVED, measured on this box, same method as the round-2 grid: the
+//     worst shape at a given weight is the one that maximises the eligible
+//     CAST (pairs grow as n²/2 while weight grows as n × 32n), so it is n
+//     uniform characters each sitting exactly on the 32-word floor. Full
+//     `analyzeFountainText` (parse + every analyzer pass + analyzeVoices), to
+//     bound what a request actually costs rather than one function:
+//
+//       n     eligible weight   pairs     analyzeFountainText   rate
+//        97           301,088    4,656                  52 ms   0.173 us/unit
+//       250         2,000,000   31,125                 156 ms   0.078 us/unit
+//       260         2,163,200   33,670                 150 ms   0.069 us/unit
+//       500         8,000,000  124,750                 501 ms   0.063 us/unit
+//
+//     The round-2 grid's worst rate was 0.022 MS/unit; it is now 0.00017
+//     ms/unit at the small end and falls with size. The rate alone would
+//     admit ~69,000,000 under the 10 s target — NOT taken. The bound is set
+//     by two LEGITIMATE-DOCUMENT constraints instead, and they bracket it
+//     tightly:
+//       lower: >= 3x headroom on the heaviest tracked fixture, main's
+//              assembled-feature at 443,990  ->  >= 1,331,970
+//       upper: strictly BELOW every payload this file pins as rejected. The
+//              binding one is round-3 bypass B (200 uniform names, 4 double-
+//              spaced hard-wrapped occurrences each), whose real-parse weight
+//              measures 1,920,000 — so the bound must stay under that or a
+//              pinned payload would start being accepted.
+//     1,500,000 is the round value inside [1,331,970, 1,920,000). It gives
+//     3.4x headroom on assembled-feature, keeps bypass A/B, R6-0/1/2 and the
+//     three round-2 payloads (5,400,000 / 18,720,000 / 19,656,000) rejected,
+//     keeps the legacy-vs-real-parse equivalence decisions identical, and its
+//     own worst shape costs ~120 ms. NO pinned payload changed decision: that
+//     is the test, not the claim.
 //
 // THE FIX (MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT below): track, per distinct
 // character (grouped by BASE NAME — stripping (V.O.)/(O.S.)/(CONT'D) the
@@ -605,14 +639,31 @@ const VOICE_ELIGIBLE_MIN_WORDS = 30;
 // VOICE_ELIGIBLE_MIN_WORDS — the one condition under which voice-delta.ts's
 // O(distinct²) Burrows's-Delta pass actually runs instead of abstaining —
 // (eligible character count) x (their total pooled dialogue words) must not
-// exceed this. Calibrated from the round-2 cost grid: the four measured
-// ACCEPTED-and-eligible extremes cost 0.01-0.022ms per unit of this
-// product; 300,000 x the worst observed rate (0.022ms/unit) predicts a
-// ~6.6s ceiling, comfortably under the review's ~10s target with margin for
-// a slower box. Every legitimate fixture measured against this bound (the
-// 54 tracked fixtures, the CC0 corpus, a realistic 150-name skewed feature)
-// clears it by at least 3x — see this file's own margin-proof test.
-export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 300_000;
+// exceed this. RE-DERIVED 2026-09-11 from 300,000 — see point (3) of the
+// long comment above MAX_FOUNTAIN_TOKEN_CHARS for the fail-first evidence
+// (main's own feature fixture was rejected at 300,000) and the measured
+// rate table. In short: the worst shape at this bound is 250 uniform
+// characters on the 32-word floor, 31,125 Burrows's-Delta pairs, and a full
+// analyzeFountainText on it measures 156 ms — 64x under the review's ~10 s
+// target, where the old bound's own calibration predicted ~6.6 s. Every
+// legitimate fixture measured against this bound (the 54 tracked fixtures,
+// the CC0 corpus, main's 2,927-line assembled feature at 443,990, a
+// realistic 150-name skewed feature) clears it by at least 3x — see this
+// file's own margin-proof test, which is what fails if a future fixture
+// grows into it.
+export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1_500_000;
+/** The measured worst-shape cost rate behind MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+ *  in MICROSECONDS of full `analyzeFountainText` per unit of eligible weight,
+ *  at the SMALL end of the table above (0.173 us/unit at weight 301,088 —
+ *  the rate falls as the shape grows, so the small end is the conservative
+ *  one). Exported so the bound and the measurement that justifies it cannot
+ *  drift apart silently: the margin-proof test multiplies the two and fails
+ *  if the product ever crosses the review's ~10 s target. Re-measure with
+ *  the n-uniform-32-word-floor shape before changing either number. */
+export const VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT = 0.173;
+/** The cost target the two constants above are held to (microseconds) — the
+ *  2026-09-05 review's own ~10 s ceiling for an accepted request. */
+export const VOICE_ELIGIBLE_WEIGHT_COST_TARGET_US = 10_000_000;
 // 2026-09-06 review round 7 follow-up, non-blocking — RESIDUAL accepted
 // worst case. CLOSED 2026-09-07 by the per-character eligibility change (see
 // this section's 2026-09-07 UPDATE): the shape below is now REJECTED, and

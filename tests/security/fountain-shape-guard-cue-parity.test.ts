@@ -103,6 +103,8 @@ import {
   MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT,
   MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES,
   MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+  VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT,
+  VOICE_ELIGIBLE_WEIGHT_COST_TARGET_US,
   guardVoiceWordCounts,
   guardEligibleVoiceWordCounts,
   isSceneSegmentHeading,
@@ -989,6 +991,55 @@ describe('ROUND 2: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT — the three reviewer pay
       worstMargin,
       Infinity,
       'this headroom proof is worthless if no tracked fixture reaches the bound at all — under per-character eligibility most of them must',
+    );
+  });
+
+  // ROUND 2 (2026-09-11), the other half of the re-derivation: a bound and
+  // the measurement that justifies it must not drift apart. The bound was
+  // raised from 300,000 to 1,500,000 because main's own 2,927-line
+  // assembled-feature fixture (eligible weight 443,990) was REJECTED at
+  // 300,000 — `does not reject tests/fixtures/feature-length/assembled-
+  // feature.fountain` above is the fail-first evidence and it failed on the
+  // rebased tree before the change. What keeps the new value honest is this:
+  // the worst shape AT the bound is n uniform characters each on the 32-word
+  // floor (pairs grow as n²/2 while weight grows as 32n², so maximising the
+  // cast maximises cost at fixed weight), and the recorded rate is the
+  // SMALL-end, conservative one. The product must stay under the review's
+  // ~10 s target, so raising the bound without re-measuring the rate fails
+  // here rather than in production. The bound is ALSO bracketed from above by
+  // the lightest pinned payload (round-3 bypass B, real-parse weight
+  // 1,920,000), which is asserted below: a bound at or past that number would
+  // start accepting a payload this file exists to reject.
+  it('the bound x its measured worst-shape rate stays under the review cost target', () => {
+    const predictedUs = MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT * VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT;
+    assert.ok(
+      predictedUs < VOICE_ELIGIBLE_WEIGHT_COST_TARGET_US,
+      `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT=${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} x the measured `
+      + `${VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT} us/unit predicts ${(predictedUs / 1000).toFixed(0)} ms, `
+      + `over the ${(VOICE_ELIGIBLE_WEIGHT_COST_TARGET_US / 1000).toFixed(0)} ms target — re-measure the rate `
+      + 'with the n-uniform-32-word-floor shape before raising the bound',
+    );
+    // And the other direction: a bound so small that the heaviest fixture the
+    // repository ships cannot clear it is the defect this round fixed, so pin
+    // that fixture's measured weight by name. 443,990 is measured, not
+    // guessed; if the fixture changes, this number changes with it.
+    const ASSEMBLED_FEATURE_ELIGIBLE_WEIGHT = 443_990;
+    assert.ok(
+      MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT >= 3 * ASSEMBLED_FEATURE_ELIGIBLE_WEIGHT,
+      `main's assembled-feature fixture measures ${ASSEMBLED_FEATURE_ELIGIBLE_WEIGHT} and the bound is `
+      + `${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} — under 3x headroom on a legitimate committed feature`,
+    );
+    // The upper bracket, so the bound can never be raised past a payload this
+    // file pins as rejected without this line failing first. Measured
+    // real-parse weight of round-3 bypass B (200 uniform names x 4
+    // double-spaced hard-wrapped occurrences): 1,920,000 — the lightest of
+    // every pinned payload (the round-2 three are 5,400,000 / 18,720,000 /
+    // 19,656,000).
+    const LIGHTEST_PINNED_PAYLOAD_WEIGHT = 1_920_000;
+    assert.ok(
+      MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT < LIGHTEST_PINNED_PAYLOAD_WEIGHT,
+      `the bound ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} is at or past the lightest pinned payload `
+      + `(${LIGHTEST_PINNED_PAYLOAD_WEIGHT}) — raising it that far starts ACCEPTING round-3 bypass B`,
     );
   });
 });
