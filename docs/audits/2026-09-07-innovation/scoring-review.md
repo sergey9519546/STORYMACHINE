@@ -472,3 +472,209 @@ as written, each with a file:line and a one-command reproduction above. None
 changes a health value, so the owner's `measure-real` run is worth spending and
 can proceed in parallel; items 1, 2 and 7 should be corrected before the owner
 reads the evidence to decide, because they change what the evidence says.
+
+---
+
+## Round 2
+
+**Objects:** `scoring/feature-length-defects` @ **`13d64bb58af4123a7534b205489d7d96b6e688e1`**
+(17 commits on `main` @ `ad3f6fa7`) and `scoring/feature-length-saturation-only`
+@ **`efd1a463014d2974931ebc6d5bf60f1eed447878`** (3 commits on the same base).
+Lane report: `docs/audits/2026-09-07-innovation/scoring-lane-report.md` "## Round 2"
+(`main` @ `4694b95f`).
+
+**Method, same discipline as round 1.** `git archive` exports of `13d64bb5`,
+`efd1a463` and `ad3f6fa7` beside the round-1 exports, `node_modules` symlinked;
+one `git clone --shared` detached at each tip for the git-dependent suites and
+gates. `/home/user/wt-flength` was never read from, written to, or entered;
+`/home/user/STORYMACHINE`'s working tree was not modified except for this file.
+No `--lock`, no push, no merge, no `npm test` (per the budget), no battery.
+Every AUC, Spearman, ordering health, slope ratio, identity statistic and
+clue-channel count below is from **my own implementation**, run against the
+exports — not read off the lane's scripts. Where two routes to the same
+statistic exist I ran both (`AGREE` in probe output).
+
+### Round-1 items: status
+
+| item | round-1 finding | round-2 claim | my reproduction | status |
+|---|---|---|---|---|
+| 1 | staple invariant false for 6 of 12 permutations; witness pinned one order | saturation 15 → 12; `−1.6` over all 14 seeded orderings; 13 rejected for passing by 0.7 against a 3.4 spread | **my 58-ordering sweep** (the lane's 14 + 40 fresh seeds + 4 targeted): worst case **−1.5**, **0 of 58 failing**, range 4.2. Lane-14 subset: max 80.2 → **−1.6**, min 76.8, range 3.4 — the runner's own print, to the decimal | **CLOSED**, and stronger than claimed |
+| 2 | slope table's population wrong, 2 rows irreproducible, 4 omissions load-bearing | population stated (16 sub-1 scripts, binding 11.42), 16 rows, 2 bad rows removed, 4 omissions named with meaning | all 16 rows match my `probe-slope2.ts` to 4 decimals; min over all 32 is 6.67 as stated; the four named inversions are **exactly** my measured list on the final tree (`quiet-season +0.1, room-12 +8.4, the-key-under-the-mat +1.6, transfer-window +8.9`) | **CLOSED** |
+| 3 | "BRASS KEY beside a character called KEY stays a clue" false; title and chain suppressions | two shapes fixed at the cause, two left as `todo`; narrowing tried, measured, reverted; corpus-wide property added | B `["key-title"]` → **`["brass-key"]`**; C `[]` → **`["leverage"]`**; D and E unchanged and `todo` with measured id lists; my own corpus-wide count: **65 offenders of 131 seeded ids on `ad3f6fa7` → 0 of 53 on the tip** | **CLOSED as far as it can be**, honestly |
+| 4 | third credit-cap residue (`CREDIT_FULL_SCENES`, "three constants", 0.1889) | all three fixed, a fourth found in §8.4 | `CREDIT_FULL_SCENES` survives only in retraction prose; "TWO things moved, not three"; `= 8.5/54.22 = 0.1568`; §8.4's 82.7/57.7 corrected | **CLOSED but for one residue — see R2-3** |
+| 5 | `benchmark:public` printed five figures its own table contradicted | caveats rendered from the `BenchmarkResult` | ran it: every figure in the caveat block equals the table above it (0.8750/[0.7500,0.9688], 0.8291/[0.7222,0.9268], 0.5469, 0.5151, "2 of the four … still contain 0.5", 0 pinned / 1 tie / 31 movable, 4 of 6 at 0.3833, control 1.0000/1.0000). `npm run gates` exit 0 and quotes **no** point estimate at all | **CLOSED** |
+| 6 | disclosure sentence asserted a cause it did not account for | states the real gap, names all four terms, false clause gone | staple: "82/100, **4 point(s) above it**" against a displayed gap of 4 ✓; 40 scenes: 13 ✓; inert 2-scene: 70 ✓; "the gap is the length of the draft, not the dimensions" is gone | **CLOSED** |
+| 7 | scarcity framing pointed at the AUC-irrelevant half | rewritten in four places around the level shift vs the degradation delta | `0.586` present in the receipt, the doc, the owner note and `auc.ts`; the `140/79 − 140/118 = +0.586 → 0.000` derivation and the 10.480-point level shift are both stated, with "rank-preserving … cannot move a matched-pair statistic" and an explicit can/cannot-settle list | **CLOSED** (7a regressed — see R2-2) |
+| 8 | owner note's "same two functions" wrong; separable half not offered | corrected to one function; three-step decision tree; sibling branch built | R5's diff leaves `scarcityPenalty` untouched ✓; the note now says so; decision tree present at `:193-209`; the sibling branch exists, is measured, and its two caveats are true (see below) | **CLOSED** |
+| 9a | grade-tier substitute near-implied by the delta gate | verdict tier is a **hard** check again on its own merits | `feature-scale-discrimination.test.ts` 7 pass / **0 todo**; the verdict assertion carries no `todo` option; intact 79 CONSIDER / flattened 58.2 PASS, crossing 60 by 1.8, with health 60 and the 20.0 delta gate both untouched | **CLOSED, better than asked** |
+| 9b | NOT-WIRED guard greped `doctor.ts` only | reads the whole scoring-path set via `scoringPathFiles()` | **68** files, includes `server/nvm/revision/passes/belief.ts`; **I planted a reference there myself** and the guard failed naming that file. Restored afterwards | **CLOSED**, fail-first proven independently |
+| cosmetics | 7 listed | all fixed | +2.109375 and 7.632 untruncated; `void sceneCount` gone; both R5 ratios given; full-precision slope table; metamorphic margins now recorded (`scene_dup_padding` −2.1 → **−4.4**, which my run confirms) | **CLOSED** |
+
+### The numbers, measured on my own scorer
+
+| statistic | `main` @ `ad3f6fa7` | lane tip `13d64bb5` | sat-only `efd1a463` | claim |
+|---|---|---|---|---|
+| SHUFFLE_DROP matched-pair | 0.5313 (17/15/0) | **0.8750** (28/4/0) | **0.5313** (17/15/0) | all three ✓ |
+| SHUFFLE_DROP all-pairs | 0.5586 | **0.8291** | **0.5493** | ✓ |
+| SHUFFLE_DROP mean gap | −1.93125 | **+1.89375** | **−2.15** (worse than main) | ✓ incl. the honest "worse" |
+| CLIMAX_RELOCATE matched / all-pairs | 0.4219 / 0.4673 | **0.5469 / 0.5151** | **0.4219 / 0.4746** | ✓ |
+| CLIMAX exact ties · intact pinned at 76.0 | 11 · 10 | **1 · 0** | **11 · 10** | ✓ |
+| DIALOGUE_FLATTEN control | 1.0000 / 0.9473, gap 29.30 | **1.0000 / 1.0000, gap 26.40** | 1.0000 / 0.9473, gap 29.30 | ✓ |
+| blind pairs | 1/6, −0.0167 | **4/6, +0.3833** | 1/6, −0.0167 | ✓ |
+| calibration, 20 samples | 62.40/52.52/42.12/37.08, gap 25.32 | **byte-identical per sample** | **byte-identical per sample** | ✓ (also identical to round 1's base) |
+| `stapled_shorts` over 14 orderings | +8.2 / every ordering fails | **−1.6** (min 76.8, max 80.2, range 3.4) | **0.0** (min 75.4, max 78.3, range 2.9) | ✓ |
+| output identity vs base, 45 fixtures | — | **25 moved, RMS 9.839, mean +2.292, largest +32.2 `transfer-window`, 6 verdict flips, 5 grade flips; `plainSummary` 34/45, `strengths` 4/45** | — | every figure ✓ |
+
+Floor margins: every one of the twelve floors across the two branches is exactly
+`measured − 0.02` on my own measurement. All six are satisfied on both trees.
+
+**Item 1's arithmetic, derived independently.** The staple comparison is a
+139-scene document against a 12-scene best part, so the term's contribution is
+`140/min(139,S) − 140/min(12,S)`: zero for every `S ≤ 12`, and a bonus to the
+long document of `0.897 / 1.667 / 2.333` at `S = 13 / 14 / 15`. Adding those to
+my measured lane-14 maximum of 80.2 reproduces the branch's sensitivity table
+exactly (81.1 / 81.87 / 82.53 against a best part of 81.8 → margins
+0.7 / −0.1 / −0.7, failing counts 0 / 1 / 7), and 82.5 at `S = 15` is the number
+I measured myself in round 1. The branch does **not** claim 12 is the only such
+value — `doctor.ts:585-591` says "0 for every `S ≤ 12`" and "**S = 12 is
+therefore the LARGEST** saturation point at which scene count contributes
+NOTHING", which is the true statement.
+
+**The ordering set is seeded and machine-stable.** `stapledShortsOrderings()`
+builds canonical + reversed + twelve Fisher-Yates permutations from a
+`Math.imul`-exact mulberry32 at fixed seeds 1..12 over a by-name parts list, so
+it is identical on every machine. My sweep added 40 seeds it never uses plus
+`healthDesc`, `healthAsc`, `bestFirst`, `bestLast` — the arrangements most likely
+to be adversarial — and none failed.
+
+**Floors, both readings, because they differ.** Relative to round 1's tip, one
+floor moved and it moved **DOWN** (`PUBLIC_SHUFFLE_DROP_FLOOR` 0.8106 → 0.8091)
+and the other five are unchanged — the lane's claim, verified. Relative to the
+**merge base** `ad3f6fa7`, five of six moved **UP** (0.5113→0.855, 0.5386→0.8091,
+0.4019→0.5269, 0.4473→0.4951, 0.9273→0.98), which is the same posture round 1
+carried and which I judged acceptable then for the same reason: the public
+benchmark needs no corpus, no key and no owner, CLAUDE.md's rule is "re-lock only
+after a scoring change you intended", and `AUC24_FLOOR` is untouched at 0.622 on
+both branches. On the **saturation-only** branch one floor moved down
+(`PUBLIC_SHUFFLE_DROP_FLOOR` 0.5386 → 0.5293) and **one moved up**
+(`PUBLIC_ORDER_FLOOR` 0.4473 → 0.4546); the lane states both, and both are
+`measured − 0.02` on my run.
+
+**The revert is exact.** The upward re-lock lived only in `5e509394..89a3c038`
+(0.8863 / 0.8233 / 0.5738 / 0.5039). `diff` of the floor-constant lines between
+`5362dee9` (the saturation commit) and the tip is **empty** — byte-equal,
+including `AUC24_FLOOR`. The 0.9063 reading belongs to a tree that does not ship
+and is quoted nowhere as the branch's own.
+
+**The new corpus-wide clue property bites, measured independently.** Over the 20
+CC0 scripts, counting multi-word seeded clue ids that share a word with a cue
+name: **65 of 131 on `ad3f6fa7`, 0 of 53 on the tip.** That is a guard with real
+discriminating power, not a tautology — and it independently re-confirms that
+half the "clues" main seeds are character names.
+
+**The re-derived DoS bound checks out.** `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`
+= `1_500_000`, inside the stated bracket `[1,331,970, 1,920,000)` — I verified
+both ends: `3 × 443,990 = 1,331,970`, and with the suite's own `dsWrapped(200,4,3)`
+builder the lightest pinned payload (round-3 bypass B) is still **REJECTED** by
+that bound in 19 ms, while `tests/fixtures/feature-length/assembled-feature.fountain`
+is now **ACCEPTED** in 40 ms. The measured derivation is in the header at
+`server/lib/validation.ts:535-565`. One nit: the worst-shape grid uses 32 words
+per character where `VOICE_ELIGIBLE_MIN_WORDS` is 30, and 30 is the heavier shape
+at fixed weight (~3% more characters, ~7% more pairs) — immaterial against a
+0.00017 ms/unit rate, but the grid is very slightly optimistic rather than
+conservative.
+
+### Gates I ran
+
+| gate | result |
+|---|---|
+| touched suites on the tip | `clue-proper-noun-guard` 12/0/**2 todo** · `script-doctor` 90/0 · `public-benchmark` 33/0 · `summary-honesty` 9/0 · `feature-scale-discrimination` 7/0/**0 todo** · `agency-signal` 52/0 · `calibration` 21/0 · `discrimination` 12/0/2 todo · `blind-pairs-discrimination` 4/0 · `rebuild-experiment` 40/0 · `structural-signals` 22/0 · `fountain-shape-guard-cue-parity` **649/0** (in a clone; the tar export fails 4 on `git ls-files`, the round-1 artifact) — every figure matches the lane's table |
+| `npm run benchmark:public` | exit 0 on both branches; all six AUCs equal my own implementation |
+| `npm run test:metamorphic` | exit 0 on both; tip `stapled_shorts` −1.6 `[n=14, min 76.8, max 80.2, range 3.4]`; sat-only 0.0 `[n=14, min 75.4, max 78.3, range 2.9]` |
+| `npm run gates` | exit 0, no point estimate quoted |
+| check-brain / honesty-audit / check-docs / check-no-console | 0 / 0 / 0 / 0 |
+| receipt gate | `ad3f6fa7..13d64bb5` exit **1**, naming exactly **one** `PENDING ENTRY` and no missing field; `ad3f6fa7..efd1a463` exit **1**, naming exactly one |
+| conversion recipe | three scans applied mechanically on a `clone --shared` scratch copy → **exit 0**, "gained a well-formed new entry in the same range. OK." |
+| 9b fail-first | my own planted reference in `server/nvm/revision/passes/belief.ts` fails the guard by name; restored |
+
+I did not run `npm test` (budget); the lane reports 13,124 / 0 fail / 91 skipped /
+5 todo, and the five `todo`s it names are the five I count in the suites above
+(2 clue + 2 discrimination + 1 latency).
+
+### Items requiring revision
+
+All four are single-line corrections. **None moves a number, and none of them
+bears on the owner's `measure-real` decision** — the measurement is sound and the
+run can proceed now. They are merge blockers, not measurement blockers.
+
+**R2-1. `server/nvm/analyze/doctor.ts:614` says the floor was not re-locked, in
+the commit that re-locked it.** The line reads:
+
+```
+//   SHUFFLE_DROP    paired 0.8750 unchanged (28/4/0, 0 ties); all-pairs
+//                   0.8306 -> 0.8291 (floor 0.8106, unchanged, NOT re-locked)
+```
+
+On the same tree `scripts/lib/auc.ts:241` reads `PUBLIC_SHUFFLE_DROP_FLOOR =
+0.8091`, and `auc.ts:224-225`, the doc's §8.3 (`:738`), §12 (`:1153`) and the
+receipt (`:2368`) all correctly record "0.8106 → 0.8091, DOWN". Commit `5362dee9`
+both changed the constant and wrote this sentence. Reproduce:
+`grep -rn "0\.8106" server/ scripts/` on the tip — two hits, and they contradict
+each other. This is item 5's class in the one file item 5 did not cover.
+
+**R2-2. The receipt's commit count is stale a second time, and the entry names
+none of the branch's commits.** `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md:2163`
+reads "**thirteen** commits on `main` @ `ad3f6fa7`" and `:2168` "six round-2
+commits added". `git rev-list --count ad3f6fa7..13d64bb5` is **17**, of which
+**nine** are round-2 commits. The entry was last touched in `b0a35cb7`, the
+fourteenth; the three after it did not update the count — the identical mechanism
+the entry's own parenthetical corrects for round 1 ("this line read six … and
+there were SEVEN"). Separately, the only SHAs the entry names are `4643d590`
+(the **pre-rebase tip**, orphaned by the rebase and not an ancestor of either
+branch), `9b199b72` (the old base) and `ad3f6fa7`; it names none of the 17
+commits of either round and not the tip. The gate is satisfied (the Git SHA field
+is present and describes the method), so this is accuracy, not a gate failure —
+but it is the owner-facing ledger row, and it currently points at a SHA the
+branch no longer contains while miscounting the branch by four.
+
+**R2-3. A fifth instance of the `0.1889` quotient, inside the table that records
+the class.** `docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md:1023` — §9.3's
+correction table — still reads "| `{1,2,3}` at 10 scenes / 300 words | 82.7 |
+**84.6** | no credit cap: **density 0.1889** is charged by the near-linear curve
+alone |". `8.5 / 300^0.7 = 0.1568`. §12's ledger at `:1143` records the fix as
+"corrected in `tests/core/script-doctor.test.ts` and in §8.4" — both true, and
+both miss this one. Round 1 found the third instance, round 2 found the fourth
+(§8.4's 82.7/57.7), and this is the fifth.
+
+**R2-4. `docs/brain/Owner/Owner - R5 Measurement and Merge.md:207` misquotes the
+lane branch's witness margin as 1.8.** The sentence tells the owner the
+saturation-only witness "passes there at a margin of exactly **0.0** rather than
+1.8". The lane branch's margin is **1.6** (`npm run test:metamorphic` prints
+`stapled_shorts … -1.6 [n=14, min 76.8, max 80.2, range 3.4]`; my 58-ordering
+sweep gives 1.5). The 1.8 is item 9a's verdict-line crossing margin
+(`60 − 58.2`), copied into the wrong comparison. It understates the difference
+between the two branches the owner is being asked to choose between.
+
+### What I could not break
+
+The ordering closure. 58 orderings, 44 of them the witness has never seen,
+including the four arrangements most likely to be adversarial — every one passes,
+worst case −1.5. The slope table reproduces to four decimals across all sixteen
+rows and the four disclosed inversions are exactly the four I measure on the
+final tree. The clue-guard revert is byte-exact and the property that replaced the
+narrowing is a genuine 65-of-131 → 0-of-53 discriminator. The benchmark printout
+and `npm run gates` now carry no figure the run did not produce, and re-hardcoding
+one is caught. The NOT-WIRED guard reads 68 files and failed on a reference I
+planted myself. The new DoS bound accepts the feature fixture the rebase exposed
+and still rejects the lightest pinned payload. Calibration is byte-identical per
+sample across all four trees I have now measured. The sibling branch's two
+uncomfortable readings — a mean gap that gets *worse* than main's and a witness
+margin of exactly 0.0 — are both true and both stated before the benefit in every
+place they appear.
+
+**VERDICT: REVISE** — four numbered items above, each a one-line correction with a
+file:line and a reproduction, and each one a documentation or comment inaccuracy
+rather than a measurement. Nine of nine round-1 items are discharged, two of them
+better than asked. The measurement is sound: the owner's `measure-real` run on
+`scoring/feature-length-defects` (then `scoring/feature-length-saturation-only` if
+AUC-24 rejects it) is worth spending and should not wait on R2-1 to R2-4.
