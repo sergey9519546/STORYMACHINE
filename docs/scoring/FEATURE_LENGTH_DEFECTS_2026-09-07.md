@@ -1129,3 +1129,62 @@ PENDING ENTRY (### 2026-09-07 — FEATURE-LENGTH DEFECTS: …) — this receipt
 records that no measurement happened (the entry heading contains "PENDING").
 A pending entry is a promise to measure, not a receipt of a measurement…
 ```
+
+## 12. Round 2 — the revision round, item by item
+
+The independent review is `docs/audits/2026-09-07-innovation/scoring-review.md`
+(verdict REVISE on tip `4643d590`, nine numbered items plus cosmetics). Its
+finding was worth stating before the corrections: **every headline MEASUREMENT in
+the lane's claim list reproduced on the reviewer's own implementation**, several
+to four decimals, and what was wrong was five STATEMENTS. This section records
+what each item changed. The measurements themselves are in §8.2, §8.2a and §8.3,
+which were rewritten in place rather than appended to, because a measurement doc
+that carries two contradictory tables is worse than one that carries the
+correction beside the number.
+
+| item | what was wrong | what closed it | did a number move? |
+|---|---|---|---|
+| 1 | the staple witness passed by pinning one ordering; 7 of 14 orderings of its own twelve parts still outscored the best part | `SCARCITY_SATURATION_SCENES` 15 → 12 and an ordering-free witness (max over 14 seeded orderings) | **yes** — §8.2's cost table |
+| 2 | the slope-constraint table named the wrong population (all 32, where no curve is admissible), printed two rows that do not reproduce, and omitted the four scripts the constraint cannot reach | §8.2 rewritten: the 16 sub-1 scripts, all sixteen rows, the non-reproducing rows removed, the inverted scripts named | no |
+| 3 | `ORPHAN_CLUE`'s guard deleted three kinds of genuine prop, including the example its own comment used as justification | the learning pass requires the introduction marker; the title guard only excludes tokens absent from the body | **yes** — all six benchmark statistics |
+| 4 | a third and fourth credit-cap residue: prose describing a rejected variant, a `CREDIT_FULL_SCENES` that exists nowhere, and `8.5/300^0.7 = 0.1889` | corrected in `tests/core/script-doctor.test.ts` and in §8.4 | no |
+| 5 | `npm run benchmark:public` printed five numbers its own table contradicted | the caveats are rendered from the `BenchmarkResult`, with five tests parsing the rendered text | no |
+| 6 | the scene-term disclosure sentence asserted a cause it does not account for past 15 scenes (term 12, gap 4 on the staple) | the sentence states the gap, names every term, and drops the false causal clause | no (a string) |
+| 7 | the owner-facing framing pointed at the ~8-point level shift, which AUC-24 cannot see | §8.2a: the level shift is rank-preserving; the AUC-relevant fact is the degradation delta going +0.586 → 0.000 | no |
+| 8 | "the two rewrite the same two functions" — R5 touches `densityPenalty` only | the formula commit SPLIT into two (saturation, then steepness), `scoring/feature-length-saturation-only` pushed, the owner note corrected with a decision tree | no |
+| 9a | the GRADE-tier assertion was nearly redundant with the 20-point delta gate beside it | the VERDICT-tier assertion is a hard check again on its own merits (intact 79 CONSIDER / flattened 58.2 PASS); the grade check is labelled as the thinner of the two | no |
+| 9b | the `NOT WIRED` guard grepped `doctor.ts` alone | it reads all 68 scoring-path files, enumerated by `check-scoring-receipt.mjs`'s own classifier | no |
+| cosmetics | truncated means (+2.10, 7.625), a `void sceneCount` parameter, two derivations of the same ratio disagreeing, a `tests/core/monotonicity.test.ts` that does not exist, a rounded max-slope table | all corrected at their sites | no |
+
+**Two of the nine moved numbers, and both moved the floors.** Item 1's
+saturation move took one secondary floor DOWN (`PUBLIC_SHUFFLE_DROP_FLOOR`
+0.8106 → 0.8091) and item 3's clue fix took all four measurement floors UP
+(0.855 → 0.8863, 0.8091 → 0.8233, 0.5269 → 0.5738, 0.4951 → 0.5039).
+`AUC24_FLOOR` is untouched at 0.622. Both re-locks are printed before → after in
+§8.3, and the coupling the four upward moves create is stated in
+`scripts/lib/auc.ts` beside the constants: if `measure-real` forces the steepness
+change to be weakened, those tests fail, and the answer is to revert the scoring
+change and re-lock from the reverted tree — never to lower a floor.
+
+**The three residues round 2 did not close**, each recorded where a reader will
+hit it rather than only here: three of the 32 public scripts are still inverted
+under the drop and all three are on the density power branch (§8.2); below 12
+scenes the scarcity term still lets length buy `140/bestPartScenes − 140/12`
+(§8.2 and `tests/core/script-doctor.test.ts`); and the clue guard still
+suppresses a prop that is comma-continued AND shares a word with a cue name
+(a `todo` fixture in `tests/core/clue-proper-noun-guard.test.ts`, with the
+measured id list).
+
+### 12.1 The probe that reproduces §8.2's slope table
+
+Not checked in — it is a throwaway that reads only committed text, and the
+committed harness it composes is the authority. For reproduction, it is:
+`listPublicCorpus()` from `scripts/lib/public-benchmark.ts` for the 32 files,
+`shuffleDropDegrade(text, file)` from `scripts/lib/auc.ts` for the degradation
+(note the second argument is the FILE PATH, not a seed integer — passing
+`degradationSeed(file)` there produces a different document and a different
+table), `runScriptDoctor` on both, and then
+`density = (4·critical + 1.5·major + 0.5·minor) / wordCount^0.7` and
+`scarcity = 140/min(sceneCount, 12)` per document. The population filter is
+`density < 1` at BOTH ends. The max-slope column is the numerical maximum of the
+anchored sub-1 curve's derivative over [0, 1] at each steepness.

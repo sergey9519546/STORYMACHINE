@@ -1,6 +1,6 @@
 ---
 type: owner
-updated: 2026-09-07
+updated: 2026-09-11
 sources: [docs/PATH_TO_EXCELLENCE.md, docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md, docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md]
 status: active
 ---
@@ -12,6 +12,15 @@ as [[Owner - Run Measure Real]], plus a judgment call on scoring-path changes
 whose costs are written down and whose benefit has not been measured on real
 writing. The corpus cannot reach CI, so [[Gate - Receipt Gate]] can only
 check that a human ran the measurement, never that the number is real.
+
+**What changed 2026-09-11:** `scoring/feature-length-defects` went through an
+independent review and a revision round, and it now has a SIBLING —
+`scoring/feature-length-saturation-only`, which carries one of its two formula
+changes without the other. There are now three things to decide in order, not
+two; the decision tree is below the branch table. Two corrections to what this
+note used to say are in that section: the reason the two heads are alternatives
+was wrong, and the "roughly 8 points" framing pointed at the half AUC-24 cannot
+see.
 
 **What changed 2026-09-07:** a fourth branch,
 `scoring/feature-length-defects`, arrived and takes the front of the queue —
@@ -142,36 +151,103 @@ only a heading — that is the one route the entry text itself forbids.
 | branch | tip | what it is |
 | --- | --- | --- |
 | `scoring/feature-length-defects` | see the branch note | **measure this one FIRST** — [[Branch - Feature-Length Defects]] |
+| `scoring/feature-length-saturation-only` | see the branch note | **second, only if the first is rejected** — [[Branch - Feature-Length Saturation Only]], the saturation half alone |
 | `scoring/stacked-r5-plus-advice` | `408166ae` | [[Branch - Stacked R5 plus Advice]] |
 | `scoring/r5-verbosity-bias` | `52bf410a` | [[Branch - R5 Verbosity Bias]] alone |
 | `scoring/advice-rule-fixes` | `a1cf7677` | [[Branch - Advice Rule Fixes]] alone |
 
 **THE ORDER CHANGED 2026-09-07, and the two heads are ALTERNATIVES, not a
-stack.** `scoring/feature-length-defects` branches from `main` @ `9b199b72`
-independently of the other three and attacks the SAME defect from the opposite
-direction. R5 replaces the density denominator `wordCount^0.7` with
-`(sceneCount·30)^0.7`; the feature-length branch measured exactly that
-substitution on the public benchmark and it **inverts** — paired shuffle-drop
-**0.0938**, worse than doing nothing — because a scene drop shrinks that
-denominator by `(2/3)^0.7 = 0.752` while weighted issues fall to 0.546, so it
-normalises by the quantity the degradation attacks. The same benchmark puts
-the feature-length branch at **0.8750** on that channel. Both cannot land: the
-two rewrite the same two functions in `doctor.ts`, and a merge of the pair
-would have to pick one density formula anyway.
+stack.** `scoring/feature-length-defects` branches from `main` independently of
+the other three and attacks the SAME defect from the opposite direction. R5
+replaces the density denominator `wordCount^0.7` with `(sceneCount·30)^0.7`; the
+feature-length branch measured exactly that substitution on the public benchmark
+and it **inverts** — paired shuffle-drop **0.0938**, worse than doing nothing —
+because a scene drop shrinks that denominator by `(2/3)^0.7 = 0.752` while
+weighted issues fall to about 0.55 of intact, so it normalises by the quantity
+the degradation attacks. The same benchmark puts the feature-length branch at
+**0.9063** on that channel.
 
-So measure `scoring/feature-length-defects` first. If its AUC-24 holds, the R5
-stack's density change is superseded on the evidence and what remains worth
-salvaging from it is `scoring/advice-rule-fixes`'s six detector-correctness
-fixes, which touch no formula. If it does NOT hold, the stack is still there
-and nothing has been lost. The numbers behind that reading are in
-[[Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07]] §8.2 — the candidate
-comparison is the artifact to read before choosing.
+**CORRECTION 2026-09-11, and it is the reason the sibling branch exists.** This
+paragraph used to end "Both cannot land: the two rewrite **the same two
+functions** in `doctor.ts`." That reason is wrong.
+`git diff 9b199b72..52bf410a -- server/nvm/analyze/doctor.ts` shows R5 changing
+`densityPenalty`'s denominator and curve and leaving `scarcityPenalty`
+**untouched**. They collide on ONE function, not two.
 
-**The one thing to check on that branch specifically.** Its scarcity
-saturation is byte-identical for every script of 15 scenes or fewer, so the
-public benchmark and the calibration corpus are both blind to it. On the
-private corpus (median 118 scenes) it will move EVERY script by roughly 8
-points. That is the single largest unmeasured effect in this queue.
+The CONCLUSION survives — R5's denominator inverts at 0.0938 on its own tip, and
+the feature-length branch's scarcity saturation is identity on the public corpus,
+so R5 + saturation would still read 0.0938 there, and a merge would still have to
+pick one density formula. But the two halves of the feature-length branch are
+**independently landable**, because they are two different functions:
+
+* `SUB_DENSITY_STEEPNESS` 50 → 2, inside `densityPenalty` — this is the half
+  that collides with R5, and the half that carries both public measurement
+  channels.
+* `scarcityPenalty` saturating at `140/min(sceneCount, 12)` — this is the half
+  that fixes the STAPLE pathology, and the only half with any effect at feature
+  length. It does NOT collide with R5 at all.
+
+`scoring/feature-length-saturation-only` is that second half on its own, pushed,
+with its own PENDING receipt and its own re-locked floors.
+
+**THE DECISION TREE, in order.**
+
+1. **Measure `scoring/feature-length-defects`.** If its AUC-24 holds above
+   0.622, land it. The R5 stack's density change is then superseded on the
+   evidence, and what remains worth salvaging from the stack is
+   `scoring/advice-rule-fixes`'s six detector-correctness fixes, which touch no
+   formula.
+2. **If it does NOT hold, measure `scoring/feature-length-saturation-only`
+   next**, before reaching for the R5 stack. It is the same branch minus the
+   steepness change, so if AUC-24 rejected the steepness this is the half that
+   survives — and it is the half that fixes the staple pathology, which nothing
+   in the R5 stack addresses. Know two things before landing it: the mean health
+   gap under the drop gets slightly WORSE on the public corpus (−1.93 → −2.15),
+   because the saturation alone does not fix the deletion reward; and the staple
+   witness passes there at a margin of exactly **0.0** rather than 1.8, because
+   without the steepness change the density term is pinned at its ceiling for
+   both documents and the margin is carried entirely by a deduction that is
+   often zero.
+3. **If neither holds, the R5 stack is still there** and nothing has been lost.
+   Its own costs are in the "What to expect" section below.
+
+The numbers behind all three readings are in
+[[Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07]] §8.2 (the candidate
+comparison) and §8.2a (what AUC-24 can and cannot settle). Read §8.2a before
+deciding — it is the section that says which half of the change the run
+measures.
+
+**WHAT TO CHECK ON THOSE TWO BRANCHES, corrected 2026-09-11.** This note used to
+say: "its scarcity saturation is byte-identical for every script of 15 scenes or
+fewer, so the public benchmark and the calibration corpus are both blind to it.
+On the private corpus (median 118 scenes) it will move EVERY script by roughly 8
+points. That is the single largest unmeasured effect in this queue." The 8 points
+was arithmetically right and it pointed at the half AUC-24 cannot see. Two
+separable things happen, and only one of them can move a matched-pair rank
+statistic:
+
+* **A near-uniform LEVEL SHIFT, which cannot move AUC-24.** At 118 scenes the
+  term goes from `140/118 = 1.186` to `140/12 = 11.667`, so every script loses
+  **10.480 points** (9.92 at 80 scenes, 10.97 at 200). This is what will move
+  verdicts, grades and all 72 rows of
+  `tests/fixtures/real-corpus-manifest.json` — the re-lock this note already
+  asks for. Both halves of a matched pair lose the same amount, so by itself it
+  cannot change AUC-24 at all.
+* **THE SCARCITY CHANNEL'S DEGRADATION DELTA GOING TO EXACTLY ZERO, which can.**
+  For a 118-scene script the drop recipe leaves ~79 scenes. Before saturation
+  that term contributed `140/79 − 140/118 = +0.586` points of separation; after
+  it contributes `140/12 − 140/12 = 0.000`. For every script of roughly 22 scenes
+  or more — essentially the whole corpus — the channel `doctor.ts`'s own
+  measurements credit with AUC 0.938 now contributes **nothing** to this
+  degradation. That is what the run is testing.
+
+So: AUC-24 **can** settle whether health still orders an intact feature above a
+shuffle-dropped copy of itself with the scarcity channel contributing zero and
+the density curve near-linear. It **cannot** settle which of the two changes is
+responsible on the combined branch (neither half has its own AUC-24 receipt —
+which is why the sibling branch exists), it cannot settle whether the
+~10.5-point level shift is right (that is the manifest re-lock and the band
+averages), and it says nothing about craft.
 
 The stack CONTAINS both singles as unsquashed ancestors, so merging it subsumes
 them and the other two need not be merged separately. Whichever lands last needs
