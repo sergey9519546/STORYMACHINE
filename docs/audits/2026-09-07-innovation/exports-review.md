@@ -156,3 +156,73 @@ Three sentences, truncated mid-word, as the opening line of the producer's page 
 - Item 1 touches a brain note, so re-run `npm run brain` after fixing it.
 - Items 2 and 3 re-lock `tests/fixtures/coverage-letter/report{1,2,3}.expected.md` and `tests/fixtures/coverage-html/no-percentile-no-draftrank.html`, and will move `docs/user-validation/sample-coverage-report.html` — which means `npm run generate-p0-sample` and a re-read of the `p0-sample-drift` diff before the re-check.
 - No scoring-path file is touched, so no receipt is required for any of the five items.
+
+---
+
+## Round 2
+
+*Reviewed object: `lane/exports-producer-tier` tip **`b7d45017`** (`b7d4501710558062a88f9a56e73bcb9d29e0be12`), two commits on the round-1 object `8165c168`, twelve on `dd57251d`; `origin/lane/exports-producer-tier` equals it. Same reviewer as round 1, warm context, re-checking its own five items and four notes. Both trees held read-only — `git status --porcelain` empty in `/home/user/STORYMACHINE` (but for this review file) and `/home/user/wt-exports`, before and after. All work from a `git archive b7d45017` export plus a FRESH `git archive dd57251d` baseline and six mutated copies under `<session scratch>/exports-review/r2/`. No server left running.*
+
+### Verdict: MERGE (`b7d45017`)
+
+All five round-1 items and all four notes are built, and every one of them holds under adversarial probing. I checked in the failure direction first and found no item that was narrowed, no tolerance widened, no surface left out, and no test that cannot fail — each of the three mutations I ran against the new gates failed exactly the cases it should. Two filing observations are recorded at the end; neither blocks.
+
+The one thing that moved the needle most: **item 1's fix is better than the item asked for.** I asked for a corrected table. What shipped is the table turned into an exported constant that a live run re-derives, so the class of defect (a measured claim only a human re-types) is gone rather than the instance.
+
+### Item-by-item re-check
+
+| # | Round-1 item | Round-2 disposition | My reproduction |
+|---|---|---|---|
+| 1 | a measured table with a wrong row, and a brain note quoting it | **DONE, and generalized** | The six values are `SCENE_SPAN_DRIFT_MEASUREMENT` (`root-cause-pipeline.ts:215-235`), re-derived by `tests/routes/root-cause-parity.test.ts` (**18/18**). Mutating `withSpans.topFindingScenes` → `Scenes 2–9` fails **2 of 18** — `the WITH-spans column matches a live run` and `the brain note does not quote "Scenes 2–9"` — exactly as claimed. I also mutated the four non-scene fields at once (`issueCount` 899→900, `contentHash12`→`deadbeef0000`, `health` 84.4→84.5, `wordCount` 19293→19294): **1 of 18 fails** (`every column comes from ONE contentHash, and the report facts match`), so no field is re-typed without a gate |
+| 2 | the producer's first page stated the reference bounds twice | **DONE on all three paths** | `reader-tier.ts:192-193` decides by string containment, `boundsLine: null` only then. Measured on runoff's exported first page (`<probe r2-bounds.ts>`): `"20 samples"` **1×** (was 2), `"256"` **1×** (was 2), `"Reference bounds"` **0×**, `tier.boundsLine === null`. In-band (10 sc / 300 w): band sentence says `20-sample`, not `20 samples`, so containment correctly fails and the labelled line renders — **1×**. No percentile at all: labelled line renders — **1×**, never zero. Tier text and markdown both 1× on every path. Golden letters `"20 samples"` **3× → 2×** in all three (`report{1,2,3}.expected.md`). Committed P0 sample first page: **1×**, `"Reference bounds"` 0× |
+| 3 | the letter's caveat no longer parsed on any real draft | **DONE, clause branched not deleted** | `percentileCaveatSentenceFor` (`percentile-copy.ts:160-187`) is the one decision point; `coverage-letter.ts:320-329` calls it. In-band output keeps `— not against other scripts you might send it, and not a market comparison.` **verbatim**; out-of-band reads `… (20 samples / 9–10 scenes / 256–337 words). A percentile against that set would be measuring this draft's length, not its craft.` Register **row 93 quotes the out-of-band bytes exactly** (probe imports the function and greps the register → true), and the register also still quotes the in-band clause. Goldens read as English. 93 register rows, matching `honesty-audit` |
+| 4 | "mid-clause ellipses: 4 before, 0 after" was false in shipped bytes | **DONE, and the design choice is justified** | Re-measured across all 32 committed scripts, round-1 tip vs round-2 tip (`<probe r2-logline.ts>`): goal clauses **7 → 7, none lost**; truncated mid-word **1 → 0**; **6 of 7** become a shorter on-point quote; whole-logline ellipses **1 → 0** on this leg (5 → 1 → 0 across `dd57251d` → `8165c168` → `b7d45017`, so the lane's 5 → 0 is right). runoff's tier now opens `Logline: SARA must contend with “I'm going to need their discharge permit”.` `wantSentence` over `firstSentence` is not a preference: `dead-frequency`'s want IS the third sentence (`I want to know what you can see from here.`), and `firstSentence` would have quoted `I got a call at the station.` The follow-up commit's cap statement checks out — `MAX_CLAUSE_LEN = 140` (`logline.ts:166`), longest of the 7 goal sentences is **98 chars** (`fence-line-bad.fountain`), so no committed script reaches the cap, which is why "0" is honest rather than corpus-lucky. `b7d45017` is comment-only on `logline.ts` (no non-comment line in its diff) |
+| 5 | the turn-quoting before-count omitted the script the change is named for | **DONE, with the cause verified** | `<probe r2-turn.ts>` on `dd57251d`'s builder: turn quoted in **ANY** slot = **8**; in the `must face the turn “` slot only = **7** — so the report's stated cause for its own undercount is exactly right, and `runoff` is the one quoting in the `before …` slot of a logline that also has a goal. After: **3**, five lost (`counter-offer`, `red-line`, `runoff`, `the-key-under-the-mat`, `low-tide-excellent`) |
+
+### Notes A–D
+
+| Note | Disposition | My reproduction |
+|---|---|---|
+| A — the drift guard failed in a `.git`-less tree | **DONE** | `p0-sample-drift.test.ts:68` adds `<code>dev</code>` → `<code><ENGINE_COMMIT></code>`, scoped to the verify block's own element, with an assertion that `a developer wrote this` survives. In my `.git`-less export, with no `GIT_SHA`: **4/4, 0 fail** (round 1: 1 of 3 failed there). Still bites: the round-1 sample dropped into the round-2 tree fails **2 of 4**; a single injected attribute (`class="reader-tier" data-injected="1"`) fails **1 of 4**. The old `Reference bounds: 20 samples` assertion — which was pinning the very duplication item 2 removed — is replaced by the invariant (exactly once above the divider, via the percentile sentence, with no labelled line beside it) |
+| B — round 1's citation correction was itself wrong | **DONE, and says so** | The header now records, from git, that the original citation was CORRECT when written (line 376 of `272943f9`'s artifact — which is what I found in round 1), that `99fb0159` removed it as an honesty fix on **2026-07-28**, a week before the stimulus swap the first correction blamed, and that the first correction's attribution and date were wrong. Both quoted live sentences still exist in the regenerated sample (2 hits) |
+| C — two counts did not match the tree | **DONE** | `check-no-console` **304** on the tip, **298** on `dd57251d` — both measured, both stated. §8 carries the final log; `git log --oneline dd57251d..b7d45017` is **12**, and the report says twelve |
+| D — "229 of 231 references checkable" is 228 | **DONE** | Corrected in the report; no code asserted the number, and none changed |
+
+### Round-2 gates, reproduced
+
+| Gate | Command | Result |
+|---|---|---|
+| receipt | `node scripts/check-scoring-receipt.mjs dd57251d..b7d45017` | **exit 0 — "no scoring-path files changed"** |
+| output identity | fresh `git archive dd57251d` baseline, `GIT_SHA` pinned identically, `--compare`, **no `--ignore-keys`** | **PASS — all 45 reports byte-identical** |
+| public benchmark | `tests/core/public-benchmark.test.ts` | **28/28, 0 fail** |
+| `verify:surfaces` | `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium node scripts/verify-p2-p3-surfaces.mjs` | **212/212, exit 0** on the round-2 tree |
+| honesty audit | `node scripts/honesty-audit.mjs` | **exit 0 — 458 files, 432 markdown, 93 register rows, clean** |
+| brain | `node scripts/brain-graph.mjs --check` | **exit 0 — 97 notes, 322 links, fresh** |
+| docs quality | `check-docs-quality.ts --all` | **exit 0 — clean** |
+| no-console | `node scripts/check-no-console.mjs` | **exit 0 — 304 files** |
+| trailers | `git log --format=… 8165c168..b7d45017` | both trailers on both commits, same `Co-Authored-By` value every recent `main` commit carries |
+| touched suites | each run individually | root-cause-parity **18/18** · reader-tier **21/21** · percentile-comparability **23/23** · percentile-copy-consistency **30/30** · coverage-letter **47/47** · coverage-html **53/53** · logline **56/56** · p0-sample-drift **4/4** · verify-report **19/19** · brain-coverage **7/7** · honesty-audit-claims **5/5** — every number as reported |
+
+### Re-locked artifacts — every diff read
+
+| Artifact | Declared | What the diff actually contains |
+|---|---|---|
+| `tests/fixtures/coverage-letter/report{1,2,3}.expected.md` | duplicate bounds line gone, dangling clause replaced, `"20 samples"` 3× → 2× | **exactly those two changes in each file, nothing else** (verified with `diff \| grep '^[+-][^+-]'`: one deleted `*Reference bounds: …*` line, one replaced percentile caveat) |
+| `tests/fixtures/coverage-html/no-percentile-no-draftrank.html` | 26,830 bytes, re-captured | 26,829 → 26,830: **one added BLANK LINE** before the bounds line — see observation 1 |
+| `docs/user-validation/sample-coverage-report.html` | 226,783 → 226,619, same `contentHash` | four changed lines: the logline shortened by `wantSentence` (`MAYA must contend with “I want to know what you can see from here” before the revelation “I knew it”.`), the duplicate bounds line removed, and the two masked volatiles (engine commit, generated timestamp). `09e8b038…` present in both, unchanged. **Nothing undeclared** |
+
+### Two observations, neither blocking
+
+1. **The bounds-line template leaves one stray blank line in the generated HTML.** `reader-tier.ts:352-353` puts the conditional on its own line, so the rendered document now carries an empty line where the bounds paragraph used to be (`…reference set (…)</p>\n\n    <h2 class="tier-heading">…` out of band, and before the labelled line in band). That is the entire 1-byte delta in the re-captured byte fixture. Invisible to a reader, honestly re-captured rather than hidden — but the re-lock table states the new size without saying the changed byte is whitespace, and moving the `${data.boundsLine ? …}` onto the preceding line removes it. Worth folding into whatever touches that template next; not worth a round 3.
+
+2. **Item 4's three gates live in `tests/core/percentile-comparability.test.ts`, not beside the code they guard.** `tests/core/logline.test.ts` is **byte-identical between the two rounds** (`cmp -s` → identical), and the report's touched-suite line reads `logline 56/56`, which could read as "the logline suite gained the cases". It did not; they are cases 1–3 of `describe("the producer tier's logline is one sentence, never a truncated speech")` in the percentile suite. They are real and they bite — mutating `wantSentence` → `firstSentence` fails **2 of 23** (including `the quoted want is the matching sentence, not merely the first one`), and restoring the whole-block behaviour fails **3 of 23** — so this is a filing preference, not a gap. A future change to `findApparentGoal` will not obviously run a suite named for percentile comparability.
+
+Also noted for the record: the Round 2 section's own header says "One commit: `faa46146`" while the reviewed object is `b7d45017` (two commits). §8's log is correct and the follow-up commit is comment-only, so nothing is misstated about the tree — the sentence is just one commit stale.
+
+### What remains deferred, unchanged and correctly recorded
+
+- Defect #8's score-versus-dimension contradiction still stops at the `doctor.ts` seam (`scoring/feature-length-defects` `efc1899d`, owner-gated).
+- The cluster-title overclaim — **6 of 70** findings on the feature fixture carry a title whose range is wider than their own scene list beneath it — stays deferred with file-and-line evidence, as §2 permits.
+- The `prioritiesHeadingFor` enumeration in the surfaces gate stops matching at a priorities count of 11+. The lane's reasoning for leaving it (a gate locator over a fixture whose count is 10; widening the loop hides the coupling) is sound, and it is now named in the report for the next lane.
+
+### Verdict: MERGE (`b7d45017`)
