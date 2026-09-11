@@ -535,10 +535,15 @@ function buildNamedRootCausesSection(rootCauses: RootCauseFinding[] | undefined)
 function buildClusterFindingsSection(rootCauses: RootCauseFinding[] | undefined): string {
   // Guard: only render when the report actually carries a synthesis — an
   // absent rootCauses means the caller never attached one (this field is
-  // optional on ScriptDoctorReport; only the /doctor, /doctor/deep, and
-  // /doctor/pdf routes attach it today, per each route's own clustering step
-  // in server/routes/scriptide.ts), not that clustering ran and found nothing
+  // optional on ScriptDoctorReport), not that clustering ran and found nothing
   // to group.
+  //
+  // CORRECTED 2026-09-11: this used to say "only the /doctor, /doctor/deep, and
+  // /doctor/pdf routes attach it today", which stopped being true the day the
+  // coverage export and the coverage letter started attaching it — and which was
+  // the same blind spot that let those two routes attach it with the scene-span
+  // argument missing for as long as they did. All eight call sites now go through
+  // server/lib/root-cause-pipeline.ts; see its header for the list.
   if (!rootCauses) return '';
   const generic = rootCauses.filter(rc => !isNamedRootCause(rc));
   if (generic.length === 0) return '';

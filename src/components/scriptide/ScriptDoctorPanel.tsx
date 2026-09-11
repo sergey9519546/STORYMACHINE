@@ -304,10 +304,10 @@ function formatPassName(pass: PassName): string {
 }
 
 // Upgrade item #12: "why this matters" — a finding's `pass` + `rule` is
-// exactly the (filename, anchor) pair docs/rulebook/generate-rulebook.ts
-// generates: docs/rulebook/<pass>.md, with a `#rule-<rule.toLowerCase()>`
-// anchor on that rule's list item (both sides asserted to agree in
-// tests/rulebook/rule-links.test.ts). PassName's 14 values already match
+// exactly the (filename, anchor) pair scripts/generate-rulebook.ts generates:
+// docs/rulebook/<pass>.md, with a `#rule-<rule.toLowerCase()>` anchor on that
+// rule's list item (both sides asserted to agree in
+// tests/core/rulebook-links.test.ts). PassName's 14 values already match
 // the rulebook's filenames one-for-one (server/nvm/revision/passes/types.ts).
 //
 // No in-app route serves docs/** (server/app.ts only serves the built

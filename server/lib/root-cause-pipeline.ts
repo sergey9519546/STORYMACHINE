@@ -45,7 +45,7 @@
 // Pure (no I/O, no clock, no randomness) over a report + its text, so the same
 // pair always produces the same findings in the same order with the same ids —
 // which is exactly what the cross-surface parity test
-// (tests/core/root-cause-parity.test.ts) asserts of all four renderers at
+// (tests/routes/root-cause-parity.test.ts) asserts of all four renderers at
 // once.
 //
 // NOT on the scoring path: nothing here is reachable from
