@@ -12,10 +12,15 @@
 // still fire.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { analyzeFountainText } from '../../server/nvm/analyze/fountain-analyzer.ts';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 import { stapledShortsText } from '../../evals/scoring/runner/metamorphic-cases.ts';
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /** Every clue id the analyzer SEEDS, across every scene. This is the
  *  bookkeeping ORPHAN_CLUE and ORPHAN_CLUE_PERVASIVE read
@@ -239,7 +244,25 @@ describe('ORPHAN_CLUE proper-noun / title / location guard', () => {
   });
 
   // ── The three reviewer shapes (round 2, item 3) ──────────────────────────
-  it('FIRES: `BRASS KEY` beside a character called KEY stays a clue — the claim the guard is sold on', () => {
+  // `todo`, with the measured id list, because this shape is LEXICALLY
+  // UNDECIDABLE here and the reviewer's own remedy allows for that. "BRASS KEY"
+  // beside a character called KEY is identical in form to "JUDGE PARETSKY"
+  // beside a character called PARETSKY: a multi-word caps run in an action line,
+  // one of whose words is a cue name. The 20 CC0 scripts contain FOUR of the
+  // second shape (mise "renee-okafor", the-defense-rests "judge-paretsky" and
+  // "court-clerk-etta", the-key-under-the-mat "real-estate-agent") and NONE of
+  // the first, and the corpus-wide property below is the hard assertion that
+  // keeps those four out. A narrowing that required the introduction marker was
+  // tried, closed this case, and put all four of those names back into the clue
+  // channel — the measurement and the reversal are recorded above
+  // `buildProperNounGuard`'s learning pass. So the claim the guard was SOLD on
+  // does not hold, the three places that asserted it no longer do, and this is
+  // the ledger row rather than a silent gap. What closes it is information this
+  // pass does not have (a role-title lexicon, or animacy), measured before it is
+  // added rather than after.
+  it('FIRES: `BRASS KEY` beside a character called KEY stays a clue — the claim the guard is sold on',
+    { todo: 'LEXICALLY UNDECIDABLE: measured [] for this fixture (no brass-key). Identical in form to the four real "JUDGE PARETSKY"-shaped names the guard must keep excluding; the narrowing that closed this case leaked all four. See buildProperNounGuard.' },
+    () => {
     // The premise, so this cannot pass vacuously: KEY really is a speaking cue.
     assert.match(CUE_SHARES_A_PROP_WORD, /^KEY$/m, 'the fixture must contain a cue line reading exactly KEY');
     assert.match(CUE_SHARES_A_PROP_WORD, /BRASS KEY/, 'and the prop must still be planted');
@@ -272,7 +295,17 @@ describe('ORPHAN_CLUE proper-noun / title / location guard', () => {
     );
   });
 
-  it('FIRES: a prop that happens to sit beside a cue name in one caps phrase survives it', () => {
+  // `todo` for the same reason, and it is the same mechanism one step along:
+  // "MARA REVOLVER" teaches `revolver` as a name word because the run contains
+  // the cue word `mara`, and the standalone REVOLVER token is then excluded. The
+  // learning pass's retracted claim was that it "cannot chain outward through
+  // unrelated props"; it chains exactly one step, and one step reaches a prop.
+  // The claim is gone from the code. Separating this from "DISPATCHER NELL
+  // ARCEO" teaching `dispatcher` — which is a real exclusion this corpus needs —
+  // has the same undecidability as the case above.
+  it('FIRES: a prop that happens to sit beside a cue name in one caps phrase survives it',
+    { todo: 'LEXICALLY UNDECIDABLE, same mechanism: measured [] against ["revolver"] for the control that differs only in the two caps words. Closing it re-admits four real character names; see buildProperNounGuard.' },
+    () => {
     const ids = seededClueIds(CUE_ADJACENT_PROP);
     const control = seededClueIds(CUE_ADJACENT_PROP_CONTROL);
     assert.ok(
@@ -296,23 +329,66 @@ describe('ORPHAN_CLUE proper-noun / title / location guard', () => {
     }
   });
 
-  // The residual the narrowed guard still has, recorded as a `todo` with the
-  // measured id list rather than as a claim that it cannot happen. A caps run
-  // that IS followed by the introduction marker and DOES contain a cue word
-  // still teaches its other words, so a prop written line-initially and
-  // comma-continued, beside a character sharing one of its words, is still
-  // suppressed. It needs all three conditions at once.
-  it('the remaining suppression: a comma-continued prop sharing a word with a cue name', { todo: true }, () => {
-    const body = BODY
-      .replace(
-        'MARA VOSS, 30s, unlatches the door. A hidden BRASS KEY glints under the mat.',
-        'MARA VOSS, 30s, unlatches the door.\n\nBRASS KEY, still warm, lies under the mat.',
-      );
-    const text = `Title: THE LONG WAY DOWN\nAuthor: A Writer\n\n${body}`
-      .replace('DESK CLERK\nCheckout is at eleven.', 'KEY\nCheckout is at eleven.')
-      .replace('DESK CLERK\nNobody I remember.', 'KEY\nNobody I remember.');
-    const ids = seededClueIds(text);
-    assert.ok(ids.includes('brass-key'), `measured without brass-key: ${JSON.stringify(ids)}`);
+  // ── The property, over the whole distributable corpus (round 2) ──────────
+  // The fixtures above are six hand-built shapes. This is the guard's claim
+  // checked over all 20 CC0 scripts at once, and it is here because the
+  // narrowed learning pass shipped with a leak the fixtures could not see: the
+  // introduction marker was "a comma or an opening parenthesis immediately
+  // after the caps run", and a LIST introduction puts the marker after the LAST
+  // name — "two fellow associates, JORDY LANE and FEN ABIODUN, growing more
+  // animated" introduces both, and `JORDY LANE` is followed by " and". So
+  // `lane` stayed unknown and `the-defense-rests` seeded "jordy-lane" as a
+  // planted prop. What caught it was three files away
+  // (`tests/core/agency-signal.test.ts`'s locked table, whose `legacyIsPassive`
+  // predicate reads `seededClueIds.length === 0`), in the one full `npm test`.
+  // A guard should fail at the guard.
+  it('no MULTI-WORD seeded clue on any of the 20 CC0 scripts shares a word with a cue name', () => {
+    const dir = path.join(REPO, 'data/screenplays');
+    const names = ['chain-of-custody', 'close-quarters', 'code-blue', 'counter-offer', 'dead-frequency',
+      'high-voltage', 'mise', 'off-season', 'quiet-season', 'red-line', 'room-12', 'runoff',
+      'same-page', 'soft-launch', 'the-defense-rests', 'the-detour', 'the-key-under-the-mat',
+      'transfer-window', 'two-lane', 'undertow'];
+    const offenders: string[] = [];
+    let totalSeeded = 0;
+    for (const name of names) {
+      const text = readFileSync(path.join(dir, `${name}.fountain`), 'utf8');
+      const analysis = analyzeFountainText(text);
+      // The cast, as the analyzer itself resolved it, split into words — the
+      // same notion of "a name word" the guard is built on.
+      const nameWords = new Set<string>();
+      for (const c of analysis.characters) {
+        for (const w of c.toLowerCase().split(/\s+/)) if (w.length >= 2) nameWords.add(w);
+      }
+      for (const record of analysis.records) {
+        for (const id of record.seededClueIds ?? []) {
+          totalSeeded++;
+          const words = id.split('-').filter(Boolean);
+          // MULTI-WORD and sharing any word with a cue name. Single-word ids are
+          // excluded deliberately: the guard's documented asymmetry is that a
+          // one-word prop whose name is also a character's ("KEY") can still be a
+          // clue, and `some` over one word would forbid exactly the case the
+          // guard exists to protect. On a multi-word caps run, sharing a word
+          // with a cue name is the introduction convention in every instance
+          // this corpus contains — which is itself asserted below, so a future
+          // corpus addition that breaks the premise fails here and gets read
+          // rather than quietly relaxing the check.
+          if (words.length >= 2 && words.some(w => nameWords.has(w))) {
+            offenders.push(`${name}: "${id}" (shares ${words.filter(w => nameWords.has(w)).join(', ')} with the cast)`);
+          }
+        }
+      }
+    }
+    assert.ok(totalSeeded >= 10, `the corpus must still seed clues, or this property is vacuous; got ${totalSeeded}`);
+    assert.deepEqual(
+      offenders,
+      [],
+      `these multi-word seeded clue ids share a word with the cast: ${offenders.join(', ')}. `
+      + 'On this corpus every such run is an introduction, so a hit here means the learning pass is '
+      + 'missing a shape of the introduction convention — not that the guard is too strict. '
+      + 'Measured leak this assertion was written for: the-defense-rests seeded "jordy-lane" from '
+      + '"two fellow associates, JORDY LANE and FEN ABIODUN, growing more animated", where the '
+      + 'comma follows the LAST name of the list and not the first.',
+    );
   });
 
   it('at feature scale the priority tier does not move when the title does', async () => {

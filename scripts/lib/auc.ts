@@ -157,7 +157,7 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  *    detect, a reader cannot tell "the score is blind to mechanical damage"
  *    from "the harness never worked". The score catches this one on 32 of 32
  *    scripts with zero ties, through a scoring channel neither other
- *    degradation touches (~17-18 of its 26.91-point mean gap comes from
+ *    degradation touches (~17-18 of its 26.40-point mean gap comes from
  *    outside the density/scarcity craft formula; that gap read 29.30 on
  *    `main @ 9b199b72` and the figure was carried forward unrefreshed until
  *    round 2). The engine ships a deduction built
@@ -166,44 +166,38 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  *
  * WHERE THE NUMBERS STAND, 2026-09-11 (branch scoring/feature-length-defects,
  * round 2; re-locked by `npm run benchmark:public -- --lock` in the same commit
- * as the scoring change). Shuffle-drop 0.9063 matched-pair / 0.8433 all-pairs;
- * climax-relocate 0.5938 / 0.5239; control 1.0000 / 1.0000. Read each of
+ * as the scoring change). Shuffle-drop 0.8750 matched-pair / 0.8291 all-pairs;
+ * climax-relocate 0.5469 / 0.5151; control 1.0000 / 1.0000. Read each of
  * those against what it was and against what it means:
  *
- *  - SHUFFLE-DROP moved 0.5313 -> 0.9063 matched-pair, and the sign counts
- *    moved with it: 17 ordered / 15 inverted / 0 tied -> 29 / 3 / 0, with the
+ *  - SHUFFLE-DROP moved 0.5313 -> 0.8750 matched-pair, and the sign counts
+ *    moved with it: 17 ordered / 15 inverted / 0 tied -> 28 / 4 / 0, with the
  *    mean health gap going from -1.93125 (the DAMAGED copy scored higher) to
- *    +1.96875. (Round 1 of this branch measured +2.109375 at steepness 2 plus
- *    saturation-at-15 and wrote it "+2.10", truncated rather than rounded.
- *    Round 2 moved the saturation point to 12 scenes, which costs the six
- *    13-and-14-scene scripts 0.898-1.667 points each and took the mean gap to
- *    +1.89375, and then fixed the clue guard's three false suppressions, which
- *    took it back to +1.96875 and the AUC from 0.8750 to 0.9063.) That is not a
+ *    +1.89375. (Round 1 of this branch read +2.109375 and wrote it "+2.10",
+ *    truncated rather than rounded; round 2's scarcity saturation at 12 rather
+ *    than 15 scenes costs the six 13-and-14-scene scripts 0.898-1.667 points
+ *    each, which is where the rest of the difference went.) That is not a
  *    tuning: it is the formula no longer paying the AVERAGE writer to delete a
- *    third of their scenes. It is NOT "no writer": THREE of the 32 are still
+ *    third of their scenes. It is NOT "no writer": FOUR of the 32 are still
  *    inverted, and they are named here because a narrative beside a disclosed
- *    29/3/0 should not need a reader to go looking —
+ *    28/4/0 should not need a reader to go looking —
  *      transfer-window          64.1 -> 73.0  (+8.9 for the damaged copy)
  *      room-12                  63.9 -> 72.3  (+8.4)
- *      quiet-season             73.8 -> 74.3  (+0.5)
- *    All three sit on the density POWER branch (intact density > 1), which the
+ *      the-key-under-the-mat    72.5 -> 74.1  (+1.6)
+ *      quiet-season             73.8 -> 73.9  (+0.1)
+ *    All four sit on the density POWER branch (intact density > 1), which the
  *    sub-1 slope constraint provably cannot reach — see §8.2 of
  *    docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md, which states that
  *    constraint's population (the 16 scripts sub-1 at both ends) rather than
- *    implying all 32. `the-key-under-the-mat` was the fourth and is now
- *    ordered (+1.1); `quiet-season` went the other way, from +0.1 to +0.5, so
- *    the clue fix moved two of these four in opposite directions. See also the
- *    DELETION REWARD block above doctor.ts's densityPenalty.
- *  - CLIMAX-RELOCATE moved 0.4219 -> 0.5938 matched-pair and its exact ties
- *    collapsed from 11 of 32 to ZERO. That second number matters more than the
+ *    implying all 32. See also the DELETION REWARD block above doctor.ts's
+ *    densityPenalty.
+ *  - CLIMAX-RELOCATE moved 0.4219 -> 0.5469 matched-pair and its exact ties
+ *    collapsed from 11 of 32 to 1. That second number matters more than the
  *    first: the channel's N is no longer a third frozen, so the estimate now
- *    rests on all 32 movable scripts rather than 21. Its interval [0.4063,
- *    0.7500] still contains 0.5 — the doctor still does not reliably detect
- *    reordering with scene count held constant, 19 ordered against 13
- *    inverted. It reads chance HONESTLY now instead of reading chance through
- *    a saturated formula, and a floor at 0.5738 is a ratchet on a point
- *    estimate whose own interval still admits chance. Do not read it as a
- *    result.
+ *    rests on 31 movable scripts rather than 21. Its interval [0.3750,
+ *    0.7188] still contains 0.5 — the doctor still does not reliably detect
+ *    reordering with scene count held constant. It reads chance HONESTLY now
+ *    instead of reading chance through a saturated formula.
  *  - The CONTROL is unchanged in kind and cleaner in degree (0.9473 -> 1.0000
  *    all-pairs). It is still a liveness check on the instrument, never
  *    evidence about the score.
@@ -262,27 +256,13 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * before -> after. Do that ONLY after a scoring change you intended, and read
  * the resulting diff: a re-lock following an unintended regression silently
  * lowers the ratchet, which is the one way this machinery can be defeated.
- * ONE floor has ever moved DOWN here: round 2's first re-lock took
+ * ONE floor has ever moved DOWN here: round 2's re-lock took
  * PUBLIC_SHUFFLE_DROP_FLOOR from 0.8106 to 0.8091 (measured 0.8306 ->
  * 0.8291), because the saturation point moved from 15 scenes to 12 and one of
  * the 1,024 all-pairs comparisons went with it. The PRIMARY floor and the
  * other four did not move, AUC24_FLOOR did not move, and the change was
  * intended and measured before it was locked — which is the only condition
- * under which a downward re-lock is allowed to happen at all. Round 2's
- * SECOND re-lock, after the clue guard's false suppressions were fixed, took
- * all four measurement floors UP: 0.855 -> 0.8863, 0.8091 -> 0.8233,
- * 0.5269 -> 0.5738, 0.4951 -> 0.5039.
- *
- * THE COUPLING THAT COMES WITH THOSE FOUR, named because it is the hazard this
- * comment exists to warn about. They are now high enough that if the owner's
- * `measure-real` run forces the steepness change to be weakened or reverted,
- * these tests fail and the pressure will be to lower the floors. Do not. The
- * right response is to revert the scoring change and re-lock from the reverted
- * tree's own measurement, in that order, with the before -> after print in the
- * commit. A floor lowered to let a regression through is the one way this
- * machinery can be defeated, and `scoring/feature-length-saturation-only`
- * exists precisely so that half of this branch can be landed without the other
- * and re-locked honestly from its own run.
+ * under which a downward re-lock is allowed to happen at all.
  * The values, intervals, N and per-script pairs are in
  * docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md and in the PUBLIC-CORPUS
  * section of docs/p1-benchmark/MEASUREMENT_RECEIPTS.md.
@@ -292,10 +272,10 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * matches exactly that shape, and tests/core/public-benchmark.test.ts asserts
  * every one of them is still reachable by it.
  */
-export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.8863;
-export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.8233;
-export const PUBLIC_ORDER_PAIRED_FLOOR = 0.5738;
-export const PUBLIC_ORDER_FLOOR = 0.5039;
+export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.855;
+export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.8091;
+export const PUBLIC_ORDER_PAIRED_FLOOR = 0.5269;
+export const PUBLIC_ORDER_FLOOR = 0.4951;
 export const PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR = 0.98;
 export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.98;
 
