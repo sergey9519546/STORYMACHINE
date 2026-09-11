@@ -2321,12 +2321,24 @@ this worktree; no AUC-24 value is claimed here either.** The six commits:
    `PUBLIC_BENCHMARK_LIMITS` is now `publicBenchmarkLimits(result)`, with five
    tests that parse the rendered text and refuse any figure the run did not
    produce.
-4. **`ORPHAN_CLUE`'s guard stops deleting real props.** Three measured
-   suppressions of genuine props, including the exact example the guard's own
-   comment used to justify itself. Two causes fixed: the full-name learning pass
-   now requires the introduction convention, and the title guard only excludes a
-   token that occurs nowhere outside the title page. Three fixtures, positive and
-   negative, plus a `todo` carrying the measured residual.
+4. **`ORPHAN_CLUE`'s guard, two of three shapes closed and the third measured
+   rather than claimed.** Three measured suppressions of genuine props, including
+   the exact example the guard's own comment used to justify itself. The TITLE
+   cause is fixed — the guard now excludes a title token only when it occurs
+   nowhere outside the title page, which closes the two shapes where a script is
+   named after its own central object. The LEARNING-PASS cause was narrowed
+   (requiring the introduction marker), measured, and REVERTED: it closed the
+   other two shapes and put four real character names back into the clue channel
+   on the CC0 corpus (`mise` "renee-okafor", `the-defense-rests` "judge-paretsky"
+   and "court-clerk-etta", `the-key-under-the-mat` "real-estate-agent"), because
+   the corpus also introduces people with no marker at all. "BRASS KEY" beside a
+   character called KEY is lexically identical to "JUDGE PARETSKY" beside a
+   character called PARETSKY; the corpus has four of the second and none of the
+   first. So those two shapes are `todo` fixtures with their measured id lists,
+   the false claim is removed from all three live places, and a new corpus-wide
+   property test asserts no multi-word seeded clue on any of the 20 CC0 scripts
+   shares a word with a cue name — which is what caught the four and what will
+   catch the next one at the guard instead of three files away.
 5. **The verdict tier closes on its own merits, and the NOT-WIRED guard widens.**
    The verdict-tier assertion round 1 re-opened as `todo` is a hard check again
    (intact 79 CONSIDER / flattened 58.2 PASS — nothing moved to meet it), the
@@ -2340,32 +2352,35 @@ prints are in the doc's §8.3):**
 
 | channel | `main` @ `ad3f6fa7` | round 1 | round 2 final | floor |
 |---|---|---|---|---|
-| `SHUFFLE_DROP` matched-pair | 0.5313 | 0.8750 | **0.9063** [0.8125, 1.0000] | 0.8863 |
-| `SHUFFLE_DROP` all-pairs | 0.5586 | 0.8306 | 0.8433 [0.7461, 0.9316] | 0.8233 |
-| `SHUFFLE_DROP` sign counts | 17/15/0 | 28/4/0 | **29/3/0** | — |
-| `SHUFFLE_DROP` mean gap | −1.93125 | +2.109375 | **+1.96875** | — |
-| `CLIMAX_RELOCATE` matched-pair | 0.4219 | 0.5469 | **0.5938** [0.4063, 0.7500] | 0.5738 |
-| `CLIMAX_RELOCATE` all-pairs | 0.4673 | 0.5151 | 0.5239 [0.4609, 0.5918] | 0.5039 |
-| `CLIMAX_RELOCATE` ties | 11 of 32 | 1 of 32 | **0 of 32** | — |
-| `DIALOGUE_FLATTEN` control | 1.0000 / 0.9473 | 1.0000 / 1.0000 | 1.0000 / 1.0000, gap 26.91 | 0.98 / 0.98 |
+| `SHUFFLE_DROP` matched-pair | 0.5313 | 0.8750 | **0.8750** [0.7500, 0.9688] | 0.855 |
+| `SHUFFLE_DROP` all-pairs | 0.5586 | 0.8306 | 0.8291 [0.7222, 0.9268] | 0.8091 |
+| `SHUFFLE_DROP` sign counts | 17/15/0 | 28/4/0 | 28/4/0 | — |
+| `SHUFFLE_DROP` mean gap | −1.93125 | +2.109375 | **+1.89375** | — |
+| `CLIMAX_RELOCATE` matched-pair | 0.4219 | 0.5469 | **0.5469** [0.3750, 0.7188] | 0.5269 |
+| `CLIMAX_RELOCATE` all-pairs | 0.4673 | 0.5151 | 0.5151 [0.4473, 0.5820] | 0.4951 |
+| `CLIMAX_RELOCATE` ties | 11 of 32 | 1 of 32 | 1 of 32 | — |
+| `DIALOGUE_FLATTEN` control | 1.0000 / 0.9473 | 1.0000 / 1.0000 | 1.0000 / 1.0000, gap 26.40 | 0.98 / 0.98 |
 | blind matched pairs | 1 of 6, −0.0167 | 4 of 6, +0.3833 | 4 of 6, +0.3833 | none |
 | calibration | MONO, gap 25.32 | unchanged | unchanged, 21/21 | — |
-| `stapled_shorts` | +8.2 KNOWN FAIL | −2.0 on ONE ordering | **−1.8 over all 14** | — |
+| `stapled_shorts` | +8.2 KNOWN FAIL | −2.0 on ONE ordering | **−1.6 over all 14** | — |
 
-**One floor moved DOWN and four moved UP, in two separate re-locks.** The
-saturation move took `PUBLIC_SHUFFLE_DROP_FLOOR` 0.8106 → 0.8091 (all-pairs
-0.8306 → 0.8291); the clue-guard fix then took all four measurement floors up
-(0.855 → 0.8863, 0.8091 → 0.8233, 0.5269 → 0.5738, 0.4951 → 0.5039).
-`AUC24_FLOOR` is untouched at 0.622 throughout. Both were intended, measured
-before being locked, and the `auc.ts` diffs were read. **The coupling those four
-create is named in `auc.ts`:** if `measure-real` forces the steepness change to
-be weakened, those tests fail and the pressure will be to lower the floors. Do
-not. Revert the scoring change and re-lock from the reverted tree, in that order.
-Note also what the climax floor is — 0.5738 under a point estimate whose own
-interval [0.4063, 0.7500] still contains 0.5.
+**ONE floor moved, and it moved DOWN.** The saturation move took
+`PUBLIC_SHUFFLE_DROP_FLOOR` 0.8106 → 0.8091 (all-pairs 0.8306 → 0.8291), because
+the saturation point went from 15 scenes to 12 and one of the 1,024 all-pairs
+comparisons went with it. `AUC24_FLOOR` is untouched at 0.622. It was intended,
+measured before being locked, and the `auc.ts` diff read.
+
+**A SECOND re-lock happened and was undone, and that belongs in the ledger.**
+Item 3's first attempt at the clue guard took all four measurement floors UP
+(0.855 → 0.8863, 0.8091 → 0.8233, 0.5269 → 0.5738, 0.4951 → 0.5039) on a reading
+of 0.9063 / 0.8433 / 0.5938. The one full `npm test` then showed that attempt had
+re-admitted character names (see item 4 above), it was reverted, and the four
+floors were re-locked back to exactly the values the saturation commit left. **No
+number in this entry comes from that reverted tree**, and the four floors are
+where measurement puts them on the tree that ships.
 
 **In-repo blast radius, round 2 final against `main` @ `ad3f6fa7`:** 45 fixtures
-compared, health moves on **25**, RMS **9.850**, mean **+2.380**, largest
+compared, health moves on **25**, RMS **9.839**, mean **+2.292**, largest
 **+32.2** on `transfer-window`, **6 verdicts flip**, 5 grades flip. Ignored keys
 in that comparison, stated: `plainSummary` (differs in 34 of 45 — by design, the
 disclosure sentence), `strengths` (4 of 45) and `provenance.engineCommit` (45 of

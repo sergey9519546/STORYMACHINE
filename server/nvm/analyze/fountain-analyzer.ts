@@ -874,38 +874,6 @@ function extractDistinctiveTokens(text: string): string[] {
   return [...tokens];
 }
 
-/** Caps runs that carry the INTRODUCTION CONVENTION: the run is immediately
- *  followed by a comma or an opening parenthesis, which is how a screenplay
- *  introduces a person and is not how it flags a prop.
- *
- *  "DISPATCHER NELL ARCEO, 40s, clipboard in hand" -> "dispatcher nell arceo"
- *  "RIVA CHEN, 30s, August's former research partner" -> "riva chen"
- *  "DISPATCHER NELL ARCEO (40s)" -> "dispatcher nell arceo"
- *  "A hidden BRASS KEY glints under the mat" -> nothing
- *  "MARA REVOLVER sits on the nightstand" -> nothing
- *
- *  Added 2026-09-11 (round 2 item 3) so buildProperNounGuard's full-name
- *  learning pass reads the convention rather than every multi-word caps run —
- *  see that function's own comment for the two suppressions the looser version
- *  measured. Token normalisation (stopword filter, lowercase, >= 3 chars) is
- *  deliberately the SAME as extractDistinctiveTokens', so the learning pass and
- *  the candidate walk cannot disagree about what a token is. */
-function introductionTokens(text: string): string[] {
-  const tokens = new Set<string>();
-  for (const line of text.split(/\r?\n/)) {
-    if (isAllCapsLine(line)) continue;
-    for (const m of line.matchAll(CAPS_TOKEN_RE)) {
-      const after = line.slice((m.index ?? 0) + m[0].length);
-      if (!/^\s*[,(]/.test(after)) continue;
-      const words = m[0].split(/\s+/).filter(w => !CAPS_STOPWORDS.has(w));
-      if (words.length === 0) continue;
-      const id = words.join(' ').toLowerCase();
-      if (id.length >= 3) tokens.add(id);
-    }
-  }
-  return [...tokens];
-}
-
 function slugifyToken(raw: string): string {
   return raw.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
@@ -1783,35 +1751,55 @@ function buildProperNounGuard(
   // keeps "ramon delgado" (cue DELGADO, `ramon` unknown) and even the bare
   // "dispatcher", which is exactly the noise measured in the critical tier.
   //
-  // TWO conditions, not one (the second added 2026-09-11, round 2 item 3).
+  // ONE condition, not two — and the second one was TRIED, MEASURED and
+  // REVERTED on 2026-09-11 (round 2 item 3). The record, because the next
+  // person will have the same idea:
   //
-  //   (a) the caps run must contain an ALREADY-KNOWN cue word, so learning
-  //       cannot start from nothing; and
-  //   (b) the caps run must be FOLLOWED BY THE INTRODUCTION MARKER — a comma
-  //       or an opening parenthesis, immediately after the run. That is what
-  //       the convention this pass models actually looks like, in this
-  //       repository's own corpus and everywhere else: "DISPATCHER NELL ARCEO,
-  //       40s, clipboard in hand", "RIVA CHEN, 30s, August's former research
-  //       partner", "OFFICER TRAN, who steps aside", "DISPATCHER NELL ARCEO
-  //       (40s)". A PROP does not get that marker: "A hidden BRASS KEY glints
-  //       under the mat", "MARA REVOLVER sits on the nightstand".
+  // The condition is that the caps run must contain an ALREADY-KNOWN cue word.
+  // That is what lets a cue of DELGADO exclude "ramon delgado", and it is also
+  // what made the three suppressions in the header possible, because a PROP can
+  // contain a cue word too.
   //
-  // Condition (a) alone is what made the two suppressions (i) and (iii) in the
-  // header possible — it is satisfied by any caps run that happens to contain a
-  // cue word, including a prop. With (b) added, one pass still learns
-  // `dispatcher` and `arceo` from a cue of NELL, and no longer learns `brass`
-  // from "BRASS KEY" or `revolver` from "MARA REVOLVER".
+  // THE FIX TRIED: also require the INTRODUCTION MARKER — a comma or an opening
+  // parenthesis immediately after the run, optionally after an `and`-joined
+  // caps run for list introductions. That is what the convention looks like in
+  // much of this repository's corpus ("DISPATCHER NELL ARCEO, 40s", "RIVA CHEN,
+  // 30s, August's former research partner", "JORDY LANE and FEN ABIODUN,
+  // growing more animated") and not what a prop looks like ("A hidden BRASS KEY
+  // glints under the mat"). It closed two of the three shapes.
   //
-  // The residual, stated rather than left to be discovered: a caps run that IS
-  // followed by a comma and DOES contain a cue word still teaches its other
-  // words, so "BRASS KEY, still warm, lies under the mat" beside a character
-  // called KEY would suppress the prop. That shape needs the prop to be
-  // line-initial-ish AND comma-continued AND share a word with a cue name; it
-  // is a fixture below (`todo`, with the measured id list) rather than a claim
-  // that it cannot happen.
+  // WHY IT WAS REVERTED: measured over the 20 CC0 scripts, the corpus also
+  // introduces people with NO marker at all, and four character names came
+  // straight back into the clue channel —
+  //
+  //   mise                   "renee-okafor"       "Front-of-house manager RENEE OKAFOR checks a printed ..."
+  //   the-defense-rests      "judge-paretsky"     "JUDGE PARETSKY watches over reading glasses, unreadable."
+  //   the-defense-rests      "court-clerk-etta"   "COURT CLERK ETTA MOSS passes with a cart of files."
+  //   the-key-under-the-mat  "real-estate-agent"  "A REAL ESTATE AGENT walks the room with a clipboard ..."
+  //
+  // Trading four real character names on real scripts for two synthetic
+  // fixtures is the wrong direction for a guard whose whole job is excluding
+  // names, so the broad condition stays and the two shapes it cannot handle are
+  // `todo` fixtures in tests/core/clue-proper-noun-guard.test.ts with their
+  // measured id lists.
+  //
+  // WHY THEY CANNOT BE HANDLED HERE, stated so nobody re-tries it blind:
+  // "BRASS KEY" beside a character called KEY is LEXICALLY IDENTICAL to "JUDGE
+  // PARETSKY" beside a character called PARETSKY — a multi-word caps run, one of
+  // whose words is a cue name, in an action line. The corpus contains four of
+  // the second shape and none of the first. Separating them needs information
+  // this pass does not have (a role-title lexicon, or animacy), and this file's
+  // one-list-per-signal convention is a reason to measure such a lexicon before
+  // adding one, not to add it on the strength of two fixtures.
+  //
+  // One pass, not a fixed point: only tokens containing an already-known cue
+  // word teach new words. That bounds the reach at one step — and ONE STEP IS
+  // ENOUGH to reach a prop, which is shape (iii) in the header and is exactly
+  // what the retracted claim ("the set cannot chain outward through unrelated
+  // props") got wrong. It chains one step, and that step can land on a prop.
   const cueWords = new Set(nameWords);
   for (const s of scenes) {
-    for (const token of introductionTokens(s.rawText)) {
+    for (const token of extractDistinctiveTokens(s.rawText)) {
       const words = token.split(/\s+/).filter(Boolean);
       if (words.length < 2) continue;
       if (!words.some(w => cueWords.has(w))) continue;

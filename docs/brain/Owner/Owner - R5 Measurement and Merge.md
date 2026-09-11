@@ -165,7 +165,7 @@ and it **inverts** — paired shuffle-drop **0.0938**, worse than doing nothing 
 because a scene drop shrinks that denominator by `(2/3)^0.7 = 0.752` while
 weighted issues fall to about 0.55 of intact, so it normalises by the quantity
 the degradation attacks. The same benchmark puts the feature-length branch at
-**0.9063** on that channel.
+**0.8750** on that channel.
 
 **CORRECTION 2026-09-11, and it is the reason the sibling branch exists.** This
 paragraph used to end "Both cannot land: the two rewrite **the same two

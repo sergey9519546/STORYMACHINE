@@ -399,8 +399,7 @@ measurement round 1 made and it is not the property the witness claims — see
 | (d) saturation alone (`sat=15`) | 0.5781 | 0.6196 | +1.18 | 0.5156 | 17/32 | 0/6 | MONO, gap 25.32 | 1.0000 | −1.3 PASS |
 | (b)+(c)+(d) | 0.8750 | 0.8564 | +2.59 | 0.5625 | 2/32 | 4/6 | MONO, gap 25.32 | 1.0000 | −1.9 PASS |
 | (c)+(d at `sat=15`) ✓harness | **0.8750** | 0.8306 | +2.109 | **0.5469** | **1/32** | **4/6** | MONO, gap 25.32 | 1.0000 | −2.0 PASS, but **+0.7 FAIL** over orderings |
-| (c)+(d at `sat=12`) ✓harness | **0.8750** | 0.8291 | +1.894 | **0.5469** | **1/32** | **4/6** | MONO, gap 25.32 | 1.0000 | **−1.6 PASS over all 14 orderings** |
-| **FINAL (round 2): + the clue-guard fix** ✓harness | **0.9063** | 0.8433 | +1.969 | **0.5938** | **0/32** | **4/6** | MONO, gap 25.32 | 1.0000 | **−1.8 PASS over all 14 orderings** |
+| **FINAL (round 2): (c)+(d at `sat=12`)** ✓harness | **0.8750** | 0.8291 | +1.894 | **0.5469** | **1/32** | **4/6** | MONO, gap 25.32 | 1.0000 | **−1.6 PASS over all 14 orderings** |
 
 The last two rows are the round-2 correction in one line: `sat=15` passes the
 witness on the shipped ordering by 2.0 and FAILS it on 7 of 14 orderings of the
@@ -504,15 +503,9 @@ the-key-under-the-mat    dIntact 1.3315  ratio  9.39    intact 72.5 -> degraded 
 quiet-season             dIntact 1.1800  ratio 10.52    intact 73.8 -> degraded 73.9  (+0.1)
 ```
 
-On the FINAL round-2 tree (after the clue-guard fix of §12) the list is three,
-not four, and one of them got worse:
-
-```
-transfer-window                                        64.1 -> 73.0  (+8.9)  unchanged
-room-12                                                63.9 -> 72.3  (+8.4)  unchanged
-quiet-season                                           73.8 -> 74.3  (+0.5)  WORSE than +0.1
-the-key-under-the-mat    now ORDERED                   74.5 -> 73.4  (-1.1)  fixed
-```
+Those four are also the list on the FINAL round-2 tree: the clue-guard work of
+§12 ended up byte-identical on this corpus (see §12's item-3 row), so nothing in
+this block moved after the saturation change.
 
 What that means, plainly: every one of them sits on the density POWER branch,
 which this change does not touch at all, so no choice of
@@ -1146,7 +1139,7 @@ correction beside the number.
 |---|---|---|---|
 | 1 | the staple witness passed by pinning one ordering; 7 of 14 orderings of its own twelve parts still outscored the best part | `SCARCITY_SATURATION_SCENES` 15 → 12 and an ordering-free witness (max over 14 seeded orderings) | **yes** — §8.2's cost table |
 | 2 | the slope-constraint table named the wrong population (all 32, where no curve is admissible), printed two rows that do not reproduce, and omitted the four scripts the constraint cannot reach | §8.2 rewritten: the 16 sub-1 scripts, all sixteen rows, the non-reproducing rows removed, the inverted scripts named | no |
-| 3 | `ORPHAN_CLUE`'s guard deleted three kinds of genuine prop, including the example its own comment used as justification | the learning pass requires the introduction marker; the title guard only excludes tokens absent from the body | **yes** — all six benchmark statistics |
+| 3 | `ORPHAN_CLUE`'s guard deleted three kinds of genuine prop, including the example its own comment used as justification | **two of three closed at the cause** (the title guard now excludes only tokens absent from the body); the third is lexically undecidable and is a `todo` with its measured id list, plus a new corpus-wide property test | no — the two closed shapes do not occur in the 32 corpus scripts |
 | 4 | a third and fourth credit-cap residue: prose describing a rejected variant, a `CREDIT_FULL_SCENES` that exists nowhere, and `8.5/300^0.7 = 0.1889` | corrected in `tests/core/script-doctor.test.ts` and in §8.4 | no |
 | 5 | `npm run benchmark:public` printed five numbers its own table contradicted | the caveats are rendered from the `BenchmarkResult`, with five tests parsing the rendered text | no |
 | 6 | the scene-term disclosure sentence asserted a cause it does not account for past 15 scenes (term 12, gap 4 on the staple) | the sentence states the gap, names every term, and drops the false causal clause | no (a string) |
@@ -1156,15 +1149,32 @@ correction beside the number.
 | 9b | the `NOT WIRED` guard grepped `doctor.ts` alone | it reads all 68 scoring-path files, enumerated by `check-scoring-receipt.mjs`'s own classifier | no |
 | cosmetics | truncated means (+2.10, 7.625), a `void sceneCount` parameter, two derivations of the same ratio disagreeing, a `tests/core/monotonicity.test.ts` that does not exist, a rounded max-slope table | all corrected at their sites | no |
 
-**Two of the nine moved numbers, and both moved the floors.** Item 1's
-saturation move took one secondary floor DOWN (`PUBLIC_SHUFFLE_DROP_FLOOR`
-0.8106 → 0.8091) and item 3's clue fix took all four measurement floors UP
-(0.855 → 0.8863, 0.8091 → 0.8233, 0.5269 → 0.5738, 0.4951 → 0.5039).
-`AUC24_FLOOR` is untouched at 0.622. Both re-locks are printed before → after in
-§8.3, and the coupling the four upward moves create is stated in
-`scripts/lib/auc.ts` beside the constants: if `measure-real` forces the steepness
-change to be weakened, those tests fail, and the answer is to revert the scoring
-change and re-lock from the reverted tree — never to lower a floor.
+**ONE of the nine moved a number, and it moved one floor.** Item 1's saturation
+move took one secondary floor DOWN (`PUBLIC_SHUFFLE_DROP_FLOOR` 0.8106 →
+0.8091); `AUC24_FLOOR` is untouched at 0.622. That re-lock is printed
+before → after in §8.3.
+
+**Item 3 moved all six statistics and then did not.** The narrowing it first
+shipped (requiring the introduction marker before the learning pass would teach)
+took shuffle-drop to 0.9063 / 0.8433 with 29/3/0 and climax-relocate to 0.5938
+with zero ties, and all four measurement floors were re-locked upward to match.
+The ONE full `npm test` then failed on
+`tests/core/agency-signal.test.ts`'s locked table — whose `legacyIsPassive`
+predicate reads `seededClueIds.length === 0` — and the cause was that the
+narrowing had let a character name back into the clue channel
+(`the-defense-rests` seeded "jordy-lane" from "two fellow associates, JORDY LANE
+and FEN ABIODUN, growing more animated", where the comma follows the LAST name of
+a list). Widening the marker to cover list introductions fixed that one and a
+corpus-wide property test then found FOUR more, all introductions with no marker
+at all: `mise` "renee-okafor", `the-defense-rests` "judge-paretsky" and
+"court-clerk-etta", `the-key-under-the-mat` "real-estate-agent". Trading four
+real character names on real scripts for two synthetic fixtures is the wrong
+direction for a guard whose job is excluding names, so the narrowing was
+REVERTED, the four floors were re-locked back down to exactly the values the
+saturation commit left (0.855, 0.8091, 0.5269, 0.4951), and the two shapes that
+needed it are `todo` fixtures with their measured id lists. **The 0.9063 figure
+is not this branch's reading and appears nowhere as one.** The title half of the
+fix survives, closes the other two shapes, and is byte-identical on this corpus.
 
 **The three residues round 2 did not close**, each recorded where a reader will
 hit it rather than only here: three of the 32 public scripts are still inverted

@@ -47,19 +47,20 @@ up at, or are only visible because of, feature length.
 
 | channel | `main` @ `9b199b72` | this branch |
 |---|---|---|
-| `SHUFFLE_DROP` matched-pair | 0.5313 | **0.9063** |
-| `SHUFFLE_DROP` mean health gap | **−1.93125** (damaged copy higher) | **+1.96875** |
-| `SHUFFLE_DROP` sign counts | 17/15/0 | **29/3/0** |
-| `CLIMAX_RELOCATE` matched-pair | 0.4219, 11 of 32 ties | **0.5938, 0 ties** |
+| `SHUFFLE_DROP` matched-pair | 0.5313 | **0.8750** |
+| `SHUFFLE_DROP` mean health gap | **−1.93125** (damaged copy higher) | **+1.89375** |
+| `SHUFFLE_DROP` sign counts | 17/15/0 | **28/4/0** |
+| `CLIMAX_RELOCATE` matched-pair | 0.4219, 11 of 32 ties | **0.5469, 1 tie** |
 | `DIALOGUE_FLATTEN` control | 1.0000 / 0.9473 | 1.0000 / 1.0000 |
 | blind matched pairs | 1 of 6, −0.02 | **4 of 6, +0.3833** |
 | calibration bands | MONO, gap 25.32 | MONO, gap 25.32 (not one sample moves) |
-| `stapled_shorts` witness | +8.2 KNOWN FAIL | **−1.8 PASS over all 14 orderings**, `hard` |
+| `stapled_shorts` witness | +8.2 KNOWN FAIL | **−1.6 PASS over all 14 orderings**, `hard` |
 
-Three of the 32 are still inverted under the drop — `transfer-window` +8.9,
-`room-12` +8.4, `quiet-season` +0.5 — and all three sit on the density POWER
-branch, which the sub-1 steepness change cannot reach. A writer of a dense
-10-scene script can still gain 8.9 points by deleting a third of their scenes.
+Four of the 32 are still inverted under the drop — `transfer-window` +8.9,
+`room-12` +8.4, `the-key-under-the-mat` +1.6, `quiet-season` +0.1 — and all four
+sit on the density POWER branch, which the sub-1 steepness change cannot reach. A
+writer of a dense 10-scene script can still gain 8.9 points by deleting a third
+of their scenes.
 
 Blast radius: 25 of 45 in-repo fixtures move health (RMS 9.580), 6 verdicts
 flip. Four assertions moved, each re-anchored with its measurement rather than
