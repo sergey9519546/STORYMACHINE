@@ -212,18 +212,52 @@ describe('renderCoverageLetter — shape and wording', () => {
     assert.ok(!withoutField.includes('## Root Causes'));
   });
 
-  it('renders up to 3 root causes, worst severity and largest member count first', () => {
-    const minor = makeRootCause({ id: 'a', title: 'Minor thread', severity: 'minor', memberCount: 20, sceneIdxs: [] });
-    const criticalSmall = makeRootCause({ id: 'b', title: 'Small critical', severity: 'critical', memberCount: 1, sceneIdxs: [0] });
-    const majorBig = makeRootCause({ id: 'c', title: 'Big major', severity: 'major', memberCount: 9, sceneIdxs: [1, 2] });
-    const majorSmall = makeRootCause({ id: 'd', title: 'Small major', severity: 'major', memberCount: 2, sceneIdxs: [] });
+  // 2026-09-11 (producer-tier discovery defect #2): this used to hand the letter
+  // an UNSORTED finding list and assert the letter re-sorted it by
+  // `severity || memberCount`. That re-sort was the defect. It dropped the
+  // middle key clusterIssues applies — named-beats-generic (cluster.ts's
+  // isNamedRootCause; the 2026-09-04 advice-quality audit's finding that a
+  // hand-written named diagnosis must outrank a same-severity 15-member
+  // auto-titled cluster) — so for the same script the letter's "top three" could
+  // be three different findings from the three the writer's panel led with.
+  //
+  // `rootCauses` arrives in clusterIssues' canonical order from
+  // server/lib/root-cause-pipeline.ts; the letter's job is to take the first
+  // three and say them, never to re-rank them. Both directions are pinned: the
+  // order is preserved, and the named-over-bigger-generic case the old
+  // comparator inverted is asserted explicitly below.
+  it('renders the first 3 root causes in the order it was given, never re-ranking them', () => {
+    const first = makeRootCause({ id: 'b', title: 'Small critical', severity: 'critical', memberCount: 1, sceneIdxs: [0] });
+    const second = makeRootCause({ id: 'c', title: 'Big major', severity: 'major', memberCount: 9, sceneIdxs: [1, 2] });
+    const third = makeRootCause({ id: 'd', title: 'Small major', severity: 'major', memberCount: 2, sceneIdxs: [] });
+    const fourth = makeRootCause({ id: 'a', title: 'Minor thread', severity: 'minor', memberCount: 20, sceneIdxs: [] });
 
-    const { markdown } = renderCoverageLetter(buildReport({ rootCauses: [minor, criticalSmall, majorBig, majorSmall] }));
-    const order = ['Small critical', 'Big major', 'Small major', 'Minor thread']
-      .map(t => markdown.indexOf(t))
-      .filter(i => i !== -1);
-    assert.deepEqual(order, [...order].sort((a, b) => a - b), 'must appear in severity/size order');
+    const { markdown } = renderCoverageLetter(buildReport({ rootCauses: [first, second, third, fourth] }));
+    const order = ['Small critical', 'Big major', 'Small major']
+      .map(t => markdown.indexOf(t));
+    assert.ok(order.every(i => i !== -1), 'all three leading findings must render');
+    assert.deepEqual(order, [...order].sort((a, b) => a - b), 'must appear in the order given');
     assert.ok(!markdown.includes('Minor thread'), 'only the top 3 root causes render');
+  });
+
+  it('does not demote a named finding below a bigger generic one — the old re-sort did', () => {
+    // `midpoint-stall-…` is a NAMED template id (cluster.ts's isNamedRootCause),
+    // which is why clusterIssues ranked it first despite having a fifth of the
+    // members. The letter must keep that order.
+    const named = makeRootCause({
+      id: 'midpoint-stall-abc123', title: 'The middle has no engine',
+      severity: 'major', memberCount: 3, sceneIdxs: [5],
+    });
+    const genericBigger = makeRootCause({
+      id: 'deadbeefdeadbeef', title: 'Recurring pacing trouble in Scene 9',
+      severity: 'major', memberCount: 15, sceneIdxs: [8],
+    });
+
+    const { markdown } = renderCoverageLetter(buildReport({ rootCauses: [named, genericBigger] }));
+    assert.ok(
+      markdown.indexOf('The middle has no engine') < markdown.indexOf('Recurring pacing trouble in Scene 9'),
+      'the named finding was demoted below a bigger generic cluster',
+    );
   });
 
   it('names the scenes a root cause points at, and omits the parenthetical when there are none', () => {

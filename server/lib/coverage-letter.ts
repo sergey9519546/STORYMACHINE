@@ -84,6 +84,9 @@ import {
   draftRankDenominatorLabel, draftRankNextOpportunityLabel, unrankedDraftsNote,
 } from '../../src/lib/draft-rank-copy.ts';
 import { ACTION_PROSE_VARIATION_LABEL_LOWER, formatSignalValue } from '../../src/lib/structural-signals-copy.ts';
+// ONE root-cause ordering and wording (2026-09-11) — see
+// server/lib/root-cause-pipeline.ts.
+import { rootCauseStatements, topRootCauses } from './root-cause-pipeline.ts';
 
 export interface CoverageLetterOptions {
   title?: string;
@@ -150,9 +153,15 @@ function severityWord(sev: RevisionIssue['severity']): string {
   return sev.toUpperCase();
 }
 
-function severityRank(sev: RevisionIssue['severity']): number {
-  return sev === 'critical' ? 0 : sev === 'major' ? 1 : 2;
-}
+// NOTE (2026-09-11): a local `severityRank()` used to live here, used by exactly
+// one caller — buildRootCauses' re-sort of the root causes. That re-sort is gone
+// (it dropped clusterIssues' named-beats-generic key and so disagreed with the
+// panel about which three findings were the top three), and with it the only
+// reason this file had its own severity comparator. It is deleted rather than
+// left unreferenced on purpose: a severity comparator sitting in this file is an
+// invitation to re-sort the findings again, which is the defect. Ordering for
+// root causes belongs to server/nvm/analyze/cluster.ts and is carried through by
+// server/lib/root-cause-pipeline.ts's topRootCauses().
 
 // ── Intermediate data model ───────────────────────────────────────────────────
 // Built once from the report; both renderers (markdown/text) format the same
@@ -196,22 +205,33 @@ function buildHeadline(report: ScriptDoctorReport): string {
   return parts.join(' · ');
 }
 
+// 2026-09-11 (producer-tier discovery defect #2): three things here disagreed
+// with the writer's screen for the SAME script, and all three are now taken
+// from server/lib/root-cause-pipeline.ts.
+//
+//   1. ORDER. This function re-sorted by `severity || memberCount`, which drops
+//      clusterIssues' middle key — named-beats-generic (cluster.ts's
+//      isNamedRootCause; the 2026-09-04 advice-quality audit's finding that a
+//      hand-written named diagnosis must outrank a same-severity 15-member
+//      auto-titled cluster). So the letter's "top three" could be three
+//      different findings from the three the panel led with. topRootCauses()
+//      slices the canonical order instead; it never re-sorts.
+//   2. THE COUNT. `Subsumes N issue(s)` vs the panel's "15 issues from 12
+//      rules" (rootCauseCountSentence). The shared sentence is now the object of
+//      this letter's own verb, so the bytes are unchanged wherever the two
+//      counts agree and honest wherever they differ.
+//   3. THE SCENES. One entry per scene index, which on a real draft produced a
+//      544-character parenthetical. formatSceneList (server/lib/
+//      scene-ranges.ts) collapses contiguous stretches and leaves scattered
+//      sets explicit; an unanchored finding still drops the parenthetical
+//      entirely rather than rendering "(Scenes )".
 function buildRootCauses(rootCauses: RootCauseFinding[] | undefined): ListEntry[] {
   if (!rootCauses || rootCauses.length === 0) return [];
-  const top = [...rootCauses]
-    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || b.memberCount - a.memberCount)
-    .slice(0, 3);
 
-  return top.map(rc => {
-    const scenes = rc.sceneIdxs.length > 0
-      ? ` (Scene${rc.sceneIdxs.length === 1 ? '' : 's'} ${rc.sceneIdxs.map(i => i + 1).join(', ')})`
-      : '';
-    const subsumes = `Subsumes ${formatNumber(rc.memberCount)} issue${rc.memberCount === 1 ? '' : 's'}.`;
-    return {
-      heading: `${severityWord(rc.severity)} — ${rc.title}${scenes}`,
-      body: `${rc.explanation} ${subsumes}`,
-    };
-  });
+  return rootCauseStatements(topRootCauses(rootCauses)).map(st => ({
+    heading: `${severityWord(st.severity)} — ${st.title}${st.sceneList ? ` (${st.sceneList})` : ''}`,
+    body: `${st.explanation} Subsumes ${st.countSentence}.`,
+  }));
 }
 
 /** Sentence-terminate without doubling: findings arrive both ways — some

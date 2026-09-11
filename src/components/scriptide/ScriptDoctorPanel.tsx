@@ -91,6 +91,12 @@ import {
   type JumpTarget,
   type LocationAnchorIndex,
 } from "../../lib/finding-jump.ts";
+// One scene-list wording for the panel, the exported coverage HTML and the
+// coverage letter (2026-09-11) — see server/lib/scene-ranges.ts. src/ already
+// imports server/lib modules directly (src/lib/story-axes.ts imports
+// server/lib/genre-router.ts); this module is pure, server-free and has no
+// scoring-path edge.
+import { formatSceneList } from "../../../server/lib/scene-ranges.ts";
 import { FindingJump } from "./FindingJump.tsx";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -1967,12 +1973,15 @@ function RootCauseCard({
   const [open, setOpen] = useState(false);
   const meta = SEVERITY_META[finding.severity];
   const Icon = meta.icon;
-  const sceneLabel =
-    finding.sceneIdxs.length > 0
-      ? `scene${finding.sceneIdxs.length === 1 ? "" : "s"} ${finding.sceneIdxs
-          .map((idx) => idx + 1)
-          .join(", ")}`
-      : null;
+  // 2026-09-11 (producer-tier discovery): this used to be a local
+  // `scene${s} 1, 2, 3` join — the THIRD independent wording of one fact
+  // (the coverage HTML said "Scene 1, Scene 2, Scene 3", the letter said
+  // "(Scenes 1, 2, 3)"), and on a feature-length draft it listed every scene of
+  // a 116-scene span. formatSceneList (server/lib/scene-ranges.ts) is now the
+  // single implementation all three read: contiguous stretches collapse to
+  // "Scenes 1–36", scattered sets stay explicit, and '' for a finding with no
+  // scene anchor keeps this card's bullet separator from rendering alone.
+  const sceneLabel = formatSceneList(finding.sceneIdxs) || null;
   const notesId = `root-cause-notes-${finding.id}`;
 
   return (

@@ -27,6 +27,11 @@ import { buildSlateEntry, rankSlate, renderSlateHtml, type SlateEntry } from '..
 import { analyzeFountainText } from '../nvm/analyze/fountain-analyzer.ts';
 import { runScriptDoctorForRequest } from '../lib/doctor-request.ts';
 import { checkContentHash, compareVerifyClaims } from '../lib/verify-compare.ts';
+// ONE root-cause pipeline (2026-09-11) — see server/lib/root-cause-pipeline.ts.
+// Static, not the `await import` this route used to do: renderCoverageHtml
+// (imported above) already pulls cluster.ts and prioritize.ts into this
+// module's static graph, so the dynamic import deferred nothing.
+import { buildRootCausePipeline } from '../lib/root-cause-pipeline.ts';
 
 const router = express.Router();
 export default router;
@@ -391,17 +396,20 @@ router.post('/api/export/coverage', gameLimiter, validate(CoverageBodySchema), a
 
     // Root-cause clustering (pilot session 2026-08-07 finding #3,
     // PILOT_SESSION_REPORT.md §0.3/§6/§9.3): POST /api/scriptide/doctor
-    // attaches this at the route layer via the exact same locateIssues +
-    // clusterIssues pair (see server/routes/scriptide.ts's own comment for
-    // why it lives at the route rather than inside doctor.ts), but this
-    // export route never did — so the exported coverage.html had nothing to
-    // feed renderCoverageHtml's Root Causes section even after that section
+    // attaches this at the route layer (see server/routes/scriptide.ts's own
+    // comment for why it lives at the route rather than inside doctor.ts), but
+    // this export route never did — so the exported coverage.html had nothing
+    // to feed renderCoverageHtml's Root Causes section even after that section
     // existed, and a static-report reader never saw the synthesis at all.
-    // Same two-call pattern, same inputs already in scope here.
-    const { locateIssues } = await import('../nvm/analyze/locate.ts');
-    const { clusterIssues } = await import('../nvm/analyze/cluster.ts');
-    const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-    const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
+    //
+    // 2026-09-11 (producer-tier discovery defect #2): when it WAS added, it was
+    // added as a hand-assembled `clusterIssues(locateIssues(...))` pair with
+    // the scene-spans argument MISSING, so the producer's export and the
+    // writer's screen named different scenes, counted a different number of
+    // findings, and ordered them differently from one contentHash. Now the one
+    // shared pipeline, which derives the spans itself — see
+    // server/lib/root-cause-pipeline.ts for the measurement.
+    const { rootCauses } = buildRootCausePipeline(report, fountain);
 
     const html = renderCoverageHtml({ ...report, contentHash, rootCauses }, title, {
       titlePageTitle: titlePage.title,

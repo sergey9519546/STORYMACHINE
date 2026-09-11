@@ -40,6 +40,7 @@ import { fdxToFountain } from '../lib/fdx-import.ts';
 import { runScriptDoctorForRequest } from '../lib/doctor-request.ts';
 import { renderCoverageLetter } from '../lib/coverage-letter.ts';
 import { extractTitlePage } from '../lib/logline.ts';
+import { buildRootCausePipeline } from '../lib/root-cause-pipeline.ts';
 
 const router = express.Router();
 export default router;
@@ -126,14 +127,14 @@ router.post('/api/export/coverage-letter', gameLimiter, validate(CoverageLetterB
       ? sanitizeForPrompt(authorBody.trim(), 256)
       : (titlePage.author?.trim() || undefined);
 
-    // Root-cause clustering — same two-call pattern as POST
-    // /api/export/coverage (see that route's own comment): the doctor
-    // doesn't attach rootCauses itself, so it's computed here from the same
-    // inputs already in scope.
-    const { locateIssues } = await import('../nvm/analyze/locate.ts');
-    const { clusterIssues } = await import('../nvm/analyze/cluster.ts');
-    const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-    const rootCauses = clusterIssues(locateIssues(issuesWithPass, fountain));
+    // Root-cause clustering — the doctor doesn't attach rootCauses itself, so
+    // it's computed here from the same inputs already in scope. 2026-09-11:
+    // through the ONE shared pipeline (server/lib/root-cause-pipeline.ts).
+    // This route used to hand-assemble `clusterIssues(locateIssues(...))` with
+    // the scene-spans argument missing, which is why the letter named different
+    // scenes — and a different number of findings, in a different order — from
+    // the panel for the same script.
+    const { rootCauses } = buildRootCausePipeline(report, fountain);
 
     const { markdown, text } = renderCoverageLetter(
       { ...report, rootCauses },

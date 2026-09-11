@@ -23,8 +23,7 @@ import { runScriptDoctor } from '../server/nvm/analyze/doctor.ts';
 import { renderCoverageHtml } from '../server/lib/coverage-html.ts';
 import { extractTitlePage, buildLogline } from '../server/lib/logline.ts';
 import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
-import { locateIssues } from '../server/nvm/analyze/locate.ts';
-import { clusterIssues } from '../server/nvm/analyze/cluster.ts';
+import { buildRootCausePipeline } from '../server/lib/root-cause-pipeline.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = path.join(__dirname, '../docs/user-validation');
@@ -41,12 +40,15 @@ async function main(): Promise<void> {
   const { records } = analyzeFountainText(sampleFountain);
   const logline = buildLogline(report, records, sampleFountain);
 
-  // Root-cause clustering (pilot session 2026-08-07 finding #3): matches the
-  // /api/export/coverage route's own clustering step exactly, so this
-  // committed sample stays byte-identical to a real export — including the
-  // Root Causes section now surfaced in coverage-html.ts.
-  const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-  const rootCauses = clusterIssues(locateIssues(issuesWithPass, sampleFountain));
+  // Root-cause clustering (pilot session 2026-08-07 finding #3): the SAME
+  // shared pipeline POST /api/export/coverage runs (server/lib/
+  // root-cause-pipeline.ts), so this committed sample stays byte-identical to
+  // a real export — including the Root Causes section surfaced in
+  // coverage-html.ts. Until 2026-09-11 this was a hand-assembled copy of that
+  // route's (then also wrong) two-call pattern with the scene spans omitted:
+  // the committed sample therefore disagreed with the in-app panel about which
+  // scenes its own findings were in.
+  const { rootCauses } = buildRootCausePipeline(report, sampleFountain);
 
   const html = renderCoverageHtml({ ...report, contentHash, rootCauses }, sampleTitle, {
     titlePageTitle: titlePage.title,

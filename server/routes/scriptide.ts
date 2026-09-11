@@ -23,9 +23,14 @@ import {
 } from '../lib/validation.ts';
 import { isDoctorAnalysisBudgetExceeded } from '../lib/doctor-budget.ts';
 import { fdxToFountain } from '../lib/fdx-import.ts';
-import { locateIssues, sceneLineSpans } from '../nvm/analyze/locate.ts';
-import { clusterIssues } from '../nvm/analyze/cluster.ts';
-import { buildPrioritizedIssues, buildCharacterSummaries, suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
+// ONE root-cause pipeline for every route in this file (2026-09-11) — see
+// server/lib/root-cause-pipeline.ts. The locateIssues/sceneLineSpans/
+// clusterIssues/buildPrioritizedIssues quartet used to be hand-assembled at
+// each of the five doctor-shaped routes below (and at three export call sites
+// that got the argument list WRONG); it is now one call with no scene-spans
+// argument to forget.
+import { buildRootCausePipeline } from '../lib/root-cause-pipeline.ts';
+import { buildCharacterSummaries, suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
 import type { DirectorStyle, StoryStructure } from '../engine/types.ts';
 import type { DoctorSource, LiveDiagnosis, ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import { withAiBudget, consumeAiAttempt, isAiBudgetExceededError, aiBudgetEnvNumber, type AiBudgetLimits } from '../lib/ai-budget.ts';
@@ -574,27 +579,33 @@ router.post('/api/scriptide/doctor', gameLimiter, validate(DoctorBodySchema), as
   // every existing field untouched (including any percentile fields a
   // parallel agent adds to `dimensions`), so this can never regress an
   // existing consumer of the report shape.
-  const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
   // E2 (2026-08-21): `locatedIssues` rides along for the exact reason
-  // `rootCauses` does two lines up — computed for free from the same
-  // locateIssues() call clusterIssues() already needs, so the client can
-  // resolve a topPriorities/per-pass issue to a concrete editor line span
+  // `rootCauses` does — computed for free from the same locateIssues() call
+  // clusterIssues() already needs, so the client can resolve a
+  // topPriorities/per-pass issue to a concrete editor line span
   // (click-a-finding → jump-to-line) without re-deriving scene/character
   // spans itself. Same shape /api/scriptide/diagnose already sends.
-  const locatedIssues = locateIssues(issuesWithPass, fountain);
-  // Shape-&-rhythm jump-to-scene (2026-09-04): the same per-scene line spans
-  // clusterIssues already needs, computed once and reused rather than
-  // re-derived, so the client can resolve a structuralSignals scene row
-  // (which carries only sceneIdx/slug, no line numbers) to a concrete editor
-  // span the same way it already does for topPriorities/per-pass issues via
-  // locatedIssues. Index i of this array is scene i's { startLine, endLine }.
-  const spans = sceneLineSpans(fountain);
-  const rootCauses = clusterIssues(locatedIssues, spans);
+  //
+  // Shape-&-rhythm jump-to-scene (2026-09-04): `sceneLineSpans` is the same
+  // per-scene line-span array clusterIssues already needs, computed once and
+  // reused rather than re-derived, so the client can resolve a
+  // structuralSignals scene row (which carries only sceneIdx/slug, no line
+  // numbers) to a concrete editor span the same way it already does for
+  // topPriorities/per-pass issues via locatedIssues. Index i is scene i's
+  // { startLine, endLine }.
+  //
   // A3 (2026-09-03): `prioritized` is the "start here" ordering — see
   // server/nvm/analyze/prioritize.ts for why it is attached beside
   // `topPriorities` instead of replacing it (topPriorities is a published
   // ScriptDoctorReport field on the scoring path and stays byte-identical).
-  const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
+  //
+  // 2026-09-11: all four values now come from ONE shared pipeline
+  // (server/lib/root-cause-pipeline.ts) instead of four hand-assembled steps
+  // repeated at eight call sites — three of which omitted the scene spans and
+  // therefore produced different findings, in a different order, for the same
+  // script. See that module's header for the measurement.
+  const { locatedIssues, sceneLineSpans: spans, rootCauses, prioritized } =
+    buildRootCausePipeline(report, fountain);
   // A4 (2026-09-03): `characterSummaries` — same attach-at-the-route
   // reasoning as `prioritized` two lines up, derived from three existing
   // report fields (characters, characterFunctions, voiceAnalysis) plus this
@@ -719,14 +730,10 @@ router.post('/api/scriptide/doctor/stream', gameLimiter, validate(DoctorBodySche
       onProgress: event => emitSSE({ type: 'doctor_progress', event }),
     });
 
-    const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-    // E2: same locatedIssues attachment as /doctor above.
-    const locatedIssues = locateIssues(issuesWithPass, fountain);
-    // Shape-&-rhythm jump-to-scene: same sceneLineSpans attachment as
-    // /doctor above.
-    const spans = sceneLineSpans(fountain);
-    const rootCauses = clusterIssues(locatedIssues, spans);
-    const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
+    // Same shared pipeline as /doctor above — see
+    // server/lib/root-cause-pipeline.ts.
+    const { locatedIssues, sceneLineSpans: spans, rootCauses, prioritized } =
+      buildRootCausePipeline(report, fountain);
     // A4: same characterSummaries attachment as /doctor above.
     const characterSummaries = buildCharacterSummaries(
       report.characters, locatedIssues, report.characterFunctions, report.voiceAnalysis,
@@ -875,13 +882,10 @@ router.post('/api/scriptide/doctor/deep', aiLimiter, validate(DeepDoctorBodySche
   // attaches it at the route rather than inside doctor.ts — see that route's
   // comment above. Deep read changes how SIGNALS were sensed, not the shape
   // of the resulting issues, so this step is identical either way.
-  const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-  // E2: same locatedIssues attachment as /doctor above.
-  const locatedIssues = locateIssues(issuesWithPass, fountain);
-  // Shape-&-rhythm jump-to-scene: same sceneLineSpans attachment as /doctor above.
-  const spans = sceneLineSpans(fountain);
-  const rootCauses = clusterIssues(locatedIssues, spans);
-  const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
+  // Same shared pipeline as /doctor above — see
+  // server/lib/root-cause-pipeline.ts.
+  const { locatedIssues, sceneLineSpans: spans, rootCauses, prioritized } =
+    buildRootCausePipeline(report, fountain);
   // A4: same characterSummaries attachment as /doctor above.
   const characterSummaries = buildCharacterSummaries(
     report.characters, locatedIssues, report.characterFunctions, report.voiceAnalysis,
@@ -1033,13 +1037,11 @@ router.post(
     // Route-level enrichment, same reasoning as the /doctor route above: kept
     // out of doctor.ts (fixed contract, parallel agent's), and only needs the
     // report's own `passes` plus the converted Fountain text already in scope.
-    const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-    // E2: same locatedIssues attachment as /doctor above.
-    const locatedIssues = locateIssues(issuesWithPass, converted.fountain);
-    // Shape-&-rhythm jump-to-scene: same sceneLineSpans attachment as /doctor above.
-    const spans = sceneLineSpans(converted.fountain);
-    const rootCauses = clusterIssues(locatedIssues, spans);
-    const prioritized = buildPrioritizedIssues(locatedIssues, rootCauses);
+    // Same shared pipeline as /doctor above, over the CONVERTED Fountain (the
+    // text the report was produced from) — see
+    // server/lib/root-cause-pipeline.ts.
+    const { locatedIssues, sceneLineSpans: spans, rootCauses, prioritized } =
+      buildRootCausePipeline(report, converted.fountain);
     // A4: same characterSummaries attachment as /doctor above.
     const characterSummaries = buildCharacterSummaries(
       report.characters, locatedIssues, report.characterFunctions, report.voiceAnalysis,
@@ -1082,9 +1084,9 @@ router.post('/api/scriptide/diagnose', gameLimiter, validate(DiagnoseBodySchema)
   const report = await runScriptDoctorForRequest(fountain, res);
   if (!report) return;
 
-  const issuesWithPass = report.passes.flatMap(p => p.issues.map(issue => ({ ...issue, pass: p.pass })));
-  const locatedIssues = locateIssues(issuesWithPass, fountain);
-  const rootCauses = clusterIssues(locatedIssues, sceneLineSpans(fountain));
+  // Same shared pipeline as /doctor above — see
+  // server/lib/root-cause-pipeline.ts.
+  const { locatedIssues, rootCauses } = buildRootCausePipeline(report, fountain);
   const analysisComplete = isWholeDraftAnalysisComplete(report);
 
   // Upgrade item #11: sceneHeatmap for the live editor's per-scene heatmap.

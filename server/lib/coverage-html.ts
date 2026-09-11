@@ -25,6 +25,8 @@ import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
 import { computeStructuralReliabilityNote } from './structural-reliability.ts';
 import { isNamedRootCause } from '../nvm/analyze/cluster.ts';
 import { suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
+// ONE root-cause wording (2026-09-11) — see server/lib/root-cause-pipeline.ts.
+import { rootCauseStatements } from './root-cause-pipeline.ts';
 // Shared percentile copy (2026-09-04 review — consolidates what used to be
 // four independent hand-copies of ordinal()/percentileBand() across the
 // panel, this file, SnapshotManager.tsx and SlatePanel.tsx into one
@@ -407,21 +409,39 @@ function buildTopPrioritiesSection(topPrioritiesIn: Array<RevisionIssue & { pass
 // the generic auto-titled clusters are NOT deleted — see
 // buildClusterFindingsSection below — they stay, ranked below, in the
 // original Top-Priorities-then-appendix position.
+// 2026-09-11 (producer-tier discovery defect #2): both reader-facing facts on
+// this line — how many issues/rules the cluster stands for, and which scenes it
+// is in — now come from server/lib/root-cause-pipeline.ts's
+// rootCauseStatements(), the same statements the in-app panel renders.
+//
+// What changed and why:
+//   * the count used to be a local `Subsumes N issue(s)` while the panel said
+//     `15 issues from 12 rules` (src/lib/finding-jump.ts's
+//     rootCauseCountSentence, registered in docs/CLAIMS_REGISTER.md) — one
+//     cluster, two sentences, and only one of them mentioned the rule count the
+//     `rules:` list immediately after it enumerates. The shared sentence is now
+//     the object of this document's own verb ("Subsumes ..."), so where the two
+//     counts agree the bytes are unchanged and where they differ the export
+//     stops hiding it.
+//   * the scene list used to be `rc.sceneIdxs.map(i => 'Scene ' + (i+1))` — one
+//     entry per scene, which on the feature fixture rendered a 1,231-character
+//     run of "Scene N, " for a single finding. formatSceneList
+//     (server/lib/scene-ranges.ts) collapses contiguous stretches and leaves
+//     scattered sets explicit: 1,231 characters -> 28, nothing dropped.
+// The empty-scene case still drops this document's own em-dash separator rather
+// than rendering a hollow phrase — see formatSceneList's contract.
 function rootCauseListItems(rootCauses: RootCauseFinding[]): string {
-  return rootCauses.map(rc => {
-    const scenes = rc.sceneIdxs.length > 0
-      ? rc.sceneIdxs.map(i => `Scene ${i + 1}`).join(', ')
-      : null;
-    const memberLine = `Subsumes ${formatNumber(rc.memberCount)} issue${rc.memberCount === 1 ? '' : 's'}`
-      + (scenes ? ` &mdash; ${escapeHtml(scenes)}` : '')
-      + (rc.memberRules.length > 0 ? ` &mdash; rules: ${escapeHtml(rc.memberRules.join(', '))}` : '');
+  return rootCauseStatements(rootCauses).map(st => {
+    const memberLine = `Subsumes ${st.countSentence}`
+      + (st.sceneList ? ` &mdash; ${escapeHtml(st.sceneList)}` : '')
+      + (st.memberRules.length > 0 ? ` &mdash; rules: ${escapeHtml(st.memberRules.join(', '))}` : '');
     return `
     <li class="priority-item">
       <div class="priority-head">
-        ${severityChip(rc.severity)}
-        <span class="issue-location">${escapeHtml(rc.title)}</span>
+        ${severityChip(st.severity)}
+        <span class="issue-location">${escapeHtml(st.title)}</span>
       </div>
-      <div class="issue-description">${escapeHtml(rc.explanation)}</div>
+      <div class="issue-description">${escapeHtml(st.explanation)}</div>
       <div class="issue-fix">${memberLine}</div>
     </li>`;
   }).join('\n');

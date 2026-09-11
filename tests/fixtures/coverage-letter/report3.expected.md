@@ -17,7 +17,7 @@ CONSIDER — scored in the middle band, above the decline line but short of what
 ## Root Causes
 
 1. **MAJOR — Widespread Structure & Pacing concerns** — 10 issues across 2 pass(es) in Structure & Pacing point to the same underlying problem, mostly around no reversals. Subsumes 10 issues.
-2. **MAJOR — Widespread Plot Logic & Payoff concerns** — 6 issues across 3 pass(es) in Plot Logic & Payoff point to the same underlying problem, mostly around exposition dump. Subsumes 6 issues.
+2. **MAJOR — Widespread Plot Logic & Payoff concerns** — 6 issues across 3 pass(es) in Plot Logic & Payoff point to the same underlying problem, mostly around exposition dump. Subsumes 6 issues from 5 rules.
 3. **MAJOR — Widespread Character concerns** — 4 issues across 3 pass(es) in Character point to the same underlying problem, mostly around entropy cluster. Subsumes 4 issues.
 
 ## Priorities to Address First
