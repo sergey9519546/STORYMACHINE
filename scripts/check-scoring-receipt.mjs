@@ -228,12 +228,12 @@ import { computeReachableSet } from './lib/import-graph.mjs';
 const ROOT = process.cwd();
 const RECEIPT_PATH = 'docs/p1-benchmark/MEASUREMENT_RECEIPTS.md';
 
-const ALWAYS_SCORING_FILES = new Set([
+export const ALWAYS_SCORING_FILES = new Set([
   'server/nvm/analyze/doctor.ts',
   'server/nvm/analyze/emotional-arc.ts',
   'server/nvm/analyze/fountain-analyzer.ts',
 ]);
-const ALWAYS_SCORING_DIR_PREFIXES = [
+export const ALWAYS_SCORING_DIR_PREFIXES = [
   'server/nvm/analyze/calibration/',
   'server/nvm/revision/passes/',
 ];
@@ -244,7 +244,49 @@ const ALWAYS_SCORING_DIR_PREFIXES = [
 // file's directory or its apparent purpose; that reasoning is exactly what
 // let src/lib/screenplay-layout.ts slip through before 2026-09-02.
 const REACHABLE_BUT_NOT_SCORING = new Set([]);
-const REACHABILITY_ROOTS = ['server/nvm/analyze/doctor.ts'];
+export const REACHABILITY_ROOTS = ['server/nvm/analyze/doctor.ts'];
+
+/**
+ * Every tracked file this script classifies as scoring-path, as relative paths.
+ *
+ * Exported (2026-09-11, round 2 item 9b) so a NOT-WIRED guard can grep the
+ * whole scoring path instead of one file. `server/nvm/analyze/structural-signals.test.ts`
+ * asserted that no score reads `meanAbsDialogueShareDeltaNormalised` by
+ * grepping `doctor.ts` alone — but a deduction added in
+ * `server/nvm/revision/passes/**` or any other reachable module would read the
+ * channel without doctor.ts ever naming it, and the guard would pass. There is
+ * exactly one definition of "scoring-path" in this repository and it is the one
+ * below; a second, hand-maintained list in a test file is the drift this export
+ * exists to prevent.
+ *
+ * Membership mirrors `classify()` exactly: the always-scoring files, anything
+ * under the always-scoring directory prefixes, and anything reachable from
+ * doctor.ts's import graph, minus the (currently empty) proven-not-scoring set.
+ * Test files are excluded — they assert behaviour, they do not implement it.
+ */
+export function scoringPathFiles(root = ROOT) {
+  const reachable = computeReachableSet(root, REACHABILITY_ROOTS);
+  const out = new Set();
+  const add = (rel) => {
+    const norm = rel.split(path.sep).join('/');
+    if (REACHABLE_BUT_NOT_SCORING.has(norm)) return;
+    if (/\.test\.[cm]?[jt]sx?$/.test(norm)) return;
+    if (!existsSync(path.join(root, norm))) return;
+    out.add(norm);
+  };
+  for (const rel of ALWAYS_SCORING_FILES) add(rel);
+  for (const rel of reachable) add(rel);
+  let tracked = [];
+  try {
+    tracked = git(['ls-files']).split('\n').filter(Boolean);
+  } catch {
+    tracked = [];
+  }
+  for (const rel of tracked) {
+    if (ALWAYS_SCORING_DIR_PREFIXES.some((prefix) => rel.startsWith(prefix))) add(rel);
+  }
+  return [...out].sort();
+}
 
 // ---------------------------------------------------------------------------
 // Git plumbing
