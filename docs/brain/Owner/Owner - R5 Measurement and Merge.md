@@ -127,13 +127,35 @@ Same rewrite verified on a scratch copy: with all three converted this way, the
 gate's validator reports 3 entries and 0 problems. Do not close it by editing
 only a heading — that is the one route the entry text itself forbids.
 
-**The three branches, all pushed, all PENDING:**
+**The branches, all pushed, all PENDING:**
 
 | branch | tip | what it is |
 | --- | --- | --- |
-| `scoring/stacked-r5-plus-advice` | `408166ae` | **measure this one** — [[Branch - Stacked R5 plus Advice]] |
+| `scoring/feature-length-defects` | `bcc96f85` | **measure this one FIRST** — [[Branch - Feature-Length Defects]] |
+| `scoring/feature-length-saturation-only` | `efd1a463` | **second, only if the first is rejected** — [[Branch - Feature-Length Saturation Only]], the saturation half alone |
+| `scoring/stacked-r5-plus-advice` | `408166ae` | third — [[Branch - Stacked R5 plus Advice]] |
 | `scoring/r5-verbosity-bias` | `52bf410a` | [[Branch - R5 Verbosity Bias]] alone |
 | `scoring/advice-rule-fixes` | `a1cf7677` | [[Branch - Advice Rule Fixes]] alone |
+
+**THE ORDER CHANGED 2026-09-07 (corrected 2026-09-11), and the two heads are
+ALTERNATIVES, not a stack.** `scoring/feature-length-defects` attacks the same
+defect from the opposite direction: R5 replaces the density denominator
+`wordCount^0.7` with `(sceneCount·30)^0.7`, and the feature-length branch
+measured exactly that substitution on the public benchmark — paired
+shuffle-drop **0.0938**, worse than doing nothing, because a scene drop
+shrinks that denominator faster than the weighted issues it normalises. The
+same benchmark puts the feature-length branch at **0.8750**. They collide on
+ONE function (`densityPenalty`; R5 leaves `scarcityPenalty` untouched), which
+is why the saturation half is landable on its own. The decision tree, the
+correction of the "same two functions" reason, and the two-part account of
+what AUC-24 can and cannot settle (the ~10.5-point level shift is
+rank-preserving and cannot move it; the scarcity channel's degradation delta
+going from +0.586 to exactly 0.000 for every script of about 22 scenes or more
+is what the run tests) live in the fuller version of this note ON THE BRANCH
+(`docs/brain/Owner/Owner - R5 Measurement and Merge.md` at `bcc96f85`) and in
+the branch's `docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md` §8.2a. Read
+that section before deciding. The recipe above applies unchanged to every
+branch in the table.
 
 The stack CONTAINS both singles as unsquashed ancestors, so merging it subsumes
 them and the other two need not be merged separately. Whichever lands last needs

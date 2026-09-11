@@ -24,7 +24,7 @@ into the repository before the merge, and lanes push after every commit.
 | `npm run verify-report` (P3 closed) | REVISE 5 → MERGE (+1 built) | 16bfec58 · 42206178 | 42206178, 81ec1652 (main) |
 | feature-length loop (P2/P0) | REVISE 2 (+6 non-blocking, all built) → MERGE | bff55e39 · dd57251d | dd57251d (main) |
 | producer's exports (P3) | REVISE 8 → MERGE (+4 follow-ups) → **objects lost**; rebuilt on `lane/exports-producer-tier` and re-reviewed (see `exports-review.md`) | 80824d48 · 0ad69536 (unreachable) | see `exports-review.md` |
-| scoring: feature-length defects (P1, owner-gated) | reviewed after the rebuild (`scoring-review.md`) | 4643d590 on `scoring/feature-length-defects` | never merged here; the owner's `measure-real` decides |
+| scoring: feature-length defects (P1, owner-gated) | REVISE 9 → REVISE 4 → MERGE-READY-FOR-OWNER (`scoring-review.md`, three rounds after the rebuild) | 4643d590 (pre-rebase) · 13d64bb5 · bcc96f85 on `scoring/feature-length-defects`; efd1a463 on `scoring/feature-length-saturation-only` | never merged here; the owner's `measure-real` decides, in the order the owner note gives |
 
 Full review files survive for none of the first four rounds' lanes; the
 surviving review of record for the scoring branch is complete (it was written
