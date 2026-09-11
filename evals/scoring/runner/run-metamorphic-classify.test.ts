@@ -68,8 +68,8 @@ describe('metamorphic classifyResults', () => {
       'scene_dup_padding',
       'stapled_shorts',
     ]);
-    assert.deepEqual([...KNOWN_FAILING_CASE_IDS], ['empty_verbosity', 'stapled_shorts']);
-    assert.deepEqual([...HARD_CASE_IDS], ids.filter(id => id !== 'empty_verbosity' && id !== 'stapled_shorts'));
+    assert.deepEqual([...KNOWN_FAILING_CASE_IDS], ['empty_verbosity']);
+    assert.deepEqual([...HARD_CASE_IDS], ids.filter(id => id !== 'empty_verbosity'));
   });
 });
 

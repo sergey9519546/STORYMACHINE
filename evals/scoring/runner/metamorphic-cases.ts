@@ -107,7 +107,14 @@ export const METAMORPHIC_CASES: MetamorphicCase[] = [
     transform: b => { const { head, scenes } = splitScenes(b); return head + scenes.flatMap(s => [s, s]).join(''); },
     expect: { kind: 'not_increase', epsilon: 0.5 },
     provenance: { author: 'phaseB', created: '2026-07-11' } },
-  { id: 'stapled_shorts', category: 'invariance', disposition: 'known-failing',
+  // PROMOTED to `hard` 2026-09-07, per this runner's own standing instruction
+  // ("flip them to HARD after confirming recalibration"). It was registered
+  // known-failing and printed +8.2 on `main @ 9b199b72`; after the density
+  // and scarcity changes in the same branch it measures -2.0 (best part 81.8,
+  // stapled 79.8), so it now fails the build if length alone ever buys health
+  // again. A known failure that quietly starts passing is how a fixed defect
+  // goes unnoticed.
+  { id: 'stapled_shorts', category: 'invariance', disposition: 'hard',
     description: 'twelve unrelated CC0 shorts stapled end to end → health must NOT exceed the BEST single part',
     parts: stapledShortParts,
     transform: () => stapledShortsText(),
@@ -117,7 +124,7 @@ export const METAMORPHIC_CASES: MetamorphicCase[] = [
     // 86.5 (RECOMMEND) — delta +8.2.
     expect: { kind: 'not_increase', epsilon: 0 },
     provenance: { author: 'scoring/feature-length-defects', created: '2026-09-07',
-      note: 'KNOWN FAILING on main — the scarcity term 140/sceneCount decays to ~0, so length alone buys ~10.7 points; see docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md' } },
+      note: 'Was KNOWN FAILING on main @ 9b199b72 (+8.2): the scarcity term 140/sceneCount decayed to ~0, so length alone bought ~10.7 points. Promoted to hard once scarcityPenalty saturated; see docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md' } },
 ];
 
 export const HARD_CASE_IDS = new Set(

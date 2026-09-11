@@ -59,7 +59,7 @@ for (const r of results) {
 }
 console.log(`\n${pass}/${results.length} cases passed raw; hard passes ${hardPasses}; known-failing witnesses ${knownFailures.length}.`);
 
-console.log(`KNOWN FAILING POLICY (not a CI hard fail): ${[...KNOWN_FAILING_CASE_IDS].join(', ')} — empty_verbosity is the documented verbosity bias (VERBOSITY_BIAS_2026-07-11.md); stapled_shorts is the documented length pathology (FEATURE_LENGTH_DEFECTS_2026-09-07.md).`);
+console.log(`KNOWN FAILING POLICY (not a CI hard fail): ${[...KNOWN_FAILING_CASE_IDS].join(', ')} — the documented verbosity bias (VERBOSITY_BIAS_2026-07-11.md). stapled_shorts was the second witness and was promoted to HARD on 2026-09-07 once the length pathology it measures was fixed (FEATURE_LENGTH_DEFECTS_2026-09-07.md).`);
 console.log('NOTE: a `parts` case (stapled_shorts) reports base = the MAXIMUM health over its parts, not the shared base script.');
 if (knownFailures.length > 0) {
   console.log(`CURRENT WITNESS: ${knownFailures.map(r => r.id).join(', ')} still fails as documented.`);

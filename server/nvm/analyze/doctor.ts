@@ -464,7 +464,30 @@ function densityPenalty(
  *  reason. */
 function scarcityPenalty(sceneCount: number): number {
   const SCARCITY_SCALE = 140;
-  return SCARCITY_SCALE / Math.max(sceneCount, 1);
+  // ── SATURATION (2026-09-07). SCARCITY_SCALE / sceneCount decays to zero,
+  // so LENGTH ALONE buys health without bound: twelve CC0 shorts, each
+  // 71.2-79.5 and every one CONSIDER, staple end to end into 86.5 and
+  // RECOMMEND, and the whole of that +7.0 is this term (11.667 at 12 scenes
+  // against 1.007 at 139 — the stapled document and the best single part
+  // sit 0.013 apart on densityPenalty, both pinned at its ceiling). See
+  // evals/scoring/runner/metamorphic-cases.ts's `stapled_shorts` witness
+  // and docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md.
+  //
+  // Scarcity is a DEFICIENCY penalty — "there is not enough script here to
+  // judge" — so it must stop paying once there is enough. The saturation
+  // point is anchored to ARC_DED_MIN_SCENES / CLIMAX_DED_MIN_SCENES (both
+  // 15, this file): below 15 scenes the doctor's own structural deductions
+  // do not fire and scene count is the only proxy it has for "is there
+  // enough here"; at and above 15 it reads structure directly and scene
+  // count stops being that proxy.
+  //
+  // Note what this does NOT do: for every script of 15 scenes or fewer the
+  // term is byte-identical to before, so the whole 32-script public
+  // benchmark (9-14 scenes intact, 6-10 degraded) and the whole calibration
+  // corpus (9-10 scenes) are untouched by this line. Its only in-repo
+  // evidence is the stapled witness and the four synthetic length fixtures.
+  const SCARCITY_SATURATION_SCENES = 15;
+  return SCARCITY_SCALE / Math.min(Math.max(sceneCount, 1), SCARCITY_SATURATION_SCENES);
 }
 
 // ── Dialogue-degradation deduction (P1, 2026-07-29) ─────────────────────────
