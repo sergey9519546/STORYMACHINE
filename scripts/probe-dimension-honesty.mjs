@@ -18,11 +18,23 @@
 // For each degradation, it prints how much EACH dimension's score moved.
 // The honesty matrix is then: which labels move under which damage?
 //
-// Key claim to falsify: the sample report says "The climax is where it
-// belongs — the story's single most intense scene lands in the final
-// stretch" (sample-coverage-report.html line 376). If CLIMAX_RELOCATE
-// (moving the final scene to position 2) does not drop the Structure &
-// Pacing dimension, the engine cannot support that claim.
+// Key claim to falsify: a coverage report that asserts the climax lands where it
+// should, while CLIMAX_RELOCATE (moving the final scene to position 2) does not
+// drop the Structure & Pacing dimension, is making a claim the engine cannot
+// support.
+//
+// CITATION CORRECTED 2026-09-11. This used to quote "The climax is where it
+// belongs — the story's single most intense scene lands in the final stretch"
+// at sample-coverage-report.html line 376. That sentence is from the RETIRED
+// "The Second Key" stimulus (swapped out 2026-08-04 — see
+// docs/user-validation/P0_QUICK_START.md) and appears nowhere in the committed
+// artifact at any line, so the citation pointed a reader at nothing. The live
+// sample's equivalent claims are in its "Checks That Found Nothing" section
+// (renamed from "What's Working" on 2026-09-11 — server/lib/strengths-copy.ts,
+// docs/CLAIMS_REGISTER.md row 86), e.g. "The opening earns attention immediately"
+// and "This draft keeps generating real turns". The probe's question is unchanged:
+// does the dimension that carries such a claim actually move when the structure
+// it describes is damaged?
 //
 // This is a MEASUREMENT INSTRUMENT. It does not modify the engine.
 //
