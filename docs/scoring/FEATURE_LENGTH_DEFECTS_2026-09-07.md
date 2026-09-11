@@ -388,7 +388,8 @@ measurement round 1 made and it is not the property the witness claims — see
 | (d) saturation alone (`sat=15`) | 0.5781 | 0.6196 | +1.18 | 0.5156 | 17/32 | 0/6 | MONO, gap 25.32 | 1.0000 | −1.3 PASS |
 | (b)+(c)+(d) | 0.8750 | 0.8564 | +2.59 | 0.5625 | 2/32 | 4/6 | MONO, gap 25.32 | 1.0000 | −1.9 PASS |
 | (c)+(d at `sat=15`) ✓harness | **0.8750** | 0.8306 | +2.109 | **0.5469** | **1/32** | **4/6** | MONO, gap 25.32 | 1.0000 | −2.0 PASS, but **+0.7 FAIL** over orderings |
-| **CHOSEN (round 2): (c)+(d at `sat=12`)** ✓harness | **0.8750** | 0.8291 | +1.894 | **0.5469** | **1/32** | **4/6** | MONO, gap 25.32 | 1.0000 | **−1.6 PASS over all 14 orderings** |
+| (c)+(d at `sat=12`) ✓harness | **0.8750** | 0.8291 | +1.894 | **0.5469** | **1/32** | **4/6** | MONO, gap 25.32 | 1.0000 | **−1.6 PASS over all 14 orderings** |
+| **FINAL (round 2): + the clue-guard fix** ✓harness | **0.9063** | 0.8433 | +1.969 | **0.5938** | **0/32** | **4/6** | MONO, gap 25.32 | 1.0000 | **−1.8 PASS over all 14 orderings** |
 
 The last two rows are the round-2 correction in one line: `sat=15` passes the
 witness on the shipped ordering by 2.0 and FAILS it on 7 of 14 orderings of the
@@ -482,7 +483,8 @@ in place, because neither belongs in a table of the sub-1 population.
 
 **The four scripts the constraint cannot reach are the four that still invert.**
 This is the load-bearing omission, not a cosmetic one. The scripts missing from
-round 1's table are precisely those whose damaged copy still scores HIGHER:
+round 1's table are precisely those whose damaged copy still scored HIGHER on
+the round-1 tree:
 
 ```
 transfer-window          dIntact 1.5946  ratio  6.67    intact 64.1 -> degraded 73.0  (+8.9)
@@ -491,15 +493,26 @@ the-key-under-the-mat    dIntact 1.3315  ratio  9.39    intact 72.5 -> degraded 
 quiet-season             dIntact 1.1800  ratio 10.52    intact 73.8 -> degraded 73.9  (+0.1)
 ```
 
-What that means, plainly: all four sit on the density POWER branch, which this
-change does not touch at all, so no choice of `SUB_DENSITY_STEEPNESS` can fix
-them. The 28/4/0 sign count IS reported (§8.1 and the benchmark's own table),
-so nothing was hidden — but a reader of the constraint table could not find out
-which four the constraint fails to reach, because those were the dropped rows.
-`scripts/lib/auc.ts` now names all four beside its 28/4/0 narrative for the
-same reason. **A writer of a dense 10-scene script can still gain up to 8.9
-points by deleting a third of their scenes.** That is the residue of this
-branch, it is on the power branch, and it is the next thing to fix.
+On the FINAL round-2 tree (after the clue-guard fix of §12) the list is three,
+not four, and one of them got worse:
+
+```
+transfer-window                                        64.1 -> 73.0  (+8.9)  unchanged
+room-12                                                63.9 -> 72.3  (+8.4)  unchanged
+quiet-season                                           73.8 -> 74.3  (+0.5)  WORSE than +0.1
+the-key-under-the-mat    now ORDERED                   74.5 -> 73.4  (-1.1)  fixed
+```
+
+What that means, plainly: every one of them sits on the density POWER branch,
+which this change does not touch at all, so no choice of
+`SUB_DENSITY_STEEPNESS` can fix them. The sign count IS reported (§8.1 and the
+benchmark's own table), so nothing was hidden — but a reader of the constraint
+table could not find out which scripts the constraint fails to reach, because
+those were the dropped rows. `scripts/lib/auc.ts` now names all of them beside
+its own sign-count narrative for the same reason. **A writer of a dense
+10-scene script can still gain up to 8.9 points by deleting a third of their
+scenes.** That is the residue of this branch, it is on the power branch, and it
+is the next thing to fix.
 
 **The constraint is very nearly infeasible, and that is a finding.** Any curve
 rising 10 points across a unit of density has mean slope 10, so its maximum is

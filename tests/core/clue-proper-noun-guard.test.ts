@@ -114,6 +114,52 @@ Author: A Writer
 
 ${BODY}`;
 
+// ── ROUND 2 (2026-09-11, item 3): the three shapes an independent reviewer
+// measured as DEFECTS, each as a fixture. Every one of them was a genuine prop
+// the guard suppressed, so every assertion below is in the FIRES direction —
+// and the header's own claim ("`BRASS KEY` beside a character called KEY stays
+// a clue") was asserted in three places in the tree and tested in none, because
+// this file's FIRES case never put a character called KEY in the script.
+
+/** Shape (i). The reviewer's counterexample: a character whose cue IS one word
+ *  of the prop. On the round-1 tree the full-name learning pass read the caps
+ *  run "BRASS KEY", found the already-known cue word `key` in it, added `brass`
+ *  to nameWords, and the prop was excluded — `seededClueIds` returned
+ *  ["mara-voss"] and no brass-key at all. */
+const CUE_SHARES_A_PROP_WORD = WITH_TITLE
+  .replace('DESK CLERK\nCheckout is at eleven.', 'KEY\nCheckout is at eleven.')
+  .replace('DESK CLERK\nNobody I remember.', 'KEY\nNobody I remember.');
+
+/** Shape (ii)a. A script titled after its own central object. Measured on the
+ *  round-1 tree: ["key-title"] — the real prop suppressed and a nonsense
+ *  cluster id admitted in its place. */
+const TITLED_AFTER_THE_PROP = `Title: THE BRASS KEY
+Author: A Writer
+
+${BODY}`;
+
+/** Shape (ii)b. A one-word, real-word title that is also the prop. Measured on
+ *  the round-1 tree: [] — the whole channel silenced. */
+const REAL_WORD_TITLE_IS_THE_PROP = `Title: LEVERAGE
+Author: A Writer
+
+${BODY.replace('A hidden BRASS KEY glints under the mat.', 'A hidden LEVERAGE glints under the mat.')}`;
+
+/** Shape (iii). One step of outward chaining into a prop. The guard's comment
+ *  claimed "the set cannot chain outward through unrelated props"; a caps phrase
+ *  putting a cue name next to a prop taught the prop's word as a name word and
+ *  deleted it. Measured on the round-1 tree: [] for the body below, against
+ *  ["revolver"] for the control that differs only in those two caps words. */
+const PROP_BODY = BODY
+  .replace(
+    'MARA VOSS, 30s, unlatches the door. A hidden BRASS KEY glints under the mat.',
+    'MARA VOSS, 30s, unlatches the door. MARA REVOLVER sits on the nightstand.\n\nShe lifts the REVOLVER and checks it.',
+  )
+  .replace('Mara checks behind the mirror. Nothing.', 'Mara checks behind the mirror. The REVOLVER is gone.');
+const CUE_ADJACENT_PROP = `Title: THE LONG WAY DOWN\nAuthor: A Writer\n\n${PROP_BODY}`;
+const CUE_ADJACENT_PROP_CONTROL = `Title: THE LONG WAY DOWN\nAuthor: A Writer\n\n${
+  PROP_BODY.replace('MARA REVOLVER sits on the nightstand.', 'A heavy REVOLVER sits on the nightstand.')}`;
+
 describe('ORPHAN_CLUE proper-noun / title / location guard', () => {
   it('the fixture genuinely contains the shapes this guard is about (or the test is vacuous)', () => {
     assert.match(WITH_TITLE, /Title: THE LONG WAY DOWN/);
@@ -190,6 +236,83 @@ describe('ORPHAN_CLUE proper-noun / title / location guard', () => {
       }
       assert.ok(!/long|way|down/.test(id), `top-10 ORPHAN_CLUE "${id}" is a word from the title`);
     }
+  });
+
+  // ── The three reviewer shapes (round 2, item 3) ──────────────────────────
+  it('FIRES: `BRASS KEY` beside a character called KEY stays a clue — the claim the guard is sold on', () => {
+    // The premise, so this cannot pass vacuously: KEY really is a speaking cue.
+    assert.match(CUE_SHARES_A_PROP_WORD, /^KEY$/m, 'the fixture must contain a cue line reading exactly KEY');
+    assert.match(CUE_SHARES_A_PROP_WORD, /BRASS KEY/, 'and the prop must still be planted');
+    const ids = seededClueIds(CUE_SHARES_A_PROP_WORD);
+    assert.ok(
+      ids.includes('brass-key'),
+      `the header's own example: "brass" is not a name word, so BRASS KEY is a prop. Measured ["mara-voss"] `
+      + `on the round-1 tree; got ${JSON.stringify(ids)}`,
+    );
+    // ...and KEY the character is still excluded, which is the other half.
+    assert.ok(!ids.includes('key'), `the character KEY must not be a clue; got ${JSON.stringify(ids)}`);
+  });
+
+  it('FIRES: a script titled after its own central object keeps that object', () => {
+    const ids = seededClueIds(TITLED_AFTER_THE_PROP);
+    assert.ok(
+      ids.includes('brass-key'),
+      `a screenplay named THE BRASS KEY still plants a BRASS KEY. Measured ["key-title"] on the round-1 `
+      + `tree — the prop suppressed and a nonsense id admitted; got ${JSON.stringify(ids)}`,
+    );
+    assert.ok(!ids.includes('key-title'), `"key-title" is an artefact, not a plant; got ${JSON.stringify(ids)}`);
+  });
+
+  it('FIRES: a one-word real-word title does not silence the channel', () => {
+    const ids = seededClueIds(REAL_WORD_TITLE_IS_THE_PROP);
+    assert.ok(
+      ids.includes('leverage'),
+      `title LEVERAGE + prop LEVERAGE measured [] on the round-1 tree — the whole channel silenced; `
+      + `got ${JSON.stringify(ids)}`,
+    );
+  });
+
+  it('FIRES: a prop that happens to sit beside a cue name in one caps phrase survives it', () => {
+    const ids = seededClueIds(CUE_ADJACENT_PROP);
+    const control = seededClueIds(CUE_ADJACENT_PROP_CONTROL);
+    assert.ok(
+      control.includes('revolver'),
+      `the control must seed the prop, or this pair proves nothing; got ${JSON.stringify(control)}`,
+    );
+    assert.ok(
+      ids.includes('revolver'),
+      `the ONLY difference from the control is the two caps words "MARA REVOLVER". Measured [] on the `
+      + `round-1 tree against ["revolver"] for the control; got ${JSON.stringify(ids)}`,
+    );
+  });
+
+  it('NO-FIRE: the introduction convention still teaches the parts of a name that are not the cue', () => {
+    // The capability the round-2 narrowing had to keep. `DETECTIVE RAY
+    // BELLWEATHER, 50s,` carries the convention (a comma and a descriptor), so
+    // `detective` and `bellweather` are still learned from a cue of RAY.
+    const ids = seededClueIds(WITH_TITLE);
+    for (const name of ['ray-bellweather', 'detective-ray-bellweather', 'bellweather', 'mara-voss', 'voss']) {
+      assert.ok(!ids.includes(name), `"${name}" is a character, not a plant; got ${JSON.stringify(ids)}`);
+    }
+  });
+
+  // The residual the narrowed guard still has, recorded as a `todo` with the
+  // measured id list rather than as a claim that it cannot happen. A caps run
+  // that IS followed by the introduction marker and DOES contain a cue word
+  // still teaches its other words, so a prop written line-initially and
+  // comma-continued, beside a character sharing one of its words, is still
+  // suppressed. It needs all three conditions at once.
+  it('the remaining suppression: a comma-continued prop sharing a word with a cue name', { todo: true }, () => {
+    const body = BODY
+      .replace(
+        'MARA VOSS, 30s, unlatches the door. A hidden BRASS KEY glints under the mat.',
+        'MARA VOSS, 30s, unlatches the door.\n\nBRASS KEY, still warm, lies under the mat.',
+      );
+    const text = `Title: THE LONG WAY DOWN\nAuthor: A Writer\n\n${body}`
+      .replace('DESK CLERK\nCheckout is at eleven.', 'KEY\nCheckout is at eleven.')
+      .replace('DESK CLERK\nNobody I remember.', 'KEY\nNobody I remember.');
+    const ids = seededClueIds(text);
+    assert.ok(ids.includes('brass-key'), `measured without brass-key: ${JSON.stringify(ids)}`);
   });
 
   it('at feature scale the priority tier does not move when the title does', async () => {
