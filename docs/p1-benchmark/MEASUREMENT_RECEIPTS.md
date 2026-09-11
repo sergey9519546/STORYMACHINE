@@ -2263,13 +2263,19 @@ that nobody mistakes one for the other.
 
 ### 2026-09-07 — FEATURE-LENGTH DEFECTS: the health formula stops paying for deletion and for length, plus three report-honesty fixes (PENDING OWNER MEASUREMENT — no real-corpus run happened)
 
-**Branch:** `scoring/feature-length-defects`, **thirteen** commits on `main` @
-`ad3f6fa7`. *(CORRECTED 2026-09-11: this line read "six commits on `main` @
-`9b199b72`" and there were SEVEN — the entry was written in the sixth commit and
-a seventh followed it without the count being updated. The branch has since been
+**Branch:** `scoring/feature-length-defects`, **eighteen** commits on `main` @
+`ad3f6fa7` — the round-2 tip the reviewer re-checked is `13d64bb5` (seventeen
+commits: eight from round 1 after the rebase and split, nine from round 2), and
+the eighteenth is the correction commit that carries this sentence. *(CORRECTED
+TWICE: on 2026-09-11 this line read "six commits on `main` @ `9b199b72`" and
+there were SEVEN — the entry was written in the sixth commit and a seventh
+followed it without the count being updated; later the same day it read
+"thirteen" and "six round-2 commits" when `git rev-list --count ad3f6fa7..13d64bb5`
+was 17 with nine in round 2 — the same mechanism, three commits after the entry
+was last touched. The pre-rebase tip `4643d590`, named further down as the object
+of the round-1 review, is no longer an ancestor of either branch. The branch was
 rebased onto `ad3f6fa7`, its formula commit SPLIT into two so the two halves are
-separately landable, and six round-2 commits added; the round-2 ledger is at the
-end of this entry.)* **This is a scoring-path change and its AUC-24 is not
+separately landable, and the round-2 ledger is at the end of this entry.)* **This is a scoring-path change and its AUC-24 is not
 known.**
 `node scripts/check-scoring-receipt.mjs main..HEAD` exits **1** on this entry,
 which is the intended state: the entry is an honest ledger row, not a receipt.

@@ -1020,7 +1020,7 @@ before the commit landed. The shipped formula's values are:
 
 | case | committed in commit 4 | actual, corrected here | why |
 |---|---|---|---|
-| `{1,2,3}` at 10 scenes / 300 words | 82.7 | **84.6** | no credit cap: density 0.1889 is charged by the near-linear curve alone |
+| `{1,2,3}` at 10 scenes / 300 words | 82.7 | **84.6** | no credit cap: density 0.1568 (8.5 / 300^0.7) is charged by the near-linear curve alone |
 | `{0,0,0}` at 25 scenes / 2000 words | 90.7 | 90.7 (unchanged) | the saturated scarcity term, correctly measured |
 | `{0,0,0}` at 4 scenes / 80 words | 57.7 | **65** | no credit cap, and density 0 — this case is identical to `main`, which is itself worth pinning: the branch moved the middle of the curve, not its origin |
 
@@ -1140,7 +1140,7 @@ correction beside the number.
 | 1 | the staple witness passed by pinning one ordering; 7 of 14 orderings of its own twelve parts still outscored the best part | `SCARCITY_SATURATION_SCENES` 15 → 12 and an ordering-free witness (max over 14 seeded orderings) | **yes** — §8.2's cost table |
 | 2 | the slope-constraint table named the wrong population (all 32, where no curve is admissible), printed two rows that do not reproduce, and omitted the four scripts the constraint cannot reach | §8.2 rewritten: the 16 sub-1 scripts, all sixteen rows, the non-reproducing rows removed, the inverted scripts named | no |
 | 3 | `ORPHAN_CLUE`'s guard deleted three kinds of genuine prop, including the example its own comment used as justification | **two of three closed at the cause** (the title guard now excludes only tokens absent from the body); the third is lexically undecidable and is a `todo` with its measured id list, plus a new corpus-wide property test | no — the two closed shapes do not occur in the 32 corpus scripts |
-| 4 | a third and fourth credit-cap residue: prose describing a rejected variant, a `CREDIT_FULL_SCENES` that exists nowhere, and `8.5/300^0.7 = 0.1889` | corrected in `tests/core/script-doctor.test.ts` and in §8.4 | no |
+| 4 | a third and fourth credit-cap residue: prose describing a rejected variant, a `CREDIT_FULL_SCENES` that exists nowhere, and `8.5/300^0.7 = 0.1889` — a fifth instance of that quotient in §9.3's own correction table was found by the round-2 review and corrected the same day | corrected in `tests/core/script-doctor.test.ts` and in §8.4 | no |
 | 5 | `npm run benchmark:public` printed five numbers its own table contradicted | the caveats are rendered from the `BenchmarkResult`, with five tests parsing the rendered text | no |
 | 6 | the scene-term disclosure sentence asserted a cause it does not account for past 15 scenes (term 12, gap 4 on the staple) | the sentence states the gap, names every term, and drops the false causal clause | no (a string) |
 | 7 | the owner-facing framing pointed at the ~8-point level shift, which AUC-24 cannot see | §8.2a: the level shift is rank-preserving; the AUC-relevant fact is the degradation delta going +0.586 → 0.000 | no |
