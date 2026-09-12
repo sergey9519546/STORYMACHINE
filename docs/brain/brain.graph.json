@@ -85,6 +85,12 @@
       "path": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
     },
     {
+      "id": "docs/brain/Branches/Branch - Forced Cue.md",
+      "type": "branch",
+      "title": "Branch — Forced Cue",
+      "path": "docs/brain/Branches/Branch - Forced Cue.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
       "type": "branch",
       "title": "Branch — R5 (Verbosity Bias)",
@@ -985,6 +991,22 @@
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
+      "from": "docs/brain/Branches/Branch - Forced Cue.md",
+      "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Forced Cue.md",
+      "to": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Forced Cue.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Forced Cue.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
       "from": "docs/brain/Branches/Branch - R5 Verbosity Bias.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
@@ -1679,6 +1701,10 @@
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Branches/Branch - Forced Cue.md"
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
