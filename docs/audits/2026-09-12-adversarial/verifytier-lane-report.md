@@ -355,9 +355,9 @@ references) cannot be dropped this way.
 | gate | result | exit |
 |---|---|---|
 | `npx tsc --noEmit` (= `npm run lint`) | clean | 0 |
-| `node scripts/check-no-console.mjs` | 305 files, 24 quarantine entries, all proven unreachable | 0 |
+| `node scripts/check-no-console.mjs` | 305 files, **23** quarantine entries, all proven unreachable (round 2's table said 24 — corrected in round 3, see R3.2) | 0 |
 | `npm run check-docs` | no AI writing patterns | 0 |
-| `npm run honesty-audit` | 459 files + 461 tracked markdown + 99 register rows — clean | 0 |
+| `npm run honesty-audit` | 459 files + 99 register rows — clean. (The tracked-markdown count is deliberately NOT quoted: round 2's table said 461, which was this worktree's count with uncommitted audit files in it, not the committed tree's 450 — see R3.2) | 0 |
 | `npm run check-brain` | **101 notes, 353 links**, fresh (round 1's table said 350 — stale, item 8) | 0 |
 | `node scripts/check-scoring-receipt.mjs 537c1aa3..HEAD` | **"no scoring-path files changed"** | 0 |
 | output identity vs `git archive 537c1aa3`, `GIT_SHA` pinned equal, no `--ignore-keys` | **PASS — all 45 reports byte-identical** | 0 |
@@ -394,3 +394,106 @@ should never have been quoted as a fixed result — the exit code is the gate.
    caller that supplies its own logline against a firing gate.
 4. **The claim-row label table is back-compatible by test, not by type.**
 5. **R2.3's removal residue** above.
+
+---
+
+## Round 3 — response to the round-2 review (copy only, plus the counterexample as a fixture)
+
+One commit on the rebased tip `8475f583`, pushed:
+`c9c50296 docs: the known limit, measured — with the counterexample committed as a fixture`.
+
+**Every number below was re-derived on a clean `git archive c9c50296 | tar -x`,
+not in the worktree** — which is the whole of item 2, and is why round 2's table
+had two figures that did not reproduce.
+
+### R3.1 The stated limit was still false, and the reviewer had the counterexample
+
+Round 2 replaced one wrong sentence with another. The shipped text said a forger
+who strips every signal *"leaves a document that no longer renders a summary page
+in any recognisable form"*. Replayed here on my own tip, the reviewer's artifacts
+verify at **exit 0**:
+
+| fixture | edits | what the page states | verifier |
+|---|---|---|---|
+| `known-limit-relabelled-coverage.html` | **14** | `9,999 scenes · 999,999 words · ~500 pages / ~500 min (est.)`, `Health percentile: top 5%`, `The 9 things to fix first`, `p. 999` | VERIFIED, exit 0 |
+| `known-limit-relabelled-letter.md` | **17** | the same four, under `**Premise.**` / `**Size.**` / `**Rating.**` | VERIFIED, exit 0 |
+
+The edits that matter are edits 1 and 2: every `reader-tier`/`tier-*` markup class
+renamed **and the matching stylesheet selectors renamed with them**, so zero
+classes are left unstyled and the page renders exactly as the genuine one does. I
+confirmed that on the fixture: every `rs-*` class in the file has a matching rule.
+The first half of round 2's sentence ("N independent edits, not an unforgeable
+property") was right; the second half described a cost the forger does not pay,
+because every signal is a machine-readable LABEL, not the page a human reads.
+
+All four sites now carry the reviewer's wording with the measured numbers rather
+than "N": README.md, ARCHITECTURE.md §4, `docs/brain/Surfaces/Surface - Exports.md`
+and `docs/CLAIMS_REGISTER.md` row 97.
+
+**Both artifacts are committed** as
+`tests/fixtures/verify-report/known-limit-relabelled-{coverage.html,letter.md}`,
+asserted in `tests/scripts/verify-report.test.ts` to still exit 0 under a
+`KNOWN LIMIT` heading — a fail-first target, not a guard. The assertion's failure
+message says what to do when it flips (move the fixtures out of the known-limit
+block, delete the README section and the four sentences that cite them), and the
+test also asserts the four forged strings are still in the fixture bytes, so a
+fixture that lost its forgery cannot make the block a tautology. The fixtures
+README lists all 14/17 edits and tabulates what the page claims against what the
+engine says.
+
+This is **not** the R2.3 residue. R2.3 covers a forger who REMOVES a claim's
+rendering and states nothing false; here the page states four things that are
+false, one of them flattering, and nothing warns the reader.
+
+### R3.2 The two figures, corrected — and why they were wrong
+
+| figure | round 2 said | clean archive of `c9c50296` says |
+|---|---|---|
+| `check-no-console` quarantine entries | 24 | **23** |
+| `honesty-audit` tracked markdown files | 461 | **454** on this tip (450 on `511688b8`) |
+
+The 24 came from a worktree with an untracked fixtures directory in it. The 461
+was this worktree's count with uncommitted audit files present — a moving number
+quoted as a fixed result, one line after the round's own closing paragraph warned
+against exactly that. **The markdown count is now not quoted at all** in the
+corrected round-2 table: it counts the whole tree, so it moves whenever anything
+lands on main, and the exit code is the gate. Both round-2 table rows were
+corrected in place, in both report copies, with a pointer to this section.
+
+### R3.3 Gates — round 3, on a clean `git archive c9c50296`
+
+| gate | result | exit |
+|---|---|---|
+| `node scripts/check-scoring-receipt.mjs 537c1aa3..c9c50296` | **"no scoring-path files changed"** | 0 |
+| output identity vs `git archive 537c1aa3`, `GIT_SHA` pinned equal, no `--ignore-keys` | **PASS — all 45 reports byte-identical** | 0 |
+| `node scripts/check-no-console.mjs` | 305 files, **23** quarantine entries, all proven unreachable | 0 |
+| `npm run check-docs` | no AI writing patterns | 0 |
+| `npm run honesty-audit` | 459 files, 99 register rows — clean | 0 |
+| `npm run check-brain` | 101 notes, 353 links, fresh | 0 |
+| `npx tsc --noEmit` | clean | 0 |
+| `tests/scripts/verify-report.test.ts` | **155 pass / 0 fail** (153 in round 2; +2 known-limit cases) | 0 |
+| `tests/core/artifact-claims.test.ts` | 104 pass / 0 fail | 0 |
+| `tests/core/reader-tier.test.ts` | 22 pass / 0 fail | 0 |
+| `tests/core/coverage-html.test.ts` | 54 pass / 0 fail | 0 |
+| `tests/core/coverage-letter.test.ts` | 47 pass / 0 fail | 0 |
+
+No engine, claim-set, gate or test BEHAVIOUR changed in this round — the only
+executable change is two new assertions that document a limit. The full
+`npm test`, the public benchmark and `verify:surfaces` were run on the round-2
+tip (13,482 / 13,390 pass / 0 fail; 28/28; 215/215) and this round touches
+nothing they cover; the two new test cases are inside
+`tests/scripts/verify-report.test.ts`, re-run above at 155/0.
+
+### R3.4 Left undone, after round 3
+
+Unchanged from R2.5, with one item now measured rather than asserted:
+
+1. **The known limit itself** — 14 edits to an HTML, 17 to a letter — is open,
+   documented, and has a committed fail-first target. Closing it means keying the
+   gate on something that is not a label: the page's own rendered numbers rather
+   than the markup around them.
+2. `#verify` still checks only what a recipient types (accepted by the review).
+3. The raw report JSON carries no summary page, so five claims do not exist there.
+4. The logline's TEXT is not verified, only its state.
+5. The claim-row label table is back-compatible by test, not by type.
+6. R2.3's removal residue.
