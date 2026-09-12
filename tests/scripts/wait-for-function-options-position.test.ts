@@ -108,6 +108,50 @@ function bareVerdictPolls(source: string): { line: number; text: string }[] {
   return bad;
 }
 
+/**
+ * Find a hand-rolled hold of the doctor's streaming route — a `page.route(…
+ * doctor/stream …)` whose handler delays or forwards the request itself
+ * instead of going through `holdDoctorRunInFlight`.
+ *
+ * ── Why (2026-09-12, adversarial batch) ─────────────────────────────────────
+ * "Assert on the UI while a run is in flight" needs the run to actually BE in
+ * flight. `smoke-p0-live-flow.mjs` had two steps making that claim and only
+ * one of them did anything about it: step 3c hand-rolled a fixed
+ * `setTimeout(timing.ms(4000))` before `route.continue()`, and step 3b took
+ * the claim on trust — which is the flake this scan's lane was opened for
+ * (the built-in sample answers in tens of milliseconds, so the "earliest
+ * instant" landed after the run on 4 of 8 runs). A fixed delay is a wider
+ * race, not the absence of one; `holdDoctorRunInFlight` holds until released.
+ *
+ * A route that FULFILLS the doctor stream with a canned failure (step 3d's
+ * injected 500, the budget-stop stub) is a different thing entirely — it is
+ * not pretending the run is in flight — so this scan flags only handlers that
+ * delay (`setTimeout`) or forward (`route.continue()`).
+ */
+function handRolledStreamHolds(source: string): { line: number; text: string }[] {
+  const bad: { line: number; text: string }[] = [];
+  const needle = '.route(';
+  for (let at = source.indexOf(needle); at !== -1; at = source.indexOf(needle, at + 1)) {
+    const open = at + needle.length - 1;
+    let depth = 0;
+    let i = open;
+    for (; i < source.length; i++) {
+      const c = source[i];
+      if (c === '(' || c === '[' || c === '{') depth++;
+      else if (c === ')' || c === ']' || c === '}') {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+    const call = source.slice(at, Math.min(i + 1, source.length));
+    if (!/doctor\/stream/.test(call)) continue;
+    if (!/setTimeout|\.continue\(/.test(call)) continue;
+    const line = source.slice(0, at).split('\n').length;
+    bad.push({ line, text: call.replace(/\s+/g, ' ').slice(0, 120) });
+  }
+  return bad;
+}
+
 describe('doctor-verdict waits go through the one shared helper', () => {
   // ── Why (2026-09-12, round 3) ───────────────────────────────────────────
   // A bare `/RECOMMEND|CONSIDER|PASS/` poll of `innerText` is satisfied by the
@@ -155,6 +199,59 @@ describe('doctor-verdict waits go through the one shared helper', () => {
     assert.match(helper, /export const DOCTOR_VERDICT_RE = \/\\b\(RECOMMEND\|CONSIDER\|PASS\)\\b\//);
     assert.match(helper, /export async function waitForDoctorVerdict/);
     assert.match(helper, /\.replace\(progress, ' '\)/);
+  });
+});
+
+describe('in-flight doctor runs go through the one shared hold', () => {
+  // ── Why (2026-09-12, adversarial batch) ─────────────────────────────────
+  // Same family as the verdict-poll trap above: a browser gate asserting on a
+  // readiness signal it does not control. `verify:p0-flow`'s step 3b claimed
+  // "while the sample run is still in flight" and measured nothing of the
+  // kind — red on 4 of 8 foreground runs here and on 2 of 6 on `main` for the
+  // round-3 reviewer, every failure a correctly-finished run being reported
+  // as a product regression. `holdDoctorRunInFlight` is the one
+  // implementation; this stops the next hand-rolled copy.
+  it('the scanner finds the defect it is meant to find', () => {
+    const delayed = "await p.route('**/api/scriptide/doctor/stream', async (route) => {\n"
+      + '  await new Promise((r) => { setTimeout(r, 4000); });\n'
+      + '  await route.continue();\n'
+      + '});';
+    assert.equal(handRolledStreamHolds(delayed).length, 1);
+    // A canned failure is not a pretend-in-flight hold.
+    assert.equal(
+      handRolledStreamHolds("await p.route('**/api/scriptide/doctor/stream', (route) => route.fulfill({ status: 500 }));").length,
+      0,
+    );
+    // Routes on other endpoints are not this scan's business.
+    assert.equal(
+      handRolledStreamHolds("await p.route('**/api/health', async (route) => { await route.continue(); });").length,
+      0,
+    );
+  });
+
+  it('no script hand-rolls a doctor-stream hold', () => {
+    const offenders: string[] = [];
+    for (const file of scriptFiles()) {
+      if (path.basename(file) === 'browser-verify.mjs') continue; // the one implementation
+      const source = readFileSync(file, 'utf8');
+      for (const hit of handRolledStreamHolds(source)) {
+        offenders.push(`${path.relative(REPO, file)}:${hit.line} — ${hit.text}`);
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      'use holdDoctorRunInFlight (scripts/lib/browser-verify.mjs): a fixed delay before '
+        + 'route.continue() is a wider race, not the absence of one:\n  ' + offenders.join('\n  '),
+    );
+  });
+
+  it('the helper holds until released and reports what it intercepted', () => {
+    const helper = readFileSync(path.join(REPO, 'scripts/lib/browser-verify.mjs'), 'utf8');
+    assert.match(helper, /export const DOCTOR_STREAM_ROUTE/);
+    assert.match(helper, /export async function holdDoctorRunInFlight/);
+    assert.match(helper, /get held\(\)/);
+    assert.match(helper, /async release\(\)/);
   });
 });
 

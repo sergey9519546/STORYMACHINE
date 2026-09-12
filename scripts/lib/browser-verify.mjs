@@ -572,6 +572,108 @@ export async function waitForDoctorVerdict(page, { selector = 'body', timeoutMs 
   return handle.jsonValue();
 }
 
+/** The doctor's streaming analysis route, as a Playwright route glob. One
+ *  spelling, so a gate that wants to hold a run in flight cannot quietly
+ *  intercept a slightly different path and hold nothing. */
+export const DOCTOR_STREAM_ROUTE = '**/api/scriptide/doctor/stream';
+
+/**
+ * Hold the doctor's streaming run GENUINELY in flight until the caller
+ * releases it — the readiness signal for every assertion whose premise is
+ * "while a run is still running".
+ *
+ * ── THE RACE THIS EXISTS TO CLOSE (2026-09-12) ─────────────────────────────
+ *
+ * `smoke-p0-live-flow.mjs`'s step 3b asserts that clicking "Full report" at
+ * the EARLIEST instant the toggle exists cannot cold-open the full report
+ * while the sample run is still in flight. It took its "earliest instant"
+ * from `waitFor({ state: 'attached' })` on a control that is in the DOM from
+ * the panel's first commit — a signal that says nothing about the run. It
+ * then flaked, red on 4 of 8 foreground runs here and reproduced by the
+ * round-3 reviewer on `main` itself (2 of 6), in two different-looking
+ * shapes that are one defect.
+ *
+ * MEASURED with a probe of the same steps (10 contexts against one warm
+ * keyless server, load 10.3/4): the built-in sample's POST completes in
+ * 0-49 ms, while `attached` resolves 877-1482 ms after the click — so which
+ * side of the run the "earliest instant" lands on is luck. On 2 of those 10
+ * runs the response had finished 245 ms and 258 ms BEFORE `attached`; at
+ * that instant the summary already read "VERDICT CONSIDER HEALTH 78", the
+ * toggle correctly measured `disabled=false` with no title, and the forced
+ * click opened a fully hydrated Script Doctor. The product was right every
+ * time: the toggle is disabled from the first frame it carries the "Open
+ * full report" name (`ScriptIDE.tsx`'s `coverageFullReportToggleState`, whose
+ * `doctorAutoSample` clause is set in the same batch as
+ * `setToolSlot("coverage")`) and stays disabled for as long as the run is
+ * actually running. It was the GATE that asserted a precondition it did not
+ * control.
+ *
+ * Holding the response is what makes that precondition true. The request is
+ * NOT stubbed: it reaches the real server and is answered by the real
+ * analysis exactly as it would be for a writer — only later, and only when
+ * this handle says so. That is strictly stronger than the fixed
+ * `setTimeout(4000)` delay step 3c used to hand-roll, which is still a race
+ * (a slow machine can miss the window) and still a hope; `release()` is not.
+ *
+ * `held` counts the requests actually intercepted, and `waitUntilHeld()`
+ * blocks until one has been, so a caller can assert that its "in flight"
+ * premise was real rather than silently asserting nothing against a route
+ * glob that matched no request. The two are not interchangeable: the panel
+ * mounts (and its controls attach) in the commit BEFORE the POST goes out, so
+ * a bare `held === 1` read taken at mount time is legitimately 0. Assert the
+ * mount-window UI at mount, then `await waitUntilHeld()` for the in-flight
+ * window.
+ *
+ * Usage:
+ *   const run = await holdDoctorRunInFlight(page);
+ *   … click, assert the mount-window UI …
+ *   await run.waitUntilHeld();          // now the run is provably in flight
+ *   … assert the in-flight UI …
+ *   await run.release();   // the real response is delivered from here
+ */
+export async function holdDoctorRunInFlight(page) {
+  let open;
+  const gate = new Promise((resolve) => { open = resolve; });
+  let held = 0;
+  let released = false;
+  await page.route(DOCTOR_STREAM_ROUTE, async (route) => {
+    held++;
+    await gate;
+    // The page (or its whole context) may already be gone by the time the
+    // hold lifts — a caller that finished its assertions and closed up is
+    // the normal path, not an error.
+    await route.continue().catch(() => { /* page closed while held */ });
+  });
+  return {
+    /** How many doctor-stream requests this hold has actually intercepted. */
+    get held() { return held; },
+    /** Resolve once a doctor-stream request has actually been intercepted —
+     *  i.e. once the run this hold is holding provably exists. Throws on the
+     *  deadline rather than letting a caller assert on a run that never
+     *  started. */
+    async waitUntilHeld({ timeoutMs = 15000, pollMs = 25 } = {}) {
+      const deadline = Date.now() + getTiming().ms(timeoutMs);
+      while (held === 0) {
+        if (Date.now() > deadline) {
+          throw new Error(
+            `no POST to ${DOCTOR_STREAM_ROUTE} was intercepted within the deadline — `
+            + 'the run this hold exists to hold in flight never started',
+          );
+        }
+        await new Promise((r) => setTimeout(r, pollMs));
+      }
+      return held;
+    },
+    /** Deliver the real response(s) and stop intercepting. */
+    async release() {
+      if (released) return;
+      released = true;
+      open();
+      await page.unroute(DOCTOR_STREAM_ROUTE).catch(() => { /* page closed */ });
+    },
+  };
+}
+
 /**
  * Waits for the page's DOM to stop mutating — a real signal, not a sleep.
  * A MutationObserver on `document.documentElement` (attributes incl. `style`

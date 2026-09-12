@@ -37,6 +37,7 @@ import { spawn } from 'node:child_process';
 import {
   bootKeylessServer,
   getTiming,
+  holdDoctorRunInFlight,
   launchChromium,
   pickFreePort,
   shutdown,
@@ -149,9 +150,33 @@ async function main() {
   // click that followed opened a cold dialog with "Try a sample script").
   // Own page/context — must not share `page`'s doctorStreamPosts count or
   // Draft History checks below, which are about the ONE real run.
+  //
+  // THE GATE'S OWN RACE, FIXED 2026-09-12 (adversarial batch). This step used
+  // to take "while the sample run is still in flight" on trust: its earliest
+  // instant is `waitFor({ state: 'attached' })` on a control that is in the
+  // DOM from the panel's first commit, which says nothing about the run. The
+  // built-in sample is deterministic and keyless — its POST answers in
+  // 0-49 ms measured, against 877-1482 ms for `attached` to resolve — so on a
+  // warm server the run routinely finished FIRST, and the step then reported
+  // the correct post-run UI as a regression: 4 red runs in 8 here, and the
+  // round-3 reviewer reproduced it on `main` itself (2 of 6). Both failure
+  // messages were the same defect seen from two sides — `disabled=false` when
+  // the report had already landed, or a dialog opened by the forced click
+  // when the report landed between the `isDisabled()` read and the click
+  // (its text carried "Health 78/100", i.e. a WARM report, not the cold panel
+  // the message names). The product was never wrong: the toggle is disabled
+  // from the first frame it carries this name and for exactly as long as the
+  // run runs.
+  //
+  // `holdDoctorRunInFlight` makes the premise true instead of hoping for it —
+  // the real request reaches the real server and its response is held until
+  // this step releases it. Nothing about the assertions below is weakened:
+  // the earliest-instant click is still attempted, still forced, and must
+  // still leave no dialog open.
   const earlyContext = await browser.newContext();
   const earlyPage = await earlyContext.newPage();
   wireConsoleCapture(earlyPage, genuineErrors);
+  const earlyRun = await holdDoctorRunInFlight(earlyPage);
   await earlyPage.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   await earlyPage.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
   // Round-2 review fix (2026-09-05, item 3): the toolbar toggle now carries
@@ -166,11 +191,36 @@ async function main() {
   // `force: true` now has the assertion it always claimed to — the toggle
   // must measure `disabled: true` at this instant, not just fail to open a
   // dialog for some other reason (a slow click, a mis-targeted locator).
+  // TWO instants, not one — they are different windows and the product
+  // disables this toggle through a different clause in each:
+  //   MOUNT    the toolbar toggle and CoverageSummary attach in the SAME
+  //            commit, one commit BEFORE the POST goes out, so the run is
+  //            armed but not yet requested. `coverageFullReportToggleState`
+  //            covers this through `doctorAutoSample` (parent state, set in
+  //            the same batch as setToolSlot("coverage")) — the clause whose
+  //            absence produced the original cold-open.
+  //   IN FLIGHT the POST is out and held below, so `coverageSummaryStatus`
+  //            is "loading" and the report cannot possibly have landed.
+  // Asserting only the second would drop the first — the very window this
+  // step was written for — so both are asserted, and neither can now be
+  // taken against a run that has already finished.
   const earlyDisabled = await earlyToggle.isDisabled();
   if (!earlyDisabled) {
     throw new Error(
       'golden-path regression: "Open full report" was NOT disabled at the earliest instant — a real '
       + '(non-force) click would reach it before the sample run resolves',
+    );
+  }
+  // The hold is the premise of everything below, so it is waited for rather
+  // than assumed: a route glob that matched nothing would leave this step
+  // silently re-testing the post-run UI, which is exactly the defect being
+  // fixed here.
+  await earlyRun.waitUntilHeld();
+  const earlyDisabledInFlight = await earlyToggle.isDisabled();
+  if (!earlyDisabledInFlight) {
+    throw new Error(
+      'golden-path regression: "Open full report" was NOT disabled while the sample run was provably '
+      + 'in flight (its POST is held open by this step) — a real (non-force) click would reach it',
     );
   }
   // `force: true`: the point of this assertion is that the toggle must be
@@ -187,7 +237,8 @@ async function main() {
       + `a dialog before the sample run resolved (text starts: ${JSON.stringify(earlyDialogText.slice(0, 120))})`,
     );
   }
-  console.log('[smoke] earliest-instant "Full report" click did not cold-open the full report.');
+  console.log('[smoke] earliest-instant "Full report" click did not cold-open the full report (run held in flight).');
+  await earlyRun.release();
   await earlyContext.close();
 
   // 3c. Round-2 review item 1 (BLOCKING, 2026-09-05): "Coverage is still
@@ -198,23 +249,31 @@ async function main() {
   // this coverage run" WHILE the run is still genuinely in flight. The
   // built-in sample analyses fast enough (well under a second, no LLM
   // calls) that a plain click-then-click race loses more often than it
-  // wins — route-delays the real request so the window to click Cancel is
+  // wins — the real request is HELD so the window to click Cancel is
   // reliable, not a hope. The request is not stubbed (unlike 3d below): it
   // reaches the real server exactly as it would for a writer, just later
   // than it otherwise would, which only changes WHEN the response arrives,
   // never what CoverageSummary's own Cancel/abort logic does with it.
+  // (2026-09-12: this used to hand-roll the hold as a fixed
+  // `setTimeout(timing.ms(4000))` before `route.continue()` — still a race,
+  // just a wide one. It now shares step 3b's `holdDoctorRunInFlight`, which
+  // holds until this step releases and reports how many requests it actually
+  // intercepted; `tests/scripts/wait-for-function-options-position.test.ts`
+  // stops the next hand-rolled copy.)
   const cancelContext = await browser.newContext();
   const cancelPage = await cancelContext.newPage();
   wireConsoleCapture(cancelPage, genuineErrors);
-  await cancelPage.route('**/api/scriptide/doctor/stream', async (route) => {
-    await new Promise((resolve) => { setTimeout(resolve, timing.ms(4000)); });
-    await route.continue();
-  });
+  const cancelRun = await holdDoctorRunInFlight(cancelPage);
   await cancelPage.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   await cancelPage.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
   const cancelBtn = cancelPage.getByRole('button', { name: 'Cancel this coverage run' }).first();
   await cancelBtn.waitFor({ state: 'visible', timeout: timing.ms(10000) });
   await cancelBtn.click({ timeout: timing.ms(5000) });
+  // Cancel has been clicked on a run this step provably held in flight; let
+  // the real response through from here, exactly as it would arrive for a
+  // writer whose abort lost the race.
+  await cancelRun.waitUntilHeld();
+  await cancelRun.release();
   // Give the abort + the child's own status transition (loading -> idle) a
   // moment to reach the parent — the pre-fix bug was that this sentence
   // never clears, not that it takes a moment to clear, so polling here
