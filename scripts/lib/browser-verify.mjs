@@ -596,9 +596,14 @@ export const COVERAGE_SUMMARY_CHUNK_ROUTE = '**/CoverageSummary*';
  * fails loudly instead of leaving a gate silently asserting against whatever
  * state it happened to find.
  *
- * The request is NOT stubbed: it reaches the real server and is answered by
- * the real analysis exactly as it would be for a writer, only later, and only
- * when the caller says so.
+ * MECHANISM, precisely (review round 1, non-blocking item 1): `page.route`
+ * intercepts BEFORE dispatch, so while the hold is on, the request has NOT
+ * reached the server — nothing is "held in transit". What is held is the
+ * caller's own window: the browser is waiting for a request that has not been
+ * sent. `release()` then sends it for real (`route.continue()`), so the
+ * response is the real server's, produced by the real analysis, just later.
+ * A gate asserting on SERVER-side state must therefore not expect the request
+ * to have arrived while the hold is on.
  */
 async function holdRoute(page, routeGlob) {
   let open;
@@ -669,18 +674,40 @@ async function holdRoute(page, routeGlob) {
  * click opened a fully hydrated Script Doctor. It was the GATE that asserted
  * a precondition it did not control.
  *
- * The product was right every time: the toggle is disabled from the first
- * frame it carries the "Open full report" name (`ScriptIDE.tsx`'s
- * `coverageFullReportToggleState`, whose `doctorAutoSample` clause is set in
- * the same batch as `setToolSlot("coverage")`) and stays disabled for as long
- * as the run is actually running.
+ * ── WHAT THE PRODUCT ACTUALLY GUARANTEES, AND WHAT IT DOES NOT ─────────────
+ *
+ * For the FIRST run — the one this gate drives, before any report exists —
+ * "Open full report" is disabled from the first frame it carries that name
+ * and for the whole of the run. `coverageFullReportToggleState`
+ * (`src/components/ScriptIDE.tsx`) disables it through `doctorAutoSample`
+ * (parent state, set in the same batch as `setToolSlot("coverage")`) before
+ * `CoverageSummary` has mounted, and through `coverageSummaryStatus ===
+ * "loading"` from there on. Independently measured twice: 4 of 4 in-flight
+ * DOM commits of a real unintercepted run showed it disabled, and so did a
+ * genuinely dispatched, unanswered run slowed with CDP latency (`posted:1,
+ * responded:0`, Cancel visible, `disabled:true`, forced click -> 0 dialogs).
+ *
+ * **It is NOT a general in-flight invariant, and a gate asserting one
+ * elsewhere would be wrong.** From the SECOND run onward the first clause of
+ * that same function — `if (coverageReport) return { disabled: false }` —
+ * short-circuits, so the toggle is ENABLED for the whole of an in-flight
+ * re-run: measured 5 of 5 in-flight commits enabled, and a real (non-forced)
+ * click during a held re-run opens the hydrated report and silently abandons
+ * the re-run (no further POST, Cancel gone). That is benign rather than a
+ * defect — the report it opens is for the SAME draft generation — and in the
+ * one state where a stale report could mislead, an edited draft, the toolbar
+ * renders "Re-run coverage" instead and the toggle does not exist at all
+ * (20 of 20 in-flight commits). Credit: review round 1, blocking item 3.
+ *
+ * So: this helper pins a window. It does not certify an invariant, and the
+ * assertions step 3b takes under it are about the first run only.
  *
  * Usage:
  *   const run = await holdDoctorRunInFlight(page);
  *   … click, assert the mount-window UI …
  *   await run.waitUntilHeld();          // now the run is provably in flight
  *   … assert the in-flight UI …
- *   await run.release();   // the real response is delivered from here
+ *   await run.release();   // the real request is dispatched from here
  */
 export async function holdDoctorRunInFlight(page) {
   return holdRoute(page, DOCTOR_STREAM_ROUTE);
