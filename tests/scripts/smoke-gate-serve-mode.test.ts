@@ -87,6 +87,36 @@ describe('the P0 smoke gate serves the built dist/, and says which', () => {
     assert.equal(neither.mode, 'unknown');
   });
 
+  it('the hashed-asset match takes every quoting HTML allows (review non-blocking 2)', async () => {
+    // Vite emits double quotes; a minifier in the build chain emits the other
+    // two, and this classifier fails CLOSED — so a quoting style it did not
+    // know about turned a green gate red for no product reason.
+    const stub = (html: string) => async () => ({ ok: true, status: 200, text: async () => html });
+    for (const [label, markup, expected] of [
+      ['double-quoted', '<script type="module" src="/assets/index-abc.js"></script>', '/assets/index-abc.js'],
+      ['single-quoted', "<script type='module' src='/assets/index-abc.js'></script>", '/assets/index-abc.js'],
+      ['unquoted', '<script type=module src=/assets/index-abc.js></script>', '/assets/index-abc.js'],
+      ['unquoted, self-closing', '<link rel=stylesheet href=/assets/index-abc.css />', '/assets/index-abc.css'],
+      ['stylesheet only', '<link rel="stylesheet" href="/assets/index-abc.css">', '/assets/index-abc.css'],
+      ['spaces around =', '<script src = "/assets/index-abc.js"></script>', '/assets/index-abc.js'],
+    ] as const) {
+      const got = await serveModeOf('http://127.0.0.1:1/', stub(`<!doctype html>${markup}`) as never);
+      assert.equal(got.mode, SERVE_BUILT_DIST, `${label} markup must classify as the built bundle`);
+      assert.equal(got.evidence, `hashed asset ${expected}`, `${label} evidence names the asset`);
+    }
+    // The dev branch still wins when both are present — Vite injects its
+    // client into every dev HTML response, so that test runs first.
+    const both = await serveModeOf('http://127.0.0.1:1/', stub(
+      "<script src='/@vite/client'></script><script src='/assets/index-abc.js'></script>",
+    ) as never);
+    assert.equal(both.mode, SERVE_VITE_DEV);
+    // A path that is not under /assets/ is not evidence of a build.
+    const elsewhere = await serveModeOf('http://127.0.0.1:1/', stub(
+      "<script src='/static/index-abc.js'></script>",
+    ) as never);
+    assert.equal(elsewhere.mode, 'unknown');
+  });
+
   it('distStaleness fires on a missing dist/, on a stale one, and not on a current one', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'dist-staleness-'));
     mkdirSync(path.join(root, 'src'));

@@ -533,8 +533,18 @@ export async function serveModeOf(baseUrl, fetchImpl = fetch) {
   const res = await fetchImpl(new URL('/', baseUrl));
   const html = await res.text();
   if (html.includes('/@vite/client')) return { mode: SERVE_VITE_DEV, evidence: '/@vite/client in the markup' };
-  const hashed = html.match(/(?:src|href)="(\/assets\/[^"]+\.(?:js|css))"/);
-  if (hashed) return { mode: SERVE_BUILT_DIST, evidence: `hashed asset ${hashed[1]}` };
+  // Every attribute quoting HTML allows, not just the one Vite emits today
+  // (review round 1, non-blocking 2): Vite writes double quotes, but an HTML
+  // minifier in the build chain writes single or none, and this classifier
+  // fails CLOSED — an unrecognised markup shape throws the boot. Turning a
+  // green gate red for a quoting style is a defect of the gate, not of the
+  // product.
+  const hashed = html.match(
+    /(?:src|href)\s*=\s*(?:"(\/assets\/[^"]+?\.(?:js|css))"|'(\/assets\/[^']+?\.(?:js|css))'|(\/assets\/[^\s"'`=<>]+?\.(?:js|css))(?=[\s/>]))/,
+  );
+  if (hashed) {
+    return { mode: SERVE_BUILT_DIST, evidence: `hashed asset ${hashed[1] ?? hashed[2] ?? hashed[3]}` };
+  }
   return { mode: 'unknown', evidence: `neither /@vite/client nor a /assets/ URL in ${html.length} bytes of /` };
 }
 
