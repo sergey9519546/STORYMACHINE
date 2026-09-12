@@ -534,3 +534,342 @@ calibration corpus is well designed (a different corpus, a different purpose).
 
 *Round 1. On a revision, the same reviewer re-checks item 1 against the new
 diff. The reviewed SHA is **`85273742`**.*
+
+---
+
+## Round 2 — re-check of `b798a0c4`
+
+**Object:** five commits over `85273742` (`ee861117`, `9b9a99f8`, `29dfe349`,
+`c0614f8d`, `b798a0c4`); `origin/scoring/adversarial-2026-09-12` is at the
+reviewed SHA. Warm re-check of my own items against the new diff, plus the two
+mechanisms the lane's R2.10 invited attack on. Same method as round 1: my own
+`git archive` exports of `85273742` and `78ec4464` in `<session scratch>` with
+`node_modules` symlinked; nothing committed, pushed, merged or checked out;
+`--lock` never run; no full `npm test`; no private corpus touched.
+
+*Method note, not a finding about the branch:* my round-1 snapshot directory
+for `85273742` was overwritten by another agent's identity run in the shared
+scratch path (it came back stamped with a different `GIT_SHA` pin than the one
+I set). I re-derived it from my own `git archive 85273742` export before
+comparing, and every identity figure below is from that re-derived baseline.
+
+### R2.a My blocking item — **CLOSED**
+
+The orchestrator kept `stripTitlePage(normalizeScreenplay(fountain))` and told
+the whole truth, which is the better of the two exits I offered. All four
+statements are corrected, and none was quietly deleted:
+
+* `server/nvm/analyze/doctor.ts:2982-3020` — the paragraph is replaced by
+  "THE WHOLE NORMALIZER IS APPLIED, NOT JUST THE JOIN", naming `716ee817` and
+  `ef683d4e`, listing exactly what the reconstruction does to a double-spaced
+  import, and carrying the measurement table.
+* `PARSE_FORMAT_INVARIANCE_2026-09-12.md:72-75` — item 3 now reads
+  `stripTitlePage(normalizeScreenplay(fountain))` with "**that was wrong from
+  `ef683d4e` onwards**"; §1.6 is retitled "The stronger half WAS taken, and
+  three places said it was not".
+* Lane report §5 first bullet — **struck through** and marked false rather than
+  removed, with what remains true of it kept.
+* New §4 item 10 and a new §6 paragraph.
+
+**The measurement reproduces, at the round-2 tip, including the lane's own
+third datum** (`<session scratch>/dsreport.mjs`, `dead-frequency.fountain`
+re-emitted at 45 columns with a blank line after every line):
+
+```
+as shipped, stripTitlePage(normalizeScreenplay(f))   health 81.4, 182 issues, c/m/n 2/32/148
+as documented, joinWrappedDialogue(f)                health 82.3, 158 issues   (my round-1 probe tree)
+the same file NOT re-emitted                         health 81.7, 173 issues   EXIT=0
+```
+
+The third row is the lane's addition and it is the affirmative case, which I
+had not made: the shipped expression reads the re-emitted document **0.3** from
+the un-re-emitted original and the documented one **0.6** away. The stronger
+half halves the format gap this seam exists to close. That converts my item
+from "undisclosed cost" to "disclosed cost with an argument for paying it", and
+the argument is correct.
+
+### R2.b The floors did not move — and the reason verified by hand
+
+```
+cd /home/user/wt-scoring && npm run benchmark:public                      EXIT=0
+  SHUFFLE_DROP      0.8438 [0.7188, 0.9688] floor 0.8238 · 0.7896 [0.6738, 0.8975] floor 0.7696 · 27/5/0
+  CLIMAX_RELOCATE   0.5938 [0.4219, 0.7500] floor 0.5738 · 0.5234 [0.4678, 0.5874] floor 0.5034 · 18/12/2
+  DIALOGUE_FLATTEN  1.0000 floor 0.98 · 0.9814 [0.9531, 1.0000] floor 0.9614 · 32/0/0
+```
+
+Identical to round 1 to the digit. `git diff 85273742..b798a0c4 -- scripts/lib/auc.ts`
+is **comment-only** — the single `export const` line in the diff is context, no
+constant changed, `AUC24_FLOOR` untouched at 0.622 — and
+`tests/fixtures/public-corpus-manifest.json` and
+`tests/fixtures/public-benchmark-split.json` have an **empty diffstat**.
+
+**The claim that makes that unsurprising, checked against the corpus rather
+than taken** (`<session scratch>/corpusmarkers.mjs`, all 32 committed scripts):
+
+```
+forced markers found —  ! : 0  |  . : 0  |  > : 0  |  > … < : 0  |  @ : 0  |  ~ : 0
+files carrying ANY forced marker: 0 of 32
+cue extensions present: (V.O.) ×28, (O.S.) ×1, (CONT'D) ×25
+non-canonical extension spellings: 0
+```
+
+Zero forced markers of any kind and zero non-canonical extensions in the whole
+benchmark corpus, and no `(O.C.)` either. So round 2's three scoring-path
+commits are no-ops on these 32 documents **by construction**, and a floor could
+not have moved. That is also the diagnosis: this is precisely why a benchmark
+that runs on every CI run could not catch any of these defects, and why every
+"before" figure had to be manufactured by a synthetic transform. The lane
+states it plainly rather than resting on "the numbers did not change".
+
+### R2.c My transforms, re-measured on both trees
+
+`<session scratch>/r2markers.mjs`, all 32 scripts, six-field surface, run once
+against my `85273742` export and once against the round-2 worktree.
+
+| transform | at `85273742` | at `b798a0c4` |
+|---|---|---|
+| forced-action `!` on every action line | **32 / 32, mean +1.056, largest +7.0 on room-12, 1 verdict flip** | **0 / 32** |
+| forced-heading `.` on every scene heading | **32 / 32, mean +0.659, largest +2.5 on the-key-under-the-mat** | **0 / 32** |
+| forced-transition `>` on every transition | **5 / 6 applicable, largest −15.7 on room-12** | **0 / 6** |
+| forced-cue `@` on every character cue | **32 / 32, mean −1.172, largest −26.8 on room-12** | **32 / 32 — pinned, not fixed** |
+| `(V.O.)` → `(V.O)` (my round-1 transform) | **8 / 8 applicable, largest −1.3 on soft-launch** | **0 / 8** |
+| every extension respelled without periods | **12 / 14 applicable, largest −1.3** | **0 / 14** |
+
+Every cell reproduces, including my round-1 `!` figures to the third decimal.
+The lane's correction of my "9 of 9 applicable" to **8 of 8** is right — eight
+of the 32 scripts contain `(V.O.)` and all eight move; I had miscounted the
+denominator, not the finding. Its `>` mean of −4.080 against my −3.400 is the
+same numbers over a different denominator (5 moved vs 6 applicable:
+−3.400 × 6 / 5 = −4.080).
+
+**Fail-first**, my own copy of the committed round-2 suite:
+
+```
+cd /home/user/wt-scoring          tests/core/parse-format-invariance.test.ts   59 pass / 0 fail   EXIT=0
+cd <scratch>/tip (85273742)       same file, copied unchanged                  51 pass / 8 fail   EXIT=1
+```
+
+The 8 are exactly the composition claimed: three marker rows, three extension
+spellings, and both halves of the `(O.C.)` test.
+
+**Output identity, `85273742` → round-2 tip**, `GIT_SHA=REVIEWPIN` pinned equal
+on both sides, baseline re-derived from my own export:
+
+```
+node scripts/check-doctor-output-identity.mjs --compare <scratch>/ident-85273742 <scratch>/ident-r2
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded)     EXIT=0
+```
+
+Round 2 moves no fixture's report at all, as claimed.
+
+### R2.d The two mechanisms R2.10 asked me to break
+
+**`stripForcedMarkers`'s re-parse rule — I could not break it, and I do not
+think it can be broken.** The function returns its candidate only when every
+unmarked line re-parses to its original type and every stripped line re-parses
+into the set its marker *declared*; anything else rejects the nearest allowed
+marker and the loop retries on a strictly smaller set. That is a verification,
+not a heuristic, so "a marker is removed and a block boundary moves" is
+excluded by the postcondition rather than by argument. Seven adversarial
+documents (`<session scratch>/attack.ts`), all behaving correctly:
+
+| case | stripped? | scenes | types |
+|---|---|---|---|
+| `!` escaping a speech (`NORA` / line / `!She slams…`) — the real-world use | **no** | 1 → 1 | unchanged |
+| `.BACK TO THE HOUSE` (a heading only because of the dot) | **no** | 2 → 2 | unchanged |
+| `.INT. HALL - NIGHT` (redundant) | **yes** | 2 → 2 | unchanged |
+| `>CUT TO:` inside a speech | **no** | 1 → 1 | unchanged |
+| `>CUT TO:` as its own element | **yes** | 2 → 2 | action → **transition** (the declared change) |
+| a bare `!` alone on a line | **no** | 1 → 1 | unchanged |
+| `...` opening an action line | **no** | 2 → 2 | unchanged |
+
+The first row is the one that matters most: `!` is used in real drafts
+precisely to break out of a speech, and there the strip correctly declines and
+keeps the leak rather than re-typing the line. The admitted residual is real
+and checkable — `>SMASH TO BLACK.` is not stripped because the parser's
+transition branch does not recognise it, while `>CUT TO:`, `>FADE OUT.`,
+`>MATCH CUT TO:` and `>DISSOLVE TO:` all are — and it fails safe.
+
+**`normalizeCueExtensions`'s line gate — it does not eat prose or a wryly.**
+`MARY (into phone)`, `she picks up the phone (v.o.)` and
+`THE SIGN READS KEEP OUT (beat)` are all returned unchanged; `MARY (V.O) (CONT'D)`,
+`MARY (vo)`, `MARY ^ (VO)` and `MARY (O.C)` canonicalise correctly, the `^`
+preserved. One behaviour change worth naming, and it is a consistency fix
+rather than a defect (non-blocking 5 below).
+
+### R2.e My non-blocking items 1–7
+
+All seven addressed, and three of them went wider than I asked:
+
+1. **Markers** — I reported one; the lane measured four, fixed three and pinned
+   the fourth with its size. Verified above.
+2. **Extensions** — I reported one spelling; the lane folded three spelling
+   families to one canonical set, consolidated **five** duplicate copies of the
+   extension list into `CUE_EXTENSIONS` / `stripCueDecorations` in
+   `src/lib/fountain.ts` (I confirmed `locate.ts`, `prioritize.ts`,
+   `truth-extraction.ts` and `fountain-analyzer.ts` now all alias the one
+   definition), and found that all five omitted `(O.C.)`. I reproduced the
+   `(O.C.)` bug and its fix end to end: on `85273742` `MARY (O.C.)` and her
+   speech both parse as `action`; at the tip they parse `character` +
+   `dialogue`, with `wordCount` unchanged at 16 either way.
+3. **§1.5's stale counts** — corrected, and the lane's new figures are right:
+   I measure the round-2 file at **51 pass / 8 fail** on `85273742` and
+   **59 / 59** here.
+4. **Before/after columns** — a clause added to each naming the field set.
+5. **`auc.ts`'s "−0.0059"** — now "move it **JOINTLY** by", with the parenthetical
+   naming §14.3's leave-one-out-singly table as the different statistic.
+   Comment-only diff, verified.
+6. **Markdown file count** — 474, which is what `honesty-audit` prints here.
+7. **The voice bound** — the sentence is in §5.
+
+### R2.f Gates I re-ran
+
+| gate | result |
+|---|---|
+| `npm run lint` | **EXIT=0** |
+| `npm run check-no-console` | EXIT=0 — 304 files, 24 quarantine entries applied |
+| `npm run check-docs` | EXIT=0 — clean |
+| `npm run honesty-audit` | EXIT=0 — 458 files, **474** markdown files, 93 claims rows |
+| `npm run check-brain` | EXIT=0 — 104 notes, 386 links, fresh |
+| `npm run gates` | **EXIT=0**; 1 of 1 verified row RAN; mutation check raised `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` to 0.8938 and the suite **FAILED on that floor by name**, no passing twin |
+| `npm run benchmark:public` | EXIT=0, six AUCs as above |
+| `check-scoring-receipt.mjs 78ec4464..HEAD` | **EXIT=1**, exactly **one** PENDING entry, 8 scoring-path files, no other problem |
+| `tests/core/parse-format-invariance.test.ts` | **59 / 59** |
+| `fountain-analyzer` · `locate` · `prioritize` · `truth-extraction` | 69 / 69 · 35 / 35 · 19 / 19 · 28 / 28 |
+| `unicode-character-cues` · `voice-delta` · `report-seam` · `calibration` · `public-benchmark` | 16 / 16 · 18 / 18 · 11 / 11 · 25 / 25 · 33 / 33 |
+| `tests/security/fountain-shape-guard-cue-parity.test.ts` | **650 / 650** |
+| `tests/routes/fountain-shape-guard-cue-bypass.test.ts` | **57 / 57** |
+
+No AUC-24 value is stated, implied or projected anywhere in the round-2 diff;
+every hit is `AUC24_FLOOR` untouched at 0.622, a `PENDING` marker, or a
+quotation of this review.
+
+### R2.g Is pinning `@` honest scoping or a dodge?
+
+**Honest scoping**, on four grounds, and I would not accept a fix here.
+
+1. It is the **largest** number in the round (32 of 32, up to −26.8) and the
+   lane leads with it rather than burying it — R2.2, R2.9, the normalizer's
+   block comment, the receipt row and a dedicated `describe` block all carry
+   the figure.
+2. The technical reason is real and I verified its load-bearing half: no
+   renderer strips `@` (`src/lib/pdf.ts`, `fdx.ts`, `docx.ts`,
+   `screenplay-layout.ts` contain no `@` handling at all). Honouring `@` in the
+   normaliser alone would make the analysis treat `@MARY` as a speaker while
+   five renderers print the marker — an analyzer/renderer split, which is the
+   exact class of defect this whole branch exists to close. Unlike `!`, `.` and
+   `>`, stripping `@` also re-types every line *below* the cue, so the re-parse
+   rule that makes the other three safe does not apply.
+3. The pin is `assert.equal(moved, 32)` with a message naming the destination
+   ("move this row into FORMAT_TRANSFORMS … Do not relax it"), not a tolerance
+   and not a `Number.isFinite`. It goes red the day the parser learns `@`.
+4. It is not a regression: 32 of 32 at `85273742` and 32 of 32 now.
+
+The residual risk is worth stating for the owner rather than held against the
+lane: `@` and `.` are the two markers most likely to appear in scraped or
+converted real drafts, and they are respectively the one **not fixed** and the
+one **fixed but unverifiable from this tree**.
+
+### R2.h Is the receipt's "what to compare" what an owner needs?
+
+**Yes, and it is better than what I asked for**, on four counts: it names the
+split variable (`isDoubleSpaced`) instead of gesturing at "document shape"; it
+orders the checks diagnostic-first with the reason (a change that moves both
+halves of every matched pair is largely rank-neutral); it names the statistic
+that moves **first** — issue counts by severity, with the evidence that 24
+issues moved on a document whose health moved 0.9; and it says what not to
+conclude and what not to do (`Do not move AUC24_FLOOR`). An owner who followed
+only step 4 would have drawn the wrong conclusion, and the paragraph exists to
+stop that.
+
+Two gaps, both one-line, both below.
+
+## VERDICT: **READY-FOR-OWNER**
+
+The blocking item is closed in the strongest available direction — the better
+change kept, every contradicting statement corrected rather than deleted, the
+drift named by SHA, the cost enumerated where the owner reads it, and an
+affirmative measurement added that I had not made. The two non-blocking builds
+went wider than the brief. Nothing moved a floor, nothing re-locked, no fixture
+report changed, and the two new mechanisms survive the attacks their own author
+nominated. This branch is now waiting only on `npm run measure-real`.
+
+### Non-blocking
+
+1. **The receipt's step 1 is not executable as written.** It tells the owner to
+   compare "`submittedWordCount` against `wordCount`, per script", but
+   `submittedWordCount` is assigned once in `fountain-analyzer.ts:2735` and
+   **read nowhere** — it is not on `FountainAnalysis`, not on
+   `ScriptDoctorReport`, not exported (two occurrences in the file: the comment
+   and the assignment). `isDoubleSpaced` is likewise module-private
+   (`screenplay-normalizer.ts:112`), so the split the paragraph is built around
+   cannot be computed either. The round-1 comment at the site — "keeps the raw
+   figure for anything that legitimately wants 'how much did the writer send'"
+   — is a promise nothing can consume. Two exports, or a field on the analysis,
+   makes the branch's most important owner instruction mechanical instead of
+   manual. A corpus-gated probe script in `scripts/` printing both numbers plus
+   `isDoubleSpaced` per script would be better still: every other gate on this
+   branch has a reproduce line and this one is prose.
+2. **"WHAT TO COMPARE" scopes itself to two changes; there are four.** It says
+   "this change and the strip-order change above COMPOUND". Receipt rows 9 and
+   10 — the marker strip and the extension fold — are *also* corpus-visible,
+   and the corpus is where they will actually fire: the whole finding of R2.b
+   is that the 32 committed scripts carry **zero** forced markers and **zero**
+   non-canonical extensions, while scraped PDFs and FDX exports are exactly the
+   text that carries them. One sentence naming rows 9 and 10 in that paragraph
+   would close it. Worth noting in the same sentence that `sceneCount` cannot
+   move from the marker strip (the re-parse rule forbids it, and I confirmed
+   2 → 2 on a `.`-heading document), so a corpus script whose scene count
+   changes is evidence of something else.
+3. **`@` and `.` are the two markers with the most corpus exposure**, and they
+   are the unfixed one and the fixed-but-unverifiable one (R2.g). Not an
+   objection — a line for the owner's reading of any AUC-24 movement.
+4. **`DOOR SLAMS (OS)` becomes a character cue where it did not before.** An
+   all-caps action line ending in a non-canonical extension alias is now a cue
+   with the next line as dialogue. I checked this is a *consistency* fix, not a
+   new misparse class: the canonical `DOOR SLAMS (O.S.)` was **already** read as
+   a cue at `85273742`, so the round removes a spelling-dependent inconsistency
+   rather than creating an ambiguity. The doc's "what it will not eat"
+   paragraph addresses the wryly case (`MARY (into phone)`, verified untouched)
+   but not this one; one clause would complete it.
+5. **R2.8's "23 quarantine entries"** reads 24 here. The `exclude` array is
+   **24 entries on both trees and byte-unchanged in round 2** (empty
+   `tsconfig*.json` diffstat), and the gate prints how many entries exist on
+   disk — environment-dependent, not a widened exemption. Cosmetic.
+6. **Carried forward from round 1, unchanged and still binding:**
+   `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1,500,000` must not land before the
+   sibling lane's 675,000 re-derivation is applied on the merged tree with the
+   analyzer cap in place. The lane's §5 now says so.
+
+### What the owner's run settles and what it cannot
+
+Unchanged from round 1 in substance; round 2 changes only the *list* of
+corpus-visible changes, and that list is now written where the owner reads it.
+
+**Settles.** How much of those 761 drafts is text Fountain never prints (the
+denominator), and — newly, and this is the one the branch says to read first —
+what the two double-spaced-path changes do to per-script health, verdict,
+scene count and issue counts. The receipt's four-step order is the right order,
+with the caveat of non-blocking 1 that step 1 needs two exports before it can
+be run.
+
+**Settles, with four changes now in scope rather than two.** The strip-order
+change, the passes reading the reconstructed text, the marker strip and the
+extension fold all fire on document shapes this repository does not contain.
+The first two compound on every double-spaced document; the second two fire
+wherever a real draft carries a forced marker or a non-canonical extension,
+which — on the evidence of R2.b — is the difference between the private corpus
+and the benchmark corpus.
+
+**Cannot settle.** Whether the corrections are *right*. A boneyard is a
+comment, a forced marker is not a word, and one spelling of an extension is one
+speaker: the format answers all three, not a statistic. If AUC-24 falls, the
+finding is about what those drafts contain and what shape they arrive in.
+`AUC24_FLOOR` does not move.
+
+**Cannot move at all.** Round 2 itself: 45 of 45 reports byte-identical to
+`85273742`, six AUCs unchanged to the digit, no floor touched, no re-lock run.
+
+---
+
+*Round 2. Reviewed SHA **`b798a0c4`**; round 1's was `85273742`.*
