@@ -589,6 +589,12 @@
       "path": "docs/brain/Surfaces/Surface - Coverage Summary.md"
     },
     {
+      "id": "docs/brain/Surfaces/Surface - Export Round Trip.md",
+      "type": "surface",
+      "title": "Surface — Export Round Trip",
+      "path": "docs/brain/Surfaces/Surface - Export Round Trip.md"
+    },
+    {
       "id": "docs/brain/Surfaces/Surface - Exports.md",
       "type": "surface",
       "title": "Surface — Exports",
@@ -2049,6 +2055,22 @@
       "to": "docs/brain/Surfaces/Surface - Root Cause Pipeline.md"
     },
     {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Producer Tier.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Summary.md"
+    },
+    {
       "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
       "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
     },
@@ -2077,6 +2099,14 @@
       "to": "docs/brain/Surfaces/Surface - Exports.md"
     },
     {
+      "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
+      "to": "docs/brain/Surfaces/Surface - Producer Tier.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
       "from": "docs/brain/Surfaces/Surface - Coverage Summary.md",
       "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
     },
@@ -2087,6 +2117,14 @@
     {
       "from": "docs/brain/Surfaces/Surface - Coverage Summary.md",
       "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage Summary.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Export Round Trip.md",
+      "to": "docs/brain/Surfaces/Surface - Exports.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Exports.md",
@@ -2121,6 +2159,10 @@
       "to": "docs/brain/Surfaces/Surface - Producer Tier.md"
     },
     {
+      "from": "docs/brain/Surfaces/Surface - Exports.md",
+      "to": "docs/brain/Surfaces/Surface - Export Round Trip.md"
+    },
+    {
       "from": "docs/brain/Surfaces/Surface - Fix and Verify.md",
       "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
     },
@@ -2143,6 +2185,10 @@
     {
       "from": "docs/brain/Surfaces/Surface - Producer Tier.md",
       "to": "docs/brain/Surfaces/Surface - Exports.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Producer Tier.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
@@ -2179,6 +2225,10 @@
     {
       "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
       "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Slate.md",

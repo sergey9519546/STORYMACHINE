@@ -1,7 +1,7 @@
 ---
 type: surface
 updated: 2026-09-12
-sources: [server/lib/reader-tier.ts, server/lib/artifact-claims.ts, server/lib/page-refs.ts, server/lib/reference-bounds.ts, src/lib/priorities-copy.ts, scripts/measure-reader-tier-page.mjs, tests/core/reader-tier.test.ts, tests/core/page-refs.test.ts, tests/core/reference-bounds.test.ts, tests/core/artifact-claims.test.ts]
+sources: [server/lib/reader-tier.ts, server/lib/artifact-claims.ts, server/lib/page-refs.ts, server/lib/reference-bounds.ts, src/lib/priorities-copy.ts, scripts/measure-reader-tier-page.mjs, tests/core/reader-tier.test.ts, tests/core/page-refs.test.ts, tests/core/reference-bounds.test.ts, tests/core/artifact-claims.test.ts, server/lib/priority-selection.ts]
 status: active
 ---
 
@@ -97,6 +97,18 @@ and the block publishes no logline claim at all. Both export routes always suppl
 one, so the false sentence only ever reached callers inside this repository — it
 was still a sentence the document could not support.
 
+**The tier's list is a PREFIX of the body's, not a second selection
+(2026-09-12, adversarial finding #8).** `buildReaderTier` applied
+`suppressContradictoryFindings` itself and sliced to `TIER_PRIORITY_COUNT`; the
+coverage letter's body applied an anchored-first re-sort with no suppression, so
+one letter printed the same heading over two different lists and left the
+report's only CRITICAL off the body's three. The tier now calls
+`leadingPriorities` from `server/lib/priority-selection.ts`, which suppresses
+BEFORE it slices — so the tier leads with three findings rather than two and a
+hole whenever a suppressed finding falls inside the leading three, which is the
+one case the order of those two operations changes. See
+[[Surface - Coverage Letter]] for the measurement.
+
 ## Sources
 
 - `server/lib/reader-tier.ts`; `server/lib/page-refs.ts`; `server/lib/reference-bounds.ts`
@@ -104,4 +116,5 @@ was still a sentence the document could not support.
 - `scripts/measure-reader-tier-page.mjs`
 - `tests/core/reader-tier.test.ts`; `tests/core/page-refs.test.ts`; `tests/core/reference-bounds.test.ts`
 - `server/lib/artifact-claims.ts`; `tests/core/artifact-claims.test.ts`
+- `server/lib/priority-selection.ts`; `tests/core/priority-selection-one-list.test.ts`
 - `docs/CLAIMS_REGISTER.md` rows 82-83, 87-90, 94-99

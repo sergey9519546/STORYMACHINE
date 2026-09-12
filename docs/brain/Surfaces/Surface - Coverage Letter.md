@@ -1,7 +1,7 @@
 ---
 type: surface
 updated: 2026-09-12
-sources: [server/lib/coverage-letter.ts, server/routes/coverage-letter.ts, server/lib/verify-compare.ts, server/lib/artifact-claims.ts, scripts/verify-report.mjs, tests/core/coverage-letter.test.ts, server/lib/reader-tier.ts, server/lib/strengths-copy.ts]
+sources: [server/lib/coverage-letter.ts, server/routes/coverage-letter.ts, server/lib/verify-compare.ts, server/lib/artifact-claims.ts, scripts/verify-report.mjs, tests/core/coverage-letter.test.ts, server/lib/reader-tier.ts, server/lib/strengths-copy.ts, server/lib/priority-selection.ts, server/lib/report-sections.ts]
 status: active
 ---
 
@@ -85,6 +85,44 @@ twice. `Confirm the health, verdict, and hash above all match.` became
 `Every value listed below must match.` (`docs/CLAIMS_REGISTER.md` row 95), and the
 scope sentence naming what is NOT checked ships beside the rows (row 94).
 
+**Two contradictory "3 things to fix first" in one letter (2026-09-12,
+adversarial finding #8).** `src/lib/priorities-copy.ts` gave the list ONE heading
+everywhere. What nobody checked was what went under it: this letter printed
+`The 3 things to fix first` twice, over two lists chosen by two different
+algorithms — [[Surface - Producer Tier]]'s
+`suppressContradictoryFindings(topPriorities).slice(0, 3)` and this file's own
+`[...anchored, ...unanchored].slice(0, 3)`. MEASURED on
+`data/screenplays/runoff.fountain`, one export, one `contentHash`: page one led
+with the report's only CRITICAL ("Conflict layer") and the body's three were all
+MAJORs, so a writer working from the back of the letter never touched it — and
+the letter disagreed with the coverage HTML of the same hash, which led with the
+CRITICAL. `server/lib/priority-selection.ts` is now the one selection; the tier
+renders a PREFIX of it and the body renders all of it, exactly as
+[[Surface - Coverage HTML]] does. The anchored-first re-sort is deleted rather
+than moved into the shared function: applying it there would demote the same
+document-anchored CRITICAL on every surface instead of one, and the body now
+renders the whole list, so no finding the re-sort used to lift is lost. Same
+reasoning as this file's 2026-09-11 removal of its local `severityRank()`.
+
+**A Craft Dimensions section, with the gated badges (2026-09-12, findings
+#4/#14).** The letter stated dimension readings only inside its Summary
+paragraph and no dimension percentile at all, while the panel showed five badges
+and the exported HTML showed none. It now renders `label — 92/100 — <badge>` per
+dimension plus the section caption, from
+`src/lib/percentile-copy.ts`'s `dimensionPercentileBadgeFor` /
+`dimensionPercentileCaptionFor` — the same helpers the other two surfaces call.
+`tests/core/percentile-comparability.test.ts`'s prose count for the reference
+bounds goes 2 -> 3 as a result, and gains a per-section assertion, so a section
+that states the bounds twice — the defect that test exists for — still fails.
+
+**The Root Causes heading comes from the shared table (2026-09-12, finding
+#16).** Both renderers hand-typed it; two documents of one `contentHash` must not
+name the same section two ways. It now renders from
+`server/lib/report-sections.ts`, and so does the reference this letter makes to
+the exported HTML's "Structural Signals (new, unwired diagnostics)" strip — which
+had been the hand-typed string "Structural Signals" ever since that heading
+gained its qualifier.
+
 ## Sources
 
 - `server/lib/coverage-letter.ts`; `server/lib/artifact-claims.ts`
@@ -93,4 +131,7 @@ scope sentence naming what is NOT checked ships beside the rows (row 94).
 - `tests/core/coverage-letter.test.ts`
 - `tests/scripts/verify-report.test.ts`
 - `server/lib/reader-tier.ts`; `server/lib/strengths-copy.ts`; `server/lib/root-cause-pipeline.ts`
+- `server/lib/priority-selection.ts`; `server/lib/report-sections.ts`
+- `tests/core/priority-selection-one-list.test.ts`; `tests/core/report-cross-references.test.ts`
+- `tests/core/dimension-badge-export-parity.test.ts`
 - `docs/CLAIMS_REGISTER.md` rows 34-35, 39, 55, 56-57, 74-75, 82, 86-92

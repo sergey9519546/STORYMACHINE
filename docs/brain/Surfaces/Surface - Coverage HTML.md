@@ -1,7 +1,7 @@
 ---
 type: surface
 updated: 2026-09-12
-sources: [server/lib/coverage-html.ts, server/routes/export.ts, server/lib/verify-compare.ts, scripts/verify-report.mjs, tests/core/coverage-html.test.ts, server/lib/reader-tier.ts, server/lib/strengths-copy.ts, tests/core/reader-tier.test.ts]
+sources: [server/lib/coverage-html.ts, server/routes/export.ts, server/lib/verify-compare.ts, scripts/verify-report.mjs, tests/core/coverage-html.test.ts, server/lib/reader-tier.ts, server/lib/strengths-copy.ts, tests/core/reader-tier.test.ts, server/lib/priority-selection.ts, server/lib/report-sections.ts, src/lib/diagnostic-copy.ts]
 status: active
 ---
 
@@ -79,6 +79,61 @@ than this file's own assembly — see [[Surface - Root Cause Pipeline]] for the
 scene ranges, counts and ordering, and row 88 for the comparability gate that
 decides band versus "not comparable".
 
+**One priorities list, four surfaces (2026-09-12, adversarial finding #8).**
+This file applied `suppressContradictoryFindings` itself,
+[[Surface - Producer Tier]] applied it and sliced to three, the coverage
+letter's body applied an
+anchored-first re-sort with no suppression at all, and
+[[Surface - Script Doctor Panel]] applied nothing. `server/lib/priority-selection.ts`
+is now the one selection: `orderedPriorities` for a surface that shows all of
+them, `leadingPriorities` for one that shows a prefix — suppressing BEFORE the
+slice, so the tier leads with three findings rather than two and a hole. See
+[[Surface - Coverage Letter]] for what the letter used to print under the same
+heading.
+
+**Every cross-reference resolves (2026-09-12, adversarial finding #16).** This
+document told its reader to "read after Top Priorities" — a heading the
+2026-09-11 consolidation renamed, so `grep -c "Top Priorities"` on a real export
+of `data/screenplays/runoff.fountain` returned **1**, and that one occurrence was
+the reference itself. `server/lib/report-sections.ts` now holds every fixed
+section title and every `<h2>` here renders from it; the priorities heading stays
+out of that table because its text states a COUNT, so a reference to it is
+interpolated from `prioritiesHeadingFor` with the count the priorities section
+actually rendered, computed once in `renderCoverageHtml` and handed to all three
+sections that print or name it. The check is structural rather than a banned
+string: each reference renders as `<span class="xref">…</span>`, and
+`tests/core/report-cross-references.test.ts` asserts every one of them names a
+heading THIS document rendered, over four report shapes (the 231-scene fixture, a
+9-scene short, a report with no root causes, a one-priority report whose heading
+is "Fix this first" with no numeral).
+
+**The dimension badges reach this document (2026-09-12, findings #4/#14).** The
+Craft Dimensions block rendered label / bar / score / summary / basis and NO
+percentile badge, while the panel rendered five gated ones for the same five
+numbers of the same `contentHash`. Both exports now call
+`dimensionPercentileBadgeFor` / `dimensionPercentileTooltipFor` /
+`dimensionPercentileCaptionFor` — `src/lib/percentile-copy.ts`'s three gated
+helpers, with the same three arguments the panel passes. The badge sits beside
+the LABEL, not the score: "not comparable" is a statement about the ranking, and
+putting it next to the 92/100 is what made the two read as two readings of one
+number. `tests/core/dimension-badge-export-parity.test.ts` asserts EQUALITY
+against those helpers per dimension, in the HTML, the markdown letter and the
+plain-text letter, plus a constructed in-bounds case (0 of the 20 CC0 scripts are
+inside the reference bounds, so the shown path has to be built).
+
+**Two diagnostics that used to read as score (2026-09-12, findings #9/#11).**
+This section printed `Graph Health 37/100` and, under it,
+`→ Health deduction  −9` — a sentence claiming nine points came off, in a
+document headlining Health 78, for a field
+`server/nvm/analyze/types.ts` documents as "NOT part of health/verdict". The
+heading now carries `DIAGNOSTIC_NOT_IN_HEALTH_LABEL`, the card carries
+`diagnosticNotInHealthSentence('Graph Health')`, and the deduction renders
+through `UNAPPLIED_DEDUCTION_LABEL` / `unappliedDeductionReading` — conditional,
+unsigned, out of the headline's "hp" unit (`src/lib/diagnostic-copy.ts`, shared
+with the panel). Nothing is removed: the score, the magnitude and every finding
+under them still print. The same section now also carries the Voice Separation
+channel in both its states — see [[Surface - Coverage Summary]].
+
 ## Sources
 
 - `server/lib/coverage-html.ts`
@@ -88,4 +143,7 @@ decides band versus "not comparable".
 - `tests/scripts/verify-report.test.ts`
 - `server/lib/reader-tier.ts`; `server/lib/strengths-copy.ts`; `server/lib/root-cause-pipeline.ts`
 - `tests/core/reader-tier.test.ts`; `tests/routes/root-cause-parity.test.ts`
-- `docs/CLAIMS_REGISTER.md` rows 49-51, 53, 56-57, 74-75, 82, 86-92
+- `server/lib/priority-selection.ts`; `server/lib/report-sections.ts`
+- `tests/core/priority-selection-one-list.test.ts`; `tests/core/report-cross-references.test.ts`
+- `tests/core/dimension-badge-export-parity.test.ts`; `tests/core/unapplied-deduction-honesty.test.ts`
+- `docs/CLAIMS_REGISTER.md` rows 49-51, 53, 56-57, 74-75, 82, 86-92, 107-109, 114

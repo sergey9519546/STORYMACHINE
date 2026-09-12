@@ -1,7 +1,7 @@
 ---
 type: surface
 updated: 2026-09-12
-sources: [src/components/scriptide/ScriptDoctorPanel.tsx, src/lib/diagnostic-copy.ts, src/lib/percentile-copy.ts, src/lib/finding-jump.ts, server/nvm/analyze/doctor.ts, tests/core/script-doctor.test.ts, tests/core/finding-jump.test.ts, src/lib/priorities-copy.ts, server/lib/strengths-copy.ts, server/lib/scene-ranges.ts]
+sources: [src/components/scriptide/ScriptDoctorPanel.tsx, src/lib/diagnostic-copy.ts, src/lib/percentile-copy.ts, src/lib/finding-jump.ts, server/nvm/analyze/doctor.ts, tests/core/script-doctor.test.ts, tests/core/finding-jump.test.ts, src/lib/priorities-copy.ts, server/lib/strengths-copy.ts, server/lib/scene-ranges.ts, server/lib/priority-selection.ts]
 status: active
 ---
 
@@ -189,6 +189,22 @@ That is why a 100/100 dimension could read "bottom 10%" and an 81.5 "top 10%":
 the badge was a scene-count readout. Re-ranking is a scoring change and was not
 made; the tooltip names the mismatch instead. See [[Patterns]] for the shape.
 
+**Two lists and one unapplied deduction (2026-09-12, adversarial findings #8
+and #11).** This panel rendered `report.topPriorities` RAW — the only one of the
+four surfaces that applied no contradictory-pair suppression, so it could show a
+writer a finding the coverage HTML and the coverage letter of the same
+`contentHash` had already dropped as contradicted. It now renders
+`orderedPriorities` from `server/lib/priority-selection.ts`, memoised on the
+report object; see [[Surface - Coverage Letter]] for the measurement that found
+it. Separately, the Graph Health card printed `37/100 −9hp`, the −9hp in stamp
+red, in the headline health's own unit, for a field
+`server/nvm/analyze/types.ts` documents as "NOT part of health/verdict" — the
+2026-09-11 lane captioned that number and left the figure. The figure is now
+`unappliedDeductionLine` from `src/lib/diagnostic-copy.ts`: conditional
+("Would deduct if enabled"), unsigned ("up to 9 pts — not applied"), muted rather
+than penalty-coloured, and the same rendering the exported report carries. The
+magnitude still prints; nothing is removed.
+
 ## Sources
 
 - `src/components/scriptide/ScriptDoctorPanel.tsx`,
@@ -206,4 +222,6 @@ made; the tooltip names the mismatch instead. See [[Patterns]] for the shape.
   `tests/core/dimension-percentile-badge.test.ts`,
   `tests/core/dimension-badge-wiring.test.ts`
 - `docs/audits/2026-09-12-adversarial/writer-loop.md` findings 4, 9, 14
+- `server/lib/priority-selection.ts`; `src/lib/diagnostic-copy.ts`
+- `tests/core/priority-selection-one-list.test.ts`; `tests/core/unapplied-deduction-honesty.test.ts`
 - `docs/CLAIMS_REGISTER.md` rows 9, 32-33, 36-38, 49, 72-73, 80-81, 86-88, 91, 102-105 (this panel's claims)

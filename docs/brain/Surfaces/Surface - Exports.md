@@ -1,7 +1,7 @@
 ---
 type: surface
 updated: 2026-09-12
-sources: [server/routes/export.ts, server/routes/coverage-letter.ts, server/lib/verify-compare.ts, server/lib/artifact-claims.ts, server/lib/build-info.ts, scripts/verify-report.mjs, tests/routes/export-verify.test.ts, tests/core/artifact-claims.test.ts, server/lib/root-cause-pipeline.ts, server/lib/reader-tier.ts]
+sources: [server/routes/export.ts, server/routes/coverage-letter.ts, server/lib/verify-compare.ts, server/lib/artifact-claims.ts, server/lib/build-info.ts, scripts/verify-report.mjs, tests/routes/export-verify.test.ts, tests/core/artifact-claims.test.ts, server/lib/root-cause-pipeline.ts, server/lib/reader-tier.ts, src/lib/export-roundtrip.ts]
 status: active
 ---
 
@@ -142,6 +142,14 @@ body-only and every-rendering forgeries, against artifacts a live keyless server
 produced, plus CRLF/BOM variants).
 
 
+**Export → re-import (2026-09-12, adversarial finding #18).** The export routes
+above hand a writer a file; what happens when that file comes BACK decides
+whether a report on it is the report they were given. Three content-loss bugs
+(the FDX importer deleting the whole `<TitlePage>` subtree, a transition
+terminator being doubled, and a draft date that was in no export's title-page
+model) and the format limits that remain are in
+[[Surface - Export Round Trip]].
+
 ## Sources
 
 - `server/routes/export.ts`
@@ -153,4 +161,5 @@ produced, plus CRLF/BOM variants).
 - `tests/core/build-info.test.ts`
 - `server/lib/root-cause-pipeline.ts`; `server/lib/reader-tier.ts`
 - `tests/routes/root-cause-parity.test.ts`
-- `docs/CLAIMS_REGISTER.md` rows 10, 74-75, 82, 87-92
+- `src/lib/export-roundtrip.ts`; `tests/core/export-roundtrip.test.ts`
+- `docs/CLAIMS_REGISTER.md` rows 10, 74-75, 82, 87-92, 111-113
