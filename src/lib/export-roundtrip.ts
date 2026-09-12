@@ -129,6 +129,16 @@ export const EXPORT_ROUNDTRIP_SUMMARY =
  *                 where the line reads as action without it, it is dropped.
  *                 Forcing every all-caps action line instead would prefix `!`
  *                 to text the writer never forced.
+ *
+ * WHAT 'survives' DOES NOT COVER: paragraph GROUPING. FDX has one unit of body
+ * text and it is the paragraph, so three action lines written without blank
+ * lines between them come back as three paragraphs rather than one block.
+ * MEASURED, and identical before and after this lane's rewrite — 3 source
+ * paragraphs -> 5 on the same input, on both trees. Nothing is added, lost or
+ * reordered, the analyzer reads the result the same way (no block type, scene
+ * count or word count changes), and it is named here only because "everything
+ * that prints comes back" is now an exact claim rather than a hedge, and this
+ * is the one thing that legitimately changes shape.
  */
 export const FDX_CONSTRUCT_FATE = {
   'dual dialogue (^)':            'survives',

@@ -560,3 +560,57 @@ describe('the omission rule covers exactly what the parser implements', () => {
     assert.match(disclosure, /constructs `src\/lib\/fountain\.ts` IMPLEMENTS/);
   });
 });
+
+// ── The one thing that legitimately changes shape ────────────────────────────
+//
+// 2026-09-12 (review round 2, non-blocking 4). "Everything that prints comes
+// back" is an exact claim now, so the one exception is stated and pinned rather
+// than left for the next reader to find: FDX's unit of body text is the
+// paragraph, so action lines written as one block come back as one paragraph
+// each. Inherent to the format, unchanged by this lane, and invisible to the
+// engine — which is the half that makes it a shape change rather than a loss.
+
+describe('paragraph grouping is not preserved, and nothing else changes with it', () => {
+  const SRC = [
+    'INT. KITCHEN - DAY',
+    '',
+    'MAYA pours coffee.',
+    'She does not drink it.',
+    'The cup goes cold.',
+    '',
+    'DAN watches.',
+    '',
+  ].join('\n');
+
+  const back = fdxToFountain(fountainToFdx(SRC)).fountain;
+  const paragraphs = (t: string) => t.trim().split(/\n\s*\n/).length;
+
+  it('one action block of three lines comes back as three paragraphs', () => {
+    assert.equal(paragraphs(SRC), 3);
+    assert.equal(paragraphs(back), 5, 'the grouping claim in export-roundtrip.ts is stale');
+  });
+
+  it('and every line is there, in order, with nothing added', () => {
+    // A regrouping is only acceptable because it is exactly that. If a line
+    // were lost or reordered by the same mechanism, this is where it shows.
+    assert.deepEqual(contentLines(back), contentLines(SRC));
+  });
+
+  it('and the disclosure says so, beside the table that would otherwise imply otherwise', () => {
+    const disclosure = readFileSync(join(REPO, 'src/lib/export-roundtrip.ts'), 'utf8');
+    assert.match(disclosure, /WHAT 'survives' DOES NOT COVER: paragraph GROUPING/,
+      "FDX_CONSTRUCT_FATE's 'survives' rows must name the one thing they do not cover");
+  });
+
+  it('the engine cannot tell: same block types, same scene count, same words', async () => {
+    const { runScriptDoctor } = await import('../../server/nvm/analyze/doctor.ts');
+    const before = await runScriptDoctor(SRC);
+    const after = await runScriptDoctor(back);
+    assert.equal(after.sceneCount, before.sceneCount);
+    assert.equal(after.wordCount, before.wordCount);
+    assert.deepEqual(
+      parseFountain(back).filter(b => b.type !== 'empty').map(b => b.type),
+      parseFountain(SRC).filter(b => b.type !== 'empty').map(b => b.type),
+    );
+  });
+});
