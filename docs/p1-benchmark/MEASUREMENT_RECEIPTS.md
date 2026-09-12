@@ -2810,7 +2810,17 @@ prints, per script, `isDoubleSpaced` / `submittedWordCount` / `wordCount` /
 the gap and its share of the submission / `health` / `verdict` / `sceneCount` /
 critical-major-minor, then the same summary for each of the two groups. It
 computes no AUC, asserts no floor and writes no file; the corpus is read on the
-owner's machine and nothing leaves it, and no screenplay text is printed. Run
+owner's machine and nothing leaves it, and no screenplay text is printed.
+
+**Its output is a local artifact and must not be pasted anywhere** — not into
+this receipt, a ticket, a commit message or a chat. Every row begins with a
+corpus file path, and on the private corpus those paths are the titles of 761
+real screenplays. They are not screenplay text, so the copyright boundary is
+intact, but collectively they are the corpus's index, which this repository has
+never published. Keep the table and any `--csv` file on the machine that
+produced them; if a number has to travel, quote an aggregate from the two group
+summaries. The `--public` form is the only exception, because those 32 files
+are committed here already. Run
 it once on a pre-branch checkout and once here and diff the `--csv`. **Copy
 `scripts/probe-corpus-shape.ts` onto the pre-branch checkout first** — it does
 not exist there — and expect its `isDoubleSpaced` and `submittedWordCount`

@@ -40,6 +40,16 @@
 // With the env var unset it SKIPS with exit 0, so an unset env can never
 // masquerade as a result.
 //
+// THE OUTPUT IS A LOCAL ARTIFACT. DO NOT PASTE IT ANYWHERE. Every row begins
+// with a corpus file path, and on the private corpus those paths are the
+// TITLES of 761 real screenplays — not screenplay text, so the copyright
+// boundary above still holds, but collectively they are the corpus's index,
+// which this repository has never published and must not start publishing in a
+// receipt, a ticket, a commit message or a chat. Keep the table and any
+// `--csv` file on the machine that produced them, and quote only aggregates
+// (the group summaries) if a number has to travel. The `--public` form is the
+// exception and the only one: those 32 files are committed here already.
+//
 // RUN:
 //   REAL_SCRIPT_CORPUS_DIR="../real-script-corpus" npm run probe-corpus-shape
 //   REAL_SCRIPT_CORPUS_DIR="../real-script-corpus" npm run --silent probe-corpus-shape -- --csv > shape.csv
