@@ -14,7 +14,7 @@ import { DEFAULT_TITLE_PAGE, type TitlePageState } from "../../src/lib/scriptide
 import { scriptExportFilename, slugifyScriptTitle } from "../../src/lib/export-filename.ts";
 
 describe("parseFountainTitleBlock", () => {
-  it("parses Title/Author/Contact out of a leading title block", () => {
+  it("parses Title/Author/Contact/Draft date out of a leading title block", () => {
     const script = [
       "Title: Midnight Signal",
       "Credit: Written by",
@@ -28,11 +28,24 @@ describe("parseFountainTitleBlock", () => {
       "",
     ].join("\n");
     const parsed = parseFountainTitleBlock(script);
+    // 2026-09-12 (adversarial finding #18): `draftDate` joined the three tracked
+    // fields so that an export can carry it and a re-import gets it back — it was
+    // in no exporter's title-page model, so all three dropped it and an
+    // FDX round trip lost the writer's draft date. Still a deepEqual, so a
+    // FURTHER field cannot be added without this assertion noticing.
     assert.deepEqual(parsed, {
       title: "Midnight Signal",
       author: "Jane Doe",
       contact: "jane@example.com",
+      draftDate: "January 1, 2026",
     });
+  });
+
+  it("a block with a draft date and none of the three tracked fields is still no title page", () => {
+    // The null test is deliberately unchanged by the draftDate addition: a script
+    // that opens with a stray `Draft date:` line must not suddenly acquire a
+    // title page in ScriptIDE's Title tab.
+    assert.equal(parseFountainTitleBlock("Draft date: January 1, 2026\n\nFADE IN:\n"), null);
   });
 
   it("accepts 'Authors:' (plural) as an alias for Author", () => {
