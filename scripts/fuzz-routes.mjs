@@ -545,17 +545,24 @@ async function concurrencyAttack(base) {
   console.log(`  status breakdown: ${JSON.stringify(byStatus)}, wall=${wallMs}ms`);
   console.log(`  /health during load: n=${healthSamples.length}, p95=${p95}ms, max=${Math.max(...healthSamples, 0)}ms`);
 
-  // 503 here is `SessionCapacityError` (server/lib/session-store.ts) or the
-  // doctor-pool's own admission-control refusal (doctor-pool.ts) — both are
-  // deliberate, caught, formatted responses (their own test coverage exists
-  // under tests/core/doctor-analysis-budget.test.ts), not an uncaught
-  // exception. On a freshly-booted server with a real 120/min ceiling, 200
-  // truly concurrent requests using 200 distinct session ids can legitimately
-  // trip MAX_SESSIONS (server/lib/session-store.ts) once enough sessions are
-  // simultaneously busy — a second, orthogonal way this server sheds an
-  // overflow it cannot serve, not a crash. A real crash — a network error/
-  // timeout (status null) or an UNCAUGHT exception (any other 5xx) — still
-  // flags.
+  // Measured (round-4 review, and reproduced independently by this lane —
+  // see docs/audits/2026-09-12-adversarial/followups-lane-report.md "Round
+  // 3"): on a freshly-booted server at the real ceiling, every 503 this case
+  // observes is `DoctorAnalysisBudgetExceededError` (state: 'queued',
+  // server/lib/doctor-budget.ts) — the doctor analysis pool's own queue
+  // budget declining to start a run because no worker slot freed up in time,
+  // not a session-lifecycle refusal. `SessionCapacityError`
+  // (server/lib/session-store.ts, MAX_SESSIONS) is a real 503 source
+  // elsewhere in this server, but it cannot fire in THIS case:
+  // gameLimiter (120/min/IP) admits only ~90 of the 200 requests past the
+  // per-IP ceiling before the window is spent, well under MAX_SESSIONS=100,
+  // so the session table never fills here. Both are deliberate, caught,
+  // formatted responses — the doctor budget's own test coverage is
+  // tests/core/doctor-analysis-budget.test.ts, session capacity's is
+  // tests/core/session-eviction.test.ts — never an uncaught exception, which
+  // is why the exclusion below is by status code rather than by which of the
+  // two fired. A real crash — a network error/timeout (status null) or an
+  // UNCAUGHT exception (any other 5xx) — still flags.
   const crashedOutcomes = outcomes.filter(o => o.status === null || (o.status >= 500 && o.status !== 503));
   const succeeded = byStatus['200'] || 0;
   const limited = byStatus['429'] || 0;
@@ -585,7 +592,7 @@ async function concurrencyAttack(base) {
       status: (succeeded > 0 && (limited > 0 || capacityRefused > 0)) ? 'overflow-shed' : 'no-overflow-signal',
       expectStatus: 'overflow-shed',
       ms: 0,
-      note: `${succeeded} succeeded, ${limited} rate-limited (gameLimiter), ${capacityRefused} refused on session capacity, wall=${wallMs}ms, on a fresh window, 0 crashed`,
+      note: `${succeeded} succeeded, ${limited} rate-limited (gameLimiter), ${capacityRefused} refused by the doctor analysis budget (pool admission control), wall=${wallMs}ms, on a fresh window, 0 crashed`,
     });
   }
   if (p95 > SLOW_THRESHOLD_MS) {
