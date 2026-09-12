@@ -2923,3 +2923,170 @@ describe('ROUND 7 equivalence: retiring the legacy voice-eligible-weight walk ch
     assertSameDecision('round-2 realistic 150-name skewed feature', text);
   });
 });
+
+// ── FINDING 10 (2026-09-12 adversarial review, engine-logic.md): the
+// voice-eligible-weight bound bound at a cast of 300,000 / 15,000 ≈ 20 on
+// an ORDINARY ~15,000-dialogue-word feature — an entirely ordinary
+// 20-character ensemble (heist, courtroom drama, war film, TV pilot) got no
+// score and no report. Re-derived by measurement (see
+// MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own comment in validation.ts for the
+// six timings and the full bracket derivation) to 1,500,000. This block
+// proves three things: (1) realistic 20/30/40-cast features are now
+// ACCEPTED, (2) the new bound is still STRICTLY BELOW the lightest payload
+// this file's own DoS/bypass regressions pin as REJECTED — computed here
+// from that fixture's own generator, not restated as a literal, so a future
+// edit to that fixture's shape re-checks the inequality rather than
+// silently trusting a stale number — and (3) every one of this file's
+// existing 648 pinned decisions is unchanged (verified by running this
+// whole suite after the bound change: 648/648 pass, none flipped).
+describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — realistic casts accept, DoS fixtures still reject', () => {
+  const DLG6 = 'this is ordinary lowercase dialogue here.';
+
+  // Same Zipf-with-a-floor shape the constant's own header comment measures
+  // against (probe-cast.ts): every character clears VOICE_ELIGIBLE_MIN_WORDS
+  // with margin (the worst case for this bound — a real script's minors
+  // usually fall under the floor and skip it entirely), spread over a
+  // 110-page-scale feature.
+  function buildProbeCastFeature(cast: number, totalDialogueWords = 15_150): string {
+    const raw: number[] = [];
+    let rawSum = 0;
+    for (let i = 1; i <= cast; i++) { const w = 1 / i; raw.push(w); rawSum += w; }
+    const alloc = raw.map((w) => Math.max(35, Math.round((w / rawSum) * totalDialogueWords)));
+    const drift = totalDialogueWords - alloc.reduce((a, b) => a + b, 0);
+    alloc[0] = Math.max(35, alloc[0]! + drift);
+
+    const names = Array.from({ length: cast }, (_, i) => `CHARACTER${i + 1}`);
+    let text = 'INT. ROOM 0 - DAY\n\nA moment passes before anyone speaks.\n\n';
+    let scene = 1;
+    for (let i = 0; i < cast; i++) {
+      let remaining = alloc[i]!;
+      while (remaining > 0) {
+        const n = Math.min(remaining, 10);
+        text += `${names[i]}\n${DLG6}${n > 6 ? ' ' + DLG6 : ''}\n\n`;
+        remaining -= Math.min(remaining, n > 6 ? 12 : 6);
+        if (remaining > 0 && (i + scene) % 7 === 0) {
+          text += `INT. LOCATION ${scene++} - DAY\n\nA moment passes before anyone speaks.\n\n`;
+        }
+      }
+    }
+    return text;
+  }
+
+  for (const cast of [20, 30, 40]) {
+    it(`a realistic ${cast}-cast fully-eligible feature (Zipf-distributed speech, 35-word floor, ~15,150 pooled dialogue words) is ACCEPTED`, () => {
+      const text = buildProbeCastFeature(cast);
+      const reason = fountainShapeRejectionReason(text);
+      assert.equal(reason, null, `expected a realistic ${cast}-cast feature to be accepted, got: ${reason}`);
+    });
+  }
+
+  it('a realistic 15-cast feature is ACCEPTED too (sanity: the pre-existing floor case still works)', () => {
+    const text = buildProbeCastFeature(15);
+    assert.equal(fountainShapeRejectionReason(text), null);
+  });
+
+  // Brief item (b)/(c)/(d): the lightest payload this file's own DoS/bypass
+  // regressions pin as REJECTED via this bound is ROUND 3's "bypass B"
+  // (200 uniform names, 4 occurrences each, 3 hard-wrapped 4-real-word
+  // lines per occurrence — the "line ${w} has five words" digit token drops
+  // out of voiceTokenCount's letter-only regex, leaving 4 real words per
+  // wrap line). Recomputed HERE from that exact generator (not restated as
+  // a literal weight) so this inequality is re-checked against the real
+  // fixture shape, not a number that could silently drift out of sync with
+  // it.
+  function bypassBWeight(): number {
+    function dsWrapped(distinct: number, occPerChar: number, wrapLines: number): string {
+      let t = '', scene = 0, occ = 0;
+      const total = distinct * occPerChar;
+      while (occ < total) {
+        t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < 40 && occ < total; i++, occ++) {
+          t += `CHAR${occ % distinct}\n\n`;
+          for (let w = 0; w < wrapLines; w++) t += `line ${w} has five words\n\n`;
+        }
+      }
+      return t;
+    }
+    const text = dsWrapped(200, 4, 3);
+    const blocks = parseFountain(normalizeScreenplay(text));
+    const counts = new Map<string, number>();
+    let currentSpeaker = '';
+    for (const b of blocks) {
+      const t = b.text.trim();
+      if (!t) continue;
+      if (b.type === 'character' || b.type === 'dual_dialogue') {
+        currentSpeaker = t.replace(/\^\s*$/, '').trim();
+      } else if (b.type === 'dialogue' && currentSpeaker) {
+        const words = (t.toLowerCase().match(/[a-z']+/g) ?? []).filter((w) => /[a-z]/.test(w)).length;
+        counts.set(currentSpeaker, (counts.get(currentSpeaker) ?? 0) + words);
+      }
+    }
+    const nonZero = [...counts.values()].filter((w) => w > 0);
+    const total = nonZero.reduce((a, b) => a + b, 0);
+    return nonZero.length * total;
+  }
+
+  it('the bound is strictly below the lightest payload this file pins as REJECTED (bypass B, weight computed from its own generator — not a literal)', () => {
+    const weight = bypassBWeight();
+    assert.equal(weight, 1_920_000, 'sanity: bypass B\'s own weight must match what the constant\'s header comment cites, or the derivation is stale');
+    assert.ok(
+      MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT < weight,
+      `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT (${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT}) must stay strictly below bypass B's weight (${weight}), or that DoS fixture would stop being rejected by this bound`,
+    );
+    // And bypass B itself must still actually be rejected under the new
+    // bound — the inequality above is necessary but not sufficient proof by
+    // itself (a bound above the OLD weight formula's rounding, say, could
+    // still satisfy `<` while the real guard disagreed for an unrelated
+    // reason); this closes that gap directly against the production path.
+    const text = (() => {
+      let t = '', scene = 0, occ = 0;
+      const total = 200 * 4;
+      while (occ < total) {
+        t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < 40 && occ < total; i++, occ++) {
+          t += `CHAR${occ % 200}\n\n`;
+          for (let w = 0; w < 3; w++) t += `line ${w} has five words\n\n`;
+        }
+      }
+      return t;
+    })();
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected bypass B to still be rejected under the new bound');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
+
+  it('every one of this file\'s existing rejection fixtures is still REJECTED under the new bound — verified by this whole suite (648 tests, all 23 describe blocks above) passing unchanged after the MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT edit; nothing in ROUNDS 2-7 above flipped from reject to accept', () => {
+    // Spot-check the three heaviest-cited reviewer/attack payloads directly,
+    // as a fast, self-contained proof alongside the full-suite evidence
+    // this test's title cites (every ROUND 2-7 describe block above already
+    // asserts its own fixtures independently; this is not a substitute for
+    // those, just a same-file confirmation that does not depend on test
+    // execution order).
+    const DLG = 'this is ordinary lowercase dialogue here.';
+    function uniformCast(distinct: number, occurrences: number): string {
+      let t = 'INT. ROOM - DAY\n\n', occ = 0, scene = 0;
+      while (occ < occurrences) {
+        t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room, quietly and without much fuss.\n\n`;
+        for (let i = 0; i < 40 && occ < occurrences; i++, occ++) t += `CHAR${occ % distinct}\n${DLG}\n\n`;
+      }
+      return t;
+    }
+    function r6Doc(): string {
+      let t = '', occ = 0;
+      for (let s = 0; s < 400; s++) {
+        t += `INT. LOCATION ${s} - DAY\n\nSomething happens in the room.\n\n`;
+        for (let i = 0; i < 5; i++, occ++) t += `CHAR${occ % 200}\n${DLG6}\n\n`;
+      }
+      return t;
+    }
+    for (const [label, text] of [
+      ['reviewer payload 1 (50x18,000, weight 4,788,000)', uniformCast(50, 18_000)],
+      ['reviewer payload 2 (520x6,000, weight 18,720,000)', uniformCast(520, 6_000)],
+      ['R6-0 (200x2,000 over 400 scenes, weight 2,400,000)', r6Doc()],
+    ] as const) {
+      const reason = fountainShapeRejectionReason(text);
+      assert.ok(reason, `expected "${label}" to still be rejected`);
+      assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/, `"${label}"`);
+    }
+  });
+});

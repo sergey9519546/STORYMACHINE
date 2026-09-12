@@ -67,7 +67,10 @@ decision, repo visibility. Each has its own note under `Owner/`; start at
   numbered entry in `docs/DECISION_LOG.md`) — start at
   [[Decision 1 - User Validation First]].
 - **"What stops a bad change from merging?"** → `Gates/` — start at
-  [[Gate - Receipt Gate]].
+  [[Gate - Receipt Gate]]. For the generated-artifact freshness check on the
+  rule catalog, see [[Gate - Rulebook Freshness]]; for the raw-text cost
+  bounds every route enforces before analysis, see
+  [[Gate - Fountain Shape Guard]].
 - **"What does surface X actually show, and where does the number come
   from?"** → `Surfaces/` — start at [[Surface - Script Doctor Panel]].
   When a number appears on more than one surface, the note for the shared

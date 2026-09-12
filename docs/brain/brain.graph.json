@@ -163,6 +163,12 @@
       "path": "docs/brain/Gates/Gate - Corpus Layout Verification.md"
     },
     {
+      "id": "docs/brain/Gates/Gate - Fountain Shape Guard.md",
+      "type": "gate",
+      "title": "Gate — Fountain Shape Guard",
+      "path": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
       "id": "docs/brain/Gates/Gate - Honesty Audit.md",
       "type": "gate",
       "title": "Gate — Honesty Audit",
@@ -197,6 +203,12 @@
       "type": "gate",
       "title": "Gate — Receipt Gate",
       "path": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "id": "docs/brain/Gates/Gate - Rulebook Freshness.md",
+      "type": "gate",
+      "title": "Gate — Rulebook Freshness",
+      "path": "docs/brain/Gates/Gate - Rulebook Freshness.md"
     },
     {
       "id": "docs/brain/Glossary.md",
@@ -670,6 +682,14 @@
     },
     {
       "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Gates/Gate - Rulebook Freshness.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
       "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
     },
     {
@@ -1081,6 +1101,14 @@
       "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
     },
     {
+      "from": "docs/brain/Gates/Gate - Fountain Shape Guard.md",
+      "to": "docs/brain/Gates/Gate - Pure-Core Boundary.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Fountain Shape Guard.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
       "from": "docs/brain/Gates/Gate - Honesty Audit.md",
       "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
     },
@@ -1135,6 +1163,10 @@
     {
       "from": "docs/brain/Gates/Gate - Receipt Gate.md",
       "to": "docs/brain/Gates/Gate - Pure-Core Boundary.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Rulebook Freshness.md",
+      "to": "docs/brain/Surfaces/Surface - Root Cause Pipeline.md"
     },
     {
       "from": "docs/brain/Glossary.md",

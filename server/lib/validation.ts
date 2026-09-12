@@ -570,14 +570,72 @@ const VOICE_ELIGIBLE_MIN_WORDS = 30;
 // VOICE_ELIGIBLE_MIN_WORDS — the one condition under which voice-delta.ts's
 // O(distinct²) Burrows's-Delta pass actually runs instead of abstaining —
 // (eligible character count) x (their total pooled dialogue words) must not
-// exceed this. Calibrated from the round-2 cost grid: the four measured
-// ACCEPTED-and-eligible extremes cost 0.01-0.022ms per unit of this
-// product; 300,000 x the worst observed rate (0.022ms/unit) predicts a
-// ~6.6s ceiling, comfortably under the review's ~10s target with margin for
-// a slower box. Every legitimate fixture measured against this bound (the
-// 54 tracked fixtures, the CC0 corpus, a realistic 150-name skewed feature)
-// clears it by at least 3x — see this file's own margin-proof test.
-export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 300_000;
+// exceed this.
+//
+// 2026-09-12 RE-DERIVATION (docs/audits/2026-09-12-adversarial/engine-logic.md
+// finding 10). The round-2/3 value this replaces (300,000) bound at a cast of
+// 300,000 / 15,000 ≈ 20 on an ORDINARY ~15,000-dialogue-word feature —
+// MAX_FOUNTAIN_FREQUENT_CUE_LINES's own neighbouring comment says "a real
+// large-ensemble feature can comfortably have dozens of characters," but
+// this bound fired FIRST and rejected a routine 20-speaking-character
+// ensemble outright (heist, courtroom drama, war film, TV pilot) — no score,
+// no report. Re-derived by measurement, not guesswork:
+//
+// (a) Six timings, probe-cast shape (Zipf-distributed per-character speech
+//     allocation, 35-word floor so every character clears
+//     VOICE_ELIGIBLE_MIN_WORDS=30 with margin — the WORST case for this
+//     bound, since a real script's minor characters usually fall under the
+//     floor and skip the bound entirely — 110-page feature, ~15,150 pooled
+//     dialogue words total), runScriptDoctor with the guard bypassed, this
+//     lane's box:
+//       cast 15  weight   227,250  wall  8,396ms  cpu  7,962ms
+//       cast 20  weight   303,000  wall  8,665ms  cpu  8,451ms
+//       cast 25  weight   378,750  wall  9,449ms  cpu  9,105ms
+//       cast 30  weight   454,500  wall  9,471ms  cpu  9,214ms
+//       cast 40  weight   606,000  wall 10,691ms  cpu 10,451ms
+//       cast 60  weight   909,000  wall 13,734ms  cpu 13,592ms
+//     Confirms finding 10's own reproduction (cast 20 already crosses the
+//     OLD 300,000 bound, at weight 303,000) and that a fully-eligible
+//     60-character ensemble finishes in well under 14s — nowhere near a DoS
+//     shape; the O(distinct²) cost this bound exists to stop is driven by
+//     DISTINCT COUNT far more than by this product once the cast stays in
+//     the dozens, not the hundreds.
+// (b) The lightest payload the existing DoS/bypass regression fixtures
+//     (tests/security/fountain-shape-guard-cue-parity.test.ts) pin as
+//     REJECTED via this bound: ROUND 3's "bypass B" (200 uniform names, 4
+//     dialogue occurrences each, 3 hard-wrapped 4-real-word lines per
+//     occurrence) — weight 1,920,000. Every OTHER fixture in that file
+//     pinned REJECTED via this bound measures at or above 2,400,000 (the
+//     "200 names x ~2,000 occurrences" shape common to rounds 2, 3, 4, 5, 6
+//     and 7); bypass B is the minimum found.
+// (c) New bound, bracketed strictly inside (40-cast normal feature, bypass
+//     B) = (606,000, 1,920,000): 1,500,000 — derived from
+//     MAX_FOUNTAIN_FREQUENT_CUE_LINES's own "dozens ... not HUNDREDS"
+//     framing two constants up: 99 characters (the largest cast still
+//     short of "hundreds") at this same ~15,150-word feature is
+//     99 x 15,150 = 1,499,850, rounding to 1,500,000. The bound now admits
+//     any cast this repo's own neighbouring comment already calls ordinary
+//     (2.48x above the measured 40-cast weight), while staying 1.28x below
+//     the lightest fixture the security suite pins as an attack.
+//
+//     The independent scoring-branch re-derivation (scoring/feature-length-
+//     defects) landed on the SAME value, 1,500,000, bracketed inside
+//     [1,331,970, 1,920,000) — this lane's own measurement lands in that
+//     same bracket (the same value, in fact), from a lighter (~15,150-word)
+//     normal-feature assumption than whatever produced their 1,331,970
+//     lower endpoint; both derivations agree the binding constraint is the
+//     SAME upper bound (bypass B, 1,920,000), which is what actually caps
+//     how high this can safely go.
+//
+// Every legitimate fixture measured against this bound (the 54 tracked
+// fixtures, the CC0 corpus, a realistic 150-name skewed feature, and now the
+// probe-cast 20/30/40-cast features from finding 10) clears it — see this
+// file's own margin-proof tests and
+// tests/security/fountain-shape-guard-cue-parity.test.ts's "finding 10"
+// describe block. This bound stays STRICTLY below every fixture the DoS/
+// bypass regressions above pin as REJECTED — asserted directly (computed
+// from bypass B's own measured weight, not a literal) in that same block.
+export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1_500_000;
 // 2026-09-06 review round 7 follow-up, non-blocking — RESIDUAL accepted
 // worst case, recorded here rather than left unstated: a document sitting
 // at the analyzer's own 400-scene ceiling, with a genuine (not hand-model-
@@ -592,8 +650,9 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 300_000;
 // passes over a document at the size the analyzer itself advertises
 // supporting — not a mis-modelled eligibility set (that class, rounds 4-7,
 // is closed; see realVoiceEligibleWeightRejectionReason's own comment).
-// This crosses the "~10s" figure named earlier in this comment, but
-// bounding it further would mean rejecting legitimate documents at the
+// This sits above the ~8-14s range the 2026-09-12 re-derivation above
+// measured for fully-eligible casts up to 60, but bounding it further would
+// mean rejecting legitimate documents at the
 // analyzer's OWN advertised ceiling for their ordinary cost, which is a
 // request-timeout/worker-pool sizing decision, not something a shape guard
 // should enforce by refusing otherwise-valid input. For scale: this
