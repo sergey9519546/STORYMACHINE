@@ -2087,6 +2087,10 @@
       "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
     },
     {
+      "from": "docs/brain/Sessions/Session - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Branches/Branch - Forced Cue.md"
+    },
+    {
       "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
       "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
     },

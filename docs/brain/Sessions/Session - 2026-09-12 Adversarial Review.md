@@ -7,15 +7,15 @@ status: active
 
 # Session — 2026-09-12: The Adversarial Review
 
-**Heading:** "2026-09-12 — the adversarial review: eight lanes, twenty-three
+**Heading:** "2026-09-12 — the adversarial review: ten lanes, twenty-seven
 review rounds, no lane through on its first pass." The owner asked for a
 principal-level adversarial review of the current features and logic, run as
 an orchestrator over subagents, aimed at the best achievable version of this
-product. Three read-only investigators chose the direction; eight build lanes
+product. Three read-only investigators chose the direction; ten build lanes
 followed ([[Audit - 2026-09-12 Adversarial Review]]), every one reviewed
 independently before merge and none passing on its first pass.
 
-**What landed on main (c087a6ca → 54e97efd):**
+**What landed on main (c087a6ca → 9d0b832d):**
 
 - `verify-covers-tier` — one claim set behind both exporters and both
   verifiers; nine more verified fields; the forgery limit stated with its
@@ -39,13 +39,18 @@ independently before merge and none passing on its first pass.
   See [[Surface - Script Doctor Panel]].
 
 **Owner-gated:** [[Branch - Adversarial 2026-09-12]] — READY-FOR-OWNER at
-3124a94e after three review rounds, with `npm run probe-corpus-shape` as the
-owner's first instruction; `scoring/forced-cue` stacked on it.
+4cf5b2f3 after four review rounds, with `npm run probe-corpus-shape` as the
+owner's first instruction; [[Branch - Forced Cue]] stacked on it,
+READY-FOR-OWNER at 089bec91 after two.
 
 - `p0-flow-race` — the smoke gate's earliest-instant race was a gate race,
   not a product defect; both windows (MOUNT, IN FLIGHT) are now pinned rather
   than trusted, and the regressed tree is caught 6 of 6
   (`docs/audits/2026-09-12-adversarial/p0flow-lane-report.md`).
+- `smoke-gate-boot` — the smoke gate drives the built bundle and names what
+  it serves; `public/` joined the audited build-input set after the review
+  showed an edited favicon certified "current"
+  (`docs/audits/2026-09-12-adversarial/smokegate-lane-report.md`).
 
 **What the process learned:** a claims-register row collision between two
 MERGE-reviewed lanes, fixed by renumbering at merge and a citation test that

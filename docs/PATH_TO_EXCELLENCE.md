@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-12, main @ 3f4a6872 (nine session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-12, main @ 143ad651 (nine session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -35,7 +35,7 @@ browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
 
-**2026-09-12 — the adversarial review: eight lanes, twenty-three review
+**2026-09-12 — the adversarial review: ten lanes, twenty-seven review
 rounds, no lane through on its first pass.** The owner asked for a
 principal-level adversarial review of the current features and logic, run as
 an orchestrator over Sonnet and Opus subagents, with the objective of finding
@@ -51,7 +51,7 @@ and test soundness of everything merged since 2026-09-06 (the verifier checked
 none of the producer tier's numbers). Their findings became build lanes, each
 through `docs/LANE_STANDARD.md`'s independent review, every review written
 into `docs/audits/2026-09-12-adversarial/` before its verdict
-([[Audit - 2026-09-12 Adversarial Review]]). **Six landed on main:**
+([[Audit - 2026-09-12 Adversarial Review]]). **Eight landed on main:**
 
 - **`verify-covers-tier`** (9cd1805c, REVISE 8 → REVISE → MERGE): one claim
   set behind both exporters and both verifiers, nine more verified fields,
@@ -119,19 +119,44 @@ implied or projected anywhere. Stacked on it, `scoring/forced-cue` (in
 flight) honours Fountain's `@` marker, the largest remaining format
 sensitivity (32 of 32 public scripts, up to −26.8).
 
-**The seventh lane landed last:** `lane/p0-flow-race` (9816ffe0, REVISE 3 →
-MERGE) — the smoke gate's earliest-instant race, shown by a reviewer to fail
-3 of 8 runs on main itself, was a gate race and not a product defect: the
-built-in sample's doctor POST answers in 0–49 ms, so the "earliest instant"
-landed after the run as often as before it, and the gate misread a warm
-report as a cold panel. The gate now holds the lazy chunk at MOUNT and the
-run at IN FLIGHT, so both windows are pinned rather than trusted; the review
-returned REVISE because the regression detector caught the removed clause 4
-of 6 times, and the pinned version catches it 6 of 6 at MOUNT with the
-original cold panel reproduced on purpose. A deny-by-default scanner stops
-the next hand-rolled hold. One lesson from its merge: the lane was gated on
-a base that predated the exports merge, so the full suite and the battery
-were run again on merged main before the record was closed.
+**The seventh lane:** `lane/p0-flow-race` (9816ffe0, REVISE 3 → MERGE) —
+the smoke gate's earliest-instant race, shown by a reviewer to fail 3 of 8
+runs on main itself, was a gate race and not a product defect: the built-in
+sample's doctor POST answers in 0–49 ms, so the "earliest instant" landed
+after the run as often as before it, and the gate misread a warm report as a
+cold panel. The gate now holds the lazy chunk at MOUNT and the run at IN
+FLIGHT, so both windows are pinned rather than trusted; the review returned
+REVISE because the regression detector caught the removed clause 4 of 6
+times, and the pinned version catches it 6 of 6 at MOUNT with the original
+cold panel reproduced on purpose. A deny-by-default scanner stops the next
+hand-rolled hold. One lesson from its merge: the lane was gated on a base
+that predated the exports merge, so the full suite and the battery were run
+again on merged main before the record was closed.
+
+**The eighth lane:** `lane/smoke-gate-boot` (9d0b832d, REVISE → MERGE) —
+the p0-flow lane had found the smoke gate booting through Vite's dev
+middleware while it certified "the live flow", and one run had died on a
+Vite `504 Outdated Optimize Dep`. The gate now drives the built bundle:
+`dist/` is rebuilt when any audited build input is newer, the served mode
+is read back off the wire and a mismatch is fatal, and every boot in every
+suite names what it serves. Five documents that said the gate drove dev
+were corrected in the other direction, and the P0 demo script now states
+that the moderator runs the dev server — a different path — rather than
+papering over it. The review's one blocking item was that `public/` (the
+favicon and eleven font faces copied verbatim into the bundle) was missing
+from the staleness set, so an edited favicon was certified "current"; it
+joined an audited list with reasons beside each entry. The verdict-poll
+scanner now follows a hoisted read and a local call, and caught a real site
+on main. The gate runs in 13–14 seconds on the built bundle against 20–22
+on dev.
+
+**Stacked on the scoring branch,** `scoring/forced-cue` (089bec91,
+READY-FOR-OWNER after two rounds) honours Fountain's `@` marker — the largest
+format sensitivity left, 32 of 32 public scripts moved, up to −26.8 — at the
+parser seam and in every renderer, and found that the parser change itself
+opened a ninth shape-guard bypass class (every cue-shaped disjunct began at
+a cased capital, which `@` escapes), closed with a fourth disjunct whose
+safety is now a property test. Two renderer residuals are named, not fixed.
 
 **What the process learned, all recorded:** two lanes numbered their claims
 register rows from the same base and both were reviewed MERGE, so for a day
