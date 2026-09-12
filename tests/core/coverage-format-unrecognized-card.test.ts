@@ -58,6 +58,18 @@ describe('the compact card shows the hint, not just the reason', () => {
     );
   });
 
+  it('a superseded run is stopped, not orphaned (a re-run must not double the server work)', () => {
+    // Found driving the finding-#3 fix at feature length: `genRef` made a stale
+    // RESPONSE harmless, but the stale REQUEST kept running, so a re-run put two
+    // full 14-pass analyses of a 231-scene draft into the doctor pool at once.
+    const runPrefix = coverageSummary.slice(
+      coverageSummary.indexOf('setStatus("loading");'),
+      coverageSummary.indexOf('let timedOut = false;'),
+    );
+    assert.ok(runPrefix.length > 0, 'run() prefix not found');
+    assert.match(runPrefix, /abortRef\.current\?\.abort\(\);\s*\n\s*const controller = new AbortController\(\);/);
+  });
+
   it('clears the hint when a new run starts, so it cannot describe text that is gone', () => {
     const runPrefix = coverageSummary.slice(
       coverageSummary.indexOf('setStatus("loading");'),

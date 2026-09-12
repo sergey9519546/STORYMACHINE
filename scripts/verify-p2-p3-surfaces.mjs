@@ -2287,7 +2287,10 @@ async function main() {
   await pageE.waitForTimeout(timing.ms(1200));
 
   await pageE.getByRole('button', { name: /^COVERAGE$/i }).first().click();
-  await pageE.getByRole('button', { name: /run coverage/i }).first().click({ timeout: timing.ms(20000) });
+  const runBtnE = pageE.getByRole('button', { name: 'Run coverage', exact: true }).first();
+  if (await runBtnE.isVisible().catch(() => false)) {
+    await runBtnE.click({ timeout: timing.ms(20000) }).catch(() => {});
+  }
   await pageE.waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(120000) });
   await pageE.waitForTimeout(timing.ms(800));
   const healthBefore = await pageE.evaluate(() => {
@@ -2423,7 +2426,7 @@ async function main() {
   await typeWithoutDrainGaps(pageF, titleOnlyPaste);
   await pageF.waitForTimeout(timing.ms(800));
   await pageF.getByRole('button', { name: /^COVERAGE$/i }).first().click();
-  const runBtnF = pageF.getByRole('button', { name: /run coverage/i }).first();
+  const runBtnF = pageF.getByRole('button', { name: 'Run coverage', exact: true }).first();
   if (await runBtnF.isVisible().catch(() => false)) {
     await runBtnF.click({ timeout: timing.ms(20000) });
   }
@@ -2558,7 +2561,16 @@ async function main() {
   await pageC.waitForTimeout(timing.ms(2500));
 
   await pageC.getByRole('button', { name: /^COVERAGE$/i }).first().click();
-  await pageC.getByRole('button', { name: /run coverage/i }).first().click({ timeout: timing.ms(20000) });
+  // EXACT name, not /run coverage/i (2026-09-12): that regex also matches the
+  // action strip's "Re-run coverage" banner button, which is a DIFFERENT control
+  // on a different element. Opening Coverage already starts a run on mount, so
+  // this button exists only in the brief idle window before that run begins —
+  // click it when it is there, and otherwise just wait for the run that is
+  // already in flight.
+  const runBtnC = pageC.getByRole('button', { name: 'Run coverage', exact: true }).first();
+  if (await runBtnC.isVisible().catch(() => false)) {
+    await runBtnC.click({ timeout: timing.ms(20000) }).catch(() => {});
+  }
   await pageC.waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(180000) });
   await pageC.waitForTimeout(timing.ms(1500));
   record(
@@ -2669,7 +2681,11 @@ async function main() {
   await pageD.locator('.cm-content').first().waitFor({ timeout: timing.ms(30000) });
   await pageD.waitForTimeout(timing.ms(2500));
   await pageD.getByRole('button', { name: /^COVERAGE$/i }).first().click();
-  await pageD.getByRole('button', { name: /run coverage/i }).first().click({ timeout: timing.ms(20000) });
+  // Exact name — see pageC's note above.
+  const runBtnD = pageD.getByRole('button', { name: 'Run coverage', exact: true }).first();
+  if (await runBtnD.isVisible().catch(() => false)) {
+    await runBtnD.click({ timeout: timing.ms(20000) }).catch(() => {});
+  }
   await pageD.waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(180000) });
   await pageD.waitForTimeout(timing.ms(1500));
 

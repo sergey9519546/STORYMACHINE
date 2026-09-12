@@ -337,6 +337,18 @@ export default function CoverageSummary({
       // Mirrors runDiagnosis's proven pattern in ScriptDoctorPanel.tsx, with
       // `timedOut` distinguishing a real deadline from a teardown/superseded
       // abort so only the former paints an error.
+      // A SUPERSEDED RUN IS STOPPED, NOT ORPHANED (2026-09-12, found driving the
+      // finding-#3 fix at feature length). `genRef` already made a stale
+      // response harmless to the UI, but the REQUEST kept running: the server
+      // carried both analyses to completion and only one was ever read. On a
+      // 231-scene draft that is two full 14-pass analyses competing for the
+      // doctor pool, and the visible symptom was a coverage run that never
+      // landed inside the browser suite's 180 s budget. Aborting closes the
+      // connection, which frees the pool worker immediately — exactly what
+      // cancelRun below relies on, and what that method's own comment already
+      // claims. The superseded run's catch returns at its `gen` check before it
+      // can touch any state, so this cannot paint an error.
+      abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
       userCancelledRef.current = false;
