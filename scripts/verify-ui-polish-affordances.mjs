@@ -50,6 +50,7 @@ import {
   launchChromium,
   pickFreePort,
   shutdown,
+  waitForDoctorVerdict,
 } from './lib/browser-verify.mjs';
 
 const REPO = process.cwd();
@@ -120,7 +121,16 @@ try {
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
 
   await page.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
-  await page.waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), undefined, { timeout: timing.ms(40000) });
+  // NOT a bare /RECOMMEND|CONSIDER|PASS/ poll of the whole body: `innerText`
+  // reflects text-transform, so the doctor's own "Running pass 1 of 14…"
+  // renders as "RUNNING PASS 1 OF 14…" and its literal "PASS" satisfied this
+  // wait while the panel was still streaming. The phase then counted the jump
+  // control before the card existed — measured `count=0` on ~1 run in 4, on
+  // THIS tree and on main alike, and it read as a product regression. See
+  // waitForDoctorVerdict in scripts/lib/browser-verify.mjs; scoped to the
+  // Coverage summary, which is the surface every assertion below reads.
+  const coverageAside = 'aside[role="region"]';
+  await waitForDoctorVerdict(page, { selector: coverageAside, timeoutMs: 40000 });
   await page.screenshot({ path: join(SHOTS, 'A1-coverage-summary.png'), fullPage: false });
 
   const jumpBtn = page.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).first();

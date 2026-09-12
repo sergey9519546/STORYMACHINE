@@ -508,6 +508,70 @@ export async function waitForRenderedText(page, needle, { timeoutMs = 45000, pol
   return body;
 }
 
+/** The doctor's own live-progress copy, as the panels render it.
+ *  `CoverageSummary`/`ScriptDoctorPanel` show "Running pass 1 of 14…",
+ *  "Reading the draft…", "Reading the script…", "Compiling the report…" and
+ *  "Reading each scene's meaning with AI…" while a run streams
+ *  (src/lib/doctor-stream.ts's `doctorProgressLabel`). */
+export const DOCTOR_PROGRESS_COPY_RE =
+  /Running pass \d+ of \d+[.…]*|Reading the draft[.…]*|Reading the script[.…]*|Compiling the report[.…]*|Reading each scene[^\n]*/gi;
+
+/** The three verdict tokens, as a WORD — never a substring of something else. */
+export const DOCTOR_VERDICT_RE = /\b(RECOMMEND|CONSIDER|PASS)\b/;
+
+/**
+ * Wait until a real doctor VERDICT is on screen — not the progress copy that
+ * contains the word "pass".
+ *
+ * ── THE TRAP THIS EXISTS TO CLOSE (rediscovered three times) ────────────────
+ *
+ * A bare `waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(body.innerText))`
+ * is satisfied by **"RUNNING PASS 1 OF 14…"**. `innerText` reflects CSS
+ * `text-transform`, and `.sm-slug` uppercases, so the doctor's own per-pass
+ * counter turns "Running pass 1 of 14…" into a string containing the literal
+ * "PASS" — the progress line answers a poll that was asking for the verdict.
+ *
+ * It has been diagnosed and fixed independently three times, each time in one
+ * suite only: `verify-production-build.mjs` (waits for the literal "CONSIDER"),
+ * `verify-p2-p3-surfaces.mjs`'s P3 phase (2026-09-05 — "Caught by driving it:
+ * [debug] verdict-wait matched line: RUNNING PASS 1 OF 14…"), and now
+ * `verify-ui-polish-affordances.mjs`'s phase A, where it made the sample's jump
+ * control assertion fail on roughly one run in four: the gate counted the
+ * control while the panel was still streaming, measured `count=0`, and read as
+ * a product regression. MEASURED on `main` too — a probe of the same steps
+ * returned `atWait={"loading":true} jumpCountAtGate=0` on 1 of 4 runs there as
+ * well, and the control that eventually rendered was "Jump to scene 9" on both
+ * trees.
+ *
+ * This is the one implementation. It strips the progress copy and then requires
+ * a verdict as a whole WORD, so it can be satisfied only by a real verdict; and
+ * `selector` scopes it to the surface under test, so a verdict elsewhere on the
+ * page cannot stand in for the one that was supposed to render.
+ *
+ * Returns the matched surface's text (trimmed to 400 chars) so a caller can
+ * assert on what it actually saw.
+ */
+export async function waitForDoctorVerdict(page, { selector = 'body', timeoutMs = 45000 } = {}) {
+  const timing = getTiming();
+  const handle = await page.waitForFunction(
+    ({ sel, progressSource, verdictSource }) => {
+      const el = document.querySelector(sel);
+      if (!el) return null;
+      const progress = new RegExp(progressSource, 'gi');
+      const verdict = new RegExp(verdictSource);
+      const text = (el.innerText || '').replace(progress, ' ');
+      return verdict.test(text) ? text.slice(0, 400) : null;
+    },
+    {
+      sel: selector,
+      progressSource: DOCTOR_PROGRESS_COPY_RE.source,
+      verdictSource: DOCTOR_VERDICT_RE.source,
+    },
+    { timeout: timing.ms(timeoutMs) },
+  );
+  return handle.jsonValue();
+}
+
 /**
  * Waits for the page's DOM to stop mutating — a real signal, not a sleep.
  * A MutationObserver on `document.documentElement` (attributes incl. `style`

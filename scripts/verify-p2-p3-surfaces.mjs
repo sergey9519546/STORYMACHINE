@@ -53,6 +53,7 @@ import {
   launchChromium,
   pickFreePort,
   shutdown,
+  waitForDoctorVerdict,
   wireConsoleCapture,
 } from './lib/browser-verify.mjs';
 // Shared draft-rank copy (src/lib/draft-rank-copy.ts) — imported here so this
@@ -2082,8 +2083,14 @@ async function main() {
   record('P2-generative', 'Labs flag survives the reset (the ON context is genuinely ON)', labsStillOn === 'true', `sm_labs_enabled=${labsStillOn}`);
 
   await pageB.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
-  const verdictRenderedB = await pageB
-    .waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), undefined, { timeout: timing.ms(30000) })
+  // Same trap the P3 phase above documents, and the same fix, now through the
+  // one shared helper: a bare body poll is satisfied by "RUNNING PASS 1 OF 14…".
+  // This assertion failed exactly that way once during round 2 of this lane's
+  // review, and was misattributed to an unrelated edit.
+  const verdictRenderedB = await waitForDoctorVerdict(pageB, {
+    selector: 'aside[role="region"]',
+    timeoutMs: 30000,
+  })
     .then(() => true)
     .catch(() => false);
   record('P2-generative', 'Sample coverage still produces a verdict with Labs ON', verdictRenderedB, '');
