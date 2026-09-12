@@ -46,6 +46,8 @@ const USAGE = [
   '  npm run benchmark:public -- --control    also score the calibration corpus (labelled CONTROL)',
   '  npm run benchmark:public -- --json       print the whole result as JSON',
   '  npm run benchmark:public -- --quiet      suppress per-script progress',
+  '  npm run benchmark:public -- --limits     print ONLY the control rationale and the caveats,',
+  '                                           without running the measurement (instant)',
   '',
   'No corpus mount, no env var, no owner-local step: the text is committed.',
 ].join('\n');
@@ -113,6 +115,22 @@ async function main(): Promise<void> {
   const control = argv.includes('--control');
   const asJson = argv.includes('--json');
   const quiet = argv.includes('--quiet') || asJson;
+
+  // --limits prints the caveats WITHOUT the 128 doctor runs. Two reasons it
+  // exists (2026-09-12): a reader who wants to know what this benchmark cannot
+  // show should not have to wait 6 s for a table to find out, and
+  // tests/core/public-benchmark-limits.test.ts greps this command's real stdout
+  // for the constant names in it. That grep is why finding 6's corrected
+  // sentence cannot drift back: the claim is printed on every run, so the test
+  // checks the printed bytes rather than a copy of them.
+  if (argv.includes('--limits')) {
+    out('-'.repeat(78));
+    out(PUBLIC_CONTROL_RATIONALE);
+    out('-'.repeat(78));
+    out(PUBLIC_BENCHMARK_LIMITS);
+    out('-'.repeat(78));
+    return;
+  }
 
   const started = Date.now();
   const result = await measurePublicBenchmark({

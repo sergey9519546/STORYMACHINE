@@ -561,10 +561,17 @@ them, and this lane deliberately changed no file on any of those branches.
   that the score is valid — and mistaking one for the other would be the
   worst possible misreading of this document.
 * Transfer to feature-length real writing. N = 32 at 9–14 scenes.
-  `ARC_DED_MIN_SCENES` and `CLIMAX_DED_MIN_SCENES` are both 15
-  (`doctor.ts:2101`, `doctor.ts:619-622`), so the feature-scale deductions
-  never fire on this corpus at all — this benchmark measures a strictly
-  smaller engine than the AUC-24 ratchet does.
+  `ARC_DED_MIN_SCENES` is 15 (`doctor.ts:2104`), so the one feature-scale
+  deduction that is wired into health never fires on this corpus at all — this
+  benchmark measures a strictly smaller engine than the AUC-24 ratchet does.
+  **Corrected 2026-09-12:** this line also named `CLIMAX_DED_MIN_SCENES`, as a
+  second "feature-scale deduction". It gates `climaxZoneDecayDeduction`
+  (`doctor.ts:617`), which is exported and appears in no scoring-path call site
+  at all — `aggregateReport`'s health line subtracts `structuralDeduction`,
+  `arcIncoherenceDeduction` and `dialogueDeduction` only, and
+  `doctor.ts:2127-2131` records why the climax term was reverted ("it over-fired
+  on real scripts with naturally flat climaxes"). "Never fires at this length"
+  implied it fires at some length. It fires at no length (adversarial finding 6).
 * Say anything about the AUC-24 ≥ 0.622 ratchet. Different corpus, different
   script length, different denominator. **The owner's `npm run measure-real`
   run is what confirms or refutes transfer, in either direction, and nothing in

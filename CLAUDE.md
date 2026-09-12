@@ -234,9 +234,14 @@ reads — never that the score is valid. If it ever drops, suspect the harness
 before the score.
 
 None of these six is comparable to AUC-24 or to the P1 baseline — 32 short
-scripts vs feature-length, and the feature-scale deductions
-(`ARC_DED_MIN_SCENES` / `CLIMAX_DED_MIN_SCENES`, both 15) never fire at this
-length, so the public benchmark measures a strictly smaller engine. What
+scripts vs feature-length, and the one feature-scale deduction that is WIRED
+INTO HEALTH (`ARC_DED_MIN_SCENES` = 15, `doctor.ts:2104`) never fires at this
+length, so the public benchmark measures a strictly smaller engine. *(This
+sentence also named `CLIMAX_DED_MIN_SCENES` until 2026-09-12. That constant
+gates `climaxZoneDecayDeduction`, which is exported and wired into NOTHING —
+`doctor.ts:2127-2131` records the revert, "it over-fired on real scripts with
+naturally flat climaxes" — so "never fires at this length" implied it fires at
+some length. It fires at no length. Adversarial finding 6.)* What
 distinguishes the two measurement channels from each other is scene count:
 shuffle-drop changes it, climax-relocate preserves it exactly (measured
 scarcity delta 0.000), so only the second isolates order-sensitivity.

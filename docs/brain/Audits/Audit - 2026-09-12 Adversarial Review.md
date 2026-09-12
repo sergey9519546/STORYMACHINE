@@ -53,7 +53,7 @@ files changed".
   means for the owner's lock.
 * **Finding 6 — `CLIMAX_DED_MIN_SCENES` was presented as a live feature-scale
   gate in four places.** `climaxZoneDecayDeduction` is exported and wired into
-  nothing (`doctor.ts:2130-2134` records the revert), so "never fires at this
+  nothing (`doctor.ts:2127-2131` records the revert), so "never fires at this
   length" implied it fires at some length. All four now name
   `ARC_DED_MIN_SCENES` alone.
 * **Finding 11 — the claims register checked that an evidence `path` exists,
