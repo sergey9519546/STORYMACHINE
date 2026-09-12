@@ -210,12 +210,13 @@ describe('the multiplier is scoped to browser gates, not every keyless caller', 
     assert.equal(VAR in env, false, `${VAR} must be absent, not just falsy, so the production ceiling applies`);
   });
 
-  it('the three load/attack/production-boot callers all opt out in source', () => {
+  it('the production-boot and load-test callers opt out directly in source', () => {
     // verify-production-build.mjs imports the function under a local alias
     // (`keylessBrowserServerEnv as buildKeylessEnv`), so the call-site regex
-    // has to accept either name.
+    // has to accept either name. fuzz-routes.mjs is checked separately below
+    // — round 3 gave it a SECOND, dedicated server rather than a single
+    // opted-out one (see the next test).
     const callers: Array<{ file: string; callee: string; reason: string }> = [
-      { file: 'scripts/fuzz-routes.mjs', callee: 'keylessBrowserServerEnv', reason: 'its own 200-concurrent-doctor-requests case measures gameLimiter 429s' },
       { file: 'scripts/verify-production-build.mjs', callee: 'buildKeylessEnv', reason: 'the one suite proving the real Dockerfile-shaped boot' },
       { file: 'scripts/load-test-doctor.mjs', callee: 'keylessBrowserServerEnv', reason: 'documents itself as staying under gameLimiter\'s 120/min ceiling' },
     ];
@@ -227,6 +228,31 @@ describe('the multiplier is scoped to browser gates, not every keyless caller', 
         `${rel} (${reason}) must call ${callee}(..., { productionRateLimit: true })`,
       );
     }
+  });
+
+  it('fuzz-routes.mjs boots TWO servers: the validation/WS server multiplied, the overflow case alone on the production ceiling', () => {
+    // Round-3 review item 1: sharing one server between the ~195 validation
+    // probes and the 200-concurrent overflow case meant the rate-limit
+    // window was already spent by the time the overflow case ran, so it
+    // could not tell "sheds the overflow while legitimate traffic gets
+    // through" apart from "refuses everything" — and answered sixteen
+    // validation probes with 429 instead of the route's own rejection.
+    const body = readFileSync(path.join(REPO, 'scripts/fuzz-routes.mjs'), 'utf8');
+    // bootServer's default (no options / productionRateLimit left false) is
+    // what genericBodyShapeFuzz, structuralFuzz, unicodeFuzz,
+    // fountainPathologyFuzz, pathParamFuzz and collabWsAttack all run
+    // against — the multiplier, same as every other keyless gate.
+    assert.match(body, /const \{ proc, base \} = await bootServer\(port\);/, 'the validation/WS server must boot with the default (multiplied) env');
+    // The overflow case gets its own, separately-booted server with the real
+    // ceiling, on a fresh window.
+    assert.match(
+      body,
+      /bootServer\(overflowPort,\s*\{\s*productionRateLimit:\s*true\s*\}\)/,
+      'concurrencyAttack must run against its own server booted with { productionRateLimit: true }',
+    );
+    // …and concurrencyAttack is called with that overflow server's base, not
+    // the validation server's.
+    assert.match(body, /await concurrencyAttack\(overflow\.base\);/);
   });
 });
 // ── Round-2 follow-up item 2 (2026-09-12) ───────────────────────────────────

@@ -36,6 +36,22 @@
 //     responsive (sub-second) and to 429 the overflow rather than let the
 //     server fall over — a pass, not a finding, but exercised here so a
 //     future regression in either mechanism gets caught.
+//
+// TWO SERVERS, DELIBERATELY (round-3 review, item 1). The ~195 sequential
+// validation probes above, and the collab WebSocket attacks, were never
+// about the rate limiter — they exist to check that a route's OWN schema/
+// shape guard rejects garbage. They run against a server booted with the
+// verification-only multiplier (the default `bootServer(port)`), same as
+// every other keyless gate, so gameLimiter's production ceiling cannot
+// answer for a route and get scored `[ok]` by accident. The
+// 200-concurrent-doctor-requests case is the one place this harness
+// deliberately measures gameLimiter itself, and it needs its OWN fresh
+// server on the real production ceiling (`{ productionRateLimit: true }`)
+// booted right before it runs: sharing the validation server's window would
+// mean the budget is already spent by the time this case starts, and
+// `{"429":200}` with zero successes cannot tell "sheds the overflow while
+// legitimate traffic gets through" apart from "refuses everything" — see
+// docs/audits/2026-09-12-adversarial/writer-review.md's Round 3.
 
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -59,13 +75,16 @@ function pickFreePort() {
   });
 }
 
-async function bootServer(port) {
+async function bootServer(port, { productionRateLimit = false } = {}) {
   const base = `http://127.0.0.1:${port}`;
-  // productionRateLimit: true — this harness's own 200-concurrent-doctor-requests
-  // case (see the header comment) exists to prove gameLimiter 429s the overflow;
-  // the verification-only multiplier would hide that behind 10x headroom. See
-  // scripts/lib/keyless-browser-certification.mjs's doc comment.
-  const env = { ...keylessBrowserServerEnv(process.env, port, { productionRateLimit: true }), SESSION_DB_DIR: ':memory:' };
+  // Default (productionRateLimit: false): the verification-only multiplier,
+  // same as every other keyless gate — this is the server the ~195
+  // validation probes and the collab WebSocket attacks run against, and none
+  // of them are about the rate limiter. `{ productionRateLimit: true }` is
+  // passed only for the dedicated, freshly-booted server the
+  // 200-concurrent-doctor-requests case runs against — see the header
+  // comment's "TWO SERVERS, DELIBERATELY".
+  const env = { ...keylessBrowserServerEnv(process.env, port, { productionRateLimit }), SESSION_DB_DIR: ':memory:' };
   const proc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
     cwd: new URL('..', import.meta.url).pathname,
     env,
@@ -526,11 +545,48 @@ async function concurrencyAttack(base) {
   console.log(`  status breakdown: ${JSON.stringify(byStatus)}, wall=${wallMs}ms`);
   console.log(`  /health during load: n=${healthSamples.length}, p95=${p95}ms, max=${Math.max(...healthSamples, 0)}ms`);
 
-  const crashedOutcomes = outcomes.filter(o => o.status === null || o.status >= 500);
+  // 503 here is `SessionCapacityError` (server/lib/session-store.ts) or the
+  // doctor-pool's own admission-control refusal (doctor-pool.ts) — both are
+  // deliberate, caught, formatted responses (their own test coverage exists
+  // under tests/core/doctor-analysis-budget.test.ts), not an uncaught
+  // exception. On a freshly-booted server with a real 120/min ceiling, 200
+  // truly concurrent requests using 200 distinct session ids can legitimately
+  // trip MAX_SESSIONS (server/lib/session-store.ts) once enough sessions are
+  // simultaneously busy — a second, orthogonal way this server sheds an
+  // overflow it cannot serve, not a crash. A real crash — a network error/
+  // timeout (status null) or an UNCAUGHT exception (any other 5xx) — still
+  // flags.
+  const crashedOutcomes = outcomes.filter(o => o.status === null || (o.status >= 500 && o.status !== 503));
+  const succeeded = byStatus['200'] || 0;
+  const limited = byStatus['429'] || 0;
+  const capacityRefused = byStatus['503'] || 0;
   if (crashedOutcomes.length > 0) {
-    record('200-concurrent-doctor-requests', { status: 500, ms: wallMs, note: `${crashedOutcomes.length}/200 errored or 5xx` });
+    record('200-concurrent-doctor-requests', { status: 500, ms: wallMs, note: `${crashedOutcomes.length}/200 errored or an uncaught 5xx` });
   } else {
-    record('200-concurrent-doctor-requests', { status: 200, ms: wallMs, note: `${byStatus['200'] || 0} succeeded, ${byStatus['429'] || 0} rate-limited (gameLimiter), 0 crashed` });
+    // Both halves of the property this case exists to prove (see the file's
+    // header comment): the overflow gets shed (limited + capacityRefused > 0)
+    // AND legitimate concurrent traffic still gets through (succeeded > 0).
+    // Either alone — 200/200 succeeding (the limiter never engaged) or 0/200
+    // succeeding (a fully spent window refusing everything) — means this run
+    // cannot tell "sheds the overflow" apart from either extreme, and is
+    // flagged rather than silently printed `[ok]`.
+    // `ms` deliberately does NOT carry wallMs into `record`'s generic
+    // SLOW_THRESHOLD_MS check below: that threshold exists to catch ONE
+    // request hanging, and wallMs is the aggregate time for up to `succeeded`
+    // real doctor analyses to drain through the doctor pool's fixed-size
+    // worker queue — a fresh-window run that actually admits legitimate
+    // traffic (the whole point of this fix) necessarily takes longer than
+    // the ~0-real-work run this case used to be. The genuine "did the server
+    // stay responsive under load" signal is the health-p95 check right below,
+    // which already applies SLOW_THRESHOLD_MS to the right thing (one
+    // /health round trip). wallMs is still printed, in the note, for a human
+    // reading the log.
+    record('200-concurrent-doctor-requests', {
+      status: (succeeded > 0 && (limited > 0 || capacityRefused > 0)) ? 'overflow-shed' : 'no-overflow-signal',
+      expectStatus: 'overflow-shed',
+      ms: 0,
+      note: `${succeeded} succeeded, ${limited} rate-limited (gameLimiter), ${capacityRefused} refused on session capacity, wall=${wallMs}ms, on a fresh window, 0 crashed`,
+    });
   }
   if (p95 > SLOW_THRESHOLD_MS) {
     record('health-p95-during-200-concurrent-load', { status: 200, ms: p95, note: 'p95 exceeded the slow threshold under load' });
@@ -605,9 +661,21 @@ async function collabWsAttack(base, wsBase) {
 
 // ── Main ──────────────────────────────────────────────────────────────────
 
+/** Kill a booted `{ proc }` cleanly: SIGTERM, then SIGKILL if it does not
+ *  exit within 300ms. Shared by the validation server and the overflow
+ *  server below so both are torn down the same way. */
+async function killServer(proc) {
+  proc.kill('SIGTERM');
+  await sleep(300);
+  if (!proc.killed) proc.kill('SIGKILL');
+}
+
 async function main() {
   const port = await pickFreePort();
   console.log(`Booting keyless server on :${port} (${QUICK ? 'quick' : 'full'} mode)...`);
+  // The validation server: verification-only multiplier (the default), same
+  // as every other keyless gate — none of the probes run against it are
+  // about the rate limiter. See "TWO SERVERS, DELIBERATELY" above.
   const { proc, base } = await bootServer(port);
   const wsBase = base.replace('http://', 'ws://');
   let shuttingDown = false;
@@ -624,20 +692,35 @@ async function main() {
     await unicodeFuzz(base);
     await fountainPathologyFuzz(base);
     await pathParamFuzz(base);
-    // Collab (mints a room + token via gameLimiter-budgeted POSTs) runs
-    // BEFORE the 200-concurrent burst below, deliberately: that burst is
-    // designed to exhaust gameLimiter's shared 120/min/IP budget (that's the
-    // point of it — see concurrencyAttack's header), and this harness's own
-    // requests all share one IP (loopback), so running collab after it would
-    // make room/token minting itself get 429'd and read as a false collab
-    // finding rather than the real, already-covered rate-limiter behavior.
     await collabWsAttack(base, wsBase);
-    if (!QUICK) await concurrencyAttack(base);
+    if (!QUICK) {
+      // A second, freshly-booted server on the REAL production ceiling, used
+      // for nothing but this one case — see "TWO SERVERS, DELIBERATELY"
+      // above. Booting it here, right before the burst, gives it an
+      // untouched 60s window: the whole point of this case is to measure
+      // gameLimiter shedding an overflow while legitimate traffic still gets
+      // through, which a window already spent by the ~195 probes above
+      // cannot show.
+      const overflowPort = await pickFreePort();
+      console.log(`\nBooting a second, isolated keyless server on :${overflowPort} for the overflow case (production rate limit, fresh window)...`);
+      const overflow = await bootServer(overflowPort, { productionRateLimit: true });
+      let overflowShuttingDown = false;
+      overflow.proc.on('exit', (code, signal) => {
+        if (!overflowShuttingDown && !crashed) {
+          crashed = true;
+          console.log(`\n!!! OVERFLOW SERVER PROCESS EXITED MID-RUN (code=${code} signal=${signal}) !!!`);
+        }
+      });
+      try {
+        await concurrencyAttack(overflow.base);
+      } finally {
+        overflowShuttingDown = true;
+        await killServer(overflow.proc);
+      }
+    }
   } finally {
     shuttingDown = true;
-    proc.kill('SIGTERM');
-    await sleep(300);
-    if (!proc.killed) proc.kill('SIGKILL');
+    await killServer(proc);
   }
 
   console.log('\n=== SUMMARY ===');
