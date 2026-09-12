@@ -25,10 +25,11 @@
 // cache (this development container puts one at /opt/pw-browsers/chromium).
 // Unset -> Playwright's own resolution, which is the CI path.
 
-import { spawn, execSync } from 'node:child_process';
+import { spawn, execSync, execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { assertKeylessAiConfig, keylessBrowserServerEnv } from './keyless-browser-certification.mjs';
@@ -367,28 +368,170 @@ export function pickFreePort() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// WHAT A GATE IS SERVED — and the dist/ freshness that has to hold first.
+//
+// `server/app.ts:279` picks one of two completely different front ends:
+// `NODE_ENV !== 'production'` mounts VITE DEV MIDDLEWARE (every module
+// transformed on demand, `/@vite/client` in the markup, a dep-optimizer cache
+// under `node_modules/.vite`), and `NODE_ENV === 'production'` serves the
+// BUILT `dist/` (content-hashed `/assets/*.js`, compression, cache headers,
+// and a Content-Security-Policy that does not exist in dev).
+//
+// Which one a suite got used to be invisible: nothing logged it and nothing
+// asserted it, so a gate could certify one app while its own header described
+// the other. That is exactly what happened to `verify:p0-flow` — its brief and
+// the 2026-09-12 review disagreed about whether it drove the production build,
+// and settling it took a reviewer booting the server by hand and grepping the
+// markup. `serveModeOf()` reads it off the wire in one request, every boot
+// prints it, and a caller that names the mode it MEANS to certify gets a
+// throw instead of a silent swap.
+export const SERVE_VITE_DEV = 'vite-dev-middleware';
+export const SERVE_BUILT_DIST = 'built-dist';
+
+/** The client-side build inputs `vite build` reads to produce `dist/`.
+ *  `server/**` is deliberately absent: the server runs from source under tsx
+ *  in every mode, so a server edit cannot make a built bundle stale. */
+const DIST_BUILD_INPUTS = ['src', 'index.html', 'vite.config.ts', 'package.json', 'package-lock.json'];
+
+/** Newest mtime under `target` (a file or a directory, walked recursively),
+ *  with the path that carried it. Returns null for a path that is absent —
+ *  an input that does not exist cannot make anything stale. */
+function newestMtime(target) {
+  let stat;
+  try { stat = statSync(target); } catch { return null; }
+  if (!stat.isDirectory()) return { ms: stat.mtimeMs, path: target };
+  let best = null;
+  for (const entry of readdirSync(target, { withFileTypes: true })) {
+    const hit = newestMtime(path.join(target, entry.name));
+    if (hit && (best === null || hit.ms > best.ms)) best = hit;
+  }
+  return best;
+}
+
+/**
+ * Guarantee that `dist/` exists and is newer than every client build input,
+ * building it if it is not, so a gate served from `dist/` can never certify
+ * bytes that are not the tree's own.
+ *
+ * WHY IT BUILDS RATHER THAN ONLY REFUSING: the gates in this repo are
+ * runnable from a clean checkout — `.github/workflows/ci.yml`'s `browser` job
+ * runs `npm ci`, installs Chromium and goes straight to `npm run
+ * verify:browser` with no build step, and `docs/user-validation/RUN_DEMO.md`
+ * tells a P0 moderator to run the smoke check as a single command. A gate
+ * that refused on a missing `dist/` would be red on both of those paths for a
+ * reason that is not a defect. It still refuses loudly if the build does not
+ * fix the staleness (a build that silently produced nothing, a `dist/` written
+ * somewhere else), and it always says which branch it took.
+ *
+ * Returns `{ built, reason, distMs, newestInput }`.
+ */
+export function ensureBuiltDist({ repo, logPrefix = 'verify' } = {}) {
+  const cwd = repo ?? process.cwd();
+  const stamp = path.join(cwd, 'dist', 'index.html');
+  const assets = path.join(cwd, 'dist', 'assets');
+  const rel = (p) => path.relative(cwd, p) || p;
+
+  const staleness = () => {
+    let newest = null;
+    for (const input of DIST_BUILD_INPUTS) {
+      const hit = newestMtime(path.join(cwd, input));
+      if (hit && (newest === null || hit.ms > newest.ms)) newest = hit;
+    }
+    if (!existsSync(stamp)) return { reason: 'dist/index.html does not exist', newest, distMs: null };
+    if (!existsSync(assets)) return { reason: 'dist/assets/ does not exist', newest, distMs: statSync(stamp).mtimeMs };
+    const distMs = statSync(stamp).mtimeMs;
+    if (newest && newest.ms > distMs) {
+      return {
+        reason: `dist/index.html is older than ${rel(newest.path)} `
+          + `(${new Date(distMs).toISOString()} < ${new Date(newest.ms).toISOString()})`,
+        newest,
+        distMs,
+      };
+    }
+    return { reason: null, newest, distMs };
+  };
+
+  const before = staleness();
+  if (!before.reason) {
+    console.log(
+      `[${logPrefix}] dist/ is current (built ${new Date(before.distMs).toISOString()}, `
+      + `newest build input ${before.newest ? rel(before.newest.path) : 'none'}) — not rebuilding.`,
+    );
+    return { built: false, reason: null, distMs: before.distMs, newestInput: before.newest?.path ?? null };
+  }
+
+  console.log(`[${logPrefix}] dist/ is stale — ${before.reason}; running \`npm run build\`...`);
+  try {
+    execFileSync('npm', ['run', 'build'], { cwd, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
+  } catch (e) {
+    const out = `${e.stdout ?? ''}${e.stderr ?? ''}`.trim().split('\n').slice(-12).join('\n');
+    throw new Error(`\`npm run build\` failed, so this gate cannot be served from dist/:\n${out}`);
+  }
+  const after = staleness();
+  if (after.reason) {
+    throw new Error(
+      `\`npm run build\` reported success but dist/ is still not usable — ${after.reason}. `
+      + 'Refusing to certify a build that is not this tree\'s.',
+    );
+  }
+  console.log(`[${logPrefix}] dist/ rebuilt (${new Date(after.distMs).toISOString()}).`);
+  return { built: true, reason: before.reason, distMs: after.distMs, newestInput: after.newest?.path ?? null };
+}
+
+/**
+ * Read off the wire which of app.ts's two front ends a booted server is
+ * actually serving. One HTTP GET of `/`, no guessing from environment
+ * variables — the env is the INPUT to that choice, the markup is the result.
+ */
+export async function serveModeOf(baseUrl, fetchImpl = fetch) {
+  const res = await fetchImpl(new URL('/', baseUrl));
+  const html = await res.text();
+  if (html.includes('/@vite/client')) return { mode: SERVE_VITE_DEV, evidence: '/@vite/client in the markup' };
+  const hashed = html.match(/(?:src|href)="(\/assets\/[^"]+\.(?:js|css))"/);
+  if (hashed) return { mode: SERVE_BUILT_DIST, evidence: `hashed asset ${hashed[1]}` };
+  return { mode: 'unknown', evidence: `neither /@vite/client nor a /assets/ URL in ${html.length} bytes of /` };
+}
+
 /**
  * Boot the real server keyless on `port`, waiting for its `server_started`
- * line, then assert /api/ai-config really reports llmReady:false.
+ * line, then assert /api/ai-config really reports llmReady:false and report
+ * which front end it came up serving.
  *
- * `extraEnv` is merged in AFTER the keyless overrides — the one intended use
- * is verify-production-build.mjs setting `NODE_ENV: 'production'` (and its
- * own SESSION_DB_DIR) to boot the SAME server this helper already knows how
- * to launch, but through app.ts's production static/CSP/compression branch
- * instead of Vite dev middleware. Every other caller omits it and keeps
- * today's dev-mode boot unchanged.
+ * `serve` names the front end this caller intends to certify:
+ *   'vite-dev-middleware' (default) — app.ts's dev branch, what seven of the
+ *       eight browser suites drive and what `npm run dev` gives a developer.
+ *   'built-dist' — `NODE_ENV=production` against the built `dist/`, the same
+ *       static bundle the Dockerfile CMD and the published image serve.
+ *       `ensureBuiltDist()` runs first, so the bytes are this tree's.
+ * Either way the mode is READ BACK off the wire and asserted: a boot that
+ * comes up in the other mode (an inherited `NODE_ENV=production` in a
+ * developer's shell, a `dist/` that vanished) fails here, by name, instead of
+ * being certified as something it is not.
+ *
+ * `extraEnv` is merged in AFTER the keyless overrides and after `serve`'s own
+ * `NODE_ENV`, so a caller can still set its own SESSION_DB_DIR or budget —
+ * and if it contradicts `serve`, the read-back assertion below says so.
  *
  * Returns the ChildProcess. Callers keep it so they can hand it to
  * `shutdown()`.
  */
-export async function bootKeylessServer({ repo, port, baseUrl, logPrefix = 'verify', extraEnv } = {}) {
+export async function bootKeylessServer({ repo, port, baseUrl, logPrefix = 'verify', extraEnv, serve = SERVE_VITE_DEV } = {}) {
   const cwd = repo ?? process.cwd();
   const base = baseUrl ?? `http://127.0.0.1:${port}`;
   const timing = getTiming({ logPrefix });
+  if (serve !== SERVE_VITE_DEV && serve !== SERVE_BUILT_DIST) {
+    throw new Error(`bootKeylessServer: unknown serve mode ${JSON.stringify(serve)} (expected '${SERVE_VITE_DEV}' or '${SERVE_BUILT_DIST}')`);
+  }
+  if (serve === SERVE_BUILT_DIST) ensureBuiltDist({ repo: cwd, logPrefix });
   console.log(`[${logPrefix}] booting keyless server on port ${port}...`);
   const serverProc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
     cwd,
-    env: { ...keylessBrowserServerEnv(process.env, port), ...(extraEnv ?? {}) },
+    env: {
+      ...keylessBrowserServerEnv(process.env, port),
+      ...(serve === SERVE_BUILT_DIST ? { NODE_ENV: 'production' } : {}),
+      ...(extraEnv ?? {}),
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let booted = false;
@@ -407,6 +550,20 @@ export async function bootKeylessServer({ repo, port, baseUrl, logPrefix = 'veri
   }
   if (!booted) throw new Error('server started without emitting server_started');
   await assertKeylessAiConfig(base);
+  const served = await serveModeOf(base);
+  if (served.mode !== serve) {
+    throw new Error(
+      `this gate asked to certify the ${serve} front end and the server came up serving `
+      + `${served.mode} (${served.evidence}). ${serve === SERVE_BUILT_DIST
+        ? 'NODE_ENV was forced to production for this boot, so something else overrode it.'
+        : 'NODE_ENV=production is set in this environment, so app.ts took its dist/ branch.'}`,
+    );
+  }
+  console.log(
+    `[${logPrefix}] serving: ${served.mode === SERVE_BUILT_DIST
+      ? `the BUILT dist/ under NODE_ENV=production (${served.evidence}) — the same static bundle the Dockerfile CMD serves; no Vite dev middleware in this run`
+      : `Vite dev middleware with NODE_ENV unset (${served.evidence}) — dist/ is NOT used by this run`}.`,
+  );
   console.log(`[${logPrefix}] server booted (keyless).`);
   return serverProc;
 }
@@ -580,9 +737,14 @@ export const DOCTOR_STREAM_ROUTE = '**/api/scriptide/doctor/stream';
 /** `CoverageSummary`'s lazy chunk (`ScriptIDE.tsx:98`,
  *  `lazy(() => import("./scriptide/CoverageSummary"))`). One glob that matches
  *  both shapes the app is served in: the Vite dev module URL
- *  (`/src/components/scriptide/CoverageSummary.tsx?t=…`, which is what
- *  `verify:p0-flow` actually drives — see `bootKeylessServer`) and the built
- *  chunk (`/assets/CoverageSummary-<hash>.js`). The built name is a
+ *  (`/src/components/scriptide/CoverageSummary.tsx?t=…`, what the seven
+ *  dev-middleware suites drive) and the built chunk
+ *  (`/assets/CoverageSummary-<hash>.js`, what `verify:p0-flow` drives since
+ *  2026-09-12 — see `bootKeylessServer`'s `serve` option). The built shape is
+ *  not assumed: `npm run build` on `50bdc589` emits
+ *  `dist/assets/CoverageSummary-Bj05VbW3.js`, and the gate's MOUNT window
+ *  pins on it (`earlyChunk.waitUntilHeld()` resolves, which it cannot do if
+ *  the glob matched nothing). The built name is a
  *  chunk-name-shaped dependency: it comes from Vite's default
  *  `build.rollupOptions.output.chunkFileNames` (`[name]-[hash].js`, `[name]`
  *  being the lazy import's file basename). A `manualChunks` entry in

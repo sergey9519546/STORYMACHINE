@@ -21,6 +21,37 @@
 // it cost real rot (the SSE migration broke the report wait in three suites
 // and nobody noticed for days because nothing ran them).
 //
+// WHAT THIS GATE SERVES (changed 2026-09-12): the BUILT `dist/`, under
+// NODE_ENV=production — the same static bundle the Dockerfile's CMD, the
+// compose file and the published image serve. It boots via
+// `bootKeylessServer({ serve: SERVE_BUILT_DIST })`, which builds `dist/` first
+// if it is missing or older than any client build input (src/, index.html,
+// vite.config.ts, package.json, package-lock.json) and then READS THE MODE
+// BACK off the wire, so "this gate drives the production build" is asserted on
+// every run instead of being a sentence in a document.
+//
+// It used to boot with NODE_ENV unset, which put app.ts on its Vite
+// dev-middleware branch, and nothing said so — the 2026-09-12 adversarial
+// review had to boot the server by hand and grep the markup for
+// `/@vite/client` to find out. Two reasons it moved rather than the sentence:
+//
+//   * This is the golden-path gate that blocks `publish` in release.yml. The
+//     artifact that gets published is the built bundle, and a defect that only
+//     exists there (a CSP that blocks a dynamic import, a chunk that fails to
+//     resolve under hashed URLs) was invisible to every assertion below.
+//   * Vite dev middleware brought a failure mode that is not the product's:
+//     its dep-optimizer cache lives in `node_modules/.vite`, which concurrent
+//     worktrees share through a symlinked `node_modules`, and a 504 "Outdated
+//     Optimize Dep" then takes the run down with a missing "Try sample
+//     coverage" button and three console errors. Measured on this tree at
+//     `50bdc589`: 1 red in 6 consecutive dev-mode runs, zero in 6 served from
+//     dist/. NODE_ENV=production does not run the optimizer at all.
+//
+// The dev-middleware path is still covered — `verify:surfaces` (P3) and
+// `verify:a11y` both drive "Try sample coverage" with NODE_ENV unset — and
+// `docs/user-validation/RUN_DEMO.md` now says plainly that a moderator's
+// `npm run dev` is the dev front end while this check certifies the built one.
+//
 // Prereqs: Node >= 22.6; `npm ci` (brings Playwright) plus a Chromium binary
 // — `npx playwright install chromium`, or point PW_CHROMIUM_PATH at a browser
 // provisioned outside Playwright's cache (this container:
@@ -35,6 +66,7 @@
 
 import { spawn } from 'node:child_process';
 import {
+  SERVE_BUILT_DIST,
   bootKeylessServer,
   getTiming,
   holdCoverageSummaryChunk,
@@ -87,13 +119,19 @@ async function main() {
   // without paying for either. See scripts/lib/browser-verify.mjs.
   const timing = getTiming({ logPrefix: 'smoke' });
 
-  // 1. Boot the server keyless on the isolated port, neutralizing inherited
-  // provider configuration as well as Gemini's direct environment key.
+  // 1. Boot the server keyless on the isolated port, serving the BUILT
+  // dist/ (see this file's header), and neutralizing inherited provider
+  // configuration as well as Gemini's direct environment key.
   serverProc = await bootKeylessServer({
     repo: REPO,
     port: ISOLATED_PORT,
     baseUrl: BASE,
     logPrefix: 'smoke',
+    // THE BUILT BUNDLE, not Vite dev middleware — see this file's header.
+    // `bootKeylessServer` builds dist/ first if it is missing or older than
+    // any client build input, and reads the mode back off the wire, so this
+    // is an assertion about what got certified, not a hope.
+    serve: SERVE_BUILT_DIST,
   });
 
   // 2. Drive the live flow with headless Chromium.
@@ -392,6 +430,9 @@ async function main() {
     port: budgetPort,
     baseUrl: budgetBase,
     logPrefix: 'smoke-budget',
+    // Same front end as the main server above: this step's whole point is
+    // that a writer meets the registered sentence on the app that ships.
+    serve: SERVE_BUILT_DIST,
     extraEnv: { DOCTOR_ANALYSIS_BUDGET_MS: '1' },
   });
   const budgetContext = await browser.newContext();
