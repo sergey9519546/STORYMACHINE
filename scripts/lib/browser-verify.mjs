@@ -389,10 +389,41 @@ export function pickFreePort() {
 export const SERVE_VITE_DEV = 'vite-dev-middleware';
 export const SERVE_BUILT_DIST = 'built-dist';
 
-/** The client-side build inputs `vite build` reads to produce `dist/`.
- *  `server/**` is deliberately absent: the server runs from source under tsx
- *  in every mode, so a server edit cannot make a built bundle stale. */
-const DIST_BUILD_INPUTS = ['src', 'index.html', 'vite.config.ts', 'package.json', 'package-lock.json'];
+// ── What `vite build` actually reads ───────────────────────────────────────
+//
+// Audited against the build, not assumed (2026-09-12 review, blocking item 1):
+// the first version of this list omitted `public/`, and `public/` is copied
+// VERBATIM into `dist/` — the favicon plus the 11 `.woff2` faces the built
+// stylesheet references exist in `dist/` for no other reason. The reviewer
+// edited `public/favicon.svg`, `distStaleness()` still said "current", and the
+// gate served a favicon that was not this tree's, which is precisely what
+// `ensureBuiltDist`'s doc comment promises cannot happen.
+//
+// What is IN, and why:
+//   src/            every module the bundle is built from
+//   public/         copied verbatim into dist/ (favicon, fonts/)
+//   index.html      the entry document Vite transforms
+//   vite.config.ts  chunking, plugins, aliases
+//   package.json / package-lock.json   the dependency tree the bundle inlines
+//   tsconfig*.json, postcss.config.*, tailwind.config.*, vite.config.*
+//                   matched by pattern at the repo ROOT rather than listed, so
+//                   a config this repo does not have today (it has only
+//                   tsconfig.json; Tailwind 4 is configured in CSS under src/)
+//                   is covered the day someone adds one, not the day someone
+//                   remembers this list
+//
+// What is OUT, and why:
+//   server/**       the server runs from source under tsx in every mode, so a
+//                   server edit cannot make a built bundle stale
+//   metadata.json   nothing in index.html or src/ references it
+//   .env*           Vite only inlines `import.meta.env.VITE_*`, and
+//                   `grep -rn "import.meta.env.VITE_" src/ index.html` is
+//                   EMPTY on this tree — no env value reaches the bundle. If
+//                   that ever stops being true, `.env` belongs in the list.
+const DIST_BUILD_INPUTS = ['src', 'public', 'index.html', 'vite.config.ts', 'package.json', 'package-lock.json'];
+
+/** Root-level build configuration, by shape — see the note above. */
+const DIST_BUILD_CONFIG_RE = /^(?:tsconfig.*\.json|(?:postcss|tailwind|vite)\.config\.[cm]?[jt]s)$/;
 
 /** Newest mtime under `target` (a file or a directory, walked recursively),
  *  with the path that carried it. Returns null for a path that is absent —
@@ -439,7 +470,11 @@ export function distStaleness({ repo } = {}) {
   const assets = path.join(cwd, 'dist', 'assets');
   const rel = (p) => path.relative(cwd, p) || p;
   let newest = null;
-  for (const input of DIST_BUILD_INPUTS) {
+  const inputs = [...DIST_BUILD_INPUTS];
+  for (const entry of readdirSync(cwd)) {
+    if (DIST_BUILD_CONFIG_RE.test(entry) && !inputs.includes(entry)) inputs.push(entry);
+  }
+  for (const input of inputs) {
     const hit = newestMtime(path.join(cwd, input));
     if (hit && (newest === null || hit.ms > newest.ms)) newest = hit;
   }

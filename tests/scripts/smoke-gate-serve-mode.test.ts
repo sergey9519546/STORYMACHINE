@@ -90,8 +90,12 @@ describe('the P0 smoke gate serves the built dist/, and says which', () => {
   it('distStaleness fires on a missing dist/, on a stale one, and not on a current one', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'dist-staleness-'));
     mkdirSync(path.join(root, 'src'));
+    mkdirSync(path.join(root, 'public', 'fonts'), { recursive: true });
     writeFileSync(path.join(root, 'src', 'main.tsx'), 'x');
     writeFileSync(path.join(root, 'index.html'), 'x');
+    writeFileSync(path.join(root, 'public', 'favicon.svg'), '<svg/>');
+    writeFileSync(path.join(root, 'public', 'fonts', 'inter-400.woff2'), 'font');
+    writeFileSync(path.join(root, 'tsconfig.json'), '{}');
 
     assert.match(distStaleness({ repo: root }).reason ?? '', /dist\/index\.html does not exist/);
 
@@ -114,6 +118,70 @@ describe('the P0 smoke gate serves the built dist/, and says which', () => {
     const later = new Date(Date.now() + 180_000);
     utimesSync(path.join(root, 'index.html'), later, later);
     assert.match(distStaleness({ repo: root }).reason ?? '', /older than index\.html/);
+  });
+
+  it('distStaleness fires on public/ — the input that was missing (review round 1, blocking)', () => {
+    // WHY THIS FIXTURE EXISTS: `public/` is copied VERBATIM into `dist/` (the
+    // favicon `index.html` links at :6, and the 11 `.woff2` faces
+    // `src/index.css` loads from `/fonts/`), and the first version of
+    // DIST_BUILD_INPUTS left it out. The reviewer edited `public/favicon.svg`,
+    // distStaleness returned `reason: null`, the boot logged "dist/ is
+    // current", and the served favicon was not the tree's. The two fixtures
+    // above (src/, index.html) could not have caught it.
+    const root = mkdtempSync(path.join(tmpdir(), 'dist-staleness-public-'));
+    mkdirSync(path.join(root, 'src'));
+    mkdirSync(path.join(root, 'public', 'fonts'), { recursive: true });
+    mkdirSync(path.join(root, 'dist', 'assets'), { recursive: true });
+    writeFileSync(path.join(root, 'src', 'main.tsx'), 'x');
+    writeFileSync(path.join(root, 'index.html'), 'x');
+    writeFileSync(path.join(root, 'public', 'favicon.svg'), '<svg/>');
+    writeFileSync(path.join(root, 'public', 'fonts', 'inter-400.woff2'), 'font');
+    writeFileSync(path.join(root, 'tsconfig.json'), '{}');
+    writeFileSync(path.join(root, 'dist', 'index.html'), 'built');
+    assert.equal(distStaleness({ repo: root }).reason, null, 'the fixture starts current');
+
+    // A content edit to the favicon, exactly the reviewer's plant.
+    const future = new Date(Date.now() + 60_000);
+    writeFileSync(path.join(root, 'public', 'favicon.svg'), '<svg data-edited="1"/>');
+    utimesSync(path.join(root, 'public', 'favicon.svg'), future, future);
+    assert.match(
+      distStaleness({ repo: root }).reason ?? '',
+      /older than public[/\\]favicon\.svg/,
+      'an edit to a file copied verbatim into dist/ must make dist/ stale',
+    );
+
+    // A font face, nested one level deeper — the built stylesheet references
+    // these by URL, so a replaced face ships without a rebuild.
+    const rebuilt = new Date(Date.now() + 120_000);
+    utimesSync(path.join(root, 'dist', 'index.html'), rebuilt, rebuilt);
+    assert.equal(distStaleness({ repo: root }).reason, null);
+    const later = new Date(Date.now() + 180_000);
+    utimesSync(path.join(root, 'public', 'fonts', 'inter-400.woff2'), later, later);
+    assert.match(distStaleness({ repo: root }).reason ?? '', /older than public[/\\]fonts[/\\]inter-400\.woff2/);
+
+    // And root build configuration, which is matched by shape rather than
+    // listed: this tree has only tsconfig.json, but a postcss/tailwind config
+    // added tomorrow is covered the same day.
+    const rebuilt2 = new Date(Date.now() + 240_000);
+    utimesSync(path.join(root, 'dist', 'index.html'), rebuilt2, rebuilt2);
+    assert.equal(distStaleness({ repo: root }).reason, null);
+    const later2 = new Date(Date.now() + 300_000);
+    utimesSync(path.join(root, 'tsconfig.json'), later2, later2);
+    assert.match(distStaleness({ repo: root }).reason ?? '', /older than tsconfig\.json/);
+    writeFileSync(path.join(root, 'postcss.config.js'), 'module.exports = {};');
+    const later3 = new Date(Date.now() + 360_000);
+    utimesSync(path.join(root, 'dist', 'index.html'), new Date(Date.now() + 330_000), new Date(Date.now() + 330_000));
+    utimesSync(path.join(root, 'postcss.config.js'), later3, later3);
+    assert.match(distStaleness({ repo: root }).reason ?? '', /older than postcss\.config\.js/);
+  });
+
+  it('this repository really does ship a public/ directory into dist/', () => {
+    // The fixture above proves the RULE; this proves the rule is about THIS
+    // repo — that `public/` is not a hypothetical input. If these two
+    // references ever move, the input list should be re-audited, not the
+    // assertion relaxed.
+    assert.match(read('index.html'), /href="\/favicon\.svg"/, 'index.html links the public/ favicon');
+    assert.match(read('src/index.css'), /url\("\/fonts\/[^"]+\.woff2"\)/, 'the stylesheet loads public/fonts faces');
   });
 
   it('no document still says verify:production is the only production-mode suite', () => {
