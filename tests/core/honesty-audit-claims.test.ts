@@ -158,7 +158,9 @@ describe('honesty-audit.mjs — claims-register lane', () => {
         '',
         '| # | Claim (verbatim) | Where it appears | Evidence type | Evidence pointer | Status |',
         '|---|---|---|---|---|---|',
-        `| 1 | Two runs on the same input are byte-identical. | src/App.tsx:1 | measured-in-repo | ${pointer} | supported |`,
+        // The appears cell names NO line on purpose: since round 2 that column
+        // is anchored too, and these cases are about the evidence column.
+        `| 1 | Two runs on the same input are byte-identical. | src/App.tsx | measured-in-repo | ${pointer} | supported |`,
         '',
       ].join('\n'),
     );
@@ -274,19 +276,176 @@ describe('honesty-audit.mjs — claims-register lane', () => {
     }
   });
 
-  it('every `path:line` evidence pointer in the REAL register carries a resolving anchor', () => {
+  it('A VACUOUS ANCHOR FAILS — "e" is not an anchor (round-2 review item 3)', () => {
+    // The round-1 rule imposed no minimum: `anchor:"e"` satisfied
+    // `String.includes` on almost any line, so a future row could satisfy the
+    // invariant with a single character. The reviewer planted exactly that on
+    // row 22 and the lane stayed green. Twelve characters is the floor; the
+    // register's real anchors run 12-49.
+    const dir = makeBaseFixture();
+    try {
+      writeFile(dir, 'src/App.tsx', 'export const x = 1;\n');
+      writeFile(dir, 'tests/core/evidence.test.ts', EVIDENCE_FILE);
+      for (const weak of ['e', 'THE', 'ANCHORED AS']) {
+        fixtureWithPointer(dir, `tests/core/evidence.test.ts:4 anchor:"${weak}"`);
+        const res = runAudit(dir);
+        assert.notEqual(res.status, 0, `anchor:"${weak}" must be rejected as too weak`);
+        assert.match(res.stderr + res.stdout, /claims-register-anchor-not-distinctive/);
+        assert.match(res.stderr + res.stdout, /at least 12/);
+      }
+      // Twelve characters exactly is accepted — the boundary is stated, not
+      // approximate.
+      fixtureWithPointer(dir, 'tests/core/evidence.test.ts:4 anchor:"THE ANCHORED"');
+      assert.equal(runAudit(dir).status, 0, 'a 12-character anchor is at the floor and must pass');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('AN AMBIGUOUS ANCHOR FAILS — it must match exactly one line in its own window', () => {
+    // The other half of distinctiveness. A 12-character anchor that appears on
+    // three lines of the +/-3 window pins nothing; length alone is not enough.
+    // This is not hypothetical — it caught `anchor:"report.plainSummary"` in
+    // this repository's own register on the rule's first run.
+    const dir = makeBaseFixture();
+    try {
+      writeFile(dir, 'src/App.tsx', 'export const x = 1;\n');
+      writeFile(
+        dir,
+        'tests/core/evidence.test.ts',
+        [
+          'line one',
+          'assert.match(report.plainSummary, /a/);',
+          'assert.match(report.plainSummary, /b/);',
+          'assert.match(report.plainSummary, /c/);',
+          'line five',
+        ].join('\n'),
+      );
+      fixtureWithPointer(dir, 'tests/core/evidence.test.ts:3 anchor:"report.plainSummary"');
+      const res = runAudit(dir);
+      assert.notEqual(res.status, 0, 'an anchor matching three lines of its window must be rejected');
+      assert.match(res.stderr + res.stdout, /matches 3 lines in the \+\/-3 window/);
+      // Quoting more of the line makes it unique again.
+      fixtureWithPointer(dir, 'tests/core/evidence.test.ts:3 anchor:"report.plainSummary, /b/"');
+      assert.equal(runAudit(dir).status, 0, 'a distinctive anchor in the same window must pass');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // ── Both columns (round-2 review item 2) ──────────────────────────────────
+  // Round 1 checked the evidence column only and exempted "Where it appears"
+  // as "historical by design". That was true of the three retired rows and
+  // false of the fifteen live ones, which were stale by 6 to 1550 lines.
+
+  /** A register fixture whose one row cites `appears` in the location column. */
+  function fixtureWithAppears(dir: string, appears: string, status = 'supported'): void {
+    writeFile(
+      dir,
+      'docs/CLAIMS_REGISTER.md',
+      [
+        '# Claims Register (fixture)',
+        '',
+        '## Register',
+        '',
+        '| # | Claim (verbatim) | Where it appears | Evidence type | Evidence pointer | Status |',
+        '|---|---|---|---|---|---|',
+        `| 1 | Two runs on the same input are byte-identical. | ${appears} | measured-in-repo | tests/core/evidence.test.ts | ${status} |`,
+        '',
+      ].join('\n'),
+    );
+  }
+
+  it('A STALE "Where it appears" LINE NOW FAILS — the column is no longer exempt', () => {
+    const dir = makeBaseFixture();
+    try {
+      writeFile(dir, 'src/App.tsx', 'export const x = 1;\n');
+      writeFile(dir, 'tests/core/evidence.test.ts', `${EVIDENCE_FILE}${'filler\n'.repeat(20)}`);
+      // Anchored, but at the wrong line — the exact shape of all 15 real cases.
+      fixtureWithAppears(dir, 'tests/core/evidence.test.ts:20 anchor:"THE ANCHORED ASSERTION"');
+      const res = runAudit(dir);
+      assert.notEqual(res.status, 0, 'a stale appears-column line must now fail');
+      const out = res.stderr + res.stdout;
+      assert.match(out, /row 1 \(where it appears\)/, 'the message must name the COLUMN, not just the row');
+      assert.match(out, /the code MOVED/);
+      // Right line, same anchor: clean.
+      fixtureWithAppears(dir, 'tests/core/evidence.test.ts:4 anchor:"THE ANCHORED ASSERTION"');
+      assert.equal(runAudit(dir).status, 0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('an UNANCHORED appears pointer fails, and a path-only one still passes', () => {
+    const dir = makeBaseFixture();
+    try {
+      writeFile(dir, 'src/App.tsx', 'export const x = 1;\n');
+      writeFile(dir, 'tests/core/evidence.test.ts', EVIDENCE_FILE);
+      fixtureWithAppears(dir, 'tests/core/evidence.test.ts:4');
+      const res = runAudit(dir);
+      assert.notEqual(res.status, 0);
+      assert.match(res.stderr + res.stdout, /row 1 \(where it appears\).*carries no anchor/s);
+      // The overwhelming majority of appears cells name no line at all (114 of
+      // them in the real register). Those are untouched by this invariant.
+      fixtureWithAppears(dir, 'tests/core/evidence.test.ts (the DraftRankLine block)');
+      assert.equal(runAudit(dir).status, 0, 'an appears pointer with no line must still pass');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('a RETIRED row\'s appears line is exempt — and its evidence column is not', () => {
+    // The carve-out, asserted so it stays exactly as narrow as its stated
+    // reason. A retired row records where wording USED to be, so its location
+    // is expected not to resolve; that says nothing about its evidence cell.
+    const dir = makeBaseFixture();
+    try {
+      writeFile(dir, 'src/App.tsx', 'export const x = 1;\n');
+      writeFile(dir, 'tests/core/evidence.test.ts', `${EVIDENCE_FILE}${'filler\n'.repeat(20)}`);
+      // Same stale, unanchored pointer that fails above — exempt when retired.
+      fixtureWithAppears(dir, 'tests/core/evidence.test.ts:20', 'retired');
+      assert.equal(
+        runAudit(dir).status,
+        0,
+        'a retired row\'s location is historical by design and must stay exempt',
+      );
+      // `supported (qualified)` is NOT retired, so it is checked.
+      fixtureWithAppears(dir, 'tests/core/evidence.test.ts:20', 'supported (qualified)');
+      assert.notEqual(
+        runAudit(dir).status,
+        0,
+        'only retired/unsupported rows are exempt — a qualified row is still a live claim',
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('every `path:line` pointer in the REAL register, in BOTH columns, carries a resolving anchor', () => {
     // The real-tree half, stated as its own assertion so a reader of this file
     // can see that the 11 anchored rows are checked, not merely permitted. The
     // full audit's pass below subsumes it; this one names the count so a silent
     // drop of the invariant (or of every anchored pointer) is visible.
     const register = readFileSync(path.join(REPO_ROOT, 'docs/CLAIMS_REGISTER.md'), 'utf8');
-    const anchored = register.match(/anchor:"[^"]+"/g) ?? [];
+    // TABLE ROWS ONLY. The rules section above the table quotes `anchor:"e"` and
+    // `anchor:"…"` as examples of what the invariant rejects; counting those
+    // would make this assertion pass on prose and fail on anchors.
+    const rowLines = register
+      .split('\n')
+      .filter((line) => /^\|\s*\d+\s*\|/.test(line.trim()));
+    const anchored = rowLines.join('\n').match(/anchor:"[^"]+"/g) ?? [];
     assert.ok(
-      anchored.length >= 13,
-      `the register carries only ${anchored.length} anchor:"…" pointers. Eleven rows cited a line `
-      + 'when invariant 4 landed (two of them needing two anchors each, for comma lists and a '
-      + 'two-line comment), so a smaller number means anchors were removed rather than rows.',
+      anchored.length >= 31,
+      `the register carries only ${anchored.length} anchor:"…" pointers. Eleven evidence pointers `
+      + 'cited a line when invariant 4 landed (two needing two anchors each) and 18 appears-column '
+      + 'pointers joined them the same day, so a smaller number means anchors were removed rather '
+      + 'than rows.',
     );
+    // And none of them is a token short enough to match anything.
+    for (const a of anchored) {
+      const text = a.slice('anchor:"'.length, -1);
+      assert.ok(text.trim().length >= 12, `the register carries a ${text.length}-character anchor: ${a}`);
+    }
   });
 
   it('the current repo tree passes the full audit, including the claims lane', () => {

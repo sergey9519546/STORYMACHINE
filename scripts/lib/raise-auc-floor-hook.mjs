@@ -27,11 +27,24 @@
 //
 // The suite reads `scripts/lib/auc.ts` from disk as well as importing it (the
 // `--lock` shape assertions), so under this hook the imported floors and the
-// on-disk literals deliberately DISAGREE and those assertions fail too. That
-// is why the reporter does not accept "the mutated run exited non-zero" as
-// proof: it requires the mutated run's own
-// `not ok … clears <CONSTANT> = <raised value>` line, which only an assertion
-// that actually compares the measurement to that constant can produce.
+// on-disk literals deliberately DISAGREE and those assertions fail too. That is
+// why the reporter does not accept "the mutated run exited non-zero" as proof on
+// its own — and, since the round-2 review, why it does not accept the named
+// `not ok … clears <CONSTANT> = <raised value>` line on its own either. This
+// header used to say that line "only an assertion that actually compares the
+// measurement to that constant can produce". That was FALSE: a
+// `process.stdout.write` can produce it, and the raised value is predictable
+// (`round4(measured + 0.05)` off the suite's own printed measurement). The
+// reviewer's `tests/fixtures/gate-liveness/forged-liveness-suite.ts` does
+// exactly that and got `[RAN]`.
+//
+// What the reporter requires now is all three of: a non-zero exit, the named
+// failure line, and NO passing twin for the same title. A genuine suite produces
+// all three for free; a forgery has to manufacture each one. That is a cost, not
+// a proof — this hook hands a child process a mutated module and the reporter
+// reads what the child says about itself, so deliberate forgery is beyond what
+// any output-parsing check can rule out. Saying so is the point: the honest
+// claim is the one that survived being attacked.
 //
 // ── Usage ──────────────────────────────────────────────────────────────────
 //   AUC_FLOOR_MUTATION_CONSTANT=PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR \

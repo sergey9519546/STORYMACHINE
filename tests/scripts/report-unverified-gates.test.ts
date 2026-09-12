@@ -334,7 +334,7 @@ describe('verified gates', () => {
     // The positive half of finding 7's fix, in the reporter's own output: the
     // row is not just RAN, it says what was mutated. A reader can re-run the
     // named mutation by hand.
-    assert.match(REPORTER_OUTPUT, /floors:\s+scripts\/lib\/auc\.ts — mutation check: PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR raised to [0-9.]+ -> suite FAILED, as it must/);
+    assert.match(REPORTER_OUTPUT, /floors:\s+scripts\/lib\/auc\.ts — mutation check: PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR raised to [0-9.]+ -> suite FAILED on that floor by name, exit non-zero, no passing twin/);
   });
 });
 
@@ -428,6 +428,22 @@ describe('floor liveness — check (5): the mutation run', () => {
     command: 'npm run benchmark:public', proves: 'p', doesNotProve: 'd',
   };
 
+  /** The round-1 REVIEWER'S forged benchmark — prints the proof line, asserts
+   *  nothing. See that fixture's header. */
+  const FORGED_GATE = { ...GUTTED_GATE, suite: 'tests/fixtures/gate-liveness/forged-liveness-suite.ts' };
+
+  /** The floor the reporter will raise, and the value it will raise it to —
+   *  derived the way the reporter derives it (from the suite's own reported
+   *  measurement) rather than restating the arithmetic, so this cannot drift
+   *  from `chooseFloorToRaise`. The plain run is memoised, so it is shared with
+   *  the outcome test below and costs nothing extra. */
+  function forgedChoice() {
+    const plain = memoisedRunSuite(path.join(REPO_ROOT, FORGED_GATE.suite));
+    const choice = chooseFloorToRaise(declared, parseFloorReport(plain.output));
+    assert.ok(choice, 'the forged fixture printed no floor report to choose from');
+    return choice!;
+  }
+
   /**
    * The real spawner, memoised on (suite, raised constant, raised value). The
    * gutted case is driven twice — once for the state, once for the rendered
@@ -465,25 +481,47 @@ describe('floor liveness — check (5): the mutation run', () => {
     assert.equal(chooseFloorToRaise(declared, mixed)!.constant, declared[1].constant);
   });
 
-  it('accepts ONLY a named floor failure, never a bare non-zero exit', () => {
+  it('requires a named floor failure, and rejects a failure that names something else', () => {
     const raise = { constant: 'PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR', value: 0.5813 };
     assert.equal(
-      mutationWasCaught('not ok 1 - SHUFFLE_DROP paired AUC clears PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5813 (PRIMARY)', raise),
+      mutationWasCaught('not ok 1 - SHUFFLE_DROP paired AUC clears PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5813 (PRIMARY)', raise).ok,
       true,
     );
     // Passed, not failed.
     assert.equal(
-      mutationWasCaught('ok 1 - SHUFFLE_DROP paired AUC clears PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5813 (PRIMARY)', raise),
+      mutationWasCaught('ok 1 - SHUFFLE_DROP paired AUC clears PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5813 (PRIMARY)', raise).ok,
       false,
     );
     // Failed, but on something else — which is what a gutted suite's
-    // on-disk-vs-imported shape assertions do under the hook. This is why the
-    // reporter does not read the exit code here.
-    assert.equal(mutationWasCaught('not ok 11 - the floor constants are still in the one-line shape', raise), false);
+    // on-disk-vs-imported shape assertions do under the hook. A non-zero exit
+    // alone is therefore necessary, never sufficient.
+    assert.equal(mutationWasCaught('not ok 11 - the floor constants are still in the one-line shape', raise).ok, false);
     // The dot in the value is a literal, not a wildcard.
     assert.equal(
-      mutationWasCaught('not ok 1 - clears PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0a5813', raise),
+      mutationWasCaught('not ok 1 - clears PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0a5813', raise).ok,
       false,
+    );
+  });
+
+  it('rejects a failure line that sits next to a PASSING twin for the same floor', () => {
+    // ROUND-2 REVIEW ITEM 1, the text half. A suite that merely PRINTS a forged
+    // `not ok … clears …` line still runs its real (vacuous) `it` block, and
+    // under the hook that block's title is generated from the RAISED value — so
+    // the same title appears twice, once failing (forged) and once passing
+    // (real). A genuine suite emits only the failure. Measured on both.
+    const raise = { constant: 'PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR', value: 0.5813 };
+    const both = [
+      'not ok 99 - SHUFFLE_DROP paired AUC clears PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5813',
+      '    # Subtest: SHUFFLE_DROP paired AUC clears PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5813',
+      '    ok 1 - SHUFFLE_DROP paired AUC clears PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5813',
+    ].join('\n');
+    const verdict = mutationWasCaught(both, raise);
+    assert.equal(verdict.ok, false);
+    assert.match(verdict.reason, /both failing and passing/);
+    // `not ok` must not be read as an `ok` line by the twin check.
+    assert.equal(
+      mutationWasCaught('    not ok 1 - x clears PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5813', raise).ok,
+      true,
     );
   });
 
@@ -522,12 +560,57 @@ describe('floor liveness — check (5): the mutation run', () => {
       + `a suite asserting Number.isFinite() on its AUCs is being counted as a verified discrimination gate. `
       + `(detail: ${outcome.detail})`,
     );
-    assert.match(outcome.detail, /PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR was raised from [0-9.]+ \(its own measurement\) to [0-9.]+ and the suite did not fail on it/);
+    assert.match(outcome.detail, /PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR was raised from [0-9.]+ \(its own measurement\) to [0-9.]+ and the mutated run still EXITED 0/);
     const r = evaluateVerified([GUTTED_GATE], { root: REPO_ROOT, runSuite: memoisedRunSuite });
     assert.equal(r.exitCode, 1, 'a gutted verified gate must BLOCK, not merely be annotated');
     const out = renderVerified(r);
     assert.match(out, /\[ABSENT\]/);
     assert.match(out, /FLOOR ASSERTIONS ARE NOT LIVE/);
+  });
+
+  it('REPORTS THE REVIEWER\'S FORGED SUITE AS NOT VERIFIED — round-2 item 1, caught', () => {
+    // THE SECOND ATTACK, AND THE SECOND TIME A CONFIDENT SENTENCE IN THIS FILE'S
+    // NEIGHBOURHOOD WAS FALSIFIED BY DOING IT. Round 1 required one thing of the
+    // mutated run — an output line naming the raised floor — and said only a real
+    // assertion could produce it. The reviewer printed one.
+    // tests/fixtures/gate-liveness/forged-liveness-suite.ts asserts
+    // `assert.ok(true)` for all six floors, prints the real FLOOR report (so it
+    // passes check (4)), and appends a literal
+    // `not ok 99 - … clears PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5813`. On the
+    // round-1 reporter that read `[RAN]`, `1 of 1`, exit 0.
+    //
+    // It is caught twice over now: its mutated run exits 0 (its assertions all
+    // pass), and its forged failure line sits next to the passing twin its own
+    // `it` block emits. Either signal alone is enough, which is deliberate —
+    // removing one still leaves the fixture red.
+    const outcome = verifiedGateOutcome(FORGED_GATE, { root: REPO_ROOT, runSuite: memoisedRunSuite });
+    assert.equal(
+      outcome.state,
+      'mutation-survived',
+      `the forged suite was reported as "${outcome.state}". If this says "ran", round-2 item 1 is `
+      + `open again: a suite asserting nothing is being counted as a verified discrimination gate `
+      + `because it printed the right string. (detail: ${outcome.detail})`,
+    );
+    assert.match(outcome.detail, /still EXITED 0/);
+    const r = evaluateVerified([FORGED_GATE], { root: REPO_ROOT, runSuite: memoisedRunSuite });
+    assert.equal(r.exitCode, 1, 'a forged verified gate must BLOCK');
+    assert.match(renderVerified(r), /FLOOR ASSERTIONS ARE NOT LIVE/);
+  });
+
+  it('the forged suite is caught by the PASSING-TWIN check too, not only by its exit code', () => {
+    // Defence in depth, asserted rather than assumed. The exit-code check is the
+    // cheap one and it fires first, so without this the twin check could rot
+    // unnoticed. This drives the forged suite's real mutated OUTPUT through
+    // mutationWasCaught directly, with the exit code taken out of the picture.
+    const choice = forgedChoice();
+    assert.equal(choice.constant, 'PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR');
+    const mutated = memoisedRunSuite(path.join(REPO_ROOT, FORGED_GATE.suite), {
+      raise: { constant: choice.constant, value: choice.value },
+    });
+    assert.equal(mutated.ok, true, 'the forged suite asserts nothing, so its mutated run must exit 0');
+    const verdict = mutationWasCaught(mutated.output, choice);
+    assert.equal(verdict.ok, false, 'the forged output must not read as a caught mutation');
+    assert.match(verdict.reason, /both failing and passing/);
   });
 
   it('REPORTS THE GENUINE SUITE AS RAN — the check is not simply always red', () => {
@@ -540,7 +623,7 @@ describe('floor liveness — check (5): the mutation run', () => {
     // of the 32-script measurement. That is also the stronger evidence: it is
     // the command CI runs, not a reconstruction of it.
     assert.match(REPORTER_OUTPUT, /\[RAN\] tests\/core\/public-benchmark\.test\.ts/);
-    assert.match(REPORTER_OUTPUT, /mutation check: PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR raised to [0-9.]+ -> suite FAILED, as it must/);
+    assert.match(REPORTER_OUTPUT, /mutation check: PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR raised to [0-9.]+ -> suite FAILED on that floor by name, exit non-zero, no passing twin/);
     assert.doesNotMatch(REPORTER_OUTPUT, /FLOOR ASSERTIONS ARE NOT LIVE/);
   });
 
@@ -568,7 +651,7 @@ describe('floor liveness — check (5): the mutation run', () => {
       + 'reported the real benchmark as ABSENT, because the child stopped emitting TAP.',
     );
     assert.doesNotMatch(poisoned, /FLOOR ASSERTIONS ARE NOT LIVE/);
-    assert.match(poisoned, /mutation check: PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR raised to [0-9.]+ -> suite FAILED/);
+    assert.match(poisoned, /mutation check: PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR raised to [0-9.]+ -> suite FAILED on that floor by name/);
   });
 
   it('leaves scripts/lib/auc.ts byte-identical — the mutation never touches disk', () => {

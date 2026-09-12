@@ -38,7 +38,10 @@ path was touched: the doctor output-identity harness is 45/45 byte-identical and
 the 32-row manifest re-locked to its previous bytes, so this is an INSTRUMENT
 change, not a scoring one. `SHUFFLE_DROP` did not move at all, because the same
 change's segmenter fix produces byte-identical output on these 32 scripts (see
-[[Gate - AUC-24 Ratchet]] for what it does mean for the corpus run).
+[[Gate - AUC-24 Ratchet]] for what it does mean for the corpus run, and
+[[Measurement - DISCRIMINATION_BASELINE_2026-07-29]] for the same disclosure
+about the P1 baseline's own two recipes, which this change migrated to the
+shared segmenter at the same time).
 
 Every floor is `round4(measured − 0.02)`. **The control is the row that makes
 the other two readable**: both measurement channels read chance, and without a

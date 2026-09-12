@@ -1,7 +1,7 @@
 ---
 type: measurement
-updated: 2026-09-05
-sources: [docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md]
+updated: 2026-09-12
+sources: [docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md, scripts/lib/rebuild-experiment-lib.mjs]
 status: active
 ---
 
@@ -26,6 +26,18 @@ live-action corpus, dialogue flattening originally scored AUC 0.54
 (153-script test partition vs. a 24-script subset), different degradation
 (four separate channels vs. one combined shuffle+drop), different
 denominator. See [[Glossary]].
+
+**A RERUN WOULD NOT REPRODUCE THESE NUMBERS, AND NOT BECAUSE THE SCORE MOVED.**
+On 2026-09-12 `degradeShuffle` and `degradeMidpointDrop` — the very recipes
+behind SCENE_SHUFFLE 0.734 and MIDPOINT_DROP 0.766 — stopped using this
+lineage's own scene segmenter (`INT.|EXT.|EST.|INT/EXT.` plus a leading dot,
+reassembled by joining lines with `\n`) and now use the doctor's own heading
+grammar, so they see `I/E.` and `INT./EXT.` headings the old split walked past
+([[Audit - 2026-09-12 Adversarial Review]] finding 12). The figures above are a
+DATED RECORD of what the old recipes measured and are correct as such; what is
+no longer comparable to them is a fresh run of
+`scripts/rebuild-experiment.mjs`. The same disclosure, for the same change, is
+in [[Gate - AUC-24 Ratchet]] about AUC-24's 0.731. Nobody has rerun either.
 
 ## Sources
 

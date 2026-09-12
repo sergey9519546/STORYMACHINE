@@ -1031,6 +1031,10 @@
       "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
     },
     {
+      "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
       "from": "docs/brain/Gates/Gate - Browser Battery Suites.md",
       "to": "docs/brain/Patterns.md"
     },
@@ -1069,6 +1073,10 @@
     {
       "from": "docs/brain/Gates/Gate - Public Benchmark.md",
       "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
     },
     {
       "from": "docs/brain/Gates/Gate - Public Benchmark.md",
@@ -1205,6 +1213,14 @@
     {
       "from": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md",
       "to": "docs/brain/Glossary.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
     },
     {
       "from": "docs/brain/Measurements/Measurement - EMOTIONAL_ARC_ANTISLOP_EXPERIMENT_2026-07-11.md",

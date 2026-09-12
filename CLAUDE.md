@@ -184,6 +184,18 @@ gate. Do not "update" the 0.622 ratchet to a P1 number — different corpus,
 different degradation, different denominator; raising it that way breaks that
 test for no real regression.
 
+**AND THE P1 BASELINE'S OWN RECIPES CHANGED ON 2026-09-12 TOO, SO A RERUN OF IT
+IS NOT COMPARABLE TO 0.734 / 0.766 EITHER.** `degradeShuffle` and
+`degradeMidpointDrop` (`scripts/lib/rebuild-experiment-lib.mjs`, the
+measure-auc-split lineage those two numbers came from) carried a THIRD scene
+segmenter — `INT.|EXT.|EST.|INT/EXT.` plus a leading dot, reassembled through
+`lines.join('\n')` — and were migrated to the doctor's own heading grammar in
+the same change that fixed the AUC-24 recipe. The dated baseline doc is
+correctly left as written; what is not comparable to it is a FRESH run of
+`scripts/rebuild-experiment.mjs`, which now sees headings the old split walked
+past. Full statement in that lib's header (its "WHAT THIS CHANGES FOR THE
+MEASURE-AUC-SPLIT LINEAGE" block).
+
 The fourth and fifth statistics are the **PUBLIC BENCHMARK** measurement
 channels, added 2026-09-06 and living beside `AUC24_FLOOR` in
 `scripts/lib/auc.ts`. `tests/core/public-benchmark.test.ts` is the first

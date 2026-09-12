@@ -690,10 +690,13 @@ function scanFile(filePath) {
 //      that same file. This is what stops a new overclaim from landing
 //      un-registered — the register cannot just describe past sins, it has
 //      to be checked against future ones.
-//   4. Every evidence pointer of the form `path:line` must carry a short
-//      QUOTED ANCHOR — `anchor:"…"` — and that string must occur within
-//      ANCHOR_WINDOW lines of the line it names. Added 2026-09-12, adversarial
-//      review finding 11.
+//   4. Every pointer of the form `path:line` — in EITHER the "Where it
+//      appears" column or the "Evidence pointer" column — must carry a short
+//      QUOTED ANCHOR (`anchor:"…"`) that is DISTINCTIVE, and that string must
+//      occur within ANCHOR_WINDOW lines of the line it names. Added
+//      2026-09-12, adversarial review finding 11; widened from evidence-only
+//      to both columns, and given a distinctiveness rule, the same day by the
+//      lane's round-1 review.
 //
 // WHY (4) EXISTS, stated here because invariant (2) looked like it covered
 // this and did not. The register's own rules said: "Every row with status
@@ -715,11 +718,26 @@ function scanFile(filePath) {
 // only when the EVIDENCE changes rather than every time a line is inserted
 // above it.
 //
-// Scope, deliberately: EVIDENCE pointers only, at any status. The "Where it
-// appears" column is NOT checked, because several of its `path:line` values
-// are historical by design — rows 1, 2 and 25 are `retired` and name where the
-// wording USED to be, and requiring a live anchor there would demand an anchor
-// for text that was deliberately deleted.
+// SCOPE — BOTH COLUMNS, WITH ONE CARVE-OUT, AND THE CARVE-OUT IS NARROW.
+// Round 1 of this invariant checked EVIDENCE pointers only and exempted the
+// "Where it appears" column with the reason "several of its line numbers are
+// historical by design — rows 1, 2 and 25 are `retired`". The lane's reviewer
+// took that reason apart: excluding retired rows, **15 of the 18** remaining
+// appears-column `path:line` pointers were stale, by 6 to 1550 lines. Row 9
+// cited `ScriptDoctorPanel.tsx:3443` for copy that lives at :4993; row 20's
+// appears cell still said `ARCHITECTURE.md:305` while the SAME ROW's evidence
+// cell had just been corrected to :414 one cell to the right. "Exempt because
+// historical" was true of three rows and false of fifteen, so the exemption is
+// now exactly those three: a `retired` or `unsupported` row's location records
+// where wording USED to be, and demanding a live anchor for deliberately
+// deleted text would be wrong. Every other row is checked in both columns.
+//
+// DISTINCTIVENESS (ANCHOR_MIN_LENGTH, and uniqueness inside the window). The
+// same review planted `anchor:"e"` on row 22 and the lane stayed green: a
+// single character satisfies `String.includes` on almost any line. An anchor
+// must now be at least ANCHOR_MIN_LENGTH characters AND match exactly one line
+// inside its own window — a substring that matches three lines of the window
+// identifies nothing, which is the same failure in a slower form.
 //
 // Blocking (not warn-only, unlike the repo-metadata lane below): unlike repo
 // metadata, every fix here is something a contributor's own PR controls.
@@ -977,8 +995,19 @@ export function anchorResolves(absolutePath, group, anchors) {
   const lo = Math.max(1, group.from - ANCHOR_WINDOW);
   const hi = Math.min(fileLines.length, group.to + ANCHOR_WINDOW);
   for (const anchor of anchors) {
+    const matches = [];
     for (let i = lo; i <= hi; i++) {
-      if (fileLines[i - 1].includes(anchor)) return { ok: true, anchor, foundAt: i };
+      if (fileLines[i - 1].includes(anchor)) matches.push(i);
+    }
+    if (matches.length === 1) return { ok: true, anchor, foundAt: matches[0] };
+    if (matches.length > 1) {
+      // An anchor that matches several lines of its own window identifies
+      // nothing — the same failure as a one-character anchor, arriving slower.
+      return {
+        ok: false,
+        reason: `anchor "${anchor}" matches ${matches.length} lines in the +/-${ANCHOR_WINDOW} window `
+          + `(${matches.join(', ')}) — it is not distinctive enough to pin anything. Quote more of the line.`,
+      };
     }
   }
   // Say WHICH failure this is: "the code moved" and "the anchor is wrong" need
@@ -996,33 +1025,90 @@ export function anchorResolves(absolutePath, group, anchors) {
   };
 }
 
-/** Invariant 4, over every row's evidence pointers. */
-function checkEvidenceLineAnchors(rows) {
+/**
+ * The shortest anchor worth having. The register's real anchors run 12-49
+ * characters; the reviewer's `anchor:"e"` passed round 1's check on every line
+ * it was pointed at. A length floor is the cheapest half of distinctiveness and
+ * `anchorResolves`'s uniqueness-in-window rule is the other half — neither
+ * alone is enough (a 12-character string can still be boilerplate; a unique
+ * one-character match is luck).
+ */
+const ANCHOR_MIN_LENGTH = 12;
+
+/**
+ * Is this anchor substantial enough to pin a line? Exported for the test.
+ * Returns `null` when it is fine, or the reason it is not.
+ */
+export function anchorTooWeak(anchor) {
+  const trimmed = anchor.trim();
+  if (trimmed.length < ANCHOR_MIN_LENGTH) {
+    return `anchor "${anchor}" is ${trimmed.length} character(s); an anchor must be at least `
+      + `${ANCHOR_MIN_LENGTH}. A one- or two-character anchor matches almost any line, which is `
+      + 'how this invariant was defeated in its first round.';
+  }
+  return null;
+}
+
+/** Which columns invariant 4 governs, and which rows are exempt from each. */
+const ANCHORED_COLUMNS = [
+  {
+    label: 'evidence pointer',
+    cell: (row) => row.evidencePointer,
+    // No exemption: an evidence pointer names where the proof IS, now.
+    exempt: () => false,
+  },
+  {
+    label: 'where it appears',
+    cell: (row) => row.location,
+    // A retired or unsupported row's location is a record of where wording USED
+    // to be — it is expected not to resolve, and often the file no longer holds
+    // that text at all. Every other row's location is a live claim about the
+    // product's surface and is checked like any other pointer.
+    exempt: (row) => row.status.startsWith('retired') || row.status.startsWith('unsupported'),
+  },
+];
+
+/** Invariant 4, over both columns of every row. */
+function checkLineAnchors(rows) {
   const hits = [];
   for (const row of rows) {
-    const pointers = row.evidencePointer.split(';').map((p) => p.trim()).filter(Boolean);
-    for (const pointer of pointers) {
-      const parsed = parseLinePointer(pointer);
-      if (parsed === null) continue; // no line cited: invariant 2's business only
-      if (parsed.path === '' || parsed.path.toUpperCase() === 'NONE') continue;
-      if (parsed.anchors.length === 0) {
-        hits.push({
-          file: CLAIMS_REGISTER_PATH,
-          pattern: 'claims-register-line-pointer-without-anchor',
-          match: `row ${row.num}: "${parsed.raw}" cites a line but carries no anchor:"…". `
-            + 'A line number with nothing to check it against is how doctor.ts:1892-1898 survived '
-            + 'in five files after the code moved to 2092-2093.',
-        });
-        continue;
-      }
-      for (const group of parsed.groups) {
-        const resolved = anchorResolves(join(ROOT, parsed.path), group, parsed.anchors);
-        if (!resolved.ok) {
+    for (const column of ANCHORED_COLUMNS) {
+      if (column.exempt(row)) continue;
+      const pointers = (column.cell(row) ?? '').split(';').map((p) => p.trim()).filter(Boolean);
+      for (const pointer of pointers) {
+        const parsed = parseLinePointer(pointer);
+        if (parsed === null) continue; // no line cited: invariant 2's business only
+        if (parsed.path === '' || parsed.path.toUpperCase() === 'NONE') continue;
+        const where = `row ${row.num} (${column.label})`;
+        if (parsed.anchors.length === 0) {
           hits.push({
             file: CLAIMS_REGISTER_PATH,
-            pattern: 'claims-register-line-anchor-mismatch',
-            match: `row ${row.num}: ${parsed.path}:${group.from === group.to ? group.from : `${group.from}-${group.to}`} — ${resolved.reason}`,
+            pattern: 'claims-register-line-pointer-without-anchor',
+            match: `${where}: "${parsed.raw}" cites a line but carries no anchor:"…". `
+              + 'A line number with nothing to check it against is how doctor.ts:1892-1898 survived '
+              + 'in five files after the code moved to 2092-2093, and how 15 of this column\'s 18 '
+              + 'live pointers drifted by up to 1550 lines.',
           });
+          continue;
+        }
+        const weak = parsed.anchors.map(anchorTooWeak).filter(Boolean);
+        if (weak.length > 0) {
+          hits.push({
+            file: CLAIMS_REGISTER_PATH,
+            pattern: 'claims-register-anchor-not-distinctive',
+            match: `${where}: ${weak.join(' ')}`,
+          });
+          continue;
+        }
+        for (const group of parsed.groups) {
+          const resolved = anchorResolves(join(ROOT, parsed.path), group, parsed.anchors);
+          if (!resolved.ok) {
+            hits.push({
+              file: CLAIMS_REGISTER_PATH,
+              pattern: 'claims-register-line-anchor-mismatch',
+              match: `${where}: ${parsed.path}:${group.from === group.to ? group.from : `${group.from}-${group.to}`} — ${resolved.reason}`,
+            });
+          }
         }
       }
     }
@@ -1112,7 +1198,7 @@ function runClaimsLane() {
   return [
     ...checkRetiredClaimsAbsent(rows),
     ...checkSupportedEvidenceExists(rows),
-    ...checkEvidenceLineAnchors(rows),
+    ...checkLineAnchors(rows),
     ...checkClaimPhrasesRegistered(rows),
   ];
 }

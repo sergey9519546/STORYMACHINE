@@ -241,11 +241,34 @@ export const GATES = [
  *   * (5) catches a suite that stopped ASSERTING. It is the genuine liveness
  *     check: `scripts/lib/raise-auc-floor-hook.mjs` presents `auc.ts` to a
  *     second child process with one floor raised (in memory — never on disk;
- *     see that file's header), and the run must produce
- *     `not ok … clears <CONSTANT> = <raised>`. A non-zero exit is NOT accepted
- *     as proof, because under the hook the suite's on-disk-vs-imported shape
- *     assertions fail too; only an assertion that compares the measurement to
- *     that constant can name it in a failure.
+ *     see that file's header), and THREE things must then be true of that run:
+ *       a. it exits NON-ZERO,
+ *       b. its output carries `not ok … clears <CONSTANT> = <raised>`, and
+ *       c. its output does NOT also carry `ok … clears <CONSTANT> = <raised>` —
+ *          the same floor cannot be reported failing and passing at once.
+ *
+ *     WHAT THIS DOES AND DOES NOT BUY, stated exactly (round-2 review). None of
+ *     the three is proof that an assertion exists: this reporter reads a child
+ *     process's SELF-REPORT, and a child can print whatever it likes. The
+ *     round-1 version required (b) alone and said "only an assertion that
+ *     compares the measurement to that constant can name it in a failure" —
+ *     which was FALSE, and was falsified the same way finding 7 falsified this
+ *     file's previous confident sentence. The reviewer planted a 26-line suite
+ *     that asserts `assert.ok(true)` for every floor, prints the real FLOOR
+ *     report, and appends one literal `not ok 99 - … clears
+ *     PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5813` line — the raised value is
+ *     `round4(measured + 0.05)` off the suite's own printed measurement, so it
+ *     is fully predictable. That suite got `[RAN]` and exit 0.
+ *
+ *     What the three conditions together buy is a COST: a forgery must now
+ *     print a failing line for the floor, suppress the passing line its own
+ *     `it` block emits for the same title, and exit non-zero — none of which a
+ *     suite does by accident, and all of which a genuine suite does for free
+ *     (measured: the genuine mutated run exits 1 and emits the `not ok` line
+ *     and no `ok` twin; the forged one exits 0 and emits both). The remaining
+ *     gap is deliberate forgery, and an output-parsing check cannot close it.
+ *     `tests/fixtures/gate-liveness/forged-liveness-suite.ts` is that forgery,
+ *     committed, and the reporter must report it NOT verified.
  *
  * WHICH CONSTANT GETS RAISED is decided deterministically and from the SOURCE,
  * never from the suite's output: the first `PUBLIC_*_FLOOR` in `auc.ts`'s own
@@ -569,16 +592,43 @@ export function chooseFloorToRaise(declared, reported) {
  * A non-zero exit is not enough. Under the hook the suite's imported floors and
  * the on-disk literals disagree, so its `--lock`-shape assertions fail too; a
  * gutted suite that kept those assertions would exit non-zero while asserting
- * nothing about the measurement. The proof is the floor assertion's own title,
- * which is generated from the constant and the (raised) value.
+ * nothing about the measurement. So the exit code is NECESSARY and not
+ * sufficient, and the same is true of the named line in the other direction —
+ * a `process.stdout.write` can print one. Both are required, plus the absence
+ * of a passing twin:
+ *
+ *   * `not ok … clears <CONSTANT> = <raised>` — the floor's own test, whose
+ *     title node:test generates from the constant and the raised value,
+ *     reported as a FAILURE;
+ *   * no `ok … clears <CONSTANT> = <raised>` — the same title must not ALSO be
+ *     reported as a pass. A suite that merely prints a forged failure line
+ *     still runs its real (vacuous) `it` block, and that block emits the
+ *     passing twin. Measured on the reviewer's forged suite: both lines
+ *     present. Measured on the genuine suite: only the failure.
+ *
+ * See the VERIFIED GATES block above for what this does and does not buy. In
+ * one line: it raises the cost of faking from "keep the file and gut the
+ * assertions" to "deliberately forge three separate signals", which is as far
+ * as a check that parses a child's self-report can go.
  *
  * @param {string} output  the mutated run's stdout+stderr
  * @param {{ constant: string, value: number }} raise
- * @returns {boolean}
+ * @returns {{ ok: boolean, reason: string }}
  */
 export function mutationWasCaught(output, raise) {
   const escaped = `${raise.value}`.replace(/\./g, '\\.');
-  return new RegExp(`not ok [^\\n]*clears ${raise.constant} = ${escaped}`).test(output);
+  const title = `clears ${raise.constant} = ${escaped}`;
+  if (!new RegExp(`not ok [^\\n]*${title}`).test(output)) {
+    return { ok: false, reason: 'the mutated run reported no failure naming that floor' };
+  }
+  if (new RegExp(`^\\s*ok \\d+ - [^\\n]*${title}`, 'm').test(output)) {
+    return {
+      ok: false,
+      reason: 'the mutated run reported the SAME floor as both failing and passing — a forged '
+        + 'failure line next to the real (vacuous) test\'s passing one',
+    };
+  }
+  return { ok: true, reason: '' };
 }
 
 /**
@@ -615,15 +665,37 @@ export function verifiedGateOutcome(g, { env = process.env, root = REPO_ROOT, ru
     };
   }
   const mutated = runSuite(suitePath, { raise: { constant: raise.constant, value: raise.value } });
-  if (!mutationWasCaught(mutated.output, raise)) {
+  // THE EXIT CODE IS REQUIRED, NOT MERELY REPORTED (round-2 review item 1).
+  // Round 1 ignored `mutated.ok` entirely, on the reasoning that the shape
+  // assertions fail under the hook anyway — true, but it left the whole check
+  // resting on a text match a `process.stdout.write` can satisfy. A suite whose
+  // floor assertion really fires exits non-zero for free; one that only prints
+  // a failure line does not. Costs nothing, strictly safe, and it catches the
+  // reviewer's forged suite (measured: forged mutated run exits 0, genuine
+  // exits 1).
+  if (mutated.ok) {
     return {
       state: 'mutation-survived',
       detail: `${raise.constant} was raised from ${raise.measured} (its own measurement) to `
-        + `${raise.value} and the suite did not fail on it`
-        + (mutated.ok ? ' — the mutated run exited 0' : ' — the mutated run failed, but never on that floor'),
+        + `${raise.value} and the mutated run still EXITED 0. A suite whose floor assertion `
+        + 'compares the measurement to that constant cannot pass with the constant above it, '
+        + 'whatever its output says.',
     };
   }
-  return { state: 'ran', detail: `mutation check: ${raise.constant} raised to ${raise.value} -> suite FAILED, as it must` };
+  const caught = mutationWasCaught(mutated.output, raise);
+  if (!caught.ok) {
+    return {
+      state: 'mutation-survived',
+      detail: `${raise.constant} was raised from ${raise.measured} (its own measurement) to `
+        + `${raise.value} and ${caught.reason}. The mutated run did fail — but a failure that `
+        + 'does not name the floor is not evidence the floor is asserted.',
+    };
+  }
+  return {
+    state: 'ran',
+    detail: `mutation check: ${raise.constant} raised to ${raise.value} -> suite FAILED on that `
+      + 'floor by name, exit non-zero, no passing twin',
+  };
 }
 
 /**

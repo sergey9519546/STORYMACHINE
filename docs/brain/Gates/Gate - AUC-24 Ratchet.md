@@ -66,8 +66,14 @@ not any more, but the floor's VALUE is still unverifiable in CI. Also: this is
 P1 baseline (SCENE_SHUFFLE 0.734, MIDPOINT_DROP 0.766, separately, against a
 ≥0.80 gate on a 153-script test partition) — different corpus, different
 degradation, different denominator; see
-[[Measurement - DISCRIMINATION_BASELINE_2026-07-29]]. Even with the table
-committed, CI can never verify a *fresh* AUC value — the corpus is
+[[Measurement - DISCRIMINATION_BASELINE_2026-07-29]] — **and since 2026-09-12
+that baseline's own two recipes (`degradeShuffle`, `degradeMidpointDrop`) segment
+scenes differently too**, so a FRESH run of `scripts/rebuild-experiment.mjs` is no
+longer comparable to 0.734 / 0.766 any more than a fresh AUC-24 is comparable to
+0.731. Both halves of that disclosure come from the same change; see
+`scripts/lib/rebuild-experiment-lib.mjs`'s header and
+[[Audit - 2026-09-12 Adversarial Review]]. The dated baseline doc is left as
+written. Even with the table committed, CI can never verify a *fresh* AUC value — the corpus is
 local-only by design and cannot reach CI (copyright; secrets were rejected
 as a corpus transport).
 
