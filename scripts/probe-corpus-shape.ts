@@ -42,9 +42,15 @@
 //
 // RUN:
 //   REAL_SCRIPT_CORPUS_DIR="../real-script-corpus" npm run probe-corpus-shape
-//   npm run probe-corpus-shape -- --csv        # same rows, diffable between runs
+//   REAL_SCRIPT_CORPUS_DIR="../real-script-corpus" npm run --silent probe-corpus-shape -- --csv > shape.csv
 //   npm run probe-corpus-shape -- --public     # smoke test on the 32 committed
 //                                              # scripts; NOT the owner's run
+//
+// `--silent` MATTERS FOR `--csv` AND ONLY FOR IT. Without it npm writes four
+// banner/blank lines ahead of stdout, so the redirected file's first line is
+// blank and its header is line 5 — a plain `diff` of two such files is
+// unaffected (the banner is identical on both sides), but a spreadsheet or a
+// csv-aware differ will not read it. With `--silent` the header is line 1.
 //
 // COST: the analysis runs twice per script — once through `runScriptDoctor`
 // for health/verdict/severity and once through `analyzeFountainText` for the

@@ -2796,9 +2796,15 @@ byte-identical — and:
 
 ```
 REAL_SCRIPT_CORPUS_DIR="<corpus>" npm run probe-corpus-shape
-REAL_SCRIPT_CORPUS_DIR="<corpus>" npm run probe-corpus-shape -- --csv
+REAL_SCRIPT_CORPUS_DIR="<corpus>" npm run --silent probe-corpus-shape -- --csv > shape.csv
 npm run probe-corpus-shape -- --public     # smoke test on the 32 committed scripts
 ```
+
+`--silent` is load-bearing on the `--csv` form and on nothing else: without it
+npm writes four banner/blank lines ahead of stdout, so the redirected file's
+header lands on line 5 and a spreadsheet or a csv-aware differ will not read
+it. A plain `diff` of two such files is unaffected, because the banner is
+identical on both sides.
 
 prints, per script, `isDoubleSpaced` / `submittedWordCount` / `wordCount` /
 the gap and its share of the submission / `health` / `verdict` / `sceneCount` /
