@@ -37,6 +37,7 @@ import { spawn } from 'node:child_process';
 import {
   bootKeylessServer,
   getTiming,
+  holdCoverageSummaryChunk,
   holdDoctorRunInFlight,
   launchChromium,
   pickFreePort,
@@ -168,14 +169,16 @@ async function main() {
   // from the first frame it carries this name and for exactly as long as the
   // run runs.
   //
-  // `holdDoctorRunInFlight` makes the premise true instead of hoping for it —
-  // the real request reaches the real server and its response is held until
-  // this step releases it. Nothing about the assertions below is weakened:
-  // the earliest-instant click is still attempted, still forced, and must
-  // still leave no dialog open.
+  // Two holds make the premise true instead of hoping for it. Neither stubs
+  // anything: each request is dispatched for real when this step releases it,
+  // and is answered by the real server. Nothing about the assertions below is
+  // weakened — the earliest-instant click is still attempted, still forced,
+  // and must still leave no dialog open; it is now attempted in BOTH windows
+  // rather than in whichever one the timing happened to land in.
   const earlyContext = await browser.newContext();
   const earlyPage = await earlyContext.newPage();
   wireConsoleCapture(earlyPage, genuineErrors);
+  const earlyChunk = await holdCoverageSummaryChunk(earlyPage);
   const earlyRun = await holdDoctorRunInFlight(earlyPage);
   await earlyPage.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   await earlyPage.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
@@ -191,19 +194,51 @@ async function main() {
   // `force: true` now has the assertion it always claimed to — the toggle
   // must measure `disabled: true` at this instant, not just fail to open a
   // dialog for some other reason (a slow click, a mis-targeted locator).
-  // TWO instants, not one — they are different windows and the product
-  // disables this toggle through a different clause in each:
-  //   MOUNT    the toolbar toggle and CoverageSummary attach in the SAME
-  //            commit, one commit BEFORE the POST goes out, so the run is
-  //            armed but not yet requested. `coverageFullReportToggleState`
-  //            covers this through `doctorAutoSample` (parent state, set in
-  //            the same batch as setToolSlot("coverage")) — the clause whose
-  //            absence produced the original cold-open.
-  //   IN FLIGHT the POST is out and held below, so `coverageSummaryStatus`
-  //            is "loading" and the report cannot possibly have landed.
-  // Asserting only the second would drop the first — the very window this
-  // step was written for — so both are asserted, and neither can now be
-  // taken against a run that has already finished.
+  // TWO windows, not one instant — they are different states and the product
+  // disables this toggle through a different clause in each. Each is PINNED
+  // by a hold, so neither is a race and neither can be taken against a run
+  // that has already finished:
+  //   MOUNT     `CoverageSummary`'s lazy chunk is held, so the child has not
+  //             mounted at all and `coverageSummaryStatus` is still its
+  //             initial "idle". The ONLY thing that can disable the toggle
+  //             here is `doctorAutoSample` (parent state, set in the same
+  //             batch as setToolSlot("coverage")) — the clause whose absence
+  //             produced the original cold-open.
+  //   IN FLIGHT the chunk is released and the POST is out and held, so
+  //             `coverageSummaryStatus` is "loading" and the report cannot
+  //             possibly have landed.
+  //
+  // Round-1 review, blocking item 2, is why MOUNT is pinned by the CHUNK and
+  // not merely by the POST. Holding the POST leaves the real mount window —
+  // the sub-frame gap between the toolbar toggle attaching and the child's
+  // "loading" status reaching the parent — unheld: when `attached` resolved
+  // after that propagation, the "loading" clause disabled the toggle on its
+  // own, so a tree that had LOST the `doctorAutoSample` clause still passed.
+  // The reviewer measured that regression caught on 4 of 6 runs; with the
+  // chunk held it is caught on every run, and the forced click on such a tree
+  // opens the cold dialog every time rather than by luck.
+  const assertEarliestClickIsInert = async (window) => {
+    // `force: true`: the point of this assertion is that the toggle must be
+    // DISABLED (or otherwise a no-op) at this instant — proven directly by
+    // the disabled check above each call — not that Playwright's own
+    // actionability wait happens to stall long enough for the run to finish
+    // first.
+    await earlyToggle.click({ force: true, timeout: timing.ms(5000) }).catch(() => { /* a genuinely disabled button can refuse the dispatch itself */ });
+    await earlyPage.waitForTimeout(timing.ms(300));
+    const earlyDialogCount = await earlyPage.locator('[role="dialog"]').count();
+    if (earlyDialogCount > 0) {
+      const earlyDialogText = (await earlyPage.locator('[role="dialog"]').first().innerText().catch(() => '')) ?? '';
+      throw new Error(
+        'golden-path cold-panel regression: clicking "Full report" at the earliest instant it exists opened '
+        + `a dialog before the sample run resolved (text starts: ${JSON.stringify(earlyDialogText.slice(0, 120))}) `
+        + `[window: ${window}]`,
+      );
+    }
+  };
+  // MOUNT. The chunk hold is waited for rather than assumed: a glob that
+  // matched nothing would leave this window unpinned and the step back in the
+  // race it exists to close.
+  await earlyChunk.waitUntilHeld();
   const earlyDisabled = await earlyToggle.isDisabled();
   if (!earlyDisabled) {
     throw new Error(
@@ -211,10 +246,10 @@ async function main() {
       + '(non-force) click would reach it before the sample run resolves',
     );
   }
-  // The hold is the premise of everything below, so it is waited for rather
-  // than assumed: a route glob that matched nothing would leave this step
-  // silently re-testing the post-run UI, which is exactly the defect being
-  // fixed here.
+  await assertEarliestClickIsInert('MOUNT');
+  // IN FLIGHT. Releasing the chunk lets CoverageSummary mount and fire its
+  // sample run; that POST is held in turn.
+  await earlyChunk.release();
   await earlyRun.waitUntilHeld();
   const earlyDisabledInFlight = await earlyToggle.isDisabled();
   if (!earlyDisabledInFlight) {
@@ -223,21 +258,8 @@ async function main() {
       + 'in flight (its POST is held open by this step) — a real (non-force) click would reach it',
     );
   }
-  // `force: true`: the point of this assertion is that the toggle must be
-  // DISABLED (or otherwise a no-op) at this instant — proven directly above
-  // via the disabled check — not that Playwright's own actionability wait
-  // happens to stall long enough for the run to finish first.
-  await earlyToggle.click({ force: true, timeout: timing.ms(5000) }).catch(() => { /* a genuinely disabled button can refuse the dispatch itself */ });
-  await earlyPage.waitForTimeout(timing.ms(300));
-  const earlyDialogCount = await earlyPage.locator('[role="dialog"]').count();
-  if (earlyDialogCount > 0) {
-    const earlyDialogText = (await earlyPage.locator('[role="dialog"]').first().innerText().catch(() => '')) ?? '';
-    throw new Error(
-      'golden-path cold-panel regression: clicking "Full report" at the earliest instant it exists opened '
-      + `a dialog before the sample run resolved (text starts: ${JSON.stringify(earlyDialogText.slice(0, 120))})`,
-    );
-  }
-  console.log('[smoke] earliest-instant "Full report" click did not cold-open the full report (run held in flight).');
+  await assertEarliestClickIsInert('IN FLIGHT');
+  console.log('[smoke] earliest-instant "Full report" click did not cold-open the full report (MOUNT and IN FLIGHT windows both held).');
   await earlyRun.release();
   await earlyContext.close();
 

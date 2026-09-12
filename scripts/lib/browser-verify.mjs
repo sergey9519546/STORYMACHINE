@@ -577,10 +577,76 @@ export async function waitForDoctorVerdict(page, { selector = 'body', timeoutMs 
  *  intercept a slightly different path and hold nothing. */
 export const DOCTOR_STREAM_ROUTE = '**/api/scriptide/doctor/stream';
 
+/** `CoverageSummary`'s lazy chunk (`ScriptIDE.tsx:98`,
+ *  `lazy(() => import("./scriptide/CoverageSummary"))`). One glob that matches
+ *  both shapes the app is served in: the Vite dev module URL
+ *  (`/src/components/scriptide/CoverageSummary.tsx?t=…`, which is what
+ *  `verify:p0-flow` actually drives — see `bootKeylessServer`) and the built
+ *  chunk (`/assets/CoverageSummary-<hash>.js`). */
+export const COVERAGE_SUMMARY_CHUNK_ROUTE = '**/CoverageSummary*';
+
 /**
- * Hold the doctor's streaming run GENUINELY in flight until the caller
- * releases it — the readiness signal for every assertion whose premise is
- * "while a run is still running".
+ * Hold every request matching `routeGlob` until the caller releases it.
+ *
+ * The two exported holds below are thin names over this one implementation —
+ * what a gate needs is not "delay a URL" but a readiness signal it CONTROLS,
+ * and the two windows `verify:p0-flow` asserts in are each pinned by holding a
+ * different request. `held` counts what was actually intercepted and
+ * `waitUntilHeld()` blocks until something was, so a glob that matches nothing
+ * fails loudly instead of leaving a gate silently asserting against whatever
+ * state it happened to find.
+ *
+ * The request is NOT stubbed: it reaches the real server and is answered by
+ * the real analysis exactly as it would be for a writer, only later, and only
+ * when the caller says so.
+ */
+async function holdRoute(page, routeGlob) {
+  let open;
+  const gate = new Promise((resolve) => { open = resolve; });
+  let held = 0;
+  let released = false;
+  await page.route(routeGlob, async (route) => {
+    held++;
+    await gate;
+    // The page (or its whole context) may already be gone by the time the
+    // hold lifts — a caller that finished its assertions and closed up is
+    // the normal path, not an error.
+    await route.continue().catch(() => { /* page closed while held */ });
+  });
+  return {
+    /** How many matching requests this hold has actually intercepted. */
+    get held() { return held; },
+    /** Resolve once a matching request has actually been intercepted — i.e.
+     *  once the thing this hold exists to hold provably exists. Throws on the
+     *  deadline rather than letting a caller assert on a window that never
+     *  opened. */
+    async waitUntilHeld({ timeoutMs = 15000, pollMs = 25 } = {}) {
+      const deadline = Date.now() + getTiming().ms(timeoutMs);
+      while (held === 0) {
+        if (Date.now() > deadline) {
+          throw new Error(
+            `no request matching ${routeGlob} was intercepted within the deadline — `
+            + 'the window this hold exists to pin never opened',
+          );
+        }
+        await new Promise((r) => setTimeout(r, pollMs));
+      }
+      return held;
+    },
+    /** Dispatch the real request(s) and stop intercepting. */
+    async release() {
+      if (released) return;
+      released = true;
+      open();
+      await page.unroute(routeGlob).catch(() => { /* page closed */ });
+    },
+  };
+}
+
+/**
+ * Hold the doctor's streaming run in flight until the caller releases it —
+ * the readiness signal for an assertion whose premise is "while a run is
+ * running".
  *
  * ── THE RACE THIS EXISTS TO CLOSE (2026-09-12) ─────────────────────────────
  *
@@ -600,29 +666,14 @@ export const DOCTOR_STREAM_ROUTE = '**/api/scriptide/doctor/stream';
  * runs the response had finished 245 ms and 258 ms BEFORE `attached`; at
  * that instant the summary already read "VERDICT CONSIDER HEALTH 78", the
  * toggle correctly measured `disabled=false` with no title, and the forced
- * click opened a fully hydrated Script Doctor. The product was right every
- * time: the toggle is disabled from the first frame it carries the "Open
- * full report" name (`ScriptIDE.tsx`'s `coverageFullReportToggleState`, whose
- * `doctorAutoSample` clause is set in the same batch as
- * `setToolSlot("coverage")`) and stays disabled for as long as the run is
- * actually running. It was the GATE that asserted a precondition it did not
- * control.
+ * click opened a fully hydrated Script Doctor. It was the GATE that asserted
+ * a precondition it did not control.
  *
- * Holding the response is what makes that precondition true. The request is
- * NOT stubbed: it reaches the real server and is answered by the real
- * analysis exactly as it would be for a writer — only later, and only when
- * this handle says so. That is strictly stronger than the fixed
- * `setTimeout(4000)` delay step 3c used to hand-roll, which is still a race
- * (a slow machine can miss the window) and still a hope; `release()` is not.
- *
- * `held` counts the requests actually intercepted, and `waitUntilHeld()`
- * blocks until one has been, so a caller can assert that its "in flight"
- * premise was real rather than silently asserting nothing against a route
- * glob that matched no request. The two are not interchangeable: the panel
- * mounts (and its controls attach) in the commit BEFORE the POST goes out, so
- * a bare `held === 1` read taken at mount time is legitimately 0. Assert the
- * mount-window UI at mount, then `await waitUntilHeld()` for the in-flight
- * window.
+ * The product was right every time: the toggle is disabled from the first
+ * frame it carries the "Open full report" name (`ScriptIDE.tsx`'s
+ * `coverageFullReportToggleState`, whose `doctorAutoSample` clause is set in
+ * the same batch as `setToolSlot("coverage")`) and stays disabled for as long
+ * as the run is actually running.
  *
  * Usage:
  *   const run = await holdDoctorRunInFlight(page);
@@ -632,46 +683,34 @@ export const DOCTOR_STREAM_ROUTE = '**/api/scriptide/doctor/stream';
  *   await run.release();   // the real response is delivered from here
  */
 export async function holdDoctorRunInFlight(page) {
-  let open;
-  const gate = new Promise((resolve) => { open = resolve; });
-  let held = 0;
-  let released = false;
-  await page.route(DOCTOR_STREAM_ROUTE, async (route) => {
-    held++;
-    await gate;
-    // The page (or its whole context) may already be gone by the time the
-    // hold lifts — a caller that finished its assertions and closed up is
-    // the normal path, not an error.
-    await route.continue().catch(() => { /* page closed while held */ });
-  });
-  return {
-    /** How many doctor-stream requests this hold has actually intercepted. */
-    get held() { return held; },
-    /** Resolve once a doctor-stream request has actually been intercepted —
-     *  i.e. once the run this hold is holding provably exists. Throws on the
-     *  deadline rather than letting a caller assert on a run that never
-     *  started. */
-    async waitUntilHeld({ timeoutMs = 15000, pollMs = 25 } = {}) {
-      const deadline = Date.now() + getTiming().ms(timeoutMs);
-      while (held === 0) {
-        if (Date.now() > deadline) {
-          throw new Error(
-            `no POST to ${DOCTOR_STREAM_ROUTE} was intercepted within the deadline — `
-            + 'the run this hold exists to hold in flight never started',
-          );
-        }
-        await new Promise((r) => setTimeout(r, pollMs));
-      }
-      return held;
-    },
-    /** Deliver the real response(s) and stop intercepting. */
-    async release() {
-      if (released) return;
-      released = true;
-      open();
-      await page.unroute(DOCTOR_STREAM_ROUTE).catch(() => { /* page closed */ });
-    },
-  };
+  return holdRoute(page, DOCTOR_STREAM_ROUTE);
+}
+
+/**
+ * Hold `CoverageSummary`'s lazy chunk, pinning the MOUNT window open.
+ *
+ * ── WHY THIS EXISTS (review round 1, blocking item 2) ──────────────────────
+ *
+ * Holding the doctor POST is not enough to pin the window step 3b's FIRST
+ * assertion is about. That window is the gap between the toolbar toggle
+ * attaching and `CoverageSummary`'s own "loading" status reaching the parent
+ * — a sub-frame gap nothing was holding open. When `attached` resolved after
+ * that propagation, `coverageSummaryStatus === "loading"` disabled the toggle
+ * on its own, so a product tree that had LOST the `doctorAutoSample` clause
+ * still passed: the reviewer measured the regression caught on only 4 of 6
+ * runs, and the lane had claimed every run.
+ *
+ * The toolbar toggle lives in `ScriptIDE`; `CoverageSummary` is
+ * `lazy(() => import(…))`. Holding its chunk therefore holds the toggle in
+ * the state where the child has not mounted at all — `coverageSummaryStatus`
+ * is still its initial `"idle"`, and the ONLY thing that can be disabling the
+ * toggle is `doctorAutoSample`. Measured 3 runs per tree: tip 3/3 disabled
+ * with no dialog after the forced click; the clause-removed tree 3/3 ENABLED
+ * with the forced click opening the dialog — the original cold-open, fired
+ * on purpose instead of by luck, in both directions.
+ */
+export async function holdCoverageSummaryChunk(page) {
+  return holdRoute(page, COVERAGE_SUMMARY_CHUNK_ROUTE);
 }
 
 /**
