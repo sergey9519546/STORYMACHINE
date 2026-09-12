@@ -3144,6 +3144,13 @@ describe('ROUND 9: a forced cue `@` is a cue the guard must count', () => {
     assert.ok(guard >= pipeline,
       `ORACLE VIOLATION: guardCueOccurrences ${guard} < pipeline character blocks ${pipeline}. The guard must `
       + 'count every line the pipeline will turn into a character block.');
-    assert.match(String(fountainShapeRejectionReason(text)), REJECTION_RE);
+    // Built from the constants, not from REJECTION_RE: that one is the
+    // DISTINCT-vocabulary bound and this payload trips the FREQUENT-lines one,
+    // which is the cheap bound the fix restored. Naming the wrong bound here
+    // is how this assertion stopped meaning anything for one commit.
+    assert.match(
+      String(fountainShapeRejectionReason(text)),
+      new RegExp(`more than ${MAX_FOUNTAIN_FREQUENT_CUE_LINES} distinct all-caps character-cue-shaped lines that each occur more than ${FREQUENT_CUE_OCCURRENCE_THRESHOLD} times`),
+    );
   });
 });
