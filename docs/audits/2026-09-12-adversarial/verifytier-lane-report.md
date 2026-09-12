@@ -265,3 +265,132 @@ No browser battery was run beyond `verify:surfaces` (the orchestrator runs it).
    `tests/core/artifact-claims.test.ts` asserts the six pre-2026-09-12 labels
    are still present; nothing prevents a future edit from renaming one and
    updating that test in the same commit.
+
+---
+
+## Round 2 — response to `docs/audits/2026-09-12-adversarial/verifytier-review.md`
+
+Continued in the same worktree on the rebased tip `4328a6eb` (the lane's
+`5bbc8a42` on main `537c1aa3`), pushed after every commit.
+
+```
+git log --oneline 537c1aa3..HEAD
+511688b8 docs: the refusal described as it actually behaves (review findings 3, 6)
+01260b05 letter: the headline's length segment comes from the shared formatter (review finding 7)
+a622cc3f verify: the claim gate covers all nine tier claims, keyed on structure not a marker
+4328a6eb verify-report: read only the letter's real claim rows, and finish the brain notes
+dbb1b537 verify: the #verify page states what its form cannot check
+e1663f92 docs: the producer tier, the claim set, and the verifier's stated scope (DOC-1)
+cafd1e6f verify: the forgery matrix — every new claim, every artifact shape, both directions
+1e842c88 verify-report: the CLI reads every new claim, and cross-checks the page against the block
+11f2143a verify: one definition of the claims an artifact carries, covering the producer tier
+```
+
+**Every number in this section was re-derived on the round-2 tip.** None is
+carried forward from round 1 — which is item 8's point, and round 1's table had
+two stale figures because it did carry numbers forward.
+
+### R2.0 Fail-first — all seven review forgeries, on `4328a6eb`
+
+Fixture `data/screenplays/chain-of-custody.fountain` (13 scenes, 824 words,
+~4 pages / ~4 min, health 76.3, CONSIDER, 178 issues, one tier finding at p. 2).
+Log: `<session scratch>/repro/fail-first-round2.log` — **7 of 7 printed
+`VERIFIED — authentic and reproducible under this engine.` at exit 0.**
+
+| # | forgery | shapes | before | after |
+|---|---|---|---|---|
+| 1 | `Estimated pages` + `Estimated runtime (minutes)` rows deleted, page forged to `~500 pages / ~500 min (est.)` | letter, HTML | VERIFIED, exit 0 | **exit 1**, `missing claim: Estimated pages` + `missing claim: Estimated runtime (minutes)` |
+| 2 | `Health percentile reading` row deleted, page rewritten to `Health percentile: top 5%` | letter, HTML | VERIFIED, exit 0 | **exit 1**, `missing claim: Health percentile reading` + the missing-bounds line |
+| 3 | tier marker renamed (`## Reader summary` → `## Reader Summary`; `class="reader-tier"` → `"reader-tier-page"`), all nine tier rows deleted, all four page claims forged | letter, HTML | VERIFIED, exit 0 | **exit 1**, `missing claim: Scenes` … and the body disagreements |
+| 4 | page says `Unavailable for this report (it was rendered without the script text)` while the block claims `Logline: derived` | letter | VERIFIED, exit 0 | **exit 1**, `the logline line says loglineState = not stated …` |
+
+Two further attacks found while building the fix, both now fixtures:
+
+| forgery | result on the round-2 tip |
+|---|---|
+| `Health percentile reading` row deleted AND the page's whole percentile sentence removed (so no reading is left to compare) | **exit 1** — `the summary page states no reference bounds — every genuine reader summary page states them exactly once, so that statement has been removed` |
+| a divider inserted immediately after the tier heading, shrinking the letter's tier REGION past every claim, then the Length line forged | **exit 1**, names `sceneCount = 9999` |
+
+### R2.1 What the eight items became
+
+| # | item | what shipped |
+|---|---|---|
+| 1 | Cover all nine tier claims; assert equality both ways | `ClaimRowSpec` gains a `tier: 'always' \| 'ifRendered'` column; `TIER_CLAIM_LABELS` / `TIER_ALWAYS_LABELS` / `TIER_CONDITIONAL_LABELS` are **derived** from it. `tests/core/artifact-claims.test.ts` asserts the converse direction (every tier-only claim a full tier report publishes is required — 9 of them) and the always/ifRendered split against a thin report. A tenth claim enters the gate by being marked, not by someone remembering a second list. |
+| 2 | The "top 5%" deletion | The four conditional claims are required **when the page states them** — the page and the block must agree about which claims EXIST, not only about their values. The half that row-deletion cannot cover (the bounds text leaving with the sentence) is a structural check: a genuine summary page states the reference bounds exactly once, so a tier page with none has had that statement removed. |
+| 3 | Gate on structure, not a string | Two independent conditions, the first needing no tier detection at all: **(a)** a block that publishes ANY tier claim must publish every required one — so partial deletion is refused whatever the markup says; **(b)** a block with none left is refused when the document still shows any of several structural signals (the verify block's scope sentence, the tier caption, the tier stylesheet rules and section classes, the labelled Length / Logline / Verdict lines, the spaced `Health N / 100` reading). The region is multi-anchored and widens to the whole document when it holds no Length line. |
+| 4 | Three logline states | `bodyLoglineState` returns `derived` / `not derived` / `not stated (the page says it was rendered without the script text)` / `null` (no logline line). The third is a value the zod enum can never accept, so a page in that state and a block claiming either real state always disagree. A test asserts the three are distinguishable from each other, not merely non-passing. |
+| 5 | The three missing round trips | `formatHealthLine`/`parseHealthLine` (all 1,001 one-decimal values, in all three shapes' surrounding markup, **and** the letter headline it must NOT match), `parseLetterTierVerdictLine` (both letter renderers, the `PASS (decline)` parenthetical, and the letter's own `**Verdict: X**` line it must not confuse), `VERDICT_WORD`/`verdictFromWord`. |
+| 6 | Copy to the truth | README, ARCHITECTURE §4, the brain Exports note and register row 97 now describe the two conditions **and state the honest limit**: N independent edits, not an unforgeable property. |
+| 7 | The surviving length-formatter copy | `buildHeadline` formats its length segment through `formatLengthLine`. Byte-identical output — the three letter goldens and the sample report are untouched by the refactor — and the headline's collection is separately asserted by forging ONLY the headline. |
+| 8 | Stale numbers | Corrected, and every number here re-derived. |
+
+### R2.2 What the review got right that the round-1 report got wrong
+
+- Round 1 §2.4 and register row 97 said the refusal was "gated on the summary
+  page's PRESENCE rather than on a version stamp a forger could also edit". False
+  twice over, exactly as the reviewer wrote: the required set covered 5 of 9
+  labels, and a class attribute or a heading's capitalisation is easier to edit
+  than a version stamp. Both are corrected in the shipped docs, not only here.
+- Round 1 §3 called three formatter/parser pairs "round-trip tested" when they
+  had no test. They have one now; the sentence was false when written.
+- The round-1 "a report with NO summary page at all" case cut the tier out of
+  today's HTML and left the tier stylesheet and the scope sentence in place — a
+  tampered document, and therefore no evidence about back-compatibility. It is
+  replaced by byte copies of GENUINE pre-tier artifacts rendered by `318493c9`
+  (`tests/fixtures/verify-report/`, with a README forbidding regeneration), and
+  the tampered shape is kept as its own case asserting it IS refused.
+
+### R2.3 The residue, stated
+
+A forger who deletes a conditional claim from the block **and** removes its
+rendering from the page (no page estimate anywhere, no percentile sentence and no
+bounds line) produces a shorter report that states nothing false, and it verifies
+on the claims it does publish. That is removal, not forgery, and treating it as a
+refusal would refuse every genuine report that legitimately has no page estimate.
+The always-required five (Scenes, Words, Priorities listed, Reference bounds, Page
+references) cannot be dropped this way.
+
+### R2.4 Gates — round 2, all foreground, all re-derived
+
+| gate | result | exit |
+|---|---|---|
+| `npx tsc --noEmit` (= `npm run lint`) | clean | 0 |
+| `node scripts/check-no-console.mjs` | 305 files, 24 quarantine entries, all proven unreachable | 0 |
+| `npm run check-docs` | no AI writing patterns | 0 |
+| `npm run honesty-audit` | 459 files + 461 tracked markdown + 99 register rows — clean | 0 |
+| `npm run check-brain` | **101 notes, 353 links**, fresh (round 1's table said 350 — stale, item 8) | 0 |
+| `node scripts/check-scoring-receipt.mjs 537c1aa3..HEAD` | **"no scoring-path files changed"** | 0 |
+| output identity vs `git archive 537c1aa3`, `GIT_SHA` pinned equal, no `--ignore-keys` | **PASS — all 45 reports byte-identical** | 0 |
+| `tests/core/public-benchmark.test.ts` | **28 pass / 0 fail** | 0 |
+| `npm run build` | clean | 0 |
+| `PW_CHROMIUM_PATH=… npm run verify:surfaces` | **215/215 assertions passed** (213 + the two new `#verify` scope assertions) | 0 |
+| `tests/scripts/verify-report.test.ts` | **153 pass / 0 fail** (105 at the end of round 1) | 0 |
+| `tests/routes/export-verify.test.ts` | 58 pass / 0 fail | 0 |
+| `tests/core/artifact-claims.test.ts` | **104 pass / 0 fail** (91 at the end of round 1) | 0 |
+| `tests/core/reader-tier.test.ts` | 22 pass / 0 fail | 0 |
+| `tests/core/coverage-html.test.ts` | 54 pass / 0 fail | 0 |
+| `tests/core/coverage-letter.test.ts` | 47 pass / 0 fail | 0 |
+| `tests/core/percentile-comparability.test.ts` | 23 pass / 0 fail | 0 |
+| `tests/core/p0-sample-drift.test.ts` | 4 pass / 0 fail | 0 |
+| `tests/core/page-refs.test.ts` | 12 pass / 0 fail | 0 |
+| `tests/routes/root-cause-parity.test.ts` | 18 pass / 0 fail | 0 |
+| `tests/core/honesty-audit-claims.test.ts` | 5 pass / 0 fail | 0 |
+| **ONE full `npm test`** | **13,482 tests · 13,390 pass · 0 fail · 91 skipped · 1 todo** (on the final tree, `511688b8`) | 0 |
+
+The round-1 table's other stale figure: it reported `honesty-audit` scanning
+"456 tracked markdown files". That number moves with the tree (the reviewer
+measured 450 on `4328a6eb`; it is 461 here after this round's doc commits), so it
+should never have been quoted as a fixed result — the exit code is the gate.
+
+### R2.5 Left undone, after round 2
+
+1. **`#verify` still checks only what a recipient types** (accepted by the review
+   as the right call). The page now says so, and `verify:surfaces` asserts a
+   verifier actually sees the sentence — round 1's left-undone item 5, closed.
+2. **The raw report JSON still carries no summary page**, so five claims do not
+   exist in that shape. Unchanged and stated per run.
+3. **The logline's TEXT is still not verified, only its state** — and
+   `server/lib/reader-tier.ts` now records the reviewer's observation about a
+   caller that supplies its own logline against a firing gate.
+4. **The claim-row label table is back-compatible by test, not by type.**
+5. **R2.3's removal residue** above.
