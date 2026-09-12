@@ -109,9 +109,54 @@ function bareVerdictPolls(source: string): { line: number; text: string }[] {
 }
 
 /**
- * Find a hand-rolled hold of the doctor's streaming route — a `page.route(…
- * doctor/stream …)` whose handler delays or forwards the request itself
- * instead of going through `holdDoctorRunInFlight`.
+ * Blank out comments and string bodies, preserving every byte position and
+ * newline, so a textual scan can be run over CODE only.
+ *
+ * Round-1 review, non-blocking item 4: `handRolledStreamHolds` used to start
+ * its brace-walk at any `.route(` it found, including ones inside prose — the
+ * walk then swallowed the following real code and could report an offender at
+ * a comment's line number. Masking first removes that whole class of
+ * misattribution, and costs one pass.
+ *
+ * String bodies are masked too, so a URL's `//` cannot be mistaken for the
+ * start of a line comment. Lengths and line breaks are preserved, so every
+ * index and line number in the masked copy still addresses the original.
+ */
+function maskCommentsAndStrings(source: string): string {
+  const out = source.split('');
+  let mode: 'code' | 'line' | 'block' | 'single' | 'double' | 'tick' = 'code';
+  for (let i = 0; i < source.length; i++) {
+    const c = source[i];
+    const next = source[i + 1];
+    const blank = () => { if (c !== '\n') out[i] = ' '; };
+    if (mode === 'code') {
+      if (c === '/' && next === '/') { mode = 'line'; blank(); }
+      else if (c === '/' && next === '*') { mode = 'block'; blank(); }
+      else if (c === "'") mode = 'single';
+      else if (c === '"') mode = 'double';
+      else if (c === '`') mode = 'tick';
+      continue;
+    }
+    if (mode === 'line') { if (c === '\n') mode = 'code'; else blank(); continue; }
+    if (mode === 'block') {
+      blank();
+      if (c === '*' && next === '/') { out[i + 1] = ' '; i++; mode = 'code'; }
+      continue;
+    }
+    // inside a string: mask the body, keep the quotes, honour escapes
+    if (c === '\\') { blank(); if (next !== undefined && next !== '\n') { out[i + 1] = ' '; i++; } continue; }
+    const closer = mode === 'single' ? "'" : mode === 'double' ? '"' : '`';
+    if (c === closer) { mode = 'code'; continue; }
+    blank();
+  }
+  return out.join('');
+}
+
+/**
+ * Find a hand-rolled hold of the doctor's streaming route — a
+ * `page.route(… doctor/stream …)` that does anything other than answer the
+ * request with a canned response, instead of going through
+ * `holdDoctorRunInFlight`.
  *
  * ── Why (2026-09-12, adversarial batch) ─────────────────────────────────────
  * "Assert on the UI while a run is in flight" needs the run to actually BE in
@@ -123,29 +168,40 @@ function bareVerdictPolls(source: string): { line: number; text: string }[] {
  * instant" landed after the run on 4 of 8 runs). A fixed delay is a wider
  * race, not the absence of one; `holdDoctorRunInFlight` holds until released.
  *
- * A route that FULFILLS the doctor stream with a canned failure (step 3d's
- * injected 500, the budget-stop stub) is a different thing entirely — it is
- * not pretending the run is in flight — so this scan flags only handlers that
- * delay (`setTimeout`) or forward (`route.continue()`).
+ * ── WHY THE TEST IS "NOT A FULFILL" AND NOT "CONTAINS setTimeout" ───────────
+ * Round-1 review, non-blocking item 3: the first spelling of this scan asked
+ * whether the call text contained `setTimeout` or `route.continue(`, which a
+ * handler hoisted into a named `const` outside the `.route(` call defeats
+ * completely — the reviewer planted a live 4-second hand-rolled hold that way
+ * and the suite stayed 8/8 green. The test is now the other way round: a
+ * doctor-stream route is allowed ONLY if it answers with a canned response
+ * (`route.fulfill(`) — step 3d's injected 500 and the budget-stop stub, which
+ * do not pretend a run is in flight. Anything else — a delay, a `continue()`,
+ * an identifier whose body lives elsewhere — is an offender. Deny-by-default
+ * is the right posture here: a new spelling of "hold the stream" should have
+ * to be added deliberately, not discovered later as a flake.
  */
 function handRolledStreamHolds(source: string): { line: number; text: string }[] {
   const bad: { line: number; text: string }[] = [];
+  const masked = maskCommentsAndStrings(source);
   const needle = '.route(';
-  for (let at = source.indexOf(needle); at !== -1; at = source.indexOf(needle, at + 1)) {
+  for (let at = masked.indexOf(needle); at !== -1; at = masked.indexOf(needle, at + 1)) {
     const open = at + needle.length - 1;
     let depth = 0;
     let i = open;
-    for (; i < source.length; i++) {
-      const c = source[i];
+    for (; i < masked.length; i++) {
+      const c = masked[i];
       if (c === '(' || c === '[' || c === '{') depth++;
       else if (c === ')' || c === ']' || c === '}') {
         depth--;
         if (depth === 0) break;
       }
     }
+    // The URL glob lives in a string, which the mask blanks — so the route
+    // being scanned is identified from the ORIGINAL text of the same span.
     const call = source.slice(at, Math.min(i + 1, source.length));
     if (!/doctor\/stream/.test(call)) continue;
-    if (!/setTimeout|\.continue\(/.test(call)) continue;
+    if (/route\.fulfill\(|\.fulfill\(/.test(call)) continue;
     const line = source.slice(0, at).split('\n').length;
     bad.push({ line, text: call.replace(/\s+/g, ' ').slice(0, 120) });
   }
@@ -217,6 +273,16 @@ describe('in-flight doctor runs go through the one shared hold', () => {
       + '  await route.continue();\n'
       + '});';
     assert.equal(handRolledStreamHolds(delayed).length, 1);
+    // THE ESCAPE THAT SENT THE FIRST SPELLING BACK (round-1 review,
+    // non-blocking item 3): the handler hoisted out of the call, so the call
+    // text contains neither `setTimeout` nor `.continue(`. A live 4-second
+    // hand-rolled hold written that way left the suite 8/8 green.
+    const hoisted = 'const holdIt = async (route) => {\n'
+      + '  await new Promise((r) => { setTimeout(r, 4000); });\n'
+      + '  await route.continue();\n'
+      + '};\n'
+      + "await p.route('**/api/scriptide/doctor/stream', holdIt);";
+    assert.equal(handRolledStreamHolds(hoisted).length, 1);
     // A canned failure is not a pretend-in-flight hold.
     assert.equal(
       handRolledStreamHolds("await p.route('**/api/scriptide/doctor/stream', (route) => route.fulfill({ status: 500 }));").length,
@@ -225,6 +291,21 @@ describe('in-flight doctor runs go through the one shared hold', () => {
     // Routes on other endpoints are not this scan's business.
     assert.equal(
       handRolledStreamHolds("await p.route('**/api/health', async (route) => { await route.continue(); });").length,
+      0,
+    );
+    // Round-1 review, non-blocking item 4: prose is not code. A `.route(` in a
+    // comment used to start the brace-walk there, swallow the real code after
+    // it, and report the offender at the comment's line number.
+    const commented = "// await p.route('**/api/scriptide/doctor/stream', async (route) => {\n"
+      + "await p.route('**/api/health', (route) => route.fulfill({ status: 200 }));";
+    assert.equal(handRolledStreamHolds(commented).length, 0);
+    const blockCommented = '/* p.route("' + '**/api/scriptide/doctor/stream", handler) *' + '/\n'
+      + "await p.route('**/api/health', (route) => route.fulfill({ status: 200 }));";
+    assert.equal(handRolledStreamHolds(blockCommented).length, 0);
+    // A URL's own `//` must not be read as the start of a line comment.
+    assert.equal(
+      handRolledStreamHolds("await p.goto('http://127.0.0.1:1/x');\n"
+        + "await p.route('**/api/scriptide/doctor/stream', (route) => route.fulfill({ status: 500 }));").length,
       0,
     );
   });
@@ -252,6 +333,11 @@ describe('in-flight doctor runs go through the one shared hold', () => {
     assert.match(helper, /export async function holdDoctorRunInFlight/);
     assert.match(helper, /get held\(\)/);
     assert.match(helper, /async release\(\)/);
+    // The MOUNT window's pin (round-1 review, blocking item 2): without it,
+    // step 3b's first assertion is a race again — the regression it exists to
+    // catch was measured caught on only 4 of 6 runs before the chunk was held.
+    assert.match(helper, /export const COVERAGE_SUMMARY_CHUNK_ROUTE/);
+    assert.match(helper, /export async function holdCoverageSummaryChunk/);
   });
 });
 
