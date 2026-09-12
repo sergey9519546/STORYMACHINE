@@ -2092,6 +2092,134 @@ async function main() {
   await contextB.close();
 
   // ══════════════════════════════════════════════════════════════════════
+  // CONTEXT E — "Coverage outdated -> Re-run coverage" RE-RUNS COVERAGE
+  // (2026-09-12 adversarial audit, finding #3).
+  //
+  // THE DEFECT. The action strip's "Re-run coverage" button called
+  // `handleTaskChange("coverage")`. The banner is reachable while the active
+  // task is ALREADY `coverage`, so the click switched nothing, issued no
+  // request — and `handleTaskChange` additionally cleared the stale flag, so
+  // the warning that the verdict on screen described text the writer had since
+  // edited was dismissed by a click that re-ran nothing. The panel header's
+  // circular-arrow control worked; two controls, one name, one inert.
+  //
+  // FAIL-FIRST, by construction: this phase counts
+  // `/api/scriptide/doctor/stream` POSTs in the window that begins when the
+  // banner is clicked. On the unfixed build that count is 0 and the banner
+  // disappears anyway. A 9-scene draft is used deliberately — the defect is
+  // length-independent and a feature-length re-run would cost minutes.
+  // ══════════════════════════════════════════════════════════════════════
+  console.log('\n=== P2-rerun — the outdated banner issues a real run ===');
+  const contextE = await browser.newContext();
+  const pageE = await contextE.newPage();
+  wireConsoleCapture(pageE, genuineConsoleErrors);
+
+  const doctorStreamPosts = [];
+  pageE.on('request', (r) => {
+    if (r.method() === 'POST' && /\/api\/scriptide\/doctor\/stream$/.test(r.url())) {
+      doctorStreamPosts.push(r.url());
+    }
+  });
+
+  const rerunFixturePath = join(REPO, 'data/screenplays/runoff.fountain');
+  await pageE.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  const [rerunChooser] = await Promise.all([
+    pageE.waitForEvent('filechooser', { timeout: timing.ms(20000) }),
+    pageE.getByText(/OPEN MY SCRIPT/i).first().click(),
+  ]);
+  await rerunChooser.setFiles(rerunFixturePath);
+  await pageE.locator('.cm-content').first().waitFor({ timeout: timing.ms(30000) });
+  await pageE.waitForTimeout(timing.ms(1200));
+
+  await pageE.getByRole('button', { name: /^COVERAGE$/i }).first().click();
+  await pageE.getByRole('button', { name: /run coverage/i }).first().click({ timeout: timing.ms(20000) });
+  await pageE.waitForFunction(() => /HEALTH/.test(document.body.innerText), { timeout: timing.ms(120000) });
+  await pageE.waitForTimeout(timing.ms(800));
+  const healthBefore = await pageE.evaluate(() => {
+    const m = document.body.innerText.match(/Health\s+([\d.]+)/i);
+    return m ? m[1] : null;
+  });
+  record(
+    'P2-rerun',
+    'a first coverage run lands on the 9-scene draft (an empty run makes every assertion below vacuous)',
+    healthBefore !== null && doctorStreamPosts.length >= 1,
+    `health=${healthBefore} doctorStreamPosts=${doctorStreamPosts.length}`,
+  );
+
+  // Edit the draft so the report on screen is genuinely outdated.
+  await pageE.locator('.cm-content').first().click();
+  await pageE.keyboard.press('Control+End');
+  await typeWithoutDrainGaps(
+    pageE,
+    '\n\nINT. ANOTHER ROOM - DAY\n\nThe tally sheet is gone.\n\nCLERK\nSomebody took it.\n',
+  );
+  await pageE.waitForTimeout(timing.ms(1500));
+
+  // The banner's button is the one with a TEXT label; the panel header's
+  // circular-arrow control carries the same accessible name via aria-label and
+  // no text, so filter on rendered text to be sure this phase drives the
+  // banner and not the control that already worked.
+  const bannerVisible = await pageE
+    .locator('button', { hasText: /^Re-run coverage$/ })
+    .first()
+    .waitFor({ state: 'visible', timeout: timing.ms(15000) })
+    .then(() => true)
+    .catch(() => false);
+  record(
+    'P2-rerun',
+    'editing after a run raises the "Coverage outdated" banner with a text-labelled "Re-run coverage" button',
+    bannerVisible,
+    bannerVisible ? '' : 'no text-labelled "Re-run coverage" button after the edit',
+  );
+
+  let postsAfterClick = 0;
+  let healthAfter = null;
+  let bannerStillVisible = null;
+  if (bannerVisible) {
+    const postsBeforeClick = doctorStreamPosts.length;
+    await pageE.locator('button', { hasText: /^Re-run coverage$/ }).first().click({ timeout: timing.ms(15000) });
+    // A run is a request plus a result: wait for the request to be counted,
+    // then for the panel to settle on a report again.
+    await pageE
+      .waitForFunction(
+        () => !/Re-running coverage/i.test(document.body.innerText) && /HEALTH/.test(document.body.innerText),
+        { timeout: timing.ms(120000) },
+      )
+      .catch(() => {});
+    await pageE.waitForTimeout(timing.ms(800));
+    postsAfterClick = doctorStreamPosts.length - postsBeforeClick;
+    healthAfter = await pageE.evaluate(() => {
+      const m = document.body.innerText.match(/Health\s+([\d.]+)/i);
+      return m ? m[1] : null;
+    });
+    bannerStillVisible = await pageE
+      .locator('button', { hasText: /^Re-run coverage$/ })
+      .first()
+      .isVisible()
+      .catch(() => false);
+  }
+  record(
+    'P2-rerun',
+    'clicking the banner\'s "Re-run coverage" issues a REAL doctor request (0 on the unfixed build)',
+    postsAfterClick >= 1,
+    `doctor/stream POSTs attributable to the click=${postsAfterClick}`,
+  );
+  record(
+    'P2-rerun',
+    'the verdict the panel shows is recomputed for the edited draft (the number moves)',
+    healthAfter !== null && healthAfter !== healthBefore,
+    `before=${healthBefore} after=${healthAfter}`,
+  );
+  record(
+    'P2-rerun',
+    'the "Coverage outdated" banner is retired by the COMPLETED run, not by the click',
+    bannerStillVisible === false && postsAfterClick >= 1,
+    `bannerAfter=${bannerStillVisible} postsAfterClick=${postsAfterClick}`,
+  );
+
+  await contextE.close();
+
+  // ══════════════════════════════════════════════════════════════════════
   // CONTEXT C — FEATURE LENGTH (2026-09-06).
   //
   // Everything above this line runs on 12-scene input, which is how four

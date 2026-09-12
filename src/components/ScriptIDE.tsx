@@ -460,6 +460,9 @@ export default function ScriptIDE({
   // Coverage freshness: after user edits, diagnosis is considered stale until
   // they re-open Coverage / re-run doctor (quiet intelligence, not a nag stack).
   const [coverageStale, setCoverageStale] = useState(false);
+  /** CoverageSummary's OWN `run()`, published up via its onRegisterRun prop —
+   *  null whenever that panel is not mounted. See rerunCoverage below. */
+  const coverageRunRef = useRef<(() => void) | null>(null);
   // W4: the last full report CoverageSummary computed, threaded into
   // ScriptDoctorPanel as initial state when "Full report" is clicked — see
   // that panel's initialReport prop doc comment for the freshness contract.
@@ -1623,7 +1626,12 @@ export default function ScriptIDE({
       const next = prev === slot ? "none" : slot;
       if (next === "coverage") {
         setTask("coverage");
-        setCoverageStale(false);
+        // Finding #3 (2026-09-12): NOT setCoverageStale(false). "Coverage
+        // outdated" is a claim about the report on screen, so only a COMPLETED
+        // run may retract it (CoverageSummary's onFreshReport, below) — opening
+        // the panel is a request for a run, not evidence that one finished.
+        // Clearing it here is what let a click dismiss the warning while
+        // issuing no request at all.
       } else if (next === "none") {
         setTask((t) => (t === "coverage" || t === "ship" ? "write" : t));
       }
@@ -1645,7 +1653,8 @@ export default function ScriptIDE({
     } else if (next === "coverage") {
       setToolSlot("coverage");
       setCoverageFull(false);
-      setCoverageStale(false);
+      // Finding #3: same rule as openToolSlot above — the stale flag is
+      // retracted by a completed run, never by the click that asks for one.
     } else if (next === "ship") {
       // W6: the writer-facing ShipPanel (exports/snapshots/verify), NOT the
       // Labs-gated research shell (toolSlot="studio") this used to mount —
@@ -1654,6 +1663,38 @@ export default function ScriptIDE({
       setCoverageFull(false);
     }
   }, []);
+
+  /** ONE re-run of coverage, for every control that offers one.
+   *
+   *  Finding #3 (2026-09-12, adversarial writer's-loop audit): the action
+   *  strip's "Coverage outdated -> Re-run coverage" button called
+   *  `handleTaskChange("coverage")`. The banner renders while the active task
+   *  is already `coverage`, so that was a no-op — zero
+   *  `/api/scriptide/doctor/stream` requests — and `handleTaskChange` also
+   *  cleared `coverageStale`, dismissing the only warning that the verdict on
+   *  screen described text the writer had since edited. The panel header's
+   *  circular-arrow control (CoverageSummary's own `run()`) worked. Two
+   *  controls, one name, one of them inert.
+   *
+   *  Both now reach the same `run()`: when the Coverage panel is mounted its
+   *  registered run is invoked directly; when it is not (the banner is
+   *  reachable from `write`/`ship` too), the panel is opened and runs on mount
+   *  under its own first-run effect. Either way the stale flag survives until a
+   *  run COMPLETES — `onFreshReport` is the only thing that clears it. */
+  /** Stable identity, so CoverageSummary's registration effect fires on its
+   *  own `run` identity and never on a new inline arrow from this render. */
+  const registerCoverageRun = useCallback((run: (() => void) | null) => {
+    coverageRunRef.current = run;
+  }, []);
+
+  const rerunCoverage = useCallback(() => {
+    const run = coverageRunRef.current;
+    if (run) {
+      run();
+      return;
+    }
+    handleTaskChange("coverage");
+  }, [handleTaskChange]);
 
   // Escape ladder: command palette → prefs → shortcuts → tool slot → mobile
   // sidebar — ordered by each layer's actual stacking (paletteOpen z-[300]
@@ -2797,8 +2838,16 @@ export default function ScriptIDE({
           ) : coverageStale && !isEmptyDraft ? (
             <>
               <span className="sm-slug">Coverage outdated</span>
-              <button type="button" onClick={() => handleTaskChange("coverage")} className="sm-btn sm-btn--stamp py-1.5">
-                Re-run coverage
+              {/* Finding #3: rerunCoverage, NOT handleTaskChange — see that
+                  callback's doc comment. The label said "re-run" and the
+                  handler only switched tasks. */}
+              <button
+                type="button"
+                onClick={rerunCoverage}
+                disabled={coverageSummaryStatus === "loading"}
+                className="sm-btn sm-btn--stamp py-1.5 disabled:opacity-40"
+              >
+                {coverageSummaryStatus === "loading" ? "Re-running coverage…" : "Re-run coverage"}
               </button>
             </>
           ) : task === "coverage" ? (
@@ -3691,6 +3740,7 @@ export default function ScriptIDE({
               autoLoadSample={doctorAutoSample}
               getDraftGeneration={getDraftGeneration}
               onFreshReport={() => setCoverageStale(false)}
+              onRegisterRun={registerCoverageRun}
               onReportComputed={setCoverageReport}
               onStatusChange={(status) => {
                 // Round-2 review fix (2026-09-05): a sample-flagged run that

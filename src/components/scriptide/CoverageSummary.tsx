@@ -72,6 +72,26 @@ interface CoverageSummaryProps {
    *  report actually exists (see ScriptIDE.tsx's `coverageSummaryStatus`),
    *  which "waits for the in-flight run" rather than papering over the race. */
   onStatusChange?: (status: Status) => void;
+  /** Hands this panel's OWN `run()` to the host, so a re-run control that lives
+   *  outside this component triggers the same request the panel's own
+   *  circular-arrow button does.
+   *
+   *  WHY (2026-09-12, adversarial finding #3). ScriptIDE's action-strip
+   *  "Coverage outdated -> Re-run coverage" banner called
+   *  `handleTaskChange("coverage")`. That banner is reachable while the active
+   *  task is ALREADY `coverage`, where switching to it is a no-op: no doctor
+   *  request went out, and `handleTaskChange` additionally cleared the stale
+   *  flag — so the one honest warning that the verdict on screen was computed
+   *  for text that no longer exists was dismissed by a click that re-ran
+   *  nothing. Two controls with the same name, one inert.
+   *
+   *  Registering the callback (rather than the host passing a nonce down and
+   *  this component watching it) is what makes "the same run()" literal: there
+   *  is exactly one implementation of the request, and both controls invoke
+   *  that function object. Called with the function on mount/`run` identity
+   *  change and with `null` on unmount, so the host never holds a callback
+   *  into a torn-down component. */
+  onRegisterRun?: (run: (() => void) | null) => void;
 }
 
 type Status = "idle" | "loading" | "success" | "error";
@@ -187,6 +207,7 @@ export default function CoverageSummary({
   onFreshReport,
   onReportComputed,
   onStatusChange,
+  onRegisterRun,
 }: CoverageSummaryProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -382,6 +403,17 @@ export default function CoverageSummary({
     userCancelledRef.current = true;
     abortRef.current?.abort();
   }, []);
+
+  // Finding #3 (2026-09-12): publish `run` to the host so ScriptIDE's
+  // "Coverage outdated -> Re-run coverage" banner issues the SAME request this
+  // panel's own circular-arrow control does. Deregisters on unmount (and
+  // before re-registering a new `run` identity) so a stale closure over a
+  // torn-down component can never be invoked. See onRegisterRun's prop doc.
+  useEffect(() => {
+    onRegisterRun?.(() => void run());
+    return () => onRegisterRun?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run]);
 
   useEffect(() => {
     if (autoLoadSample && !sampleFired.current) {
