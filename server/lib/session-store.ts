@@ -168,7 +168,11 @@ export function safeJsonParse<T>(text: string, fallback: T): T {
  * `scripts/lib/keyless-browser-certification.mjs` sets, on the isolated
  * short-lived server a gate boots for itself. Nothing else in the repository
  * sets it: not the Dockerfile, not docker-compose.yml, not package.json's
- * start/dev scripts, not `.github/**`, not `server/**` or `src/**`.
+ * start/dev scripts, not `.github/**`, not `server/**` or `src/**`. This
+ * covers everything a guard CAN cover — it cannot cover an untracked `.env`:
+ * `dotenv/config` loads one before this module runs, so a value placed there
+ * (or in a deployment's own real environment) is honored the same as any
+ * other environment variable, bounded to the same 1-50 range below.
  * `tests/core/rate-limit-verification-override.test.ts` asserts all of that AND
  * that the default is the production number — so a deployment that never sets
  * the variable is byte-for-byte the deployment that existed before this comment.

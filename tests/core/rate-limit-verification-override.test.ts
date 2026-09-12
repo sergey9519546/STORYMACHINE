@@ -229,3 +229,33 @@ describe('the multiplier is scoped to browser gates, not every keyless caller', 
     }
   });
 });
+// ── Round-2 follow-up item 2 (2026-09-12) ───────────────────────────────────
+//
+// The guard's own comment in server/lib/session-store.ts claimed slightly more
+// than a guard can prove: "nothing else in the repository sets it" is true and
+// checked above, but it read as though nothing COULD set it. `dotenv/config`
+// loads an untracked `.env` before this module runs, and no repository guard
+// can see inside a gitignored file — measured: `VERIFY_RATE_LIMIT_MULTIPLIER=10`
+// in a `.env` gave `200s=130 429s=0`, same as the gate's own server. The
+// comment must say so.
+describe('the guard\'s own comment names the one thing it cannot cover', () => {
+  it('states plainly that an untracked .env is honored, not silently omits it', () => {
+    const source = readFileSync(path.join(REPO, 'server/lib/session-store.ts'), 'utf8');
+    assert.match(
+      source,
+      /cannot cover an untracked `\.env`/,
+      'the WHY IT CANNOT LOOSEN PRODUCTION comment must say a guard cannot cover .env',
+    );
+    assert.match(
+      source,
+      /dotenv\/config.*loads one before this module runs/,
+      'the comment must say WHY .env is uncoverable: dotenv/config loads it first',
+    );
+    // The sentence this item leaves untouched, because it is already exactly
+    // right, must still be exactly right.
+    assert.match(
+      source,
+      /a deployment that never sets\s*\n\s*\* the variable is byte-for-byte the deployment that existed before this comment\./,
+    );
+  });
+});
