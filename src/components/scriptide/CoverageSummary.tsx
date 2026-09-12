@@ -535,7 +535,7 @@ export default function CoverageSummary({
    *  reviewer drove it. `normalizeScreenplay` collapses blank-line runs and joins
    *  wrapped lines, so on the reviewer's own double-spaced paste four separate
    *  action beats came back as ONE run-on paragraph. An earlier version of this
-   *  comment, and claims row 100, called that "the re-spaced draft now in the
+   *  comment, and claims row 106, called that "the re-spaced draft now in the
    *  editor for the writer to keep working in"; in the only state where this
    *  control acts, the draft it leaves behind is materially WORSE than the one
    *  the writer pasted. That is not a reason to withhold the control — the
@@ -1094,7 +1094,7 @@ export default function CoverageSummary({
               )}
               {/* Finding #5: the located notes stay reachable, attributed to the
                   finding they belong to rather than relabelled as the priority's
-                  location. Registered as docs/CLAIMS_REGISTER.md row 95. */}
+                  location. Registered as docs/CLAIMS_REGISTER.md row 101. */}
               {rootCauseMemberJump && (onNavigateToFinding || onJumpToLine) && (
                 <div className="mt-3 border-t border-[var(--sm-hair)] pt-3">
                   <p className="text-[11px] font-[family-name:var(--sm-font-mono)] leading-snug text-[var(--sm-ink-mute)]">

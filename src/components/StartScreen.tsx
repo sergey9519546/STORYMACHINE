@@ -720,7 +720,7 @@ export default function StartScreen({
                           reading, so a visitor knows what they are looking at
                           before they click the button beside it — and the
                           numbers are now the ones that button produces.
-                          Registered as docs/CLAIMS_REGISTER.md row 94. */}
+                          Registered as docs/CLAIMS_REGISTER.md row 100. */}
                       {/* NOT `.sm-slug`: that class uppercases via
                           text-transform, which turns this sentence into a
                           shout and makes the shipped bytes differ from the
