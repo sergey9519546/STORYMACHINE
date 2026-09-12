@@ -96,7 +96,8 @@ import {
 // the same label table the exported coverage HTML's verify block publishes and both
 // verifiers read back. See server/lib/artifact-claims.ts.
 import {
-  claimRowsFor, LETTER_PROSE_CLAIMS, VERDICT_WORD, VERIFY_SCOPE_SENTENCE,
+  claimRowsFor, formatLengthLine, LETTER_PROSE_CLAIMS, VERDICT_WORD, VERIFY_SCOPE_SENTENCE,
+  type ArtifactClaims,
 } from './artifact-claims.ts';
 // ONE priorities heading across the panel, the exported HTML, this letter and the
 // tier — see src/lib/priorities-copy.ts.
@@ -236,20 +237,23 @@ interface LetterData {
   generatedLine: string;
 }
 
-function buildHeadline(report: ScriptDoctorReport): string {
+/**
+ * The letter's own headline — `Health 66.7/100 (Fair) · 6 scenes · 167 words ·
+ * ~2 pages / ~2 min (est.)`.
+ *
+ * ROUND 2 (2026-09-12 review finding 7). The length segment used to be formatted
+ * here, by hand, in a format `server/lib/artifact-claims.ts`'s `formatLengthLine`
+ * also produces — and the offline verifier reads this headline back with that
+ * module's `parseLengthLine` as a THIRD independent rendering of the scene/word/
+ * page-estimate claims. Two formatters that must stay byte-compatible, with nothing
+ * asserting it: reword this one and `parseLengthLine(rest)` returns null, the third
+ * rendering silently stops being checked, and every suite stays green. It is now
+ * the same formatter, so there is nothing to drift — byte-identical output, proven
+ * by the three committed letter goldens being unchanged by this refactor.
+ */
+function buildHeadline(report: ScriptDoctorReport, claims: ArtifactClaims): string {
   const grade = report.grade ? titleCase(report.grade) : 'Unknown';
-  const parts = [
-    `Health ${report.health.toFixed(1)}/100 (${grade})`,
-    `${formatNumber(report.sceneCount)} scene${report.sceneCount === 1 ? '' : 's'}`,
-    `${formatNumber(report.wordCount)} word${report.wordCount === 1 ? '' : 's'}`,
-  ];
-  if (report.pageEstimate) {
-    parts.push(
-      `~${formatNumber(report.pageEstimate.pages)} page${report.pageEstimate.pages === 1 ? '' : 's'} `
-      + `/ ~${formatNumber(report.pageEstimate.runtimeMinutes)} min (est.)`,
-    );
-  }
-  return parts.join(' · ');
+  return `Health ${report.health.toFixed(1)}/100 (${grade}) · ${formatLengthLine(claims)}`;
 }
 
 // 2026-09-11 (producer-tier discovery defect #2): three things here disagreed
@@ -503,7 +507,7 @@ function buildLetterData(report: ScriptDoctorReport, opts: CoverageLetterOptions
     author,
     tier,
     verdictLine,
-    headline: buildHeadline(report),
+    headline: buildHeadline(report, tier.claims),
     summary,
     excerptNote,
     strengths,
