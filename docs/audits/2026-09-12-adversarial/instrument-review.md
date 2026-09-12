@@ -311,3 +311,182 @@ them touches the scoring path, so a revision round needs no new receipt —
 re-running `honesty-audit`, `report-unverified-gates`,
 `tests/scripts/report-unverified-gates.test.ts`,
 `tests/core/honesty-audit-claims.test.ts` and `check-brain` covers all four.
+
+---
+
+## Round 2 — `77755355a536c951271c3a79cfbd380e2c36364d`
+
+**Reviewed object:** `77755355a536c951271c3a79cfbd380e2c36364d` — one commit on
+the round-1 tip `29b17357`, on `origin`. Same reviewer, warm context; re-checked
+my own four items in the failure direction first, from a
+`git archive 77755355` export beside the round-1 export and probes
+(`<session scratch>/r2`, plus `r2-forge`, `r2-forge2`, `r2-anchor`,
+`r2-anchor2`). `/home/user/wt-instrument` untouched; nothing pushed.
+
+| round-1 item | state | one-line evidence |
+|---|---|---|
+| 1 — liveness check overclaimed, `&& !mutated.ok` missing | **fixed** | committed forged fixture now reads `[ABSENT]`, reporter exit 1; both sentences rewritten and TRUE |
+| 2 — 15 stale pointers in the exempted column | **fixed** | re-derived independently: **0 stale of 18**, carve-out is exactly 2 retired rows |
+| 3 — vacuous anchor accepted | **fixed** | `anchor:"e"` → `claims-register-anchor-not-distinctive`, exit 1 |
+| 4 — DISCRIMINATION_BASELINE disclosure in one place | **fixed** | now in all four sites |
+
+### Item 1 — three signals, and an honest sentence about them
+
+`tests/fixtures/gate-liveness/forged-liveness-suite.ts` is my round-1 probe
+committed verbatim (diff against `<session scratch>/probes/forged-liveness-suite.ts`:
+line-wrapping and two added comments only; the `it` body is still
+`assert.ok(true)` at `:82` — the attack was not weakened to be easier to catch).
+Replayed as `tests/core/public-benchmark.test.ts`:
+
+```
+$ node scripts/report-unverified-gates.mjs        # throwaway copy, forged suite planted
+VERIFIED GATES: 0 of 1 ran here, with no corpus and no owner step
+  [ABSENT] tests/core/public-benchmark.test.ts
+     DETAIL: PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR was raised from 0.5313 … to 0.5813
+             and the mutated run still EXITED 0.
+exit=1                                            scripts/lib/auc.ts: OK (unchanged)
+```
+
+Genuine suite, same command: `[RAN]`, `mutation check: … -> suite FAILED on that
+floor by name, exit non-zero, no passing twin`, exit 0. `npm run gates` ×3:
+**10.67 / 10.36 / 10.87 s** (lane: 10.07 / 10.55 / 9.90 — same band; round 1 was
+~11.5 s on a busier sandbox).
+
+**Beating all three signals, cheaper than the lane's concession.** The lane's
+left-undone item 8 says the residual gap is "a forgery that reads
+`AUC_FLOOR_MUTATION_CONSTANT` from its own environment". It is cheaper than
+that. `<session scratch>/r2-forge2/tests/core/public-benchmark.test.ts` (no
+`process.env` reference anywhere in the file — grep count 0) asserts nothing
+about any floor and clears all three:
+
+* **(a) non-zero exit, for free** — it keeps an innocent-looking `it('every
+  floor constant in scripts/lib/auc.ts matches the imported value')` that greps
+  the on-disk literal for the imported value. Passes unmutated; the in-memory
+  mutation necessarily breaks it. No env var needed.
+* **(b) named failure line** — printed for every floor at
+  `round4(measured + 0.05)`, computed from its own FLOOR report.
+* **(c) no passing twin** — its vacuous `it` titles are worded so they do not
+  contain `clears <CONSTANT> = <raised>`.
+
+```
+$ node scripts/report-unverified-gates.mjs        # throwaway copy, forge2 planted
+VERIFIED GATES: 1 of 1 ran here …
+  [RAN] tests/core/public-benchmark.test.ts
+     floors: … -> suite FAILED on that floor by name, exit non-zero, no passing twin
+exit=0
+```
+
+**This does not contradict the shipped text, which is the point of item 1.**
+`scripts/report-unverified-gates.mjs:263-271` says exactly what my probe does:
+"a forgery must now print a failing line for the floor, suppress the passing
+line its own `it` block emits for the same title, and exit non-zero … The
+remaining gap is deliberate forgery, and an output-parsing check cannot close
+it." `scripts/lib/raise-auc-floor-hook.mjs:41-48` says the same, and both files
+now name the round-1 falsification rather than repeating the pattern. The claim
+survives the attack, which is the standard round 1 asked for. The only
+imprecision left is in the audit record: the lane report's left-undone item 8
+names the env-var route as *the* residual gap when a forgery that never looks at
+the environment also gets through. Worth one sentence if that report is amended
+at merge; it does not change any behaviour and nothing in `scripts/**` or
+`docs/brain/**` repeats it.
+
+Mechanism read: `mutationWasCaught` (`:618-633`) now returns `{ok, reason}` and
+rejects an `ok … clears <CONSTANT> = <raised>` twin; the exit-code gate is a
+separate early return at `:676-684`, so its DETAIL names which signal failed
+(confirmed above — the fixture is caught by the exit code, not the twin).
+`tests/scripts/report-unverified-gates.test.ts` 42/42 (was 39).
+
+### Item 2 — both columns, zero stale pointers
+
+Re-derived on the tip with my own probe (locate each row's own claim text in the
+cited file; retired/unsupported excluded), not from the lane's table:
+
+```
+appears pointers checked=18  within ±3 = 17  stale = 0  unresolved = 0
+```
+
+The one row my probe first flagged, row 8 (`PrivacyPage.tsx:207`, longest
+fragment at :211), is **correct as cited**: the claim spans lines 207-214 and
+`:207` is where it begins — my round-1 `:211` was the tail of the same
+paragraph. Row 18 (`README.md:43`) resolves; the lane's hand-resolution of the
+parentheses-vs-em-dash mismatch is right. Every corrected cell records the line
+it used to cite.
+
+Carve-out census on the tip: **18 appears pointers checked, 2 exempt** (rows 1
+and 2, both `retired`) — exactly what `ANCHORED_COLUMNS`
+(`scripts/honesty-audit.mjs:1053-1069`) describes, no wider.
+
+Failure direction, in a throwaway copy — row 11's appears pointer moved
+`:666` → `:620`:
+
+```
+docs/CLAIMS_REGISTER.md: [claims-register-line-anchor-mismatch] "row 11 (where it
+  appears): src/components/SlatePanel.tsx:620 — anchor "Deterministic ranking — same"
+  is at line 666, outside the +/-3 window around 620 — the code MOVED; update the
+  line number"   exit=1
+```
+
+The violation names the column, as promised.
+
+### Item 3 — anchors ≥ 12 characters and unique in their window
+
+`anchor:"e"` on row 22, replayed from round 1:
+
+```
+docs/CLAIMS_REGISTER.md: [claims-register-anchor-not-distinctive] "row 22 (evidence
+  pointer): anchor "e" is 1 character(s); an anchor must be at least 12. …"   exit=1
+```
+
+The uniqueness half is confirmed against the lane's own round-1 anchor: at
+`29b17357`, row 19 carried `anchor:"report.plainSummary"`, and that string
+occurs on **three** lines of its ±3 window —
+`tests/core/script-doctor.test.ts:1527, 1528, 1529`. The replacement
+`anchor:"plainSummary ?? '', /structure/"` matches exactly one (`:1528`). So the
+new rule caught a real anchor the lane had written itself, which is the only
+evidence that makes a distinctiveness rule worth having.
+`tests/core/honesty-audit-claims.test.ts` 15/15 (was 10);
+`node scripts/honesty-audit.mjs` on the tip: clean, 93 rows, exit 0. The 12-char
+floor is a chosen constant, not a measurement — the lane says so in its
+left-undone item 10, which is the right way to carry it.
+
+### Item 4 — the DISCRIMINATION_BASELINE disclosure, in four places
+
+* `CLAUDE.md:188-196` — "…IS NOT COMPARABLE TO 0.734 / 0.766 EITHER", naming
+  `degradeShuffle` / `degradeMidpointDrop`, and distinguishing the dated record
+  (left as written) from a fresh run of `scripts/rebuild-experiment.mjs`.
+* `docs/brain/Gates/Gate - AUC-24 Ratchet.md:70-75`.
+* `docs/brain/Gates/Gate - Public Benchmark.md:42-44` (cross-link).
+* `docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md:31-40`
+  — the note round 1 found untouched.
+
+### Round-2 gates reproduced
+
+| check | result |
+|---|---|
+| output identity vs `git archive 0b629491` (`GIT_SHA` pinned) | **PASS — all 45 byte-identical** |
+| `check-scoring-receipt 0b629491..77755355` | "no scoring-path files changed. OK." exit 0 |
+| `npm run benchmark:public` | exit 0 — 0.5313 / 0.5586, 0.4063 / 0.4443, 1.0000 / 0.9473, intervals unchanged |
+| `npm run gates` ×3 | exit 0 ×3 — 10.67 / 10.36 / 10.87 s |
+| touched suites | report-unverified-gates 42/42 · honesty-audit-claims 15/15 · public-benchmark 28/28 · limits 7/7 · scene-segments 9/9 · auc 29/29 · rebuild-experiment 41/41 · brain-coverage 7/7 |
+| `check-brain` · `check-no-console` · `check-docs` · `honesty-audit` | OK (102 notes, 371 links) · OK · clean · clean, exit 0 |
+| commit trailers | both present on `77755355`; no stray model identifier |
+
+Not re-run per budget: full `npm test` (lane reports 13,254 / 13,162 pass / 0
+fail), the browser battery.
+
+### Verdict
+
+**MERGE.** All four round-1 items are closed in the direction they were raised,
+each verified by the probe that broke the old version: the committed forgery is
+now reported NOT verified, the appears column is checked with a carve-out of
+exactly two retired rows and zero stale pointers left, a vacuous anchor is
+rejected and the uniqueness rule caught one of the lane's own anchors, and the
+baseline disclosure is in all four sites. The score still has not moved —
+identity 45/45 against `0b629491`, receipt clean, all six floors at the
+re-locked values. My one remaining observation is not a defect in the shipped
+tree: a forgery cheaper than the one the lane's left-undone item 8 describes
+still gets through, exactly as `scripts/report-unverified-gates.mjs:263-271` and
+`scripts/lib/raise-auc-floor-hook.mjs:41-48` now say it can — the files claim a
+cost, not a proof, and that claim survived being attacked. Optional, non-blocking:
+widen item 8's sentence in the lane report to say the residual forgery need not
+read the mutation environment at all.
