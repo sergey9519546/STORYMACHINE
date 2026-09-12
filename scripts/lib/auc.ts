@@ -199,8 +199,14 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * did not move, and AUC24_FLOOR did not move. The attribution is measured, not
  * argued: with the denominator change alone reverted and every other change in
  * place, shuffle-drop reads 0.8750 / 0.8232 — i.e. the three parse fixes
- * (typography fold, non-printing strip, title-page strip) move it by 0.0000 /
- * -0.0059 and the denominator moves the rest.
+ * (typography fold, non-printing strip, title-page strip) move it JOINTLY by
+ * 0.0000 / -0.0059 and the denominator moves the rest. *(The word "jointly"
+ * was added 2026-09-12 round 2: this is one leave-one-out, all three parse
+ * fixes reverted together, and it is a DIFFERENT decomposition from the table
+ * in PUBLIC_BENCHMARK_2026-09-06.md §14.3, which reverts each of the three
+ * singly and gives the non-printing strip +0.0024 and the other two 0.0000.
+ * Both are true and they are not the same statistic; reading them as one is
+ * what the missing word invited.)*
  *
  * READ IT AS A CORRECTION TO THE INSTRUMENT'S INPUT. A benchmark whose
  * separation depends on each fixture counting its own licence text as

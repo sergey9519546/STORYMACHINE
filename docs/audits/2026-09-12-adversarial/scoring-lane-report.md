@@ -132,6 +132,14 @@ the ranked list contained none of the five rules that name the defect scene.
 Eleven transforms, 32 scripts, exact equality on health / grade / verdict /
 sceneCount / totalIssues / bySeverity.
 
+**The two columns are not the same statistic, and round 2 says so rather than
+leaving it implied** (the review's non-blocking item 4). Every **tip** figure is
+`0 / 32` over that whole six-field surface. Every **base** figure counts scripts
+whose **health** moved, which is how the base was measured — on the base a
+title page moves some field of the six on 32 of 32 while moving health on 29.
+The after-column is therefore the stronger claim of the two, not a like-for-like
+comparison with the number beside it.
+
 | transform | base | tip |
 |---|---|---|
 | dialogue reflow, 30/35/40/60 cols | 119 / 128 pairs, max 8.8, 1 verdict flip | **0 / 128** |
@@ -353,7 +361,12 @@ passes: the A1 payload's guard rejection path goes **102 ms → 63 ms**.
   merged tree, with the analyzer cap in place** — a cost-derived bound measured
   against an O(distinct²) grid is a bound against a cost that no longer exists
   once the grid is flat. The base branch's own bound commit (`111d72ed`,
-  300,000 → 1,500,000) still needs the sibling lane's correction.
+  300,000 → 1,500,000) still needs the sibling lane's correction. **This stack
+  must not land before that correction is applied on the merged tree with the
+  analyzer cap in place** — `lane/rulebook-and-guard-bound` has it at 675,000
+  on `main` and is about to merge, and a bound carried forward un-re-derived is
+  a bound that means nothing. *(Round 2, the review's non-blocking item 7,
+  which stays as written: this lane still changes no constant.)*
 * ~~**`compiled.fountain = normalizeScreenplay(fountain)` on every path.**
   Recorded as measured-and-not-taken.~~ **THIS BULLET WAS FALSE and is struck
   in round 2.** It WAS taken, in `ef683d4e`, one commit after the bullet was
@@ -427,7 +440,7 @@ purpose — the instrument for it is the P1 benchmark).
 | `npm run lint` | **0** |
 | `check-no-console` | OK — 304 files, 23 quarantine entries |
 | `npm run check-docs` | clean |
-| `npm run honesty-audit` | clean — 458 files, 470 markdown files, 93 claims rows |
+| `npm run honesty-audit` | clean — 458 files, **474** markdown files, 93 claims rows *(round 2; round 1 recorded 470 and the reviewer measured 472 — the count drifts with every markdown file the batch adds, and this branch added two by bringing this report and its review onto it)* |
 | `npm run check-brain` | fresh — 104 notes, 386 links |
 | `check-scoring-receipt 78ec4464..HEAD` | **exit 1**, naming exactly the one PENDING entry — the intended state. Seven scoring-path files listed. No other problem. |
 | three-scan conversion, isolated clone | **exit 0**, "gained a well-formed new entry in the same range. OK." |

@@ -12,8 +12,17 @@ no AUC-24 value appears here.
 
 ## 0. The claim, and why it is a prerequisite rather than a nicety
 
-Identical writing must score identically however it reaches the analyzer. The
-public benchmark's whole measured signal on the 32 committed scripts is a
+Identical writing must score identically however it reaches the analyzer.
+**That sentence is the goal, not a claim about this tree.** What is evidenced
+here is the eighteen transforms below, each measured on all 32 committed
+scripts and each asserted per script in
+`tests/core/parse-format-invariance.test.ts`. One named transform still moves
+all 32 and is pinned rather than fixed — Fountain's forced cue `@`, §3.3 — and
+two more change the ELEMENT rather than its formatting and are therefore
+outside the claim, also §3.3. Read the sentence as scoped to what is asserted;
+the honest form of a universal claim is a list of the cases you have closed.
+
+The public benchmark's whole measured signal on the 32 committed scripts is a
 shuffle-drop mean health gap of 1.9 points and a climax-relocate gap of 1.5.
 Against that, the adversarial review measured an 11.1-point swing on `main`
 from re-wrapping dialogue, a 5.2-point swing from adding a title page, and a
@@ -101,10 +110,27 @@ different seam, and any one of them alone leaves a swing larger than the signal.
 
 ### 1.5 The guard shown failing first
 
-`tests/core/parse-format-invariance.test.ts` copied unchanged onto the branch
-base tree: **35 of 37 assertions fail**. On this tree: **37 of 37 pass**. The
-two that pass on both are the escape-clause test and the dialogue-flatten
-both-directions control, which is the point of having them.
+`tests/core/parse-format-invariance.test.ts` copied unchanged onto a
+`git archive 78ec4464` export of the branch base:
+
+| file version | on the `78ec4464` export | on this tree |
+|---|---|---|
+| round 1 (`git show 85273742:...`, 49 tests) | **44 fail, 5 pass** | 49 of 49 pass |
+| round 2 (as committed, 59 tests) | **53 fail, 6 pass** | **59 of 59 pass** |
+
+*(Corrected in round 2: this section read "35 of 37 assertions fail" and "37 of
+37 pass", which was the count while the file was being written and was never
+re-measured against the committed file. The direction of the claim is
+unaffected — it is stronger than it was written. The independent review
+measured 44 of 49 first; this is that number, reproduced.)*
+
+The handful that pass on the base pass for a reason: the escape-clause test,
+the dialogue-flatten both-directions control, and the transforms that were
+already invariant before any of this work (CRLF, the byte-order mark, the
+contentHash separation). The round-2 rows are also shown failing first against
+the ROUND-1 TIP rather than the base — `git archive 85273742`, where **8 of 59
+fail**: the three forced-element markers, the three cue-extension spellings and
+both halves of the `(O.C.)` mechanism test. See §3.
 
 ### 1.6 The stronger half WAS taken, and three places said it was not
 
@@ -162,6 +188,17 @@ Same corpus, same method: 32 committed scripts, one transform each, exact
 equality on `health` / `grade` / `verdict` / `sceneCount` / `totalIssues` /
 `bySeverity`. All eleven rows are asserted per script in
 `tests/core/parse-format-invariance.test.ts`.
+
+**READ THE TWO COLUMNS AS THE SAME STATISTIC, WHICH THEY ARE NOT BY DEFAULT.**
+*(Clarified in round 2, from the independent review's non-blocking item 4.)*
+The "after" column is `0 / 32` over that whole six-field surface — no script
+moves on any of the six. The "branch base" column counts something narrower:
+how many scripts' **health** moved, which is the figure the base was measured
+with. The two are not interchangeable, and the gap is not rhetorical: on the
+base, adding a title page moves SOME field of the six on 32 of 32 scripts while
+moving health on 29. Where a before-number is quoted below it is the
+health-move count; every after-number is the six-field count, which is the
+stronger of the two.
 
 | transform | branch base | after |
 |---|---|---|
@@ -249,3 +286,109 @@ about what a screenplay is, and it is answered by the format specification, not
 by a statistic. If AUC-24 falls, the finding is about the private corpus's
 document shape, and the response is to look at what those drafts contain, not
 to move `AUC24_FLOOR`.
+
+---
+
+## 3. Round 2: the forced-element markers and the cue extensions
+
+Built after the independent review
+(`docs/audits/2026-09-12-adversarial/scoring-review.md`), whose author measured
+one transform this lane had not thought of and found a second in the same
+family. Both are the same defect in two places: **a character that tells the
+parser what an element IS was left in the element's text and scored as prose.**
+
+Method as above — 32 committed scripts, one transform each, exact equality on
+the six-field surface, asserted per script. The "before" column is measured on a
+`git archive 85273742` export (the round-1 tip), not on the branch base, because
+these are pre-existing defects that round 1 neither introduced nor closed.
+Reproduce with `node --experimental-strip-types <scratch>/markers.mjs` run from
+each tree root, or by running the suite itself.
+
+### 3.1 The forced-element markers
+
+A marker is applied where it is **redundant** — declaring the element the line
+already parses as — so not one printed character changes and no element changes.
+That is what makes each row a format transform and not a writing one.
+
+| transform | at `85273742` | here |
+|---|---|---|
+| forced-action `!` on every action line | **32 / 32, mean +1.056, largest +7.0 on room-12, one verdict PROMOTED PASS → CONSIDER** | **0 / 32** |
+| forced-heading `.` on every scene heading | **32 / 32, mean +0.659, largest +2.5** | **0 / 32** |
+| forced-transition `>` on every transition line | **5 / 6 applicable, mean −4.080, largest −15.7** | **0 / 6** |
+| forced-cue `@` on every character cue | **32 / 32, mean −1.172, largest −26.8** | **32 / 32 — NOT FIXED, see §3.3** |
+
+`!` was the reviewer's find and is the reason this section exists: a
+never-printed marker, applied mechanically, worth up to 7 points and a verdict
+promotion. `.` matters because several scripts in the private corpus mark scenes
+that way (`screenplay-normalizer.ts`'s own header names Ratatouille, Coco and
+Up). `>` is the largest per-script mover of the three that are fixed, because
+this parser has no forced-transition branch at all: `>CUT TO:` was an ACTION
+LINE, `>` and all.
+
+**The rule, and the line it must not cross.** `stripForcedMarkers` removes a
+marker only when the whole document still parses to the element the marker
+DECLARED **and** every unmarked line still parses to what it parsed to before.
+The check is a re-parse, not a heuristic. Scene segmentation is the strongest
+signal the engine has — the doctor's own measurement puts scene-count scarcity
+at AUC ~0.938 against ~0.076 for the entire weighted-rule channel — so a `.`
+silently dissolving a scene heading would be far worse than the leak it closed.
+A marker that fails the test keeps its character, and its leak with it.
+
+### 3.2 The cue extensions
+
+| transform | at `85273742` | here |
+|---|---|---|
+| every extension respelled without its periods — `(V.O)`, `(O.S)`, `(CONTD)` | **12 / 14 applicable, largest −1.3 on soft-launch** | **0 / 14** |
+| every extension respelled with no punctuation — `(VO)`, `(OS)` | **12 / 14 applicable** | **0 / 14** |
+| every extension in lower case — `(v.o.)` | **12 / 14 applicable** | **0 / 14** |
+| `(V.O.)` → `(V.O)` alone (the review's own transform) | **8 / 8 applicable** | **0 / 8** |
+| a curly apostrophe inside `(CONT’D)` | 0 / 9 (the typographic fold already covered it) | 0 / 9 |
+
+`CHARACTER_CUE_RE` admitted only the canonical spellings, so `MARY (V.O)` was
+not a cue: the line was action prose and so was the speech beneath it.
+`normalizeCueExtensions` folds the variants onto the canonical set at the
+analysis seam, before both strips, because those read block types from
+`parseFountain` and a cue the parser cannot see is a speech it types as action.
+The fold applies only to a line that is a cue name followed by nothing but
+parenthetical tails, and only when EVERY tail is a recognised extension, so
+`MARY (into phone)` — a wryly-directed cue this parser has never accepted — is
+left exactly as it was.
+
+**Five copies of one rule, and what the fifth copy cost.** The extension set
+lived inline in `CHARACTER_CUE_RE` and again, byte-identically, in
+`fountain-analyzer.ts`, `locate.ts`, `prioritize.ts` and `truth-extraction.ts`,
+each with a comment saying a shared helper was not worth exporting. All five
+omitted `(O.C.)`. So an off-camera cue failed the cue test and its speech became
+action prose — and had it passed, the four strips would have made
+`MARY (O.C.)` a second character. One definition now: `CUE_EXTENSIONS` and
+`stripCueDecorations` in `src/lib/fountain.ts`, with the cue regex built from
+the set and admitting more than one tail, so `MARY (V.O.) (CONT'D)` is a cue.
+
+### 3.3 What round 2 did NOT close, with its size
+
+* **The forced cue `@` is not stripped.** It is the largest format sensitivity
+  measured anywhere on this branch — 32 of 32 scripts, up to 26.8 points — and
+  it is pinned as a two-sided assertion with that number rather than left to be
+  rediscovered. It is not fixed here because honouring it is a PARSER FEATURE
+  wearing a normaliser's clothes: unlike `!`, `.` and `>`, removing `@` changes
+  the type of every line BELOW the cue (action becomes dialogue), and the
+  editor, PDF, FDX and DOCX renderers would all still print the marker the
+  analysis had decided was invisible. `src/lib/fountain.ts` has said since
+  2026-09-03 that teaching every renderer to strip it is a separate change; it
+  still is, and it is worth its own lane.
+* **The lyric `~` and the centered `> … <` are outside the claim, not inside
+  it.** Neither has a redundant application: no line in any of these 32 scripts
+  parses as `lyrics` or `centered` already, so adding the marker necessarily
+  changes the ELEMENT. Measured for the record — wrapping every transition line
+  as `> … <` moves 5 of 6 applicable scripts (largest −1.6) and a `~` on one
+  dialogue line moves 8 of 32 (largest +0.5) — and named as element changes
+  rather than counted as invariance failures. Both block types are skipped by
+  `extractSceneContent`, so neither carries a word into the heuristics either
+  way.
+* **Nothing was re-locked.** All 45 output-identity fixtures are byte-identical
+  against `85273742` with `GIT_SHA` pinned equal, `npm run benchmark:public`
+  reproduces 0.8438 / 0.7896, 0.5938 / 0.5234 and 1.0000 / 0.9814, and no floor
+  constant in `scripts/lib/auc.ts` was touched. The 32 committed scripts carry
+  no forced marker and no non-canonical extension — which is exactly why these
+  defects survived a benchmark, and why every "before" number above had to be
+  produced by a synthetic transform.
