@@ -20,6 +20,11 @@
 // imports this file).
 import type { CoverageVerdict, ScriptDoctorReport } from '../nvm/analyze/types.ts';
 import { VerifyExpectedSchema } from './validation.ts';
+import { buildReaderTier } from './reader-tier.ts';
+import {
+  encodePageRefs, resolvedPages,
+  type ArtifactClaims, type ArtifactPageRef, type LoglineState,
+} from './artifact-claims.ts';
 
 export interface VerifyExpected {
   contentHash: string;
@@ -29,9 +34,27 @@ export interface VerifyExpected {
   healthPercentile?: number;
   engineCommit?: string;
   rulebookCount?: number;
+  // The producer tier's claims (2026-09-12, BUG-1) — every number and discrete
+  // reading server/lib/reader-tier.ts puts on the first page. Same optionality
+  // rule as every field above: present in `expected` means the artifact stated
+  // it, so it is checked; absent means the artifact's shape does not state it.
+  sceneCount?: number;
+  wordCount?: number;
+  estimatedPages?: number;
+  estimatedRuntimeMinutes?: number;
+  prioritiesListed?: number;
+  percentileReading?: string;
+  referenceBounds?: string;
+  loglineState?: LoglineState;
+  pageRefs?: ArtifactPageRef[];
 }
 
-export interface VerifyMismatch { field: string; expected: unknown; actual: unknown }
+/** `detail` (2026-09-12) carries the one extra sentence a list-valued mismatch
+ *  needs — "finding 2 (WEAK_MIDPOINT) claims p. 999, the engine resolves p. 2" —
+ *  which `expected`/`actual` alone cannot say for a page-reference list without
+ *  making a reader diff two encoded strings by eye. Optional and additive: every
+ *  scalar field still reports exactly as it did. */
+export interface VerifyMismatch { field: string; expected: unknown; actual: unknown; detail?: string }
 
 export type MismatchKind = 'content_mismatch' | 'score_mismatch' | 'engine_mismatch' | null;
 
@@ -43,6 +66,15 @@ export interface VerifyRecomputed {
   healthPercentile?: number;
   engineCommit?: string;
   rulebookCount?: number;
+  sceneCount?: number;
+  wordCount?: number;
+  estimatedPages?: number;
+  estimatedRuntimeMinutes?: number;
+  prioritiesListed?: number;
+  percentileReading?: string;
+  referenceBounds?: string;
+  loglineState?: LoglineState;
+  pageRefs?: ArtifactPageRef[];
   structuralSignals?: { meanAbsDialogueShareDelta: number; actionSentenceCvOverall: number };
 }
 
@@ -141,9 +173,31 @@ export function checkContentHash(actualContentHash: string, expected: VerifyExpe
  * — 'contentHash' is unconditionally reported as checked-and-matching here,
  * exactly as the route's inline version did before this extraction.
  */
-export function compareVerifyClaims(report: ScriptDoctorReport, expected: VerifyExpected): VerifyCompareResult {
+export function compareVerifyClaims(
+  report: ScriptDoctorReport,
+  expected: VerifyExpected,
+  /** The script text the hash already matched. REQUIRED in practice — both
+   *  callers hold it (the route has the submitted body, the CLI has the file) —
+   *  and it is what makes the producer tier's claims checkable at all: the page
+   *  references are re-resolved through the real paginator and the logline state
+   *  is re-derived from the text, neither of which a report object alone can
+   *  supply. Defaulted to '' so an old two-argument call still type-checks and
+   *  still checks every pre-2026-09-12 field; the tier claims then recompute as
+   *  ABSENT, which reports as a mismatch rather than as a silent pass. */
+  fountain: string = '',
+): VerifyCompareResult {
   const checked: string[] = ['contentHash'];
   const mismatches: VerifyMismatch[] = [];
+
+  // The tier's claims, RECOMPUTED — not read off the report. buildReaderTier is
+  // the same function both exporters render the first page from, called here with
+  // only the script text, so the scene/word/page-estimate figures, the priorities
+  // count, the percentile reading, the reference bounds, the logline state and
+  // every per-finding page reference come back exactly as a genuine export would
+  // have stated them. Page references in particular go through
+  // server/lib/page-refs.ts -> src/lib/screenplay-layout.ts, the same paginator
+  // src/lib/pdf.ts lays the PDF out with.
+  const actualClaims = recomputeArtifactClaims(report, fountain);
 
   if (expected.health !== undefined) {
     checked.push('health');
@@ -170,6 +224,32 @@ export function compareVerifyClaims(report: ScriptDoctorReport, expected: Verify
       mismatches.push({ field: 'healthPercentile', expected: expected.healthPercentile, actual: actualPercentile });
     }
   }
+  // ── The producer tier's claims (2026-09-12, BUG-1) ────────────────────────
+  // Exact comparisons, all of them: these are integers, discrete readings and a
+  // fixed bounds string, so the 0.05 display-rounding tolerance that health and
+  // healthPercentile need has no business here — a scene count is never "13.04".
+  compareExact('sceneCount', expected.sceneCount, actualClaims.sceneCount);
+  compareExact('wordCount', expected.wordCount, actualClaims.wordCount);
+  compareExact('estimatedPages', expected.estimatedPages, actualClaims.estimatedPages);
+  compareExact('estimatedRuntimeMinutes', expected.estimatedRuntimeMinutes, actualClaims.estimatedRuntimeMinutes);
+  compareExact('prioritiesListed', expected.prioritiesListed, actualClaims.prioritiesListed);
+  compareExact('percentileReading', expected.percentileReading, actualClaims.percentileReading);
+  compareExact('referenceBounds', expected.referenceBounds, actualClaims.referenceBounds);
+  compareExact('loglineState', expected.loglineState, actualClaims.loglineState);
+
+  if (expected.pageRefs !== undefined) {
+    checked.push('pageRefs');
+    const detail = pageRefsDisagreement(expected.pageRefs, actualClaims.pageRefs);
+    if (detail !== null) {
+      mismatches.push({
+        field: 'pageRefs',
+        expected: encodePageRefs(expected.pageRefs),
+        actual: actualClaims.pageRefs ? encodePageRefs(actualClaims.pageRefs) : undefined,
+        detail,
+      });
+    }
+  }
+
   // engineCommit/rulebookCount, checked the same way as every field above
   // (exact string / exact int — no float tolerance needed), but kept out of
   // `hardMismatches` below so a difference confined to these two fields
@@ -187,6 +267,14 @@ export function compareVerifyClaims(report: ScriptDoctorReport, expected: Verify
     const actualRulebookCount = report.provenance?.rulebookCount;
     if (actualRulebookCount === undefined || expected.rulebookCount !== actualRulebookCount) {
       mismatches.push({ field: 'rulebookCount', expected: expected.rulebookCount, actual: actualRulebookCount });
+    }
+  }
+
+  function compareExact<T>(field: string, expectedValue: T | undefined, actualValue: T | undefined): void {
+    if (expectedValue === undefined) return;
+    checked.push(field);
+    if (expectedValue !== actualValue) {
+      mismatches.push({ field, expected: expectedValue, actual: actualValue });
     }
   }
 
@@ -216,6 +304,21 @@ export function compareVerifyClaims(report: ScriptDoctorReport, expected: Verify
       healthPercentile: report.healthPercentile,
       engineCommit: report.provenance?.engineCommit,
       rulebookCount: report.provenance?.rulebookCount,
+      // The recomputed tier claims, always reported (not only when a caller
+      // claimed them) so an HTTP caller that scraped nothing can still SEE what
+      // the engine says the first page should read — the same posture
+      // structuralSignals below already takes, except that these fields ARE
+      // checkable and every one of them can move `verified`.
+      sceneCount: actualClaims.sceneCount,
+      wordCount: actualClaims.wordCount,
+      ...(actualClaims.estimatedPages !== undefined ? { estimatedPages: actualClaims.estimatedPages } : {}),
+      ...(actualClaims.estimatedRuntimeMinutes !== undefined
+        ? { estimatedRuntimeMinutes: actualClaims.estimatedRuntimeMinutes } : {}),
+      prioritiesListed: actualClaims.prioritiesListed,
+      ...(actualClaims.percentileReading !== undefined ? { percentileReading: actualClaims.percentileReading } : {}),
+      referenceBounds: actualClaims.referenceBounds,
+      ...(actualClaims.loglineState !== undefined ? { loglineState: actualClaims.loglineState } : {}),
+      ...(actualClaims.pageRefs !== undefined ? { pageRefs: actualClaims.pageRefs } : {}),
       // Same two document aggregates ScriptDoctorPanel.tsx's "Shape &
       // Rhythm" section and both coverage exports already show, recomputed
       // here for parity with every other surface. PURELY INFORMATIONAL:
@@ -233,4 +336,100 @@ export function compareVerifyClaims(report: ScriptDoctorReport, expected: Verify
       } : {}),
     },
   };
+}
+
+/**
+ * The claim set a GENUINE export of this script would have published — recomputed
+ * from the script text alone, through the same function both exporters render the
+ * producer tier from (server/lib/reader-tier.ts's buildReaderTier).
+ *
+ * Deliberately passes NO logline: a verifier must not be handed the value it is
+ * checking. buildReaderTier derives the engine's own logline from the text when
+ * none is supplied, so `loglineState` here is the engine's answer, not the
+ * artifact's. The same is true of every page reference — resolved here through
+ * server/lib/page-refs.ts, which calls src/lib/screenplay-layout.ts's
+ * layoutScreenplay, the paginator src/lib/pdf.ts lays the real PDF out with.
+ *
+ * With an empty `fountain` there is no text to paginate or derive from, so
+ * `pageRefs`/`loglineState` come back absent and a claim about either reports as a
+ * mismatch. That is the honest outcome for a caller that supplied no script: it is
+ * not "checked and fine".
+ */
+export function recomputeArtifactClaims(report: ScriptDoctorReport, fountain: string): ArtifactClaims {
+  return buildReaderTier(report, { fountain }).claims;
+}
+
+/**
+ * Why the claimed page-reference list disagrees with the recomputed one, or `null`
+ * when they agree.
+ *
+ * Compares the WHOLE list, positionally: how many findings the summary leads with,
+ * which rule each one is (and its aggregation id when both sides carry one), and
+ * which page each points at. That is what makes the three separate forgeries
+ * distinguishable — moving one page number, swapping two findings' pages, and
+ * deleting a finding from the list all change this list in different places, and a
+ * check of "is a number present" catches none of them.
+ */
+export function pageRefsDisagreement(
+  expectedRefs: readonly ArtifactPageRef[],
+  actualRefs: readonly ArtifactPageRef[] | undefined,
+): string | null {
+  if (actualRefs === undefined) {
+    return 'this report claims page references, but none can be resolved for the script text supplied '
+      + '(no text, or no scene heading the paginator could locate)';
+  }
+  if (expectedRefs.length !== actualRefs.length) {
+    return `this report claims ${expectedRefs.length} page reference`
+      + `${expectedRefs.length === 1 ? '' : 's'}, the engine resolves ${actualRefs.length}`;
+  }
+  for (let i = 0; i < expectedRefs.length; i++) {
+    const claimed = expectedRefs[i];
+    const actual = actualRefs[i];
+    const where = `reference ${i + 1}`;
+    if (claimed.ordinal !== actual.ordinal) {
+      return `${where} is numbered ${claimed.ordinal} in this report and ${actual.ordinal} by the engine`;
+    }
+    if (claimed.rule !== actual.rule) {
+      return `${where} names rule ${claimed.rule} in this report and ${actual.rule} by the engine`;
+    }
+    // The id is compared only when BOTH sides carry one: a report exported before
+    // doctor.ts assigned finding ids publishes no id, and a missing id is not a
+    // disagreement — the rule and the ordinal still pin which finding it is.
+    if (claimed.id !== undefined && actual.id !== undefined && claimed.id !== actual.id) {
+      return `${where} (${claimed.rule}) carries finding id ${claimed.id} in this report and ${actual.id} by the engine`;
+    }
+    if (claimed.page !== actual.page) {
+      return `${where} (${claimed.rule}) points at ${claimed.page === null ? 'no page' : `p. ${claimed.page}`}`
+        + ` in this report and ${actual.page === null ? 'no page' : `p. ${actual.page}`} by the engine`;
+    }
+  }
+  return null;
+}
+
+/**
+ * The pages a document BODY points at, compared against the pages its verify block
+ * claims — the body-versus-block half of the check, for the one claim whose body
+ * rendering is a LIST rather than a single value.
+ *
+ * Only resolved references render on the page (reader-tier.ts omits an unresolved
+ * one rather than printing "p. ?"), so the body's ordered run of `p. N` labels is
+ * compared against the block's resolved pages in the same order. Returns a
+ * human-readable disagreement or `null`.
+ */
+export function bodyPageRefsDisagreement(
+  bodyPages: readonly number[],
+  claimedRefs: readonly ArtifactPageRef[],
+): string | null {
+  const claimedPages = resolvedPages(claimedRefs);
+  if (bodyPages.length !== claimedPages.length) {
+    return `the summary prints ${bodyPages.length} page reference${bodyPages.length === 1 ? '' : 's'}, `
+      + `but this report's verify block claims ${claimedPages.length}`;
+  }
+  for (let i = 0; i < bodyPages.length; i++) {
+    if (bodyPages[i] !== claimedPages[i]) {
+      return `page reference ${i + 1} reads p. ${bodyPages[i]} on the page, `
+        + `but this report's verify block claims p. ${claimedPages[i]}`;
+    }
+  }
+  return null;
 }

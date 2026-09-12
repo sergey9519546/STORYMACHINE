@@ -46,3 +46,30 @@ export function prioritiesHeadingFor(count: number): string {
 export function prioritiesHeadingUpper(count: number): string {
   return prioritiesHeadingFor(count).toUpperCase();
 }
+
+/**
+ * The inverse: the count a priorities heading STATES, or `null` for a string that
+ * is not one of these headings.
+ *
+ * ── Why an inverse exists (2026-09-12, BUG-1) ───────────────────────────────
+ *
+ * The producer tier's heading is a number on the page a producer is told to trust
+ * — "The 3 things to fix first" — and until now nothing could check it: a hand
+ * edit to "The 9 things to fix first" printed VERIFIED at exit 0. The offline
+ * verifier (scripts/verify-report.mjs) has to read that count back out of the
+ * rendered document to cross-check it against the verify block's claim, and the
+ * only safe place for that regex is HERE, beside the formatter it inverts, with a
+ * round-trip test over every count (tests/core/artifact-claims.test.ts). A regex
+ * in the CLI is how the 2026-09-11 verdict-stamp scrape silently stopped firing
+ * when the markup it was pinned to changed.
+ *
+ * Case-insensitive because the plain-text coverage letter prints the same heading
+ * through `prioritiesHeadingUpper`.
+ */
+export function prioritiesCountFromHeading(heading: string): number | null {
+  const trimmed = heading.trim();
+  if (/^nothing urgent surfaced$/i.test(trimmed)) return 0;
+  if (/^fix this first$/i.test(trimmed)) return 1;
+  const m = trimmed.match(/^the (\d+) things to fix first$/i);
+  return m ? Number(m[1]) : null;
+}

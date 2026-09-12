@@ -363,10 +363,22 @@ describe('renderCoverageHtml — full document shape', () => {
   // what the dialogue-share gate (server/lib/logline.ts) actually decided.
   it('states WHY no logline was derived instead of silently dropping the line', () => {
     const report = buildReport();
-    const html = renderCoverageHtml(report, 'The Long Wait');
+    // `logline: null` is the GATE firing (server/lib/logline.ts found no speaker
+    // with enough dialogue share) — the one state whose sentence makes a claim
+    // about the script. A caller that passes nothing at all is a different state:
+    // see the case below (2026-09-12).
+    const html = renderCoverageHtml(report, 'The Long Wait', { logline: null });
     assert.ok(html.includes('class="logline-line"'), 'the slot still renders');
     assert.match(html, /No logline was derived/);
     assert.match(html, /no single speaker holds enough of this script/);
+  });
+
+  it('a report rendered with neither a logline nor the script text says it cannot say, not that the script has no protagonist', () => {
+    const html = renderCoverageHtml(buildReport(), 'The Long Wait');
+    assert.ok(html.includes('class="logline-line"'), 'the slot still renders');
+    assert.match(html, /Unavailable for this report/);
+    assert.doesNotMatch(html, /no single speaker holds enough of this script/,
+      'the dialogue-share gate never ran, so its sentence must not be printed');
   });
 
   it('refuses a zero-scene report instead of exporting a fabricated PASS assessment', () => {

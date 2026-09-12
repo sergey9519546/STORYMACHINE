@@ -30,6 +30,9 @@ import { rootCauseStatements } from './root-cause-pipeline.ts';
 // The producer tier (2026-09-11) — one printed page above the full report; see
 // server/lib/reader-tier.ts.
 import { buildReaderTier, renderReaderTierHtml } from './reader-tier.ts';
+// ONE definition of the claims an exported artifact carries, shared with the
+// coverage letter and with both verifiers — see server/lib/artifact-claims.ts.
+import { claimRowsFor, VERIFY_SCOPE_SENTENCE, type ArtifactClaims } from './artifact-claims.ts';
 // ONE priorities heading across the panel, this export, the letter and the tier.
 import { prioritiesHeadingFor } from '../../src/lib/priorities-copy.ts';
 // ONE title and caption for the checks-that-found-nothing section, shared with
@@ -611,12 +614,22 @@ function buildAppendixSection(passes: ScriptDoctorReport['passes']): string {
   </section>`;
 }
 
-function buildFooterSection(report: ScriptDoctorReport): string {
+function buildFooterSection(report: ScriptDoctorReport, claims: ArtifactClaims): string {
   const analyzedAt = typeof report.analyzedAt === 'number' ? report.analyzedAt : Date.now();
   const hashLine = report.contentHash
     ? `<div class="footer-hash">Script-text hash (SHA-256, first 12 characters): <code>${escapeHtml(report.contentHash.slice(0, 12))}</code></div>`
     : '';
 
+  // EVERY CLAIM ON THE PAGE, FROM THE OBJECT THE PAGE WAS RENDERED FROM
+  // (2026-09-12, BUG-1). The rows below used to be six hand-written `<div><dt>`
+  // literals reading straight off `report`, while the producer tier above stated a
+  // scene count, a word count, a page/minute estimate, per-finding page
+  // references and a priorities count that appeared in no row at all — so a hand
+  // edit to any of those printed VERIFIED at exit 0. They now come from
+  // server/lib/artifact-claims.ts's ONE label table, fed by `tier.claims`, read
+  // back by the same table in scripts/verify-report.mjs and
+  // POST /api/export/verify.
+  //
   // P3 "verify this report" block: the footer hash is the anchor fact, but a
   // 12-char prefix can't anchor anything — collision resistance lives in the
   // full 64-hex digest. This block publishes the FULL hash alongside the
@@ -640,13 +653,10 @@ function buildFooterSection(report: ScriptDoctorReport): string {
         <li>Either way, the tool recomputes the hash and re-runs the analysis; every value must match.</li>
       </ol>
       <dl class="verify-claims">
-        <div><dt>Script-text hash (SHA-256, full)</dt><dd><code>${escapeHtml(report.contentHash)}</code></dd></div>
-        <div><dt>Health</dt><dd><code>${escapeHtml(report.health.toFixed(1))}</code></dd></div>
-        ${report.verdict ? `<div><dt>Verdict</dt><dd><code>${escapeHtml(report.verdict)}</code></dd></div>` : ''}
-        <div><dt>Total issues</dt><dd><code>${report.totalIssues}</code></dd></div>
-        ${report.provenance ? `<div><dt>Engine commit</dt><dd><code>${escapeHtml(report.provenance.engineCommit)}</code></dd></div>
-        <div><dt>Rulebook count</dt><dd><code>${report.provenance.rulebookCount}</code></dd></div>` : ''}
+${claimRowsFor(claims).map(row =>
+      `        <div><dt>${escapeHtml(row.label)}</dt><dd><code>${escapeHtml(row.value)}</code></dd></div>`).join('\n')}
       </dl>
+      <div class="verify-scope">${escapeHtml(VERIFY_SCOPE_SENTENCE)}</div>
     </div>`
     : '';
 
@@ -1053,6 +1063,14 @@ const STYLES = `
       display: inline;
       margin: 0 0 0 6px;
     }
+    /* The scope sentence (2026-09-12): what the verifier checks and what it does
+       not. Smaller and muted — it is a qualification of the block above it, not a
+       claim of its own. */
+    .verify-scope {
+      margin-top: 8px;
+      font-size: 0.92em;
+      color: #52525b;
+    }
     .verify-claims code, .verify-steps code {
       background: #f4f4f5;
       padding: 1px 6px;
@@ -1444,11 +1462,17 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
   // complete report, unchanged. `opts.fountain` is what lets every finding carry
   // a page number; without it the tier still renders and says so (see
   // buildReaderTier's own degradation note).
-  const readerTier = renderReaderTierHtml(
-    buildReaderTier(report, { logline: opts.logline, fountain: opts.fountain }),
-    escapeHtml,
-    verdictStampHtml,
-  );
+  //
+  // Built ONCE and kept: the footer's verify block is published from
+  // `tier.claims` (server/lib/artifact-claims.ts), the same object this page is
+  // rendered from, so a number cannot reach the producer's first page without
+  // reaching the claim set a verifier checks. Before 2026-09-12 the tier was built
+  // inline here and discarded, and the verify block was assembled separately from
+  // `report` — which is how the tier's scene count, word count, page estimate,
+  // page references and priorities count came to be unverifiable (BUG-1,
+  // docs/audits/2026-09-12-adversarial/server-data-tests.md).
+  const tier = buildReaderTier(report, { logline: opts.logline, fountain: opts.fountain });
+  const readerTier = renderReaderTierHtml(tier, escapeHtml, verdictStampHtml);
 
   const body = [
     buildHeaderSection(report, safeTitle, safeAuthor),
@@ -1463,7 +1487,7 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
     buildTopPrioritiesSection(report.topPriorities ?? []),
     buildClusterFindingsSection(report.rootCauses),
     buildAppendixSection(report.passes ?? []),
-    buildFooterSection(report),
+    buildFooterSection(report, tier.claims),
   ].join('\n');
 
   const html = `<!DOCTYPE html>

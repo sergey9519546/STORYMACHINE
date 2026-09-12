@@ -2596,6 +2596,54 @@ export const VerifyExpectedSchema = z.object({
   // outcome rather than a hard content/score failure.
   engineCommit: z.string().min(1).max(200).optional(),
   rulebookCount: z.number().int().min(0).optional(),
+
+  // ── The producer tier's claims (2026-09-12, BUG-1) ────────────────────────
+  // server/lib/reader-tier.ts states a scene count, a word count, an estimated
+  // page/minute figure, a page reference per leading finding, a count in its
+  // priorities heading, a percentile READING, the reference bounds and whether a
+  // logline was derived — on the one page a producer is told to trust. None of
+  // them had a field here, so POST /api/export/verify could not check them even
+  // if asked, and `npm run verify-report` printed VERIFIED at exit 0 over a
+  // hand-edited "9,999 scenes · 999,999 words · p. 999".
+  //
+  // EVERY ONE OF THESE IS A HARD (content/score) CLAIM, not an engine-identity
+  // one: see ENGINE_IDENTITY_FIELDS in server/lib/verify-compare.ts, which still
+  // holds exactly engineCommit/rulebookCount.
+  //
+  // The numeric guards are what keep the 2026-09-06 NaN bypass closed for the
+  // new fields as well as the old: `z.number()` refuses NaN and Infinity,
+  // `.int()` refuses 6.5, `.min(0)` refuses a negative, and the CLI's decoder
+  // (server/lib/artifact-claims.ts's parseCount) hands this schema NaN rather
+  // than 0 for an unreadable or EMPTY printed value — `Number('')` is 0, which
+  // would otherwise turn a deleted claim into a confident zero.
+  sceneCount: z.number().int().min(0).optional(),
+  wordCount: z.number().int().min(0).optional(),
+  estimatedPages: z.number().int().min(0).optional(),
+  estimatedRuntimeMinutes: z.number().int().min(0).optional(),
+  prioritiesListed: z.number().int().min(0).optional(),
+  // Discrete READINGS, so they are validated as such rather than as free text: a
+  // band out of src/lib/percentile-copy.ts's percentileBand, or the literal
+  // "not comparable" its gate substitutes.
+  percentileReading: z.string()
+    .regex(/^(?:not comparable|(?:top|bottom) \d{1,3}%)$/, 'percentileReading must be a percentile band or "not comparable"')
+    .optional(),
+  referenceBounds: z.string()
+    .regex(
+      /^\d+ samples \/ \d+(?:\u2013\d+)? scenes \/ \d+(?:\u2013\d+)? words$/,
+      'referenceBounds must read "<n> samples / <a>\u2013<b> scenes / <c>\u2013<d> words"',
+    )
+    .optional(),
+  loglineState: z.enum(['derived', 'not derived']).optional(),
+  // One entry per finding the reader summary leads with. `.max(20)` is a bound on
+  // a hostile body, not a statement about TIER_PRIORITY_COUNT (3 today): the
+  // comparator checks the LIST, so a claim with the wrong number of entries fails
+  // on its contents, not on this cap.
+  pageRefs: z.array(z.object({
+    ordinal: z.number().int().min(1).max(1000),
+    rule: z.string().min(1).max(200),
+    id: z.string().min(1).max(200).optional(),
+    page: z.number().int().min(1).max(100_000).nullable(),
+  }).strict()).max(20).optional(),
 });
 
 export const VerifyBodySchema = z.object({

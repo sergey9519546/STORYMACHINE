@@ -26,7 +26,7 @@ import { extractTitlePage, buildLogline, buildPitchContent } from '../lib/loglin
 import { buildSlateEntry, rankSlate, renderSlateHtml, type SlateEntry } from '../lib/slate.ts';
 import { analyzeFountainText } from '../nvm/analyze/fountain-analyzer.ts';
 import { runScriptDoctorForRequest } from '../lib/doctor-request.ts';
-import { checkContentHash, compareVerifyClaims } from '../lib/verify-compare.ts';
+import { checkContentHash, compareVerifyClaims, type VerifyExpected } from '../lib/verify-compare.ts';
 // ONE root-cause pipeline (2026-09-11) — see server/lib/root-cause-pipeline.ts.
 // Static, not the `await import` this route used to do: renderCoverageHtml
 // (imported above) already pulls cluster.ts and prioritize.ts into this
@@ -639,17 +639,11 @@ router.post('/api/export/pitchkit', gameLimiter, validate(DoctorBodySchema), asy
 // matters (one implementation, not two that can quietly drift on tolerance).
 
 router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), asyncHandler(async (req, res) => {
-  const { expected } = req.body as {
-    expected: {
-      contentHash: string;
-      health?: number;
-      verdict?: CoverageVerdict;
-      totalIssues?: number;
-      healthPercentile?: number;
-      engineCommit?: string;
-      rulebookCount?: number;
-    };
-  };
+  // The shape zod already validated (VerifyBodySchema -> VerifyExpectedSchema in
+  // server/lib/validation.ts) — typed here as the comparator's own `VerifyExpected`
+  // rather than re-listed field by field, which is what let the producer tier's
+  // claims be added in one place instead of three (2026-09-12, BUG-1).
+  const { expected } = req.body as { expected: VerifyExpected };
 
   const fountain = resolveFountainOrRespond(req, res);
   if (fountain === undefined) return;
@@ -690,7 +684,14 @@ router.post('/api/export/verify', gameLimiter, validate(VerifyBodySchema), async
       return;
     }
 
-    res.json({ ...compareVerifyClaims(report, expected), verifiedAt });
+    // `fountain` is passed so the producer tier's claims — scene/word counts, the
+    // page estimate, the priorities count, the percentile reading, the reference
+    // bounds, the logline state and every per-finding page reference — are
+    // RECOMPUTED from the text rather than read off the report, with page numbers
+    // re-resolved through the same paginator the PDF export uses (2026-09-12,
+    // BUG-1). The hash already matched at this point, so this is the same text the
+    // report was produced from.
+    res.json({ ...compareVerifyClaims(report, expected, fountain), verifiedAt });
   } catch (err) {
     logger.error('export_verify_error', { message: (err as Error).message });
     res.status(500).json({ error: 'Verification failed' });

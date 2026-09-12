@@ -138,9 +138,30 @@ describe('buildReaderTier — the honest nulls', () => {
   it('no logline: the tier says so, in both renderers, rather than dropping the line', () => {
     const tier = buildReaderTier(report, { logline: null });
     assert.equal(tier.logline, null);
+    // ONE wording for the gate's sentence, shared by all three renderers
+    // (2026-09-12): it used to be three hand-copies that differed in case
+    // ("Not derived" / "not derived" / "No logline was derived"), and the claim
+    // set now publishes this state, so the sentence a reader sees and the state a
+    // verifier checks have to come from the same constant.
     assert.match(renderReaderTierMarkdown(tier), /Not derived/);
-    assert.match(renderReaderTierText(tier), /not derived/);
+    assert.match(renderReaderTierText(tier), /Not derived/);
     assert.match(renderReaderTierHtml(tier, identity), /No logline was derived/);
+    assert.equal(tier.claims.loglineState, 'not derived');
+  });
+
+  // THE THIRD STATE (2026-09-12). The gate's sentence — "no single speaker holds
+  // enough of this script's dialogue for one" — is a claim ABOUT THE SCRIPT, and
+  // before this it was printed for a caller that simply passed no logline and no
+  // script text, which is no evidence for it. With the text but no logline the
+  // engine's own logline is derived; with neither, the tier says it cannot say.
+  it('neither a logline nor the script text: the tier states that it cannot say, and claims nothing', () => {
+    const tier = buildReaderTier(report);
+    assert.equal(tier.logline, undefined);
+    assert.equal(tier.claims.loglineState, undefined, 'no basis, so no claim');
+    for (const doc of [renderReaderTierMarkdown(tier), renderReaderTierText(tier), renderReaderTierHtml(tier, identity)]) {
+      assert.match(doc, /Unavailable for this report \(it was rendered without the script text\)/);
+      assert.doesNotMatch(doc, /no single speaker/, 'the gate never ran — its sentence must not be printed');
+    }
   });
 
   it('no script text: page references are omitted and their absence is stated', () => {
@@ -208,7 +229,10 @@ describe('renderReaderTier* — one data object, two renderers', () => {
   });
 
   it('a finding headline has one assembly: severity, location, page reference', () => {
-    const finding = { severity: 'major' as const, location: 'Scene 9 (INT. BAR)', description: 'x', pageRef: 'p. 6' };
+    const finding = {
+      severity: 'major' as const, location: 'Scene 9 (INT. BAR)', description: 'x', pageRef: 'p. 6',
+      rule: 'WEAK_MIDPOINT',
+    };
     assert.equal(tierFindingHeadline(finding), 'MAJOR — Scene 9 (INT. BAR) — p. 6');
     assert.equal(
       tierFindingHeadline({ ...finding, pageRef: '' }), 'MAJOR — Scene 9 (INT. BAR)',

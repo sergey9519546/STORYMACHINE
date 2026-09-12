@@ -53,6 +53,12 @@ import { locateIssues, sceneLineSpans, type SceneLineSpan } from '../nvm/analyze
 import { suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
 import { scenePageNumbers, pageRefLabel } from './page-refs.ts';
 import { derivedReferenceBoundsLine } from './reference-bounds.ts';
+import { analyzeFountainText } from '../nvm/analyze/fountain-analyzer.ts';
+import { buildLogline } from './logline.ts';
+import {
+  buildArtifactClaims, formatLengthLine, type ArtifactClaims, type ArtifactPageRef,
+  type LoglineState,
+} from './artifact-claims.ts';
 import { percentileSentenceFor } from '../../src/lib/percentile-copy.ts';
 import { prioritiesHeadingFor } from '../../src/lib/priorities-copy.ts';
 
@@ -74,12 +80,30 @@ export interface ReaderTierFinding {
   description: string;
   /** "p. 47", or '' when this finding has no resolvable page. */
   pageRef: string;
+  /** The rule that produced this finding, and its stable aggregation id when the
+   *  report carries one (doctor.ts's aggregateReport). Not rendered — carried so
+   *  the page reference beside this finding can be published as a CHECKABLE claim
+   *  (server/lib/artifact-claims.ts's ArtifactPageRef) rather than as a bare
+   *  number a verifier could only confirm the presence of. */
+  rule: string;
+  id?: string;
 }
 
 export interface ReaderTierData {
-  /** The deterministic logline, or null when the script has no protagonist to
-   *  write one about (server/lib/logline.ts's dialogue-share gate). */
-  logline: string | null;
+  /** The deterministic logline; null when the dialogue-share gate refused one
+   *  (server/lib/logline.ts), and UNDEFINED when this tier has no basis to say
+   *  either way — a caller that passed neither a logline nor the script text to
+   *  derive one from.
+   *
+   *  THREE STATES, NOT TWO (2026-09-12). It used to be two, and the null branch's
+   *  copy — "no single speaker holds enough of this script's dialogue for one" —
+   *  was printed for BOTH the gate firing and a caller simply not supplying a
+   *  logline, which is a statement about the script that the second case has no
+   *  evidence for. Both export routes always supply one, so the false sentence
+   *  only ever reached callers inside this repository; it is still a sentence the
+   *  document cannot support, and the verify block now publishes this state as a
+   *  claim, so "don't know" has to be distinguishable from "no". */
+  logline: string | null | undefined;
   /** "231 scenes · 19,293 words · ~79 pages / ~79 min (est.)" */
   lengthLine: string;
   verdict: CoverageVerdict | null;
@@ -99,6 +123,12 @@ export interface ReaderTierData {
   /** True when no script text was supplied, so no page references could be
    *  resolved — stated in the tier rather than silently omitted. */
   pageRefsUnavailable: boolean;
+  /** EVERY number and discrete reading on this page, as the checkable claim set
+   *  both exporters publish in their verify block and both verifiers read back
+   *  (server/lib/artifact-claims.ts). The tier's own Length line is formatted FROM
+   *  this object, which is what makes "a claim cannot exist on the page without
+   *  being in the block" a property of the code rather than a convention. */
+  claims: ArtifactClaims;
 }
 
 /** The verdict word a reader sees. PASS carries its parenthetical because
@@ -111,10 +141,6 @@ const VERDICT_WORD: Record<CoverageVerdict, string> = {
   CONSIDER: 'CONSIDER',
   PASS: 'PASS (decline)',
 };
-
-function formatNumber(n: number): string {
-  return n.toLocaleString('en-US');
-}
 
 /** Which scene contains a 1-based line number, or -1. The spans are sorted and
  *  non-overlapping (locate.ts's computeSceneSpans), so a linear walk is exact. */
@@ -141,12 +167,27 @@ export function buildReaderTier(
 ): ReaderTierData {
   const fountain = opts.fountain ?? '';
 
-  const pageEstimate = report.pageEstimate
-    ? ` · ~${formatNumber(report.pageEstimate.pages)} page${report.pageEstimate.pages === 1 ? '' : 's'}`
-      + ` / ~${formatNumber(report.pageEstimate.runtimeMinutes)} min (est.)`
-    : '';
-  const lengthLine = `${formatNumber(report.sceneCount)} scene${report.sceneCount === 1 ? '' : 's'}`
-    + ` · ${formatNumber(report.wordCount)} word${report.wordCount === 1 ? '' : 's'}${pageEstimate}`;
+  // THE LOGLINE, IN THREE STATES (2026-09-12). A caller that supplies one is
+  // believed (both export routes, the sample generator and the print-geometry
+  // measurement all pass server/lib/logline.ts's buildLogline output, the same
+  // trust posture opts.title/opts.author already had). A caller that supplies
+  // NOTHING but does supply the script text gets the engine's own deterministic
+  // logline derived here rather than a sentence claiming the script has no
+  // protagonist — which is what the old two-state fallback printed, and is a claim
+  // about the script that "the caller didn't pass one" is no evidence for. With
+  // neither, the state is genuinely unknown: `undefined`, stated as such on the
+  // page and published as no claim at all.
+  //
+  // Deriving it here also makes the claim CHECKABLE: a verifier holding only the
+  // script text recomputes this exact state through this exact function
+  // (server/lib/verify-compare.ts's recomputeArtifactClaims), with no access to
+  // whatever the original caller passed.
+  const supplied = opts.logline === undefined && fountain
+    ? buildLogline(report, analyzeFountainText(fountain).records, fountain)
+    : opts.logline;
+  const logline: string | null | undefined = supplied === undefined
+    ? undefined
+    : (supplied?.trim() ? supplied.trim() : null);
 
   // The percentile line: a BAND when the draft sits inside the reference set's
   // bounds, the not-comparable sentence when it does not, and nothing at all
@@ -178,8 +219,25 @@ export function buildReaderTier(
       location: issue.location,
       description: issue.description,
       pageRef: pageRefLabel(page),
+      rule: issue.rule,
+      ...(issue.id ? { id: issue.id } : {}),
     };
   });
+
+  // The page references as CLAIMS — same resolution, same order, one entry per
+  // leading finding INCLUDING the ones with no resolvable page (`null`, printed as
+  // "no page" in the block). `null` for the whole list, not an empty one, when
+  // there was no script text to paginate: "this report resolved no references
+  // because it never had the text" and "this report's three findings all point at
+  // nothing" are different statements and the block makes both.
+  const pageRefs: ArtifactPageRef[] | null = fountain
+    ? priorities.map((finding, i) => ({
+      ordinal: i + 1,
+      rule: finding.rule,
+      ...(finding.id ? { id: finding.id } : {}),
+      page: pageFromLabel(finding.pageRef),
+    }))
+    : null;
 
   // ONE statement of the bounds on this page. The not-comparable sentence ends in
   // "(20 samples / 9-10 scenes / 256-337 words)", so a "Reference bounds:" line
@@ -192,9 +250,24 @@ export function buildReaderTier(
   const boundsLine = derivedReferenceBoundsLine();
   const boundsAlreadyStated = percentileLine !== null && percentileLine.includes(boundsLine);
 
+  const loglineState: LoglineState | null = logline === undefined
+    ? null
+    : (logline === null ? 'not derived' : 'derived');
+
+  const claims = buildArtifactClaims(report, {
+    prioritiesListed: priorities.length,
+    loglineState,
+    pageRefs,
+    referenceBounds: boundsLine,
+  });
+
   return {
-    logline: opts.logline?.trim() ? opts.logline.trim() : null,
-    lengthLine,
+    logline,
+    // Formatted FROM the claim set, not beside it — see artifact-claims.ts's
+    // formatLengthLine. A forged Length line and a genuine Scenes/Words claim are
+    // therefore two edits, and the CLI's body-versus-block check catches either
+    // one alone.
+    lengthLine: formatLengthLine(claims),
     verdict: report.verdict ?? null,
     verdictLabel: report.verdict ? VERDICT_WORD[report.verdict] : 'N/A',
     healthLine: `Health ${report.health.toFixed(1)} / 100`,
@@ -203,7 +276,18 @@ export function buildReaderTier(
     prioritiesHeading: prioritiesHeadingFor(priorities.length),
     priorities,
     pageRefsUnavailable: fountain === '',
+    claims,
   };
+}
+
+/** "p. 47" -> 47, '' -> null. The inverse of page-refs.ts's pageRefLabel, kept
+ *  here beside its only use rather than exported from there: the label is what the
+ *  tier renders and the number is what the claim publishes, and they must come
+ *  from the same resolution rather than from two independent lookups of
+ *  `scenePages`. */
+function pageFromLabel(label: string): number | null {
+  const m = label.match(/^p\. (\d+)$/);
+  return m ? Number(m[1]) : null;
 }
 
 // ── Renderers ────────────────────────────────────────────────────────────────
@@ -218,6 +302,24 @@ export function tierFindingHeadline(finding: ReaderTierFinding): string {
   const page = finding.pageRef ? ` — ${finding.pageRef}` : '';
   return `${finding.severity.toUpperCase()} — ${finding.location}${page}`;
 }
+
+/** The gate fired: server/lib/logline.ts decided no single speaker holds enough of
+ *  this script's dialogue to be its subject. A statement ABOUT THE SCRIPT, so it is
+ *  only ever printed when the gate actually ran — see buildReaderTier's three
+ *  logline states. */
+export const NO_LOGLINE_NOTE =
+  'Not derived \u2014 no single speaker holds enough of this script\u2019s dialogue for one.';
+
+/** The same sentence with the HTML report's own sentence case (it opens the page as
+ *  a standalone paragraph rather than following a "Logline." label). */
+export const NO_LOGLINE_NOTE_HTML =
+  'No logline was derived \u2014 no single speaker holds enough of this script\u2019s dialogue for one.';
+
+/** Neither a logline NOR the script text to derive one from: the tier has no basis
+ *  for either statement, and says so rather than printing the gate's sentence on no
+ *  evidence. */
+export const LOGLINE_UNKNOWN_NOTE =
+  'Unavailable for this report (it was rendered without the script text).';
 
 /** The honest note for the no-script-text case, stated rather than leaving a
  *  reader to wonder why the findings carry no page numbers. */
@@ -236,7 +338,8 @@ export function renderReaderTierMarkdown(data: ReaderTierData): string {
   lines.push(`*${TIER_CAPTION}*`);
   lines.push('');
   if (data.logline) lines.push(`**Logline.** ${data.logline}`);
-  else lines.push('**Logline.** Not derived — no single speaker holds enough of this script’s dialogue for one.');
+  else if (data.logline === null) lines.push(`**Logline.** ${NO_LOGLINE_NOTE}`);
+  else lines.push(`**Logline.** ${LOGLINE_UNKNOWN_NOTE}`);
   lines.push('');
   lines.push(`**Length.** ${data.lengthLine}`);
   lines.push('');
@@ -272,9 +375,9 @@ export function renderReaderTierText(data: ReaderTierData): string {
   lines.push('--------------');
   lines.push(TIER_CAPTION);
   lines.push('');
-  lines.push(data.logline
-    ? `Logline: ${data.logline}`
-    : 'Logline: not derived — no single speaker holds enough of this script’s dialogue for one.');
+  lines.push(`Logline: ${data.logline
+    ? data.logline
+    : (data.logline === null ? NO_LOGLINE_NOTE : LOGLINE_UNKNOWN_NOTE)}`);
   lines.push(`Length: ${data.lengthLine}`);
   lines.push(`Verdict: ${data.verdictLabel} · ${data.healthLine}`);
   if (data.percentileLine) lines.push(data.percentileLine);
@@ -341,7 +444,7 @@ export function renderReaderTierHtml(
     <p class="tier-caption">${escape(TIER_CAPTION)}</p>
     <p class="logline-line">${data.logline
       ? escape(data.logline)
-      : 'No logline was derived &mdash; no single speaker holds enough of this script&rsquo;s dialogue for one.'}</p>
+      : escape(data.logline === null ? NO_LOGLINE_NOTE_HTML : LOGLINE_UNKNOWN_NOTE)}</p>
     <div class="tier-facts">
       <div><span class="tier-key">Length</span> ${escape(data.lengthLine)}</div>
       <div><span class="tier-key">Verdict</span> ${verdictStamp

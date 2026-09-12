@@ -4,7 +4,7 @@
 
 *One page for a reader deciding whether to read the script. The complete report follows.*
 
-**Logline.** Not derived — no single speaker holds enough of this script’s dialogue for one.
+**Logline.** Unavailable for this report (it was rendered without the script text).
 
 **Length.** 6 scenes · 167 words · ~2 pages / ~2 min (est.)
 
@@ -58,6 +58,18 @@ It does not read for market fit, casting, or budget — those require a human re
 
 ---
 Script-text hash (SHA-256): 42f08fc26ba8a760b26ff903ceaa934ad6fcc7b6caa89c95ce9fab7902ffee42
-To verify this letter, run the identical script text through Story Machine’s Script Doctor again: on your own machine with npm run verify-report -- letter.md script.fountain (the script never leaves your computer), or through a hosted instance (the app’s #verify page, or POST /api/export/verify). Confirm the health, verdict, and hash above all match.
+To verify this letter, run the identical script text through Story Machine’s Script Doctor again: on your own machine with npm run verify-report -- letter.md script.fountain (the script never leaves your computer), or through a hosted instance (the app’s #verify page, or POST /api/export/verify). Every value listed below must match.
+Health: 66.7
+Verdict: CONSIDER
+Total issues: 33
+Scenes: 6
+Words: 167
+Estimated pages: 2
+Estimated runtime (minutes): 2
+Priorities listed: 3
+Health percentile reading: not comparable
+Reference bounds: 20 samples / 9–10 scenes / 256–337 words
+Page references: unavailable (rendered without the script text)
+What is checked: every value listed above, recomputed from the script text you supply — including each finding’s page reference, re-resolved through the same paginator that lays out the PDF, and the counts and readings on the reader summary page. What is not checked: wording — the prose of this report, the finding descriptions, the logline’s text (only whether one was derived), the title and author, and the draft-rank line, all of which are supplied by whoever exported this report rather than derived by the engine.
 Engine commit: dev · Rulebook: 3,217 rule concepts.
 Generated August 21, 2026 at 02:38:59 AM UTC

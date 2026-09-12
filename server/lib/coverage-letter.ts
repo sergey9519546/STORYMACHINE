@@ -92,6 +92,10 @@ import { rootCauseStatements, topRootCauses } from './root-cause-pipeline.ts';
 import {
   buildReaderTier, renderReaderTierMarkdown, renderReaderTierText, type ReaderTierData,
 } from './reader-tier.ts';
+// ONE definition of the claims an exported artifact carries (2026-09-12, BUG-1) —
+// the same label table the exported coverage HTML's verify block publishes and both
+// verifiers read back. See server/lib/artifact-claims.ts.
+import { claimRowsFor, LETTER_PROSE_CLAIMS, VERIFY_SCOPE_SENTENCE } from './artifact-claims.ts';
 // ONE priorities heading across the panel, the exported HTML, this letter and the
 // tier — see src/lib/priorities-copy.ts.
 import { prioritiesHeadingFor, prioritiesHeadingUpper } from '../../src/lib/priorities-copy.ts';
@@ -214,6 +218,18 @@ interface LetterData {
   caveats: string[];
   hashLine: string | null;
   verifyLine: string;
+  /** The claim rows this letter publishes, as `Label: value` lines — byte-identical
+   *  in both renderers, exactly like hashLine/provenanceLine, because the two
+   *  documents must not differ on a number (2026-09-12, BUG-1: before this, the
+   *  letter stated a scene count, a word count, a page estimate, page references
+   *  and a priorities count in its producer tier that no verifier could check, and
+   *  a hand edit to any of them printed VERIFIED at exit 0).
+   *
+   *  The hash is NOT among them: `hashLine` above already states it once, in the
+   *  letter's own wording, and has since before the claim set existed. Same claims
+   *  as the HTML report, different markup — see claimRowsFor's `includeHash`. */
+  claimLines: string[];
+  claimScopeLine: string;
   provenanceLine: string | null;
   generatedLine: string;
 }
@@ -463,7 +479,7 @@ function buildLetterData(report: ScriptDoctorReport, opts: CoverageLetterOptions
     ? 'To verify this letter, run the identical script text through Story Machine’s Script Doctor again: '
       + 'on your own machine with npm run verify-report -- letter.md script.fountain (the script never '
       + 'leaves your computer), or through a hosted instance (the app’s #verify page, or POST '
-      + '/api/export/verify). Confirm the health, verdict, and hash above all match.'
+      + '/api/export/verify). Every value listed below must match.'
     : 'This report has no verification hash attached and cannot be independently re-verified.';
 
   // Same two provenance fields the exported coverage HTML's verify block
@@ -475,10 +491,15 @@ function buildLetterData(report: ScriptDoctorReport, opts: CoverageLetterOptions
     ? `Engine commit: ${report.provenance.engineCommit} · Rulebook: ${formatNumber(report.provenance.rulebookCount)} rule concepts.`
     : null;
 
+  // Built ONCE and kept: the claim lines below are published from `tier.claims`,
+  // the same object the tier is rendered from, so a number cannot reach the
+  // producer's first page without reaching the claim set a verifier checks.
+  const tier = buildReaderTier(report, { logline: opts.logline, fountain: opts.fountain });
+
   return {
     title,
     author,
-    tier: buildReaderTier(report, { logline: opts.logline, fountain: opts.fountain }),
+    tier,
     verdictLine,
     headline: buildHeadline(report),
     summary,
@@ -489,6 +510,10 @@ function buildLetterData(report: ScriptDoctorReport, opts: CoverageLetterOptions
     caveats: buildCaveats(report, opts),
     hashLine,
     verifyLine,
+    claimLines: report.contentHash
+      ? claimRowsFor(tier.claims, { omit: LETTER_PROSE_CLAIMS }).map(row => `${row.label}: ${row.value}`)
+      : [],
+    claimScopeLine: VERIFY_SCOPE_SENTENCE,
     provenanceLine,
     generatedLine: `Generated ${formatDateTime(analyzedAt)}`,
   };
@@ -554,6 +579,8 @@ function renderMarkdown(d: LetterData): string {
   lines.push('---');
   if (d.hashLine) lines.push(d.hashLine);
   lines.push(d.verifyLine);
+  for (const claim of d.claimLines) lines.push(claim);
+  if (d.claimLines.length > 0) lines.push(d.claimScopeLine);
   if (d.provenanceLine) lines.push(d.provenanceLine);
   lines.push(d.generatedLine);
 
@@ -615,6 +642,8 @@ function renderText(d: LetterData): string {
   lines.push('----------------------------------------');
   if (d.hashLine) lines.push(d.hashLine);
   lines.push(d.verifyLine);
+  for (const claim of d.claimLines) lines.push(claim);
+  if (d.claimLines.length > 0) lines.push(d.claimScopeLine);
   if (d.provenanceLine) lines.push(d.provenanceLine);
   lines.push(d.generatedLine);
 
