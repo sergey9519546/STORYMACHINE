@@ -2,9 +2,15 @@
 
 **Worktree:** `/home/user/wt-forcedcue`
 **Branch:** `scoring/forced-cue`, pushed to origin after every commit.
-**Tip:** `6eeef062`, plus the commit carrying this report (see §Tip and origin)
-**Base:** `3124a94e` — `origin/scoring/adversarial-2026-09-12` at the moment
-this lane was cut.
+**Tip:** `6d8f1653`. The pre-rebase history ended at `5be366be`; the rebase
+onto `4cf5b2f3` produced `22c6b03f`, and `6d8f1653` is the commit carrying the
+rebase section at the end of this report. The `git log` and `git ls-remote`
+blocks below were taken before those two commits existed — the off-by-one a
+self-recording report always has, stated where each block appears.
+**Base:** `4cf5b2f3` — `origin/scoring/adversarial-2026-09-12`. The lane was
+CUT from `3124a94e` and every before/after number below is measured against
+that commit; it was rebased onto `4cf5b2f3` at the end, and that rebase and
+its re-measurements are the last section of this report.
 **Answers:** the scoring lane's round-2 residual (`scoring-lane-report.md`
 R2.2, the row reading "32 / 32 — NOT FIXED") and the round-2 review's
 judgement that pinning it was honest scoping: "no renderer strips `@`, so
@@ -452,3 +458,55 @@ twice during it (`251e0840` → `0ecc8aea` → `3f4a6872`), so this branch needs
 rebase and a re-run of the identity harness and the benchmark against
 whichever tree it is merged into — the harness's own header says the baseline
 must be the branch being merged INTO, not the commit branched FROM.
+
+---
+
+## Rebase onto `4cf5b2f3`
+
+This lane was cut from `origin/scoring/adversarial-2026-09-12` @ `3124a94e`;
+that branch has since moved to `4cf5b2f3` (its rounds 3 and 4). Rebased.
+
+**Old tip `5be366be` → new tip `22c6b03f`.** Ten commits, same order, same
+messages, same trailers.
+
+### Conflicts, and how they were resolved
+
+**One file conflicted: `scripts/probe-corpus-shape.ts`,** in the commit that
+adds the `@cue` column, and in both places the column is printed. Rounds 3-4
+had made `submittedWordCount` and `isDoubleSpaced` OPTIONAL on the probe's row
+(so the script can run against a checkout from before those fields existed and
+say so, rather than printing `undefined`), replacing the inline gap arithmetic
+with a `gapOf(r)` helper and adding an `UNREPORTED` note. My side added the
+`forcedCues` column to the same two statements. **Resolved by keeping both**:
+upstream's optional-field shape, with the `@cue` cell appended to it. Nothing
+of either side was dropped.
+
+`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` **auto-merged** — rounds 3-4 added
+no ledger row numbered 11 or higher, so rows 11 and 12 land in order with no
+renumbering, and row 9's "was NOT fixed in this row … row 11 is that work"
+edit still applies to the sentence it was written for. `docs/brain/GRAPH.md`
+and `brain.graph.json` did not conflict, and `npm run check-brain` is fresh on
+the rebased tip (104 notes, 386 links) without regenerating.
+
+### Patch equivalence
+
+Sorted diff-line comparison, `3124a94e..5be366be` against `4cf5b2f3..HEAD`,
+over the whole tree EXCLUDING the two files above: **609 lines each side,
+identical**. Run again per-file on the two excluded ones, the sets are also
+identical — **50 lines each for `probe-corpus-shape.ts`, 37 each for
+`MEASUREMENT_RECEIPTS.md`** — so the rebase changed nothing this lane adds,
+conflicted files included. The lane report itself is byte-identical across the
+rebase apart from this section.
+
+### The five re-measurements on `22c6b03f`
+
+| # | check | result | exit |
+|---|---|---|---|
+| 1 | the touched tests, one run — parse-format-invariance, unicode-character-cues, fdx-import, fountain-analyzer, core-02, the route bypass suite, the parity suite, public-benchmark | **1,332 pass, 0 fail**, 154 suites | 0 |
+| 2 | `npm run benchmark:public` | **0.8438 / 0.7896 · 0.5938 / 0.5234 · 1.0000 / 0.9814** — to the digit, unchanged | 0 |
+| 3 | output identity vs a `git archive 4cf5b2f3` export, `GIT_SHA=identity` pinned on both trees | **PASS — all 45 reports byte-identical** (`analyzedAt` excluded) | 0 |
+| 4 | `node scripts/check-scoring-receipt.mjs 78ec4464..HEAD` (`78ec4464` is still an ancestor) | exit 1 naming **exactly one** PENDING entry | 1 |
+| 5 | `npm run --silent probe-corpus-shape -- --public` | the **`@cue`** column is present in the table head and every row, and the group summary reads "scripts with a forced cue 0 of 32" | 0 |
+
+`AUC24_FLOOR` still untouched, `--lock` still never run, and no AUC-24 number
+is stated, implied or projected anywhere on the rebased branch.
