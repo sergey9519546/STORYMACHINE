@@ -56,12 +56,14 @@ const CAMERA_TERMS = [
 //     a cased script, so admitting `\p{Lo}` would make every short line of
 //     Japanese or Hebrew action a character cue and destroy the parse of the
 //     very documents it was meant to help. Fountain's own escape hatch for
-//     those scripts is the forced-cue `@` prefix, which this parser does not
-//     implement today (verified by grep at the time of this change) and which
-//     this change does not add — teaching every renderer to strip the marker
-//     (src/lib/pdf.ts, fdx.ts, docx.ts, src/components/editor/**,
-//     src/lib/screenplay-layout.ts) is a separate change. A caseless cue is
-//     therefore still parsed as `action`, exactly as before.
+//     those scripts is the forced-cue `@` prefix, and as of 2026-09-12 this
+//     parser DOES implement it (`FORCED_CUE_MARKER` below), together with the
+//     renderer work that earlier versions of this comment named as the reason
+//     not to: `renderableText` is the one strip src/lib/screenplay-layout.ts,
+//     fdx.ts and docx.ts all call, and server/lib/fdx-import.ts forces the
+//     marker back on when a Final Draft name would not survive the round trip.
+//     So `@田中` is a cue whose speech is dialogue, and no exporter prints the
+//     `@`. A caseless cue WITHOUT the marker is still `action`, unchanged.
 //
 // These two class BODIES are the single definition of that alphabet. Every
 // other cue test in the repository composes them (server/nvm/analyze/
@@ -93,6 +95,19 @@ export const CUE_LETTER_CLASS = `${CUE_INITIAL_CLASS}\\p{M}`;
 // folds the variants onto them at the analysis seam, so the fold is applied to
 // the text that is scored and never to the writer's own file.
 export const CUE_EXTENSIONS = ['V.O.', 'O.S.', 'O.C.', "CONT'D"] as const;
+
+// ── FOUNTAIN'S FORCED CHARACTER CUE (2026-09-12, round 3) ─────────────────
+// `@` declares a line a character cue whatever the name looks like. It is the
+// spec's only way to write a cue this parser's cue ALPHABET cannot express —
+// a caseless script (`@田中`), a mixed-case surname (`@McCLANE`), a name that
+// would otherwise read as action prose — and it is never printed.
+//
+// It was measured as the largest single format sensitivity on this branch and
+// left unimplemented in round 2, because typing `@MARY` as a cue changes the
+// type of every line BELOW it and every renderer would still have printed the
+// marker. Both halves are done here: the classifier below reads the marker,
+// and `renderableText` is the one place the four exporters strip it.
+export const FORCED_CUE_MARKER = '@';
 const CUE_EXTENSION_ALTERNATION = CUE_EXTENSIONS
   .map((e) => `\\(${e.replace(/[.]/g, '\\.')}\\)`)
   .join('|');
@@ -119,12 +134,49 @@ export const CHARACTER_CUE_RE = new RegExp(
  *  of one character. Case-insensitive and whitespace-tolerant on input because
  *  it is also applied to text that has not been through the analysis seam. */
 export function stripCueDecorations(raw: string): string {
-  let out = raw.replace(/\^\s*$/, '');
+  let out = raw.trim();
+  // The forced-cue marker is a decoration in exactly the sense this function
+  // means: never printed, never part of the name. Stripping it here is what
+  // makes `@田中` and `田中` ONE speaker everywhere a cue name is compared —
+  // fountain-analyzer.ts, locate.ts, prioritize.ts and truth-extraction.ts all
+  // route through this function, so none of them needed to learn about `@`.
+  if (out.startsWith(FORCED_CUE_MARKER)) out = out.slice(FORCED_CUE_MARKER.length).trim();
+  out = out.replace(/\^\s*$/, '');
   for (const ext of CUE_EXTENSIONS) {
     const body = ext.replace(/[.]/g, "\\.").replace(/'/g, "'?");
     out = out.replace(new RegExp(`\\(\\s*${body}\\s*\\)`, 'gi'), '');
   }
   return out.trim();
+}
+
+// ── WHAT A BLOCK PRINTS (2026-09-12, round 3) ──────────────────────────────
+// parseFountain reads a forced-element marker to TYPE a line and then leaves
+// it in the block's `text` — the block knows what it is, and the raw line is
+// still the writer's own bytes. Every renderer therefore needs the inverse: a
+// marker declares an element and is never printed, so it must come off before
+// the text reaches a page.
+//
+// This was THREE byte-identical copies — src/lib/screenplay-layout.ts (which
+// the PDF writer draws from), src/lib/fdx.ts and src/lib/docx.ts each carried
+// the same eight lines. All three were written before the parser read `@`, so
+// all three would have printed the forced-cue marker the analysis had decided
+// was invisible; that is precisely the analyzer/renderer split this rule
+// exists to prevent, and one definition is how it stays prevented. The set of
+// markers stripped here is the set parseFountain reads, which is why the
+// function lives beside the classifier rather than in any one exporter.
+export function renderableText(block: FountainBlock): string {
+  let t = block.text.trim();
+  if (block.type === 'scene_heading' && t.startsWith('.')) t = t.slice(1).trim();
+  if (block.type === 'action' && t.startsWith('!')) t = t.slice(1);
+  if (block.type === 'character' || block.type === 'dual_dialogue') {
+    if (t.startsWith(FORCED_CUE_MARKER)) t = t.slice(FORCED_CUE_MARKER.length).trim();
+    t = t.replace(/\s*\^\s*$/, '').trim();  // drop dual-dialogue caret
+  }
+  if (block.type === 'centered') t = t.replace(/^>\s*/, '').replace(/\s*<$/, '').trim();
+  if (block.type === 'lyrics') t = t.replace(/^~\s*/, '');
+  if (block.type === 'section') t = t.replace(/^#+\s*/, '');
+  if (block.type === 'synopsis') t = t.replace(/^=\s*/, '');
+  return t;
 }
 
 /** Camera-direction ("shot") lines are all-caps too, and were gated by the
@@ -222,6 +274,25 @@ export function parseFountain(text: string): FountainBlock[] {
     }
     inDialogueBlock = false;
 
+    // Fountain's FORCED CHARACTER CUE. `@` says "this line is a cue", so the
+    // name after it is not held to CHARACTER_CUE_RE's alphabet — that is the
+    // entire point of the marker. Everything else about the element is
+    // IDENTICAL to an unforced cue: the same "preceded by a blank line,
+    // followed by a non-empty line" shape, the same `^` dual-dialogue tail,
+    // the same dialogue block underneath. The marker is not removed from the
+    // block's `text` (no marker is — see `!`); `renderableText` strips it for
+    // the exporters and `stripCueDecorations` for the analyzers.
+    //
+    // IT DOES NOT BREAK OUT OF A DIALOGUE BLOCK, unlike `!`, `.` and `~`. A
+    // Character element requires a preceding blank line in the spec, and the
+    // `prevBlock.type === 'empty'` guard below is this parser saying the same
+    // thing — a line inside a speech is not a cue however it starts. That
+    // matters more for `@` than for the other three, because `@` is a
+    // character writers really do type inside dialogue (a handle, an address);
+    // reading `@everyone, listen up` as a cue would be worse than the bug.
+    const forcedCue = trimmed.startsWith(FORCED_CUE_MARKER);
+    const cueLine = forcedCue ? trimmed.slice(FORCED_CUE_MARKER.length).trim() : trimmed;
+
     // Basic Fountain parsing rules
     if (SCENE_HEADING_RE.test(trimmed) || trimmed.startsWith('.')) {
       type = 'scene_heading';
@@ -235,12 +306,13 @@ export function parseFountain(text: string): FountainBlock[] {
       type = 'lyrics';
     } else if (trimmed.startsWith('>') && trimmed.endsWith('<')) {
       type = 'centered';
-    } else if (CHARACTER_CUE_RE.test(trimmed) && i < lines.length - 1 && lines[i+1].trim() !== '') {
+    } else if ((forcedCue ? cueLine !== '' : CHARACTER_CUE_RE.test(trimmed))
+               && i < lines.length - 1 && lines[i+1].trim() !== '') {
       // Character names are all caps, optionally ending with ^ for dual dialogue
       const prevBlock = blocks.length > 0 ? blocks[blocks.length - 1] : null;
       if (!prevBlock || prevBlock.type === 'empty') {
         // Dual dialogue: character cue ends with ^ (Fountain spec §Dual Dialogue)
-        if (trimmed.endsWith('^') || trimmed.replace(/\s*\(.*?\)\s*$/, '').trimEnd().endsWith('^')) {
+        if (cueLine.endsWith('^') || cueLine.replace(/\s*\(.*?\)\s*$/, '').trimEnd().endsWith('^')) {
           type = 'dual_dialogue';
           // Retroactively mark the preceding character block as the left column
           // so renderers can lay out both columns side-by-side. Bound the search

@@ -5,7 +5,7 @@
 // to a named paragraph style whose indents mirror the industry screenplay layout
 // (Courier, 12pt). Word, Google Docs, and LibreOffice all open the result.
 
-import { parseFountain, type FountainBlock, type FountainBlockType } from './fountain.ts';
+import { parseFountain, renderableText, type FountainBlockType } from './fountain.ts';
 import { buildZip, type ZipEntry } from './zip.ts';
 // Shared with fdx.ts — the same function was duplicated in both files, and
 // both copies let XML-illegal control characters through (see xml-escape.ts).
@@ -45,18 +45,6 @@ const STYLES: Partial<Record<FountainBlockType, DocxStyle>> = {
   section:       { styleId: 'Action',       name: 'Action',       leftIndent: ind(1.5), uppercase: true, spaceBefore: 240 },
   synopsis:      { styleId: 'Action',       name: 'Action',       leftIndent: ind(1.5), spaceBefore: 240 },
 };
-
-function cleanText(block: FountainBlock): string {
-  let t = block.text.trim();
-  if (block.type === 'scene_heading' && t.startsWith('.')) t = t.slice(1).trim();
-  if (block.type === 'action' && t.startsWith('!')) t = t.slice(1);
-  if (block.type === 'character' || block.type === 'dual_dialogue') t = t.replace(/\s*\^\s*$/, '').trim();
-  if (block.type === 'centered') t = t.replace(/^>\s*/, '').replace(/\s*<$/, '').trim();
-  if (block.type === 'lyrics') t = t.replace(/^~\s*/, '');
-  if (block.type === 'section') t = t.replace(/^#+\s*/, '');
-  if (block.type === 'synopsis') t = t.replace(/^=\s*/, '');
-  return t;
-}
 
 // ── Title page ────────────────────────────────────────────────────────────────
 // Industry convention: title centered ~1/3 down the page, a "Written by"
@@ -151,7 +139,7 @@ function buildDocumentXml(fountain: string, titlePage?: TitlePageInput): string 
     const style = STYLES[block.type];
     if (!style) continue;
 
-    let text = cleanText(block);
+    let text = renderableText(block);
     if (!pastTitlePage) {
       if (/^(title|credit|author|authors|source|draft date|contact|copyright|notes?)\s*:/i.test(text)) continue;
       pastTitlePage = true;

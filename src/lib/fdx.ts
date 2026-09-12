@@ -4,7 +4,7 @@
 // no dependency is required. Maps each parsed FountainBlock type to its FDX
 // paragraph element Type, the way Final Draft's own importer does.
 
-import { parseFountain, type FountainBlock, type FountainBlockType } from './fountain.ts';
+import { parseFountain, renderableText, type FountainBlockType } from './fountain.ts';
 import { resolveExportTitlePage, type TitlePageInput, type ExportTitlePage } from './export-title-page.ts';
 // The escaper is shared with docx.ts (it used to be copy-pasted into both, and
 // both copies let XML-illegal control characters through — see xml-escape.ts).
@@ -41,23 +41,6 @@ interface FdxEntry {
   blockType: FountainBlockType;
   fdxType: string;
   text: string;
-}
-
-// Strip Fountain's leading force/markup characters from a block's display text
-// so the FDX paragraph carries clean prose (e.g. "!action" → "action",
-// ".INT HOUSE" → "INT HOUSE", a trailing "^" dual-dialogue marker, "> " centering).
-function cleanBlockText(block: FountainBlock): string {
-  let t = block.text.trim();
-  if (block.type === 'scene_heading' && t.startsWith('.')) t = t.slice(1).trim();
-  if (block.type === 'action' && t.startsWith('!')) t = t.slice(1);
-  if (block.type === 'character' || block.type === 'dual_dialogue') {
-    t = t.replace(/\s*\^\s*$/, '').trim();  // drop dual-dialogue caret
-  }
-  if (block.type === 'centered') t = t.replace(/^>\s*/, '').replace(/\s*<$/, '').trim();
-  if (block.type === 'lyrics') t = t.replace(/^~\s*/, '');
-  if (block.type === 'section') t = t.replace(/^#+\s*/, '');
-  if (block.type === 'synopsis') t = t.replace(/^=\s*/, '');
-  return t;
 }
 
 /** A block is part of a dual-dialogue exchange's body once its speaker cue
@@ -142,7 +125,7 @@ export function fountainToFdx(fountain: string, titlePage?: TitlePageInput): str
   for (const block of blocks) {
     if (block.type === 'empty' || block.type === 'boneyard' || block.type === 'note') continue;
 
-    const text = cleanBlockText(block);
+    const text = renderableText(block);
 
     // Skip Fountain title-page key:value lines that lead the document.
     if (!pastTitlePage) {

@@ -6,7 +6,7 @@
 // owns the hard parts (margins, indents, word-wrap, pagination, widow/orphan
 // rules) so the renderers stay trivial and the logic stays unit-testable.
 
-import { parseFountain, type FountainBlock, type FountainBlockType } from './fountain.ts';
+import { parseFountain, renderableText, type FountainBlock, type FountainBlockType } from './fountain.ts';
 
 // ── Page geometry (points; 72 pt = 1 inch) ────────────────────────────────────
 export const PAGE_WIDTH = 612;   // 8.5"
@@ -105,19 +105,6 @@ function wrapText(text: string, maxChars: number): string[] {
   return lines;
 }
 
-// Strip Fountain force/markup characters so the rendered prose is clean.
-function cleanText(block: FountainBlock): string {
-  let t = block.text.trim();
-  if (block.type === 'scene_heading' && t.startsWith('.')) t = t.slice(1).trim();
-  if (block.type === 'action' && t.startsWith('!')) t = t.slice(1);
-  if (block.type === 'character' || block.type === 'dual_dialogue') t = t.replace(/\s*\^\s*$/, '').trim();
-  if (block.type === 'centered') t = t.replace(/^>\s*/, '').replace(/\s*<$/, '').trim();
-  if (block.type === 'lyrics') t = t.replace(/^~\s*/, '');
-  if (block.type === 'section') t = t.replace(/^#+\s*/, '');
-  if (block.type === 'synopsis') t = t.replace(/^=\s*/, '');
-  return t;
-}
-
 // Intermediate logical line — knows its element type for widow/orphan handling.
 interface LogicalLine {
   text: string;
@@ -138,7 +125,7 @@ function buildLogicalLines(blocks: FountainBlock[]): LogicalLine[] {
     const spec = SPEC[block.type];
     if (!spec) continue;
 
-    let text = cleanText(block);
+    let text = renderableText(block);
 
     // Skip leading Fountain title-page key:value lines.
     if (!pastTitlePage) {

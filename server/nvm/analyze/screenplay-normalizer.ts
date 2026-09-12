@@ -289,18 +289,24 @@ export function stripNonPrinting(text: string): string {
 // there is no version of that which is safe. The check is a re-parse, so it is
 // exact rather than a heuristic about what "should" happen.
 //
-// THE FORCED CUE `@` IS DELIBERATELY NOT STRIPPED, AND IT IS THE BIGGEST OF
-// THE FOUR. This parser has never implemented `@` (src/lib/fountain.ts says so
-// and says why), so `@MARY` is action prose and so is every line of her speech
-// under it — measured above at 32 of 32 scripts and up to 26.8 points, more
-// than any other transform this branch has measured. Honouring it here would
-// be a PARSER FEATURE wearing a normaliser's clothes: unlike `!`, `.` and `>`,
-// stripping `@` changes the type of every line BELOW the cue (action becomes
-// dialogue), and the editor, the PDF, the FDX and the DOCX renderers would all
-// still print the `@` that the analysis had decided was invisible. It needs
-// the renderer work src/lib/fountain.ts names, measured as its own change. It
-// is asserted here as a KNOWN, QUANTIFIED gap rather than left to be found
-// again (tests/core/parse-format-invariance.test.ts).
+// THE FORCED CUE `@` IS NOW ONE OF THE FOUR, AND IT WAS THE BIGGEST (round 3).
+// Round 2 measured it at 32 of 32 scripts and up to 26.8 points — more than any
+// other transform on this branch — and deliberately did NOT strip it, because
+// `@` is a parser feature wearing a normaliser's clothes: unlike `!`, `.` and
+// `>`, it changes the type of every line BELOW the cue, and no renderer stripped
+// the marker, so honouring it here alone would have created the analyzer/renderer
+// split this seam exists to close.
+//
+// Both halves are done now. `parseFountain` types `@MARY` as a cue and her
+// speech as dialogue; `renderableText` is the one strip every exporter calls;
+// server/lib/fdx-import.ts forces the marker back on for a Final Draft name that
+// would not otherwise survive the round trip. So the marker is redundant on a
+// cue the parser would have recognised anyway, which is exactly the condition
+// this function tests — and the re-parse below is what keeps it honest: on
+// `@McCLANE` or `@田中` the strip does NOT survive (the bare name is not a cue by
+// CHARACTER_CUE_RE), the marker stays, and the line is still typed `character`
+// because the PARSER reads it. Nothing downstream sees the `@` in a name either
+// way: every cue-name comparison routes through `stripCueDecorations`.
 //
 // TWO MARKERS ARE DELIBERATELY ABSENT. The lyric `~` and the centered
 // `> ... <` have no line that already parses as `lyrics` or `centered`, so
@@ -334,8 +340,14 @@ const FORCED_MARKERS: ForcedMarker[] = [
   // and changes no other line's type (nothing in parseFountain's state
   // depends on a transition block).
   { marker: '>', declares: ['transition'], test: (t) => t.startsWith('>') && !t.endsWith('<'), parserTypes: false },
+  // `@` declares a CHARACTER cue, and a `^` cue is retagged `dual_dialogue` by
+  // the parser, so both types are what the marker may legitimately declare.
+  // `parserTypes: true` is the guard that matters here: a `@` on a line the
+  // parser typed anything else (an action line opening with a handle or an
+  // address) is not a marker at all and is never touched.
+  { marker: '@', declares: ['character', 'dual_dialogue'], test: (t) => t.startsWith('@'), parserTypes: true },
 ];
-const MARKER_SCAN_RE = /^[ \t]*[!.>]/m;
+const MARKER_SCAN_RE = /^[ \t]*[!.>@]/m;
 
 /** Remove every forced-element marker whose removal leaves the document
  *  parsing exactly as it did — see the block comment above for the rule, the
