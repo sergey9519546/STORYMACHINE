@@ -372,3 +372,157 @@ No browser battery, per the brief.
    is the frozen provenance source `rebuild-experiment-lib.mjs`'s header says must
    never be edited, so it was not. Anything run from it measures the old recipe;
    nothing in this lane runs it.
+
+---
+
+## Round 2
+
+**Reviewed object was** `29b173570a9011195677ed8ec6c6bcb7313ae59b` (verdict
+REVISE, four items, none a measurement error —
+`docs/audits/2026-09-12-adversarial/instrument-review.md`). Round 2 continues on
+top of it. **Tip: `77755355a536c951271c3a79cfbd380e2c36364d`**, one commit,
+pushed.
+
+The review is right on all four, and two of them are the same shape as the
+findings this lane was built to answer: a confident sentence about a check,
+falsified by someone doing the thing it said was impossible.
+
+### Item 1 — the liveness check's own copy overclaimed
+
+`report-unverified-gates.mjs:245-247` and `raise-auc-floor-hook.mjs:31-34` said a
+non-zero exit is not accepted as proof because "only an assertion that compares
+the measurement to that constant can name it in a failure". **False**, and
+reproduced here before fixing: the reviewer's 26-line suite asserts
+`assert.ok(true)` for all six floors, prints the real FLOOR report, appends one
+literal `not ok 99 - … clears PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5813`, and the
+round-1 reporter returned `VERIFIED GATES: 1 of 1`, `[RAN]`, exit 0.
+
+The mutated run must now satisfy three conditions. Each is free for a genuine
+suite and each is a separate thing a forgery has to manufacture:
+
+| condition | forged suite | genuine suite |
+|---|---|---|
+| (a) mutated run exits non-zero | **0** (measured) | **1** (measured) |
+| (b) carries `not ok … clears <CONSTANT> = <raised>` | yes (forged) | yes (real) |
+| (c) carries NO `ok … clears <CONSTANT> = <raised>` twin | **fails** — both lines present | passes — failure only |
+
+(a) is the reviewer's `&& !mutated.ok`, which costs nothing and is strictly safe.
+(c) is the addition: a forged failure line does not stop the real, vacuous `it`
+block from reporting the **same title** as a pass, because under the hook the
+title is generated from the raised value. Either (a) or (c) alone catches the
+probe — deliberate, and asserted separately so removing one leaves the fixture
+red. Measured, on the reviewer's fixture with each condition removed in turn:
+twin-check alone still reports `mutation-survived`; with both removed the forged
+suite reads `[RAN]`.
+
+`mutationWasCaught` now returns `{ok, reason}` rather than a boolean, so the
+reporter's DETAIL line says *which* signal failed.
+`tests/fixtures/gate-liveness/forged-liveness-suite.ts` is the reviewer's probe,
+committed beside the gutted one, with its provenance and the attack it
+demonstrates in its header.
+
+**Both sentences rewritten** to what the check does: three signals raise the cost
+of faking from "keep the file and gut the assertions" to "deliberately forge
+three separate outputs", and an output-parsing check that reads a child process's
+self-report cannot go further. The honest claim is the one that survived being
+attacked; the review notes this is the same shape of sentence finding 7
+falsified, in the same file, and that is now said in the file itself.
+
+### Item 2 — finding 11 was still live 15× in the exempted column
+
+Round 1 exempted "Where it appears" because "several of its line numbers are
+historical by design — rows 1, 2 and 25 are `retired`". True of three rows,
+**false of fifteen**. Re-derived independently here (locating each row's own
+claim text in the cited file rather than trusting the review's list):
+
+| row | cited | actual | drift |
+|---|---|---|---|
+| 3 | `StartScreen.tsx:317` | :344 | +27 |
+| 5 | `StartScreen.tsx:411` | :477 | +66 |
+| 6 | `PrivacyPage.tsx:129` | :172 | +43 |
+| 7 | `PrivacyPage.tsx:89` | :106 | +17 |
+| 8 | `PrivacyPage.tsx:153` | :207 | +54 |
+| 9 | `ScriptDoctorPanel.tsx:3443` | :4993 | **+1550** |
+| 10 | `VerifyReport.tsx:351` | :425 | +74 |
+| 11 | `SlatePanel.tsx:582` | :666 | +84 |
+| 12 | `SlatePanel.tsx:122` | :154 | +32 |
+| 14 | `WhatIfPanel.tsx:840` | :1234 | +394 |
+| 15 | `SettingsPanel.tsx:854` | :865 | +11 |
+| 16 | `SettingsPanel.tsx:499` | :505 | +6 |
+| 18 | `README.md:23` | :43 | +20 |
+| 20 | `ARCHITECTURE.md:305` | :414 | +109 |
+| 23 | `SettingsPanel.tsx:853` | :864 | +11 |
+
+Row 18 is the one my first probe could not resolve automatically: the register's
+"verbatim" claim uses parentheses where `README.md:43` uses em dashes, so a
+prefix match fails. Confirmed by hand; the reviewer's `:43` is right. (The
+wording drift between the claim cell and the surface is a separate question this
+round did not open.) Rows 4, 13 and 17 were already within ±3 and are anchored
+where they stand.
+
+Row 20 is the sharpest case and the review names it: its appears cell still said
+`ARCHITECTURE.md:305` while **round 1's own diff** corrected the same row's
+evidence cell to `:414`. The right line was in hand and the wrong one was left
+one cell to the left.
+
+Invariant 4 now covers **both columns**, and the carve-out is exactly what its
+reason describes — `retired` or `unsupported` rows only, whose location records
+where wording USED to be. Violations name the column. All 18 appears pointers
+carry anchors; each corrected cell records the line it used to cite.
+
+### Item 3 — a vacuous anchor was accepted
+
+`anchor:"e"` passed. Two conditions now, because neither alone is enough:
+
+* **≥ 12 characters.** The register's real anchors run 12–49.
+* **Exactly one matching line inside its own ±3 window.** A 12-character
+  boilerplate string can match three lines and pin nothing.
+
+The second half caught one of this lane's **own round-1 anchors** on its first
+run: `anchor:"report.plainSummary"` matches `tests/core/script-doctor.test.ts`
+lines 1527, 1528 and 1529. Replaced with `anchor:"plainSummary ?? '', /structure/"`.
+
+### Item 4 — the DISCRIMINATION_BASELINE disclosure lived in one place
+
+The AUC-24 half of the recipe-change disclosure was in `auc.ts`, `CLAUDE.md` and
+the AUC-24 gate note; the measure-auc-split half (that `degradeShuffle` and
+`degradeMidpointDrop` also migrated, so a **fresh run** is not comparable to
+0.734 / 0.766) was only in `rebuild-experiment-lib.mjs`'s header. Added to
+`CLAUDE.md`'s "Which floor" section, `Gate - AUC-24 Ratchet.md`,
+`Gate - Public Benchmark.md`, and
+`Measurement - DISCRIMINATION_BASELINE_2026-07-29.md` — the last of which the
+review noted was untouched. The dated baseline doc itself is still left alone.
+
+### Round-2 gates, with exit codes
+
+| gate | result |
+|---|---|
+| `tests/scripts/report-unverified-gates.test.ts` | **42/42** (was 39) |
+| `tests/core/honesty-audit-claims.test.ts` | **15/15** (was 10) |
+| `tests/core/public-benchmark.test.ts` | 28/28, all six floors at the re-locked values |
+| `tests/core/public-benchmark-limits.test.ts` · `scene-segments` · `auc` · `brain-coverage` | 7/7 · 9/9 · 29/29 · 7/7 |
+| identity vs `git archive 0b629491` | **PASS — all 45 byte-identical** |
+| `check-scoring-receipt 0b629491..HEAD` | "no scoring-path files changed. OK." |
+| `npm run benchmark:public` | exit 0 — 0.5313 / 0.5586, 0.4063 / 0.4443, 1.0000 / 0.9473 |
+| `npm run gates` ×3 | exit 0 ×3 — 10.07 / 10.55 / 9.90 s |
+| `npm run lint` · `check-no-console` · `check-docs` · `honesty-audit` · `check-brain` | 0 · 0 · 0 · 0 · 0 |
+| `npm test` (once, final tree) | **13,254 tests, 13,162 pass, 0 fail**, 91 skipped, 1 todo |
+
+### Left undone after round 2
+
+Everything in §5 above still stands. Added by this round:
+
+8. **The three signals are a cost, not a proof.** A forgery that reads
+   `AUC_FLOOR_MUTATION_CONSTANT` from its own environment could fail
+   deliberately and defeat all three. The mutation is handed to a child process,
+   so the child can see it; hiding it is not possible in-process. This is
+   written into both files rather than engineered around, because the previous
+   two attempts to claim more than that were both falsified within a day.
+9. **Row 18's claim cell and `README.md:43` differ in wording** (parentheses vs
+   em dashes) while the column header says "verbatim". The anchor points at the
+   real line; whether the claim text should be re-transcribed is a separate
+   question about the register's own contract, not about invariant 4.
+10. **The `anchor` length floor is a constant, not a measurement.** Twelve
+    characters is the bottom of the observed 12–49 range; nothing establishes it
+    as the right threshold beyond "the real anchors clear it and the attack does
+    not".
