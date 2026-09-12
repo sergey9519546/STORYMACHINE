@@ -19,6 +19,14 @@ import {
   type JumpTarget,
 } from "../../lib/finding-jump.ts";
 import { FindingJump } from "./FindingJump.tsx";
+// Finding #17 (2026-09-12): the Voice Separation tile's copy, in BOTH its
+// states. The channel abstains on every feature-length script, and the tooltip
+// beside that N/A explained how to read a number that was not there. One module,
+// shared with the exported coverage report — see
+// src/lib/voice-separation-copy.ts.
+import {
+  VOICE_SEPARATION_LABEL, voiceSeparationShortValue, voiceSeparationTooltip,
+} from "../../lib/voice-separation-copy.ts";
 // Finding #15 (2026-09-12): the server answers a non-screenplay paste with BOTH
 // a `reason` and a `hint`, and this card rendered only the reason — dropping the
 // one sentence that says what to do. FormatUnrecognizedError carries both
@@ -150,8 +158,14 @@ const STAT_DEFINITIONS = {
   minor: "Findings rated severity: minor — smaller polish notes. Fewer is better.",
   subtextRatio:
     "Share of the script's words that are action/description rather than dialogue (action words ÷ action+dialogue words). A word-count split, not a judgment of literary subtlety — there's no single ideal ratio.",
-  voiceSeparation:
-    "Character pairs whose dialogue is statistically distinguishable (Burrows's Delta) out of every pair with enough dialogue to test. Higher is better — a low pair risks two characters sounding interchangeable.",
+  // 2026-09-12 (adversarial finding #17): this definition is now
+  // src/lib/voice-separation-copy.ts's VOICE_SEPARATION_DEFINITION, because the
+  // tile has TWO states and only one of them is a number. On every
+  // feature-length script the channel abstains and the tile reads N/A — and this
+  // sentence, which explains how to read a value, was the tooltip beside the
+  // absence. The tile now asks that module which sentence its current state
+  // deserves; the definition itself is unchanged, and still shown whenever there
+  // is a reading to explain.
   resolvedQs:
     "Substantive questions raised in dialogue that a later line goes on to answer, out of every question raised. Higher (closer to the total) is better — the gap is open threads left dangling.",
 } as const;
@@ -1013,12 +1027,12 @@ export default function CoverageSummary({
               </StatTile>
               <StatTile
                 id="tile-voice-separation"
-                label="Voice Separation"
-                description={STAT_DEFINITIONS.voiceSeparation}
+                label={VOICE_SEPARATION_LABEL}
+                description={voiceSeparationTooltip(report.voiceAnalysis, report.characters?.length ?? 0)}
                 cardClassName="sm-card py-2 text-center"
                 valueClassName="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-ink)]"
               >
-                {report.voiceAnalysis?.scored ? `${report.voiceAnalysis.pairs.filter(p => !p.swapRisk).length}/${report.voiceAnalysis.pairs.length} Pairs` : 'N/A'}
+                {voiceSeparationShortValue(report.voiceAnalysis)}
               </StatTile>
               <StatTile
                 id="tile-resolved-qs"

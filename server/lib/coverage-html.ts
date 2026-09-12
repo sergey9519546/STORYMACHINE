@@ -42,6 +42,15 @@ import {
   DIAGNOSTIC_NOT_IN_HEALTH_LABEL, diagnosticNotInHealthSentence,
   UNAPPLIED_DEDUCTION_LABEL, unappliedDeductionReading,
 } from '../../src/lib/diagnostic-copy.ts';
+// The Voice Separation channel, in BOTH its states (2026-09-12, adversarial
+// finding #17). On every feature-length script it abstains; this export did not
+// mention it at all, and the in-app tile that did showed a tooltip explaining how
+// to read a number that was not there. One module, shared with that tile — see
+// src/lib/voice-separation-copy.ts.
+import {
+  VOICE_SEPARATION_LABEL, voiceSeparationValue, voiceSeparationAbstentionReason,
+  VOICE_SEPARATION_DEFINITION,
+} from '../../src/lib/voice-separation-copy.ts';
 // ONE root-cause wording (2026-09-11) — see server/lib/root-cause-pipeline.ts.
 import { rootCauseStatements } from './root-cause-pipeline.ts';
 // The producer tier (2026-09-11) — one printed page above the full report; see
@@ -1512,6 +1521,29 @@ function buildGodmodeSection(report: ScriptDoctorReport): string {
       }
       parts.push('</ul>');
     }
+  }
+
+  // Voice separation (2026-09-12, adversarial finding #17). The exported report
+  // never carried this channel, so a producer holding the document had no reading
+  // AND no statement that there was none to have — while the in-app tile showed
+  // "N/A" under a tooltip explaining how to read a value. Both states render
+  // here, from the shared module: the pair count with its reading instruction, or
+  // the ABSTENTION with its reason, because "this draft could not be measured" is
+  // a fact worth printing rather than an absence worth hiding.
+  //
+  // Gated on the FIELD's presence, not on `scored`, and the distinction is the
+  // point: `voiceAnalysis` absent means the caller never attached one (a
+  // reconstructed or legacy report shape — the field is optional on
+  // ScriptDoctorReport), which is a different statement from "the engine ran this
+  // channel and abstained". Same guard convention the sections around this one
+  // use for graphHealth, disclosureAnalysis and subplots.
+  if (report.voiceAnalysis) {
+    const reading = voiceSeparationValue(report.voiceAnalysis);
+    const reason = voiceSeparationAbstentionReason(
+      report.voiceAnalysis, report.characters?.length ?? 0,
+    );
+    parts.push(`<div class="metric-row"><span class="metric-label">${escapeHtml(VOICE_SEPARATION_LABEL)}</span><span class="metric-value">${escapeHtml(reading ?? 'not measured')}</span></div>`);
+    parts.push(`<p class="dim-basis diagnostic-note" style="margin:0 0 10px;">${escapeHtml(reason ?? VOICE_SEPARATION_DEFINITION)}</p>`);
   }
 
   // Disclosure & Epistemics (L4/L19)
