@@ -50,7 +50,12 @@
 import type { ScriptDoctorReport, CoverageVerdict } from '../nvm/analyze/types.ts';
 import type { RevisionIssue } from '../nvm/revision/passes/types.ts';
 import { locateIssues, sceneLineSpans, type SceneLineSpan } from '../nvm/analyze/locate.ts';
-import { suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
+// ONE selection of "the things to fix first" (2026-09-12, adversarial finding
+// #8) — this tier used to apply suppressContradictoryFindings itself while the
+// coverage letter's body applied an anchored-first re-sort instead, so one
+// document printed two different lists under one heading. See
+// server/lib/priority-selection.ts.
+import { leadingPriorities } from './priority-selection.ts';
 import { scenePageNumbers, pageRefLabel } from './page-refs.ts';
 import { derivedReferenceBoundsLine } from './reference-bounds.ts';
 import { analyzeFountainText } from '../nvm/analyze/fountain-analyzer.ts';
@@ -198,17 +203,18 @@ export function buildReaderTier(
     ? percentileSentenceFor(report.healthPercentile, report.sceneCount, report.wordCount)
     : null;
 
-  // The same list, filtered the same way, that the full report's own priorities
-  // section shows — suppressContradictoryFindings at the render boundary, so the
-  // tier can never lead with a finding the section below it suppressed.
-  const suppressed = suppressContradictoryFindings(report.topPriorities ?? []);
-  const leading = suppressed.slice(0, TIER_PRIORITY_COUNT);
+  // The same list, in the same order, that the full report's own priorities
+  // section shows — the tier renders its first three, the body renders all of
+  // them, and neither can pick a different finding or a different order
+  // (server/lib/priority-selection.ts). Suppression happens BEFORE the slice, so
+  // the tier leads with three findings rather than two and a hole.
+  const leading = leadingPriorities(report.topPriorities, TIER_PRIORITY_COUNT);
 
   const spans = fountain ? sceneLineSpans(fountain) : [];
   const scenePages = fountain ? scenePageNumbers(fountain) : [];
   // No cast: ScriptDoctorReport.topPriorities is already
   // Array<RevisionIssue & { pass: PassName }>, which is exactly what locateIssues
-  // takes, and suppressContradictoryFindings is generic over that element type.
+  // takes, and leadingPriorities returns that same element type unchanged.
   const located = fountain ? locateIssues(leading, fountain) : [];
 
   const priorities: ReaderTierFinding[] = leading.map((issue, i) => {

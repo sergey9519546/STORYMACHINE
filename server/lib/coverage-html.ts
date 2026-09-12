@@ -24,7 +24,13 @@ import type { RevisionIssue, PassName } from '../nvm/revision/passes/types.ts';
 import { isWholeDraftAnalysisComplete } from './analysis-completeness.ts';
 import { computeStructuralReliabilityNote } from './structural-reliability.ts';
 import { isNamedRootCause } from '../nvm/analyze/cluster.ts';
-import { suppressContradictoryFindings } from '../nvm/analyze/prioritize.ts';
+// ONE selection of "the things to fix first" (2026-09-12, adversarial finding
+// #8): this section used to call suppressContradictoryFindings itself, the
+// producer tier called it and sliced to three, and the coverage letter's body
+// applied an anchored-first re-sort with no suppression at all — so one letter
+// printed two different lists under one heading and disagreed with the HTML
+// exported from the same contentHash. See server/lib/priority-selection.ts.
+import { orderedPriorities } from './priority-selection.ts';
 // ONE root-cause wording (2026-09-11) — see server/lib/root-cause-pipeline.ts.
 import { rootCauseStatements } from './root-cause-pipeline.ts';
 // The producer tier (2026-09-11) — one printed page above the full report; see
@@ -416,7 +422,11 @@ function buildTopPrioritiesSection(topPrioritiesIn: Array<RevisionIssue & { pass
   // route that built this report already applied it — see
   // prioritize.ts's suppressContradictoryFindings for the table and the
   // reasoning behind each kept/dropped rule.
-  const topPriorities = suppressContradictoryFindings(topPrioritiesIn);
+  //
+  // 2026-09-12: through server/lib/priority-selection.ts, which is also what the
+  // producer tier slices its leading three from and what the coverage letter's
+  // body now renders in full — one list, four surfaces.
+  const topPriorities = orderedPriorities(topPrioritiesIn);
   // 2026-09-11: the heading comes from the ONE shared implementation
   // (src/lib/priorities-copy.ts's prioritiesHeadingFor) that the coverage
   // letter, the in-app panel and the producer tier also use. "Top Priorities"

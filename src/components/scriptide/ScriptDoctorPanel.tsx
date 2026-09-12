@@ -115,6 +115,12 @@ import {
 // server/lib/genre-router.ts); this module is pure, server-free and has no
 // scoring-path edge.
 import { formatSceneList } from "../../../server/lib/scene-ranges.ts";
+// ONE selection of "the things to fix first" (2026-09-12, adversarial finding
+// #8). This panel rendered `report.topPriorities` raw — the only one of the four
+// surfaces that applied NO contradiction filter — so it could show the writer a
+// finding the exported report of the same contentHash had dropped as
+// contradicted. See server/lib/priority-selection.ts.
+import { orderedPriorities } from "../../../server/lib/priority-selection.ts";
 // ONE priorities heading across this panel, the exported coverage HTML, the
 // coverage letter and the producer tier (2026-09-11).
 import { prioritiesHeadingFor } from "../../lib/priorities-copy.ts";
@@ -2724,6 +2730,17 @@ export default function ScriptDoctorPanel({
   // shown here as if it were current.
   const [handoffOutdated, setHandoffOutdated] = useState(false);
   const reportIsComplete = report !== null && isWholeDraftAnalysisComplete(report);
+  // "The things to fix first", as the ONE list every surface renders (2026-09-12,
+  // adversarial finding #8). This panel used to map `report.topPriorities`
+  // directly — the only one of the four surfaces that applied no
+  // contradictory-pair suppression — so it could show a finding the coverage
+  // HTML and the coverage letter exported from the same contentHash had dropped.
+  // Memoised on the report object because `orderedPriorities` returns a NEW array
+  // every call and this list is the key source for a mapped render.
+  const panelPriorities = useMemo(
+    () => orderedPriorities(report?.topPriorities),
+    [report],
+  );
   // Draft-over-draft history (localStorage-backed; see recordDoctorHistory).
   // Declared here (ahead of its original spot further down, alongside
   // previousEntry/historyOpen/confirmingClearHistory) because draftRank
@@ -5723,14 +5740,17 @@ export default function ScriptDoctorPanel({
                 also use. "Top Priorities" was plural no matter how many items
                 followed, so a draft with exactly one — which the 1-scene inert
                 draft in this repository has — promised a list and delivered a
-                line. */}
-            {report.topPriorities.length > 0 && (
+                line.
+                2026-09-12: and the LIST comes from the one shared selection those
+                same three surfaces render (server/lib/priority-selection.ts) —
+                this was the surface with no contradiction filter at all. */}
+            {panelPriorities.length > 0 && (
               <div>
                 <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-[var(--sm-ink-mute)]">
-                  {prioritiesHeadingFor(report.topPriorities.length)}
+                  {prioritiesHeadingFor(panelPriorities.length)}
                 </h3>
                 <div className="space-y-2">
-                  {report.topPriorities.map((issue, i) => (
+                  {panelPriorities.map((issue, i) => (
                     <IssueCard
                       key={i}
                       issue={issue}

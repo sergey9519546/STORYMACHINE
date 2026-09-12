@@ -102,6 +102,10 @@ import {
 // ONE priorities heading across the panel, the exported HTML, this letter and the
 // tier — see src/lib/priorities-copy.ts.
 import { prioritiesHeadingFor, prioritiesHeadingUpper } from '../../src/lib/priorities-copy.ts';
+// ONE priorities LIST under that one heading (2026-09-12, adversarial finding #8)
+// — see server/lib/priority-selection.ts for the two contradictory lists this
+// letter used to print in one document.
+import { orderedPriorities } from './priority-selection.ts';
 // ONE title and caption for the checks-that-found-nothing section, shared with
 // the exported coverage HTML (2026-09-11, discovery #8).
 import { STRENGTHS_SECTION_TITLE, STRENGTHS_SECTION_CAPTION } from './strengths-copy.ts';
@@ -174,11 +178,18 @@ function titleCase(word: string): string {
 // one the CLI could not read back).
 const VERDICT_LABEL: Record<CoverageVerdict, string> = VERDICT_WORD;
 
-// A finding/priority is "scene- or lines-anchored" when its location string
-// names a specific scene or line range rather than reading as a whole-draft
-// generality like "Overall structure". Matches "Scene 4", "Scenes 1-3",
-// "Scene ~5", and "Lines 40-42".
-const ANCHORED_LOCATION_RE = /\b(scenes?|lines?)\s*~?\d/i;
+// NOTE (2026-09-12, adversarial finding #8): an `ANCHORED_LOCATION_RE` used to
+// live here, used by exactly one caller — buildPriorities' anchored-first
+// re-sort of the top priorities. That re-sort is gone (it demoted the report's
+// only CRITICAL finding, which is document-anchored, below three scene-anchored
+// MAJORs, so page one of the letter and the body of the SAME letter printed two
+// different lists under one heading), and with it the only reason this file had
+// its own location classifier. It is deleted rather than left unreferenced on
+// purpose, for the same reason the `severityRank()` note below gives: a
+// re-ordering helper sitting in this file is an invitation to re-order the
+// findings again, which is the defect. The order belongs to
+// server/nvm/analyze/prioritize.ts and is carried through by
+// server/lib/priority-selection.ts.
 
 function severityWord(sev: RevisionIssue['severity']): string {
   return sev.toUpperCase();
@@ -294,12 +305,29 @@ function endWithPeriod(text: string): string {
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
 }
 
+/**
+ * The letter's "things to fix first" list.
+ *
+ * 2026-09-12 (adversarial finding #8). Two changes, both so that this letter
+ * stops contradicting its own first page:
+ *
+ *   ORDER — was `[...anchored, ...unanchored]`, a local re-sort that put
+ *   location-anchored findings first and applied no contradiction filter. The
+ *   producer tier above it takes the engine's order, suppression-filtered. On
+ *   data/screenplays/runoff.fountain that put a CRITICAL at the top of page one
+ *   and left it out of the body's three entirely.
+ *
+ *   LENGTH — was `.slice(0, 3)`, the SAME count the tier prints, so the two
+ *   lists were the same length, under the same heading, in one document, and
+ *   differed only in content. The body now renders the whole list, exactly as
+ *   the exported coverage HTML does: the tier is a reading order over the first
+ *   three, the body is the complete list, and `prioritiesHeadingFor` states each
+ *   one's real count. Nothing the old slice showed is lost — every finding it
+ *   lifted into the top three is still printed, in the engine's ranking.
+ */
 function buildPriorities(topPriorities: Array<RevisionIssue & { pass: PassName }> | undefined): ListEntry[] {
-  const list = topPriorities ?? [];
-  if (list.length === 0) return [];
-  const anchored = list.filter(i => ANCHORED_LOCATION_RE.test(i.location));
-  const unanchored = list.filter(i => !ANCHORED_LOCATION_RE.test(i.location));
-  const chosen = [...anchored, ...unanchored].slice(0, 3);
+  const chosen = orderedPriorities(topPriorities);
+  if (chosen.length === 0) return [];
 
   return chosen.map(issue => {
     const fix = issue.suggestedFix ? ` Suggested fix: ${endWithPeriod(issue.suggestedFix)}` : '';
