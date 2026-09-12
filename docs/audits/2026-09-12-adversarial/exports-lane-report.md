@@ -968,3 +968,245 @@ e9a07911 fix(exports): the FDX round trip is true in both directions, and its te
 
 47 files, +3,826 / −162 over `eb8cf9b2`; round 2 alone is 19 files, +863 / −59.
 Every commit pushed as it was made; the only force push was the rebase in Step 0.
+
+---
+
+# Round 3
+
+Against the round-2 review's five non-blocking items (verdict **MERGE**,
+`exports-review.md` lines 428–662). Four ask for work and all four are built;
+the fifth (`verify:surfaces` not re-run by the reviewer) is not a lane item and
+round-1 §5.7 still stands.
+
+**Starting state, as the orchestrator left it.** The branch was rebased onto
+`main` (`git rebase --onto main eb8cf9b2`) and force-pushed before this round
+began: worktree at `e3be03f8`, 12 commits over `main` `d8bb5088`, register rows
+**107–115**, the two brain-note conflicts resolved with main's renumbered
+citations, graph regenerated. `git status` clean on arrival. Every push this
+round was a plain `git push` — no force push in round 3.
+
+| | |
+|---|---|
+| round-3 base | `e3be03f8` (12 commits over `main` `d8bb5088`) |
+| **final tip** | **`2c5f996bd3a3e123350473354213ac0341e71199`** |
+| range | 16 commits over `main`; 48 files, +4,083 / −422 |
+| round 3 alone | 4 commits, 7 files, +281 / −24 |
+
+```
+2c5f996b docs(exports): name the one thing "everything that prints comes back" does not cover
+fdb7fafb docs(exports): say what "non-printing" means here, and pin both halves of it
+0e3cab2a docs(exports): name the base the FDX byte-identity claim is measured against
+475f6eea fix(exports): the letter's length gate measures the letter the product sends
+```
+
+## Item 1 — the length gate measures the letter the product sends
+
+The review's finding reproduces exactly. Both the gate and the round-2 harness
+rendered a bare `runScriptDoctor` report; every caller attaches
+`buildRootCausePipeline` output and hands the renderer a logline and the script
+text (`server/routes/coverage-letter.ts:138-150`, and the panel the same way).
+
+`node --experimental-strip-types <session scratch>/r3/lenroute.mjs` — plain
+text, words / 500, all 21 committed screenplays, rendered three ways:
+
+| script | bare report | + rootCauses | **as the route ships it** |
+|---|---|---|---|
+| assembled-feature | 1789 (3.58) | 1899 (3.80) | **1900 (3.80)** |
+| chain-of-custody | 1706 (3.41) | 1906 (3.81) | **1900 (3.80)** |
+| close-quarters | 1769 (3.54) | 1922 (3.84) | **1916 (3.83)** |
+| code-blue | 1715 (3.43) | 1904 (3.81) | **1912 (3.82)** |
+| **counter-offer** | 1778 (3.56) | 1966 (3.93) | **1979 (3.96)** ← longest |
+| dead-frequency | 1695 (3.39) | 1833 (3.67) | **1842 (3.68)** |
+| high-voltage | 1663 (3.33) | 1851 (3.70) | **1853 (3.71)** |
+| mise | 1639 (3.28) | 1780 (3.56) | **1792 (3.58)** |
+| off-season | 1754 (3.51) | 1896 (3.79) | **1905 (3.81)** |
+| quiet-season | 1657 (3.31) | 1795 (3.59) | **1795 (3.59)** |
+| red-line | 1692 (3.38) | 1830 (3.66) | **1845 (3.69)** |
+| room-12 | 1677 (3.35) | 1865 (3.73) | **1859 (3.72)** |
+| runoff | 1739 (3.48) | 1932 (3.86) | **1929 (3.86)** |
+| same-page | 1741 (3.48) | 1950 (3.90) | **1944 (3.89)** |
+| soft-launch | 1677 (3.35) | 1816 (3.63) | **1813 (3.63)** |
+| the-defense-rests | 1752 (3.50) | 1940 (3.88) | **1934 (3.87)** |
+| **the-detour** | 1625 (3.25) | 1767 (3.53) | **1764 (3.53)** ← shortest |
+| the-key-under-the-mat | 1642 (3.28) | 1780 (3.56) | **1791 (3.58)** |
+| transfer-window | 1651 (3.30) | 1792 (3.58) | **1789 (3.58)** |
+| two-lane | 1684 (3.37) | 1825 (3.65) | **1828 (3.66)** |
+| undertow | 1669 (3.34) | 1811 (3.62) | **1808 (3.62)** |
+| **range** | 3.25 – 3.58 | 3.53 – 3.93 | **3.53 – 3.96** |
+| **at or over 4.0** | 0 | 0 | **0 of 21** |
+
+The shipped range is **3.53 – 3.96 pp**, reproducing the reviewer's figures to
+the word (`counter-offer` 1,979 w / 3.96 pp). The round-2 statement of
+**3.3 – 3.6 pp** was ~0.4 pp low and is corrected in all three places that
+carried it — `server/lib/coverage-letter.ts`'s measurement block,
+`tests/core/coverage-letter.test.ts`'s comment, and **register row 115** — each
+saying why the first figure was low rather than quietly replacing it. (Round 2's
+section of this report is left as it was written, as a dated record; this is the
+correction.)
+
+**The gate now enforces the sentence.** `shippedLetter()` builds the report the
+way the route does; the bound is `pp >= 3 && pp <= 4` instead of `< 5`, which was
+a page and a half wider than the promise; the three scripts are the measured
+extremes of the 21 (`the-detour` 3.53, `counter-offer` 3.96) plus the feature
+fixture; and a new case reads `server/routes/coverage-letter.ts` at source level,
+so a length measured on a report shape the product stopped rendering fails here
+rather than drifting.
+
+**Demonstrated, not argued.** On a blob-verified `git archive e3be03f8` export
+(`sha256(server/lib/coverage-letter.ts)` = `8e559e55dd7d92df…`, matching the
+blob), with the renderer grown by 120 words per letter — 0.24 pp, enough to take
+`assembled-feature` to ~4.04 and `counter-offer` to ~4.20 while all nine
+descriptions still say three to four pages:
+
+| gate | result on the grown renderer |
+|---|---|
+| old (bare report, `pp < 5`) | 3 failures — **all three are committed letter goldens**; 0 of its 3 page-count cases fail |
+| new (shipped shape, `pp <= 4`) | the same 3 goldens **plus 2 of the 3 page-count cases** |
+
+`the-detour` lands at ~3.77 and correctly does not fail. The old gate was blind
+to a renderer that pushed the letter past the sentence describing it; the new one
+is not.
+
+## Item 2 — the byte-identity claim names its base
+
+Re-measured independently (`sha256` of `fountainToFdx` output per script, 20 CC0
++ the feature fixture, `<session scratch>/r3/fdxbytes.mjs`):
+
+```
+tip vs 4af8ae97 (before the exporter rewrite)  →  diff exit 0, 21/21 identical
+tip vs main     (before this lane)             →  20/21; assembled-feature differs by ONE line
+                                                  + <Paragraph Type="Draft Date"><Text>2026-09-06</Text></Paragraph>
+                                                  4,809 → 4,810 lines
+```
+
+The one difference is round 1's own intended draft-date repair, on the only
+committed script carrying a `Draft date:` line.
+`docs/brain/Surfaces/Surface - Export Round Trip.md` now states both figures with
+their bases and why the distinction matters: a reader checking the claim against
+the wrong base finds a real difference and has no way to tell it from a
+regression.
+
+## Item 3 — what "non-printing" means here
+
+The reviewer's finding reproduces (`<session scratch>/r3/scope.mjs`), and the
+measurement is finer than the finding in one place:
+
+| written | parsed as | in the exported FDX |
+|---|---|---|
+| `/* … */` at line start | `boneyard` | omitted |
+| `/* … */` begun mid-sentence | **one `action` block** | **prints** |
+| `[[ … ]]` on its own line | `note` | omitted |
+| `[[ … ]]` inline, opening and closing on one line | `action` | **removed from the line** (round 2's `cleanBlockText`) |
+| `[[ … ]]` spanning two lines | **three `action` blocks** | **prints** |
+
+`src/lib/fountain.ts` opens a boneyard only at the start of a line and closes a
+note only on the line that opened it, so the two that print are, within this
+product, ordinary action. That is the honest behaviour rather than a gap: the
+analyzer scores those same blocks as action and counts their words, so an
+exporter that removed text the engine counted would hand Final Draft a different
+script from the one the report describes.
+
+Written down at the omission site in `src/lib/fdx.ts`, beside
+`NON_PRINTING_FOUNTAIN_CONSTRUCTS`, and in the brain note — and asserted in
+**both** directions: three constructs must be absent from the exported FDX and
+from the way back with the prose around them untouched, and two must still
+print, each with its block type asserted, so if the parser ever learns the wider
+form the case fails and the scope note has to be rewritten with it.
+
+## Item 4 — paragraph grouping
+
+Measured on both trees (`<session scratch>/r3/grouping.mjs`): three action lines
+written as one block come back as three paragraphs — **3 source paragraphs → 5,
+identically on `main` and on the tip**. Inherent to FDX, where the unit of body
+text is the paragraph, and untouched by this lane.
+
+Stated beside `FDX_CONSTRUCT_FATE` as what `'survives'` does not cover, and
+pinned three ways so it stays a shape change rather than becoming a loss: every
+line present, in order, with nothing added (`deepEqual` over the content lines);
+the engine cannot tell (same block types, same scene count, same word count);
+and the sentence itself must be in the module.
+
+**Fail-first for items 3 and 4 together**, on the blob-verified `git archive
+e3be03f8` export: **43 pass / 2 fail**, and the two are the documentation cases
+(`the disclosed set names constructs, and the scope is written down beside the
+rule`; `and the disclosure says so, beside the table that would otherwise imply
+otherwise`). All five behavioural cases pass there — which is the honest shape
+of a round that documents and gates existing behaviour instead of changing it,
+and is stated that way in both commit messages rather than dressed up as a
+repair.
+
+## Gates — round 3, foreground, with exit codes
+
+| gate | command | result |
+|---|---|---|
+| lint | `npx tsc --noEmit` | **0** |
+| no-console | `node scripts/check-no-console.mjs` | **0** — 307 files, 24 quarantine entries |
+| docs quality | `npm run check-docs` | **0** — "No AI writing patterns detected" |
+| honesty audit | `node scripts/honesty-audit.mjs` | **0** — 465 files, 483 markdown, 115 claims rows, clean |
+| brain graph | `node scripts/brain-graph.mjs --check` | **0** — 108 notes, 404 links, fresh |
+| scoring receipt | `node scripts/check-scoring-receipt.mjs main..HEAD` | **0** — *"no scoring-path files changed"* |
+| output identity | `--tree <git archive main>` vs `--tree .`, `GIT_SHA` pinned both sides | **PASS — 45 / 45 byte-identical** |
+| full `npm test` | not run this round, by instruction — the orchestrator runs the merge gates | — |
+
+The identity baseline was a fresh `git archive main` export verified against the
+blob (`sha256(idmain/server/nvm/analyze/doctor.ts)` ==
+`sha256(git show main:…)` → `e8acebfff34ba5059844…`).
+
+Touched suites, each run individually on the final tip:
+
+| suite | result |
+|---|---|
+| `export-roundtrip.test.ts` | **45 / 0** (was 35) |
+| `coverage-letter.test.ts` | **53 / 0** (was 52) |
+| `coverage-html.test.ts` | 54 / 0 |
+| `voice-separation-abstention.test.ts` | 15 / 0 |
+| `priority-selection-one-list.test.ts` | 14 / 0 |
+| `fdx-import.test.ts` | 8 / 0 |
+| `export-xml-wellformed.test.ts` | 11 / 0 |
+| `dimension-badge-export-parity.test.ts` | 8 / 0 |
+| `report-cross-references.test.ts` | 12 / 0 |
+| `artifact-claims.test.ts` | 104 / 0 |
+| `percentile-comparability.test.ts` | 23 / 0 |
+| `claims-row-citations.test.ts` | 5 / 0 |
+| `brain-coverage.test.ts` | 7 / 0 |
+| `p0-sample-drift.test.ts` | 4 / 0 |
+| `tests/routes/export-coverage-letter.test.ts` | 23 / 0 |
+| `tests/routes/export-coverage.test.ts` | 13 / 0 |
+| `tests/routes/root-cause-parity.test.ts` | 18 / 0 |
+| `tests/routes/export-fdx-docx-parity.test.ts` | 3 / 0 |
+| `tests/routes/export.test.ts` | 3 / 0 |
+
+Hygiene: both trailers on all 16 commits in `main..HEAD`; no model identifier
+anywhere in the round-3 diff; no claims-register row number in any source
+comment.
+
+## §5 — left undone (round 3)
+
+1. **The user-facing copy did not change.** The button title and the four
+   per-format notes still say what they said; items 3 and 4 add precision to the
+   module, the tests and the brain note, not to a hover title. Paragraph
+   grouping and the parser's boneyard scope are engineering facts a reader of
+   the code needs and a writer pressing Export does not.
+2. **Round-2 §5 items 1–3 and 5–7 stand unchanged** — the `!` marker's partial
+   restoration, `@CUE`, the italic-paragraph lyric read, `verify:surfaces` having
+   no assertion over the three new export surfaces, the three brain notes on main
+   that cite rows the client lane's renumbering moved, and the register's own
+   internal `(row N)` pointers being ungated.
+3. **Round 2's section of this report still says 3.3 – 3.6 pp.** Left as the
+   dated record it is; item 1 above is the correction, and the three live places
+   that carried the figure are fixed.
+
+## Tip and origin (Round 3)
+
+```
+git rev-parse HEAD
+2c5f996bd3a3e123350473354213ac0341e71199
+
+git ls-remote origin lane/exports-truth
+2c5f996bd3a3e123350473354213ac0341e71199	refs/heads/lane/exports-truth
+
+git status --short
+(empty)
+```
+
+Origin == local tip. 16 commits over `main` `d8bb5088`, fast-forwardable.
