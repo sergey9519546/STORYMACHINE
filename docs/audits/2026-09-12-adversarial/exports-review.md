@@ -660,3 +660,117 @@ this round, so no writer's existing export moved.
 5. Round-1 non-blocking 5 stands: `verify:surfaces` was not re-run by this
    review, and the lane's §5.5 records that the three new export surfaces still
    have no browser assertion. Nothing in either round's verdict depends on it.
+
+## Round 3 — re-check of `2c5f996b`
+
+Reviewed object: `2c5f996bd3a3e123350473354213ac0341e71199`, four commits over
+`e3be03f8` (7 files, +281 / −24), all four addressing the round-2 non-blocking
+list. The lane has been rebased again; its fork point is now `d8bb5088`, which
+is the commit that carries this review's round-2 section. Warm re-check of my
+own four items only. Scratch is a fresh `<session scratch>/r3rev`, its three
+trees (`2c5f996b`, `e3be03f8`, `d8bb5088`) each verified against the blob
+before use (`sha256(mut/server/lib/coverage-letter.ts)` = `e1d31257570b9a6b…`,
+`…/tests/core/coverage-letter.test.ts` = `501b1a5eb6608ba3…`).
+
+**Item 1 — the letter gate measures the letter the product sends: closed, and
+the mutation proof reproduces.** `475f6eea` builds the gate's report the way
+`server/routes/coverage-letter.ts:138-150` does (`buildRootCausePipeline`
+attached, plus a logline and the script text), moves the bound from `< 5` to
+`<= 4`, and re-points the three cases at the measured extremes. Confirmed
+independently, my own harness, the "as the route ships it" column the
+coordinator asked for:
+
+| script | bare report (what the old gate built) | as the route ships it | the test's `measured` |
+|---|---|---|---|
+| the-detour | 1,625 w — 3.25 pp | **1,764 w — 3.53 pp** | 3.53 |
+| counter-offer | 1,778 w — 3.56 pp | **1,979 w — 3.96 pp** | 3.96 |
+| assembled-feature | 1,789 w — 3.58 pp | **1,900 w — 3.80 pp** | 3.80 |
+
+Every figure matches the module block, the test's annotations and register row
+115, which now reads *"on the report a caller actually builds … 3.53 pp
+(the-detour, 1,764 w) to 3.96"*.
+
+The mutation proof, re-run on a scratch copy of the tip with 120 words added to
+`buildCaveats`' opening array — one paragraph that reaches every letter — with
+the OLD gate (`git show e3be03f8:tests/core/coverage-letter.test.ts`) sitting
+beside the new one in the same mutated tree:
+
+```
+node --experimental-strip-types tests/core/coverage-letter.test.ts            (new gate)
+  → 53 tests · 48 pass · 5 fail — 2 of the 3 page cases FAIL:
+      assembled-feature renders a ~4.04-page letter (measured 3.80)
+      counter-offer     renders a ~4.20-page letter (measured 3.96)
+node --experimental-strip-types tests/core/coverage-letter-OLDGATE.test.ts    (old gate, same tree)
+  → 52 tests · 49 pass · 3 fail — 0 of the 3 page cases fail
+```
+
+The three failures common to both runs are the committed letter goldens, which
+any renderer change moves; the length gate is the only thing that distinguishes
+them, and it now fires where it used to sleep. The arithmetic is exactly the
+one the margin predicted (+0.24 pp for 120 words on a 3.96-pp letter).
+`tests/core/coverage-letter.test.ts` on the real tip: **53 / 0**.
+
+**Item 2 — the byte-identity sentence names its base: closed.** The docs now
+distinguish the two claims explicitly. Re-measured on the current lineage,
+`sha256` of `fountainToFdx` output per script, 20 CC0 + the feature fixture:
+
+```
+tip vs e3be03f8 (before the exporter rewrite) → diff exit 0, 21 of 21 identical
+tip vs d8bb5088 (before this lane)            → 20 of 21; assembled-feature differs by one line,
+                                                 the Draft Date title-page paragraph, 4,809 → 4,810
+```
+
+Both numbers in the prose are mine as well, including the line counts.
+
+**Item 3 — the omission scope is stated and pinned in both directions:
+closed.** The scope note sits at the omission site (`src/lib/fdx.ts`) and in
+the disclosure module, and `fdb7fafb` pins both halves: three constructs
+asserted absent from the FDX **and** from the way back, and two — a boneyard
+opened mid-sentence, a note spanning two lines — asserted to still print. The
+second group asserts the parser's block TYPE as the reason, so if
+`src/lib/fountain.ts` ever learns the wider forms the case fails and forces the
+note to be rewritten rather than going quietly stale. That is a stronger
+version than the one-sentence note I asked for.
+
+**Item 4 — paragraph grouping: closed.** Stated beside `FDX_CONSTRUCT_FATE`
+("WHAT 'survives' DOES NOT COVER") and pinned three ways. Re-measured myself on
+the same input: **3 source paragraphs → 5**, `contentLines` equal in the same
+order, and the doctor reads both identically (scenes 1 → 1, words 18 → 18,
+health 0 → 0). `tests/core/export-roundtrip.test.ts` on the tip: **45 / 0**
+(was 35).
+
+Gates, re-run because the register and the docs moved:
+
+```
+node scripts/honesty-audit.mjs
+  → 465 files, 483 tracked markdown files, claims register (115 rows) — clean.   exit 0
+node scripts/check-scoring-receipt.mjs e3be03f8..HEAD
+  → no scoring-path files changed. OK.                                           exit 0
+```
+
+Output identity was not re-run this round: the range touches one exporter
+comment, one renderer comment block, two test files and three docs, and the
+receipt gate confirms no scoring-path file is in it. Round 2's 45/45 stands.
+
+## VERDICT: **MERGE**
+
+All four round-2 non-blocking items are closed, three of them with more than
+was asked: the length gate now measures the shipped document and enforces the
+sentence rather than a window around it — and the lane proved that with a
+mutation I reproduced, which is the discipline this batch exists to hold — the
+byte-identity claim names both bases with both numbers, and the two disclosure
+scopes are pinned in both directions rather than described. Nothing in this
+round touches the scoring path.
+
+### Non-blocking (round 3)
+
+1. The length gate runs 3 of the 21 committed screenplays. They are the right
+   three — the measured extremes plus the feature — so any proportional growth
+   is caught at the ends. A section that rendered only for a script outside the
+   three could still slip past; if the letter ever gains a conditional section,
+   the gate's script list should be re-derived from a fresh 21-script run.
+2. Each `SCRIPTS` entry's `measured` value appears only in the failure message,
+   so a letter that SHRANK to 3.1 pp would pass the gate while the annotation,
+   the module block and register row 115 all still said 3.53–3.96. The lower
+   bound (`>= 3`) makes that a narrow window, and re-measuring is a deliberate
+   act in this lane's practice — recorded, not requested.
