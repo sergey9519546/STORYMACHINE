@@ -37,7 +37,7 @@ here as the audit's finding. **The live count today is 3,217** — PR #257
 added `INVERSE_CHEKHOV_GUN` in `33a2ee48`. `docs/rulebook/README.md` is the
 machine-counted authority; noted 2026-08-24.)*
 The rule channel is **inverted** in degradation experiments, not merely weak: by
-the doctor's own measurements (`server/nvm/analyze/doctor.ts:1892-1898`) the
+the doctor's own measurements (`server/nvm/analyze/doctor.ts:2092-2093`) the
 entire weighted-rule channel has AUC ~0.076 (where 0.50 is random and 1.0 is
 perfect — rules fire LESS on shuffled scripts because the shuffle-drop recipe
 also REMOVES about a third of the scenes, so the degraded script looks

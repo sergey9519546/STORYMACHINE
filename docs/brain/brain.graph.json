@@ -1035,6 +1035,14 @@
       "to": "docs/brain/Patterns.md"
     },
     {
+      "from": "docs/brain/Gates/Gate - Claims Register Lane.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Claims Register Lane.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md"
+    },
+    {
       "from": "docs/brain/Gates/Gate - Corpus Layout Verification.md",
       "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
     },

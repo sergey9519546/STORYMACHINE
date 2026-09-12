@@ -690,6 +690,36 @@ function scanFile(filePath) {
 //      that same file. This is what stops a new overclaim from landing
 //      un-registered — the register cannot just describe past sins, it has
 //      to be checked against future ones.
+//   4. Every evidence pointer of the form `path:line` must carry a short
+//      QUOTED ANCHOR — `anchor:"…"` — and that string must occur within
+//      ANCHOR_WINDOW lines of the line it names. Added 2026-09-12, adversarial
+//      review finding 11.
+//
+// WHY (4) EXISTS, stated here because invariant (2) looked like it covered
+// this and did not. The register's own rules said: "Every row with status
+// `supported` must carry an evidence pointer that exists on disk (a `path`, or
+// `path:line` — ONLY THE PATH IS CHECKED)." So a line number pointing at the
+// wrong code passed. That is not hypothetical: three files cited
+// `server/nvm/analyze/doctor.ts:1892-1898` for the project's central negative
+// finding about its own score (rule channel AUC ~0.076 vs scene-count scarcity
+// ~0.938) while that comment had moved to `doctor.ts:2092-2093`, and lines
+// 1892-1898 held unrelated scene-index parsing. A prior audit
+// (docs/audits/2026-09-06-mistake-search/brain-review.md:398) recorded the same
+// anchor "FIXED in both places" — and it was, in the two places that audit
+// looked at. It survived in three more, because nothing could see it.
+//
+// An existence check cannot see a line that moved. A CONTENT check can, and it
+// costs one file read per pointer. The anchor also survives the thing that broke
+// the pointer: when code shifts, the quoted string moves with it and the
+// ±ANCHOR_WINDOW tolerance absorbs small drift, so the register needs editing
+// only when the EVIDENCE changes rather than every time a line is inserted
+// above it.
+//
+// Scope, deliberately: EVIDENCE pointers only, at any status. The "Where it
+// appears" column is NOT checked, because several of its `path:line` values
+// are historical by design — rows 1, 2 and 25 are `retired` and name where the
+// wording USED to be, and requiring a live anchor there would demand an anchor
+// for text that was deliberately deleted.
 //
 // Blocking (not warn-only, unlike the repo-metadata lane below): unlike repo
 // metadata, every fix here is something a contributor's own PR controls.
@@ -873,6 +903,133 @@ function checkSupportedEvidenceExists(rows) {
   return hits;
 }
 
+/**
+ * Invariant 4: a `path:line` evidence pointer must carry a quoted anchor, and
+ * that anchor must be where it says it is.
+ *
+ * POINTER GRAMMAR. A pointer cell is ';'-separated. Within one pointer the
+ * leading token is `path` or `path:<lines>`, where `<lines>` is one line, a
+ * contiguous `a-b` range, or a `a,b` comma list — all three shapes occur in the
+ * register. Anchors are `anchor:"…"`, one or more, anywhere in the same
+ * ';'-separated pointer:
+ *
+ *     server/nvm/analyze/doctor.ts:2092-2093 anchor:"scene-COUNT artifact"
+ *     tests/core/script-doctor.test.ts:1133,1528 anchor:"same hash" anchor:"plainSummary"
+ *
+ * The sigil is deliberate. Several existing pointers already carry parenthetical
+ * notes containing quotes and backticks (`tests/routes/keyless-smoke.test.ts:92
+ * (`/api/scriptide/diagnose` on a keyless server)`), so "the first quoted string
+ * in the cell" would match prose and silently pass. `anchor:"…"` cannot be
+ * produced by accident.
+ *
+ * WHAT MUST HOLD. Each cited LOCATION must be covered: for a contiguous `a-b`
+ * range that is the window `[a - ANCHOR_WINDOW, b + ANCHOR_WINDOW]`; for a comma
+ * list each line gets its OWN window. At least one of the pointer's anchors must
+ * resolve inside each window. That distinction matters: treating `1133,1528` as
+ * one span would make the window 400 lines wide and check nothing, which is the
+ * shape of the defect this invariant exists to catch.
+ *
+ * Three lines of tolerance absorbs an import added above the cited code without
+ * being so loose that a pointer at the wrong end of a file passes.
+ */
+const ANCHOR_WINDOW = 3;
+
+/** `anchor:"…"` — the one accepted anchor syntax. Global: a pointer may carry
+ *  one anchor per cited location. */
+const ANCHOR_RE = /anchor:"([^"]+)"/g;
+
+/**
+ * Parse one ';'-separated pointer into its path, the line windows it cites and
+ * its anchors. Returns `null` when the pointer names no line — the case this
+ * invariant does not apply to.
+ */
+export function parseLinePointer(pointer) {
+  const text = pointer.trim();
+  const leading = text.split(/[\s(]/)[0] ?? '';
+  const bare = leading.replace(/^[`'"]+|[`'"]+$/g, '');
+  const m = /^(.*?):(\d+(?:[,-]\d+)*)$/.exec(bare);
+  if (!m) return null;
+  // A contiguous range spans; a comma list is separate locations.
+  const groups = m[2].split(',').map((part) => {
+    const ends = part.split('-').map((n) => parseInt(n, 10)).filter((n) => Number.isInteger(n) && n > 0);
+    return ends.length === 0 ? null : { from: Math.min(...ends), to: Math.max(...ends) };
+  }).filter(Boolean);
+  if (groups.length === 0) return null;
+  const anchors = [...text.matchAll(ANCHOR_RE)].map((a) => a[1]);
+  return { path: m[1], groups, anchors, raw: text };
+}
+
+/**
+ * Is `anchor` within ANCHOR_WINDOW lines of the window `group`?
+ * Exported so the test can drive it on a temp file with no register involved.
+ */
+export function anchorResolves(absolutePath, group, anchors) {
+  let raw;
+  try {
+    raw = readFileSync(absolutePath, 'utf8');
+  } catch {
+    return { ok: false, reason: `${absolutePath} is unreadable` };
+  }
+  const fileLines = raw.split(/\r?\n/);
+  if (group.from > fileLines.length) {
+    return { ok: false, reason: `line ${group.from} is past EOF (${fileLines.length} lines)` };
+  }
+  const lo = Math.max(1, group.from - ANCHOR_WINDOW);
+  const hi = Math.min(fileLines.length, group.to + ANCHOR_WINDOW);
+  for (const anchor of anchors) {
+    for (let i = lo; i <= hi; i++) {
+      if (fileLines[i - 1].includes(anchor)) return { ok: true, anchor, foundAt: i };
+    }
+  }
+  // Say WHICH failure this is: "the code moved" and "the anchor is wrong" need
+  // different fixes, and this message is the only place a reader learns which.
+  const elsewhere = anchors
+    .map((anchor) => ({ anchor, at: fileLines.findIndex((l) => l.includes(anchor)) }))
+    .find((x) => x.at !== -1);
+  return {
+    ok: false,
+    reason: elsewhere
+      ? `anchor "${elsewhere.anchor}" is at line ${elsewhere.at + 1}, outside the +/-${ANCHOR_WINDOW} window `
+        + `around ${group.from === group.to ? group.from : `${group.from}-${group.to}`} — the code MOVED; update the line number`
+      : `none of the anchors [${anchors.map((a) => `"${a}"`).join(', ')}] appears anywhere in the file — `
+        + 'the quoted text was reworded, or the pointer names the wrong file',
+  };
+}
+
+/** Invariant 4, over every row's evidence pointers. */
+function checkEvidenceLineAnchors(rows) {
+  const hits = [];
+  for (const row of rows) {
+    const pointers = row.evidencePointer.split(';').map((p) => p.trim()).filter(Boolean);
+    for (const pointer of pointers) {
+      const parsed = parseLinePointer(pointer);
+      if (parsed === null) continue; // no line cited: invariant 2's business only
+      if (parsed.path === '' || parsed.path.toUpperCase() === 'NONE') continue;
+      if (parsed.anchors.length === 0) {
+        hits.push({
+          file: CLAIMS_REGISTER_PATH,
+          pattern: 'claims-register-line-pointer-without-anchor',
+          match: `row ${row.num}: "${parsed.raw}" cites a line but carries no anchor:"…". `
+            + 'A line number with nothing to check it against is how doctor.ts:1892-1898 survived '
+            + 'in five files after the code moved to 2092-2093.',
+        });
+        continue;
+      }
+      for (const group of parsed.groups) {
+        const resolved = anchorResolves(join(ROOT, parsed.path), group, parsed.anchors);
+        if (!resolved.ok) {
+          hits.push({
+            file: CLAIMS_REGISTER_PATH,
+            pattern: 'claims-register-line-anchor-mismatch',
+            match: `row ${row.num}: ${parsed.path}:${group.from === group.to ? group.from : `${group.from}-${group.to}`} — ${resolved.reason}`,
+          });
+        }
+      }
+    }
+  }
+  return hits;
+}
+
 function collectClaimPhraseSurfaceFiles() {
   const files = [...walk(join(ROOT, 'src'))];
   for (const rel of CLAIM_PHRASE_NAMED_ROOT_FILES) {
@@ -955,6 +1112,7 @@ function runClaimsLane() {
   return [
     ...checkRetiredClaimsAbsent(rows),
     ...checkSupportedEvidenceExists(rows),
+    ...checkEvidenceLineAnchors(rows),
     ...checkClaimPhrasesRegistered(rows),
   ];
 }
