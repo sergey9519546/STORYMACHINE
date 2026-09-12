@@ -455,7 +455,7 @@ function newestMtime(target) {
  * fix the staleness (a build that silently produced nothing, a `dist/` written
  * somewhere else), and it always says which branch it took.
  *
- * Returns `{ built, reason, distMs, newestInput }`.
+ * Returns `{ built, reason, distMs, newestInput, cached }`.
  */
 /**
  * Why `dist/` is (or is not) usable as a served artifact for THIS tree:
@@ -492,10 +492,26 @@ export function distStaleness({ repo } = {}) {
   return { reason: null, newest, distMs };
 }
 
+/** Repos this process has already proven current, so a gate that boots a
+ *  SECOND server does not re-walk `src/` and `public/` to learn the same
+ *  thing (review round 1, non-blocking 4: `verify:p0-flow`'s step 3e budget
+ *  server made it two full walks per run). Scoped to one process — each gate
+ *  is its own `node scripts/verify-*.mjs`, so "once per process" is "once per
+ *  gate run" — and only ever holds a VERIFIED-current result: the build path
+ *  below writes it after re-checking, never before. */
+const verifiedDists = new Map();
+
+/** @param {{ repo?: string, logPrefix?: string }} [options] */
 export function ensureBuiltDist({ repo, logPrefix = 'verify' } = {}) {
   const cwd = repo ?? process.cwd();
   const rel = (p) => path.relative(cwd, p) || p;
   const staleness = () => distStaleness({ repo: cwd });
+
+  const already = verifiedDists.get(cwd);
+  if (already) {
+    console.log(`[${logPrefix}] dist/ already verified current in this run — not re-checking.`);
+    return { ...already, cached: true };
+  }
 
   const before = staleness();
   if (!before.reason) {
@@ -503,7 +519,9 @@ export function ensureBuiltDist({ repo, logPrefix = 'verify' } = {}) {
       `[${logPrefix}] dist/ is current (built ${new Date(before.distMs).toISOString()}, `
       + `newest build input ${before.newest ? rel(before.newest.path) : 'none'}) — not rebuilding.`,
     );
-    return { built: false, reason: null, distMs: before.distMs, newestInput: before.newest?.path ?? null };
+    const result = { built: false, reason: null, distMs: before.distMs, newestInput: before.newest?.path ?? null };
+    verifiedDists.set(cwd, result);
+    return { ...result, cached: false };
   }
 
   console.log(`[${logPrefix}] dist/ is stale — ${before.reason}; running \`npm run build\`...`);
@@ -521,7 +539,9 @@ export function ensureBuiltDist({ repo, logPrefix = 'verify' } = {}) {
     );
   }
   console.log(`[${logPrefix}] dist/ rebuilt (${new Date(after.distMs).toISOString()}).`);
-  return { built: true, reason: before.reason, distMs: after.distMs, newestInput: after.newest?.path ?? null };
+  const result = { built: true, reason: before.reason, distMs: after.distMs, newestInput: after.newest?.path ?? null };
+  verifiedDists.set(cwd, result);
+  return { ...result, cached: false };
 }
 
 /**

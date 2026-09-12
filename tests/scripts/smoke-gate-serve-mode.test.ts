@@ -29,6 +29,7 @@ import {
   SERVE_BUILT_DIST,
   SERVE_VITE_DEV,
   distStaleness,
+  ensureBuiltDist,
   serveModeOf,
 } from '../../scripts/lib/browser-verify.mjs';
 
@@ -234,6 +235,34 @@ describe('the P0 smoke gate serves the built dist/, and says which', () => {
     utimesSync(path.join(root, 'dist', 'index.html'), new Date(Date.now() + 330_000), new Date(Date.now() + 330_000));
     utimesSync(path.join(root, 'postcss.config.js'), later3, later3);
     assert.match(distStaleness({ repo: root }).reason ?? '', /older than postcss\.config\.js/);
+  });
+
+  it('the freshness check is walked once per repo per run (review non-blocking 4)', () => {
+    // `verify:p0-flow` boots TWO servers (the main one and step 3e's budget
+    // server), and each boot asked ensureBuiltDist the same question — two
+    // full walks of src/ and public/ per run to learn the same fact. The
+    // second call now answers from the verified result.
+    const root = mkdtempSync(path.join(tmpdir(), 'dist-once-'));
+    mkdirSync(path.join(root, 'src'));
+    mkdirSync(path.join(root, 'dist', 'assets'), { recursive: true });
+    writeFileSync(path.join(root, 'src', 'main.tsx'), 'x');
+    writeFileSync(path.join(root, 'index.html'), 'x');
+    writeFileSync(path.join(root, 'dist', 'index.html'), 'built');
+
+    const first = ensureBuiltDist({ repo: root, logPrefix: 'test' });
+    assert.equal(first.cached, false, 'the first call does the work');
+    assert.equal(first.built, false);
+    const second = ensureBuiltDist({ repo: root, logPrefix: 'test' });
+    assert.equal(second.cached, true, 'the second call in the same run answers from the verified result');
+    assert.equal(second.distMs, first.distMs, 'and answers the same thing');
+
+    // Per repo, not per process: a second worktree is checked on its own.
+    const other = mkdtempSync(path.join(tmpdir(), 'dist-once-other-'));
+    mkdirSync(path.join(other, 'src'));
+    mkdirSync(path.join(other, 'dist', 'assets'), { recursive: true });
+    writeFileSync(path.join(other, 'src', 'main.tsx'), 'x');
+    writeFileSync(path.join(other, 'dist', 'index.html'), 'built');
+    assert.equal(ensureBuiltDist({ repo: other, logPrefix: 'test' }).cached, false);
   });
 
   it('this repository really does ship a public/ directory into dist/', () => {
