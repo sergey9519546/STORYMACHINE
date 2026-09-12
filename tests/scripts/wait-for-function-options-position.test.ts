@@ -121,6 +121,23 @@ function misusedCalls(source: string): { line: number; text: string }[] {
  * alternation, `innerText`, `toUpperCase`) is read from a copy with comments
  * blanked and strings KEPT, so `new RegExp('RECOMMEND|CONSIDER|PASS')` is
  * still visible while prose about the trap is not.
+ *
+ * ── AND ACROSS ONE CALL BOUNDARY (2026-09-12 review, non-blocking 1) ────────
+ * The reviewer's plant D moved the regex instead of the read:
+ *
+ *     const check = (s) => /RECOMMEND|CONSIDER|PASS/.test(s);
+ *     return check(t);                       // ← t is tainted, check() is the poll
+ *
+ * So a pre-pass collects the file's LOCAL verdict predicates — any `const`/
+ * `let`/`var` bound to a function, or a `function` declaration, whose body
+ * contains a verdict alternation — and a call to one of them with a tainted
+ * argument is the same offender. One boundary, within one file: that is the
+ * shape a person actually writes when a wait grows a helper. It does NOT
+ * follow an imported function, a method on an object, or a predicate passed in
+ * as a parameter; a hold spread across modules is the deny-by-default
+ * territory `handRolledStreamHolds` covers for its own defect, and if that
+ * shape ever appears here it should be closed the same way rather than by
+ * widening this regex-level scan into an import graph.
  */
 function bareVerdictPolls(source: string): { line: number; text: string }[] {
   const VERDICT_ALT = /RECOMMEND\|CONSIDER\|PASS|CONSIDER\|RECOMMEND\|PASS/;
@@ -135,6 +152,50 @@ function bareVerdictPolls(source: string): { line: number; text: string }[] {
   const content = maskCommentsAndStrings(source, { keepStrings: true });
   const structLines = structure.split('\n');
   const contentLines = content.split('\n');
+
+  /** The span of the declaration starting at `from`: to the `;` that closes it
+   *  at depth 0, or to the `}` that closes its body. Walked on the masked
+   *  copy, so a brace or semicolon inside a string cannot end it early. */
+  const declSpan = (from: number) => {
+    let depth = 0;
+    for (let i = from; i < structure.length; i++) {
+      const c = structure[i];
+      if (c === '(' || c === '[' || c === '{') depth++;
+      else if (c === ')' || c === ']' || c === '}') {
+        depth--;
+        if (depth <= 0 && c === '}') return content.slice(from, i + 1);
+      } else if (c === ';' && depth <= 0) return content.slice(from, i);
+    }
+    return content.slice(from, Math.min(from + 600, content.length));
+  };
+
+  /** Locally-defined predicates whose body carries a verdict alternation. */
+  const verdictPredicates = new Set<string>();
+  const declarations = [
+    /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?(?:function\b|\(|[A-Za-z_$][\w$]*\s*=>)/g,
+    /function\s+([A-Za-z_$][\w$]*)\s*\(/g,
+  ];
+  for (const pattern of declarations) {
+    for (let m = pattern.exec(structure); m; m = pattern.exec(structure)) {
+      const body = declSpan(m.index);
+      if (VERDICT_ALT.test(body) && !SHARED.test(body)) verdictPredicates.add(m[1]);
+    }
+  }
+
+  /** The argument text of the first call to `name` on this line, masked. */
+  const callArgs = (name: string, lineStart: number, lineText: string) => {
+    const at = lineText.search(new RegExp(`\\b${name}\\s*\\(`));
+    if (at === -1) return null;
+    const open = structure.indexOf('(', lineStart + at);
+    if (open === -1) return null;
+    let depth = 0;
+    for (let i = open; i < structure.length; i++) {
+      const c = structure[i];
+      if (c === '(') depth++;
+      else if (c === ')') { depth--; if (depth === 0) return structure.slice(open + 1, i); }
+    }
+    return null;
+  };
 
   /** Block scopes, innermost last. 'transform' = the value can carry
    *  CSS-uppercased text (or was uppercased by hand); 'raw' = textContent,
@@ -208,6 +269,26 @@ function bareVerdictPolls(source: string): { line: number; text: string }[] {
             line: i + 1,
             text: `${line.trim().slice(0, 90)} [\`${hoisted[0]}\` derives from ${hoisted[1].via} at line ${hoisted[1].line}]`,
           });
+        }
+      }
+    }
+
+    // 2b. The same defect with the REGEX moved instead of the read: a tainted
+    // value handed to a locally-defined verdict predicate.
+    if (!SHARED.test(line)) {
+      for (const predicate of verdictPredicates) {
+        const args = callArgs(predicate, offset, structLine);
+        if (args === null) continue;
+        const passed = scopes
+          .flatMap((scope) => [...scope.entries()])
+          .find(([name, meta]) => meta.kind === 'transform' && new RegExp(`\\b${name}\\b`).test(args));
+        if (passed) {
+          bad.push({
+            line: i + 1,
+            text: `${line.trim().slice(0, 80)} [\`${passed[0]}\` derives from ${passed[1].via} at line `
+              + `${passed[1].line}, tested by \`${predicate}()\`]`,
+          });
+          break;
         }
       }
     }
@@ -407,6 +488,40 @@ describe('doctor-verdict waits go through the one shared helper', () => {
       bareVerdictPolls('function a() {\n  const t = document.body.innerText;\n}\nfunction b(t) {\n  return /RECOMMEND|CONSIDER|PASS/.test(t);\n}').length,
       0,
       'a name reused in another block is not the same value',
+    );
+  });
+
+  it('a tainted value handed to a local verdict predicate is caught (review non-blocking 1)', () => {
+    // The reviewer's plant D, verbatim: the regex moved instead of the read.
+    const arrow = 'const check = (s) => /RECOMMEND|CONSIDER|PASS/.test(s);\n'
+      + 'const t = document.body.innerText;\n'
+      + 'return check(t);';
+    const hits = bareVerdictPolls(arrow);
+    assert.equal(hits.length, 1, 'moving the regex into a local helper is the same poll');
+    assert.match(hits[0].text, /`t` derives from an innerText read at line 2, tested by `check\(\)`/);
+
+    // The declaration form, and a predicate declared AFTER its use (hoisted).
+    assert.equal(
+      bareVerdictPolls('const t = document.body.innerText;\nreturn check(t);\nfunction check(s) { return /RECOMMEND|CONSIDER|PASS/.test(s); }').length,
+      1,
+    );
+    // Not every call to a verdict predicate is the trap — only a tainted one.
+    assert.equal(
+      bareVerdictPolls('const check = (s) => /RECOMMEND|CONSIDER|PASS/.test(s);\nconst t = await page.textContent("body");\nreturn check(t);').length,
+      0,
+      'textContent is not vulnerable, so passing it to the predicate is not the trap',
+    );
+    // A predicate that routes through the shared helper is the fix, not the trap.
+    assert.equal(
+      bareVerdictPolls('const check = (s) => textCarriesDoctorVerdict(s);\nconst t = document.body.innerText;\nreturn check(t);').length,
+      0,
+    );
+    // The declared edge, asserted so it is a known boundary rather than a
+    // surprise: the taint does not cross a MODULE boundary.
+    assert.equal(
+      bareVerdictPolls('import { check } from "./elsewhere.mjs";\nconst t = document.body.innerText;\nreturn check(t);').length,
+      0,
+      'an imported predicate is out of scope for a single-file textual scan — see the function comment',
     );
   });
 
