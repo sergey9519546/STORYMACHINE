@@ -544,6 +544,33 @@ describe('floor liveness — check (5): the mutation run', () => {
     assert.doesNotMatch(REPORTER_OUTPUT, /FLOOR ASSERTIONS ARE NOT LIVE/);
   });
 
+  it('reads the same answer under `npm test` as standalone — NODE_TEST_CONTEXT must not leak', () => {
+    // A REAL FAILURE, CAUGHT BY THE FULL SUITE AND FIXED. When this reporter runs
+    // under `npm test`, node:test puts NODE_TEST_CONTEXT in the environment. A
+    // spawned child that inherits it switches to the V8-serialized reporter and
+    // stops printing TAP — so the mutation run's
+    // `not ok … clears <CONSTANT> = <raised>` line never appears, and a perfectly
+    // live suite is reported as `mutation-survived`. The first full `npm test` of
+    // this lane failed exactly that way, while the file passed standalone.
+    //
+    // runSuiteDefault now deletes NODE_TEST_CONTEXT from the child env and pins
+    // `--test-reporter=tap`. This drives the poisoned environment directly, so the
+    // trap cannot come back silently.
+    const poisoned = execFileSync('node', [SCRIPT], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: { ...process.env, NODE_TEST_CONTEXT: 'child-v8' },
+    });
+    assert.match(
+      poisoned,
+      /\[RAN\] tests\/core\/public-benchmark\.test\.ts/,
+      'the reporter must reach the same verdict whoever invoked it. Under NODE_TEST_CONTEXT it '
+      + 'reported the real benchmark as ABSENT, because the child stopped emitting TAP.',
+    );
+    assert.doesNotMatch(poisoned, /FLOOR ASSERTIONS ARE NOT LIVE/);
+    assert.match(poisoned, /mutation check: PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR raised to [0-9.]+ -> suite FAILED/);
+  });
+
   it('leaves scripts/lib/auc.ts byte-identical — the mutation never touches disk', () => {
     // The reason the check is a module hook rather than a temp file swap. Every
     // spawn above this line ran with a raised floor; none of them may have

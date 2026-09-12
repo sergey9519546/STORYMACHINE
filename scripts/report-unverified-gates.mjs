@@ -420,8 +420,18 @@ export function render({ skipped, ran, expired }) {
  * @returns {{ ok: boolean, output: string }} exit status and stdout+stderr
  */
 export function runSuiteDefault(suitePath, { raise } = {}) {
-  const args = ['--experimental-strip-types'];
+  // `--test-reporter=tap` and a scrubbed NODE_TEST_CONTEXT are both load-bearing,
+  // not belt-and-braces. When this script runs UNDER `npm test`, node:test sets
+  // NODE_TEST_CONTEXT in the environment; a child that inherits it switches to
+  // the V8-serialized reporter and stops printing TAP, so the mutation check's
+  // `not ok … clears <CONSTANT> = <raised>` line never appears and a perfectly
+  // live suite is reported as `mutation-survived`. Measured: with
+  // NODE_TEST_CONTEXT=child-v8 in the environment, the unfixed reporter called
+  // the real benchmark ABSENT. The reporter must read the same text whoever
+  // invoked it.
+  const args = ['--experimental-strip-types', '--test-reporter=tap'];
   const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
   if (raise) {
     args.push('--import', pathToFileURL(RAISE_FLOOR_HOOK).href);
     env.AUC_FLOOR_MUTATION_CONSTANT = raise.constant;
