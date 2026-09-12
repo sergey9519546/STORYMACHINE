@@ -476,3 +476,87 @@ describe('every Fountain construct has a stated fate, and meets it', () => {
     assert.deepEqual(dropped, [...NON_PRINTING_FOUNTAIN_CONSTRUCTS].sort());
   });
 });
+
+// ── What "non-printing" means here, exactly ──────────────────────────────────
+//
+// 2026-09-12 (review round 2, non-blocking 3). The omission rule is scoped to
+// the constructs src/lib/fountain.ts IMPLEMENTS, which is narrower than the
+// Fountain spec in two places: a boneyard is opened only at the START of a line,
+// and a note is a block only when one trimmed line both opens and closes it.
+// A reviewer re-derived that as a finding; these cases make it a stated,
+// measured property instead, in both directions — what is omitted AND what
+// deliberately still prints.
+//
+// Why the narrow scope is right rather than a gap: the analyzer reads those
+// same blocks as action and scores their words. An exporter that removed text
+// the engine counted would hand Final Draft a different script from the one the
+// report describes, which is a worse defect than a printed comment marker.
+
+describe('the omission rule covers exactly what the parser implements', () => {
+  const body = (fountain: string) => fountainToFdx(fountain);
+  const roundTrip = (fountain: string) => fdxToFountain(fountainToFdx(fountain)).fountain;
+
+  const OMITTED: Array<{ name: string; src: string; marker: string }> = [
+    {
+      name: 'a boneyard opened at the start of a line',
+      src: 'INT. KITCHEN - DAY\n\n/* cut this? */\n\nMAYA pours coffee.\n',
+      marker: 'cut this?',
+    },
+    {
+      name: 'a note that opens and closes on its own line',
+      src: 'INT. KITCHEN - DAY\n\n[[a note on one line]]\n\nMAYA pours coffee.\n',
+      marker: 'a note on one line',
+    },
+    {
+      name: 'a note inside a printing line, opened and closed on it',
+      src: 'INT. KITCHEN - DAY\n\nMAYA pours coffee. [[check this]]\n',
+      marker: 'check this',
+    },
+  ];
+
+  for (const c of OMITTED) {
+    it(`${c.name}: absent from the FDX and from the way back`, () => {
+      assert.ok(!body(c.src).includes(c.marker), `${c.name} reached the exported FDX`);
+      assert.ok(!roundTrip(c.src).includes(c.marker), `${c.name} survived the round trip`);
+      assert.ok(roundTrip(c.src).includes('MAYA pours coffee'),
+        'the printing text around it must be untouched');
+    });
+  }
+
+  const STILL_PRINTS: Array<{ name: string; src: string; marker: string; why: string }> = [
+    {
+      name: 'a boneyard opened mid-sentence',
+      src: 'INT. KITCHEN - DAY\n\nMAYA pours coffee /* cut this? */ and waits.\n',
+      marker: '/* cut this? */',
+      why: 'src/lib/fountain.ts opens a boneyard only at the start of a line, so this is ONE action block',
+    },
+    {
+      name: 'a note spanning two lines',
+      src: 'INT. KITCHEN - DAY\n\n[[a note that runs\nover two lines]]\n\nMAYA pours coffee.\n',
+      marker: 'a note that runs',
+      why: 'the parser closes a note only on the line that opened it, so this is action',
+    },
+  ];
+
+  for (const c of STILL_PRINTS) {
+    it(`${c.name}: still prints, and the disclosure is scoped so that is not a lie`, () => {
+      // The block type is the reason, so it is asserted rather than assumed —
+      // if the parser ever learns the wider form, this case fails and the scope
+      // note beside the omission rule has to be rewritten with it.
+      const types = parseFountain(c.src).filter(b => b.type !== 'empty').map(b => b.type);
+      assert.ok(!types.includes('boneyard') && !types.includes('note'),
+        `${c.name}: ${c.why} — the parser now types it as a comment, so the scope note is stale`);
+      assert.ok(body(c.src).includes(c.marker),
+        `${c.name} was dropped from the FDX — the engine scores those words as action, so removing `
+        + 'them would send Final Draft a different script from the one the report describes');
+    });
+  }
+
+  it('the disclosed set names constructs, and the scope is written down beside the rule', () => {
+    const exporter = readFileSync(join(REPO, 'src/lib/fdx.ts'), 'utf8');
+    assert.match(exporter, /SCOPE \(2026-09-12, review round 2\)/,
+      'the omission site must carry the scope note, or the next reader re-derives it as a defect');
+    const disclosure = readFileSync(join(REPO, 'src/lib/export-roundtrip.ts'), 'utf8');
+    assert.match(disclosure, /constructs `src\/lib\/fountain\.ts` IMPLEMENTS/);
+  });
+});

@@ -72,6 +72,15 @@ non-printing constructs (boneyard `/* … */`, inline notes `[[ … ]]`, synopse
 `= …`, section headings `# …`) have no FDX, PDF or DOCX equivalent. `.docx` has
 no importer at all.
 
+"Non-printing" means the constructs `src/lib/fountain.ts` **implements**, which
+is narrower than the Fountain spec in two places worth knowing before reporting
+one as a bug: that parser opens a boneyard only at the start of a line and
+closes a note only on the line that opened it, so `/* … */` begun mid-sentence
+and a `[[ … ]]` spanning two lines are ordinary ACTION here — scored as action
+by the analyzer, and printed. Removing them in the exporter would hand Final
+Draft a different script from the one the report describes, so they stay; the
+scope is written down at the omission site and asserted in both directions.
+
 ## What the disclosure said, and what was actually happening
 
 The 2026-09-12 review measured the FDX sentence against the code and found it

@@ -142,6 +142,13 @@ export const FDX_CONSTRUCT_FATE = {
   'section headings (# …)':       'dropped',
 } as const satisfies Record<string, 'survives' | 'dropped' | 'unforced'>;
 
+// SCOPE: these name the constructs `src/lib/fountain.ts` IMPLEMENTS, not the
+// Fountain spec's fuller definitions. That parser opens a boneyard only at the
+// start of a line and closes a note only on the line that opened it, so a
+// `/* … */` begun mid-sentence and a `[[ … ]]` spanning two lines are ordinary
+// ACTION in this product — they are scored as action and they print. See the
+// scope note at the omission site in src/lib/fdx.ts for why that is the honest
+// behaviour rather than a gap.
 export const NON_PRINTING_FOUNTAIN_CONSTRUCTS = [
   'boneyard comments (/* … */)',
   'inline notes ([[ … ]])',

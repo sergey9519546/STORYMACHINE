@@ -200,6 +200,20 @@ export function fountainToFdx(fountain: string, titlePage?: TitlePageInput): str
     // Never printed, and therefore never carried: boneyard comments, notes on
     // their own line, section headings and synopses. A page break is the one
     // `synopsis`-typed block that IS printing, so it is separated out first.
+    //
+    // SCOPE (2026-09-12, review round 2). "Non-printing" here means the
+    // constructs src/lib/fountain.ts actually IMPLEMENTS, which is narrower than
+    // the Fountain spec in two places a reader will otherwise find and report as
+    // a defect. The parser opens a boneyard only at the START of a line
+    // (`trimmed.startsWith('/*')`), and treats a note as a block only when one
+    // trimmed line both opens and closes it. So `MAYA pours coffee /* cut? */
+    // and waits.` is ONE action block, and a `[[ … ]]` note spanning two lines
+    // is three — measured, and both come out of here as printed action text.
+    // That is correct rather than missed: the analyzer scores those words as
+    // action too, so an exporter that quietly removed them would hand Final
+    // Draft a different script from the one the report describes. An inline
+    // note that opens and closes on one line IS removed, in cleanBlockText,
+    // because there the parser and the exporter agree on what it is.
     if (block.type === 'empty' || block.type === 'boneyard' || block.type === 'note') continue;
     const isPageBreak = block.type === 'synopsis' && PAGE_BREAK_RE.test(block.text.trim());
     if (!isPageBreak && (block.type === 'section' || block.type === 'synopsis')) continue;
