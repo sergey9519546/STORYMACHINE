@@ -528,7 +528,18 @@ describe('floor liveness — check (5): the mutation run', () => {
   it('the hook rewrites exactly one constant, and refuses a shape it cannot move', () => {
     const raised = raiseFloorInSource(AUC_LIB, 'PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR', 0.5813);
     assert.match(raised, /export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0\.5813;/);
-    assert.match(raised, /export const PUBLIC_SHUFFLE_DROP_FLOOR = 0\.5386;/);
+    // The NEIGHBOUR must be untouched, read from the file rather than pinned.
+    // This line used to hardcode `= 0.5386;`, which was a second copy of a
+    // floor that re-locks every time a scoring change is measured — it went
+    // stale on 2026-09-12 and failed here for a reason that had nothing to do
+    // with the hook. The property under test is "exactly one constant moved",
+    // and that is what it now asserts.
+    const neighbour = /export const PUBLIC_SHUFFLE_DROP_FLOOR = ([0-9.]+);/.exec(AUC_LIB);
+    assert.ok(neighbour, 'scripts/lib/auc.ts no longer declares PUBLIC_SHUFFLE_DROP_FLOOR on one line');
+    assert.ok(
+      raised.includes(`export const PUBLIC_SHUFFLE_DROP_FLOOR = ${neighbour![1]};`),
+      `the rewrite moved PUBLIC_SHUFFLE_DROP_FLOOR too; it must still read ${neighbour![1]}`,
+    );
     assert.equal(raised.split('\n').length, AUC_LIB.split('\n').length, 'the rewrite must not add or remove lines');
     // A constant reshaped across two lines (or absent) must throw rather than
     // silently leave the run unmutated — an unmutated "mutation run" that

@@ -270,7 +270,18 @@ export function titlePageBlockCount(blocks: FountainBlock[]): number {
  *  spec rule and for what a title page costs when it is scored as prose.
  *  Kept here, beside the other analysis-time normalisations, so a caller that
  *  needs "the screenplay" gets all of them from one place. */
+let titleMemoInput: string | null = null;
+let titleMemoOutput = '';
+
 export function stripTitlePage(text: string): string {
+  if (text === titleMemoInput) return titleMemoOutput;
+  const out = stripTitlePageUncached(text);
+  titleMemoInput = text;
+  titleMemoOutput = out;
+  return out;
+}
+
+function stripTitlePageUncached(text: string): string {
   if (!text) return text;
   const blocks = parseFountain(text);
   const n = titlePageBlockCount(blocks);
@@ -340,14 +351,54 @@ export function joinWrappedDialogue(text: string): string {
   return joined ? out.join('\n') : text;
 }
 
+// ── ONE-ENTRY MEMO (2026-09-12) ────────────────────────────────────────────
+// normalizeScreenplay is now three passes over the document (fold, strip, join)
+// and it is called more than once on the same bytes in a single request: the
+// shape guard's real-parse bound calls it, analyzeFountainText calls it, and
+// aggregateReport calls it again to build the canonical analysis text. It is a
+// PURE function of its input, so remembering the last (input, output) pair
+// collapses those repeats to one. ONE entry, not an LRU: the repeats are
+// always the same string back-to-back, and a multi-entry cache would hold
+// several megabytes of screenplay alive for no extra hit rate.
+//
+// Measured on the round-2 reviewer's 458,716-char A1 payload: the guard's
+// rejection path goes from 102 ms to 63 ms with the memo, against a 100 ms
+// assertion in tests/security/fountain-shape-guard-cue-parity.test.ts.
+let memoInput: string | null = null;
+let memoOutput = '';
+
 export function normalizeScreenplay(raw: string): string {
+  if (raw === memoInput) return memoOutput;
+  const out = normalizeScreenplayUncached(raw);
+  memoInput = raw;
+  memoOutput = out;
+  return out;
+}
+
+function normalizeScreenplayUncached(raw: string): string {
   if (!raw || typeof raw !== 'string') return raw ?? '';
+  // ── ORDER MATTERS: STRIP BEFORE RECONSTRUCTING (2026-09-12) ──────────────
+  // The non-printing strip reads BLOCK TYPES from parseFountain, and
+  // parseFountain only recognises a boneyard when `/*` opens a line. The
+  // double-spaced reconstruction below joins wrapped fragments, which moves
+  // `/*` into the middle of a joined line — so stripping AFTER it silently
+  // does nothing on exactly the documents (scraped PDFs, FDX exports) most
+  // likely to carry production notes. Measured: a cue inside a boneyard in a
+  // double-spaced-shaped document reached `dialogueByCharacter` with 12 words,
+  // which the shape guard — correctly reading the raw text's boneyard — scored
+  // as 0, breaking the guard's `guardWords >= pipelineWords` oracle.
+  //
+  // The double-spaced DECISION is still taken on the raw lines, because
+  // server/lib/validation.ts's guard mirrors that decision on the raw text and
+  // the two must agree. Blanking boneyard lines adds blank lines, which would
+  // move the decision if it were taken after.
   const allLines = raw.replace(/\r\n?/g, '\n').split('\n').map(l => l.replace(/\s+$/, ''));
+  const cleaned = stripNonPrinting(foldTypography(raw));
   // Preserve a title page verbatim if present (key: value lines before first blank/heading).
   // Clean input still gets the dialogue join: a wrapped speech is one element.
-  if (!isDoubleSpaced(allLines)) return joinWrappedDialogue(stripNonPrinting(foldTypography(raw))); // structurally idempotent on clean input
+  if (!isDoubleSpaced(allLines)) return joinWrappedDialogue(cleaned); // structurally idempotent on clean input
 
-  const lines = allLines.filter(l => l.trim() !== '');
+  const lines = cleaned.replace(/\r\n?/g, '\n').split('\n').map(l => l.replace(/\s+$/, '')).filter(l => l.trim() !== '');
   const out: string[] = [];
   type Mode = 'none' | 'action' | 'dialogue';
   let mode: Mode = 'none';
@@ -399,5 +450,6 @@ export function normalizeScreenplay(raw: string): string {
     }
   }
   flush();
-  return stripNonPrinting(foldTypography(out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n'));
+  // Already folded and stripped above; the join is what this branch adds.
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
 }

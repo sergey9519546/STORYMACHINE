@@ -1026,11 +1026,24 @@ function isDoubleSpacedForVoiceGrouping(lines: string[]): boolean {
  *  and the next into ONE pooled dialogue block, even across what were
  *  originally several separate blank-line-gapped fragments — the exact
  *  shape a hard-wrapped, double-spaced PDF/FDX import produces). When false
- *  (single-spaced), parseFountain's OWN rule only ever types the FIRST
- *  post-cue content line as `dialogue` — a second physically-adjacent line
- *  falls through to its `action`-by-default case, since its rule requires
- *  the PRECEDING block to be character/dual_dialogue/parenthetical, never
- *  `dialogue` itself — so only that first line is summed. Bounded at 200
+ *  (single-spaced), EVERY physically-adjacent line up to the next blank one
+ *  is summed.
+ *
+ *  2026-09-12 — that last sentence used to read "only ever types the FIRST
+ *  post-cue content line as `dialogue` … so only that line is summed", and it
+ *  was a faithful mirror of a parser BUG: `src/lib/fountain.ts` required the
+ *  preceding block to be character/dual_dialogue/parenthetical and not
+ *  `dialogue` itself, so the second line of a speech fell through to action.
+ *  The Fountain dialogue element runs from its cue to the next blank line, the
+ *  parser now says so, and this walk has to say so too or the oracle property
+ *  it exists for (`guardWords >= pipelineWords`) is simply false: measured on
+ *  a single-spaced 3-line-per-speech document, guardWords 20 against
+ *  pipelineWords 60.
+ *
+ *  A cue-shaped line does NOT end the run in the single-spaced case, because
+ *  under the same rule it is not a cue — a cue needs the blank line before it.
+ *  Breaking there would UNDER-count, which is the one direction this walk may
+ *  never err in. Bounded at 200
  *  lines scanned so one pathological occurrence cannot turn this per-cue
  *  lookup into its own O(document length) cost; no legitimate dialogue turn
  *  in the calibrated corpus below comes close to that. */
@@ -1042,12 +1055,16 @@ function accumulateDialogueWords(lines: string[], startIdx: number, joinAcrossGa
   while (i < lines.length && scanned < MAX_LINES_SCANNED) {
     const t = lines[i]!.trim();
     scanned++;
-    if (t === '') { i++; continue; }
+    // A blank line ENDS a single-spaced dialogue block (parseFountain's rule);
+    // the double-spaced reconstruction joins across it.
+    if (t === '') { if (!joinAcrossGaps) break; i++; continue; }
     if (SCENE_HEADING_PREFIX_RE.test(t)) break;
-    if (isCharacterCue(lines[i]!)) break;
+    // Only the double-spaced reconstruction re-reads a cue-shaped line as a
+    // cue — see this function's header for why breaking here when single-spaced
+    // would under-count.
+    if (joinAcrossGaps && isCharacterCue(lines[i]!)) break;
     if (t.startsWith('(') && t.endsWith(')')) { i++; continue; }
     total += countWords(t);
-    if (!joinAcrossGaps) break;
     i++;
   }
   return total;

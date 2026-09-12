@@ -62,6 +62,10 @@ describe('metamorphic classifyResults', () => {
       'identity',
       'whitespace_reflow',
       'rename_character',
+      // 2026-09-12: a Fountain-legal dialogue reflow, epsilon 0. See the case's
+      // own comment in metamorphic-cases.ts and
+      // tests/core/parse-format-invariance.test.ts for the per-script set.
+      'dialogue_reflow',
       'empty_verbosity',
       'scene_shuffle',
       'scene_reverse',

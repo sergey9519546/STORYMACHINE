@@ -342,22 +342,36 @@ describe('root-cause parity — REVERSION PROBE (this test must be able to fail)
     // Exactly what server/routes/export.ts, server/routes/coverage-letter.ts and
     // scripts/generate-p0-sample-report.ts used to do: clusterIssues(located)
     // with the spans argument omitted. `locatedIssues` comes off the doctor
-    // route's own JSON, so this is the same 899 located issues every surface
+    // route's own JSON, so these are the same located issues every surface
     // above saw — not a synthetic stand-in.
     const reverted = clusterIssues(s.locatedIssues);
     const live = s.doctorRootCauses;
 
-    assert.notEqual(
-      reverted.length, live.length,
-      'clusterIssues with and without scene spans produced the same NUMBER of findings — '
-      + 'the parity assertions above would still pass with every call site reverted',
-    );
-
+    // THE DISCRIMINATOR IS THE SCENE RANGES, NOT THE COUNT (corrected
+    // 2026-09-12). This probe used to lead with `reverted.length !==
+    // live.length`, which held on this fixture at the time (70 vs 69) and was
+    // never the defect being guarded: the measured harm is a 58-scene finding
+    // reported to a producer as "Scene 1". After the parse-and-format
+    // invariance work changed the fixture's issue mix, both clusterings return
+    // the same NUMBER of findings while their ranges still differ sharply
+    // (`Scenes 12-26` vs `Scenes 13-17, 19`) — so the old assertion would have
+    // failed while the property it stands for was untouched. A count is a
+    // proxy; the ranges are the thing.
     const liveRanges = rootCauseStatements(live).map(st => st.sceneList).join(' | ');
     const revertedRanges = rootCauseStatements(reverted).map(st => st.sceneList).join(' | ');
     assert.notEqual(
       revertedRanges, liveRanges,
       'scene ranges are identical with and without spans — the parity assertions above prove nothing',
+    );
+
+    // And the difference has to be SUBSTANTIAL, not one finding's rounding:
+    // without spans the ranges go gappy, which is the mechanism.
+    const differing = rootCauseStatements(live)
+      .filter((st, i) => st.sceneList !== rootCauseStatements(reverted)[i]?.sceneList).length;
+    assert.ok(
+      differing >= 3,
+      `only ${differing} finding(s) name different scenes with and without spans; the drift this file `
+      + 'measures is document-wide, so a handful of matching ranges is not the property',
     );
   });
 

@@ -26,17 +26,27 @@ separate findings) — and because the final sort key is `memberCount`,
 omitting it also reorders the list a writer is told to fix first.
 
 **Measured** on `tests/fixtures/feature-length/assembled-feature.fountain`
-(231 scenes, 19,293 words, 899 issues, `contentHash` 6c27c8693c40…):
+(231 scenes, 17,436 words, 933 issues, `contentHash` 6c27c8693c40…):
 
 | | with spans | without spans |
 | --- | --- | --- |
-| root causes | 70 | 69 |
-| top finding's scenes | Scenes 2–12 | Scenes 2–4, 6–9 |
-| 3rd finding's scenes | Scenes 1–58 | Scene 1 |
+| root causes | 73 | 73 |
+| top finding's scenes | Scenes 12–26 | Scenes 13–17, 19 |
+| 3rd finding's scenes | Scenes 41–55 | Scenes 41–44, 46, 47 |
 
 Read the second row carefully: without the spans the top finding's scenes are
 **gappy**, not a shorter contiguous run, so the producer's document was naming a
 different SET of scenes rather than a narrower span of them.
+
+*(Re-measured 2026-09-12. The word count moved 19,293 → 17,436 and the issue
+count 899 → 933 because the score denominator became the screenplay's own
+printed words and this fixture's twenty stapled shorts each carry a CC0
+provenance boneyard; `contentHash` did not move, because it identifies the
+submitted bytes. The root-cause COUNT is now equal in both columns — it was
+70 against 69 — which is why the reversion probe in
+`tests/routes/root-cause-parity.test.ts` no longer leads with it. The count was
+always a proxy; the ranges are the defect, and they still differ on most
+findings.)*
 
 These six values are not maintained by hand. They are
 `SCENE_SPAN_DRIFT_MEASUREMENT` in `server/lib/root-cause-pipeline.ts`, and

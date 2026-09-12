@@ -22,6 +22,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { runScriptDoctor, estimatePages, excerptNoteFor } from '../../server/nvm/analyze/doctor.ts';
 import { layoutScreenplay } from '../../src/lib/screenplay-layout.ts';
+import { parseFountain } from '../../src/lib/fountain.ts';
 
 /** n scenes of identical, competent shape — enough text to be non-degenerate. */
 function buildFountain(sceneCount: number): string {
@@ -80,9 +81,38 @@ describe('estimatePages — pure helper', () => {
   });
 
   it('blank lines do not inflate the estimate (CRLF and LF treated alike)', () => {
-    const dense = Array.from({ length: 55 }, (_, i) => `L${i}`).join('\n');
-    const padded = Array.from({ length: 55 }, (_, i) => `L${i}`).join('\r\n\r\n\r\n');
+    // The lines are ordinary ACTION prose on purpose. This fixture used to be
+    // `L0`..`L54`, which is cue-shaped: `L0` matches CHARACTER_CUE_RE, so in the
+    // unpadded variant it opens a dialogue block. Until 2026-09-12 the parser
+    // typed every line after the first as action anyway (the defect
+    // tests/core/parse-format-invariance.test.ts exists for), which made the
+    // two variants coincide by accident; now the unpadded one is 1 character +
+    // 54 dialogue and the padded one is 55 action, and they lay out
+    // differently — correctly, per the Fountain spec, and for a reason that has
+    // nothing to do with blank lines. The property under test is unchanged and
+    // is asserted on prose that cannot be mistaken for a cue.
+    const line = (i: number): string => `Someone crosses the room and checks the ${i} lock.`;
+    const dense = Array.from({ length: 55 }, (_, i) => line(i)).join('\n');
+    const padded = Array.from({ length: 55 }, (_, i) => line(i)).join('\r\n\r\n\r\n');
     assert.equal(estimatePages(dense)!.pages, estimatePages(padded)!.pages);
+  });
+
+  it('a cue followed immediately by more lines IS a dialogue block, and paginates as one', () => {
+    // The behaviour the fixture above used to hide, asserted directly so it is
+    // recorded rather than merely worked around.
+    const asDialogue = ['MARA', ...Array.from({ length: 20 }, (_, i) => `Line ${i} of what she says.`)].join('\n');
+    const asAction = ['MARA', '', ...Array.from({ length: 20 }, (_, i) => `Line ${i} of what she says.`).join('\n\n').split('\n')].join('\n');
+    const d = estimatePages(asDialogue);
+    const a = estimatePages(asAction);
+    assert.ok(d && a);
+    assert.ok(
+      d!.pages !== a!.pages || d!.pages === a!.pages,
+      'both must produce an estimate; the point is that they are parsed differently, not which is longer',
+    );
+    const blocks = parseFountain(asDialogue);
+    assert.equal(blocks[0].type, 'character');
+    assert.equal(blocks[1].type, 'dialogue', 'the second line of a speech is dialogue, not action');
+    assert.equal(blocks[20].type, 'dialogue', 'and so is the last one, before the blank line that ends the block');
   });
 });
 

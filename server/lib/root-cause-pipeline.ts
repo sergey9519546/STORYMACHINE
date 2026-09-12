@@ -215,21 +215,29 @@ export function topRootCauses(
 export const SCENE_SPAN_DRIFT_MEASUREMENT = {
   fixture: 'tests/fixtures/feature-length/assembled-feature.fountain',
   sceneCount: 231,
-  wordCount: 19293,
-  issueCount: 899,
+  // 2026-09-12: wordCount 19293 -> 17436 and issueCount 899 -> 933, re-measured
+  // after the parse-and-format-invariance work made the score denominator the
+  // screenplay's own printed words (the fixture's 20 stapled shorts each carry
+  // a CC0 provenance boneyard). contentHash12 is UNCHANGED, which is the point:
+  // the hash identifies the submitted bytes, and those did not move.
+  wordCount: 17436,
+  issueCount: 933,
   /** First 12 hex of the report's contentHash — the whole point is that BOTH
    *  columns below come from this one hash. */
   contentHash12: '6c27c8693c40',
-  health: 84.4,
+  health: 74.4,
   verdict: 'CONSIDER',
   withSpans: {
-    rootCauses: 70,
-    topFindingScenes: 'Scenes 2–12',
-    thirdFindingScenes: 'Scenes 1–58',
+    rootCauses: 73,
+    topFindingScenes: 'Scenes 12–26',
+    thirdFindingScenes: 'Scenes 41–55',
   },
   withoutSpans: {
-    rootCauses: 69,
-    topFindingScenes: 'Scenes 2–4, 6–9',
-    thirdFindingScenes: 'Scene 1',
+    // The COUNT is now the same on this fixture; the RANGES are not, and they
+    // are the drift this table records. See the reversion probe in
+    // tests/routes/root-cause-parity.test.ts for why the count was a proxy.
+    rootCauses: 73,
+    topFindingScenes: 'Scenes 13–17, 19',
+    thirdFindingScenes: 'Scenes 41–44, 46, 47',
   },
 } as const;

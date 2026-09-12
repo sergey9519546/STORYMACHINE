@@ -1349,20 +1349,20 @@ describe('ROUND 3 oracle: guardVoiceWordCounts(name) >= pipeline dialogue-word c
     }
   });
 
-  it('single-spaced wrapped dialogue — only the FIRST line counts on both sides (parseFountain\'s own rule for non-double-spaced text), so the oracle holds without the guard over-joining', () => {
+  it('single-spaced wrapped dialogue — EVERY line up to the blank one counts on both sides (parseFountain\'s rule since 2026-09-12), so the oracle holds without the guard over-joining', () => {
     const P = 'line one has five words\nline two has five words\nline three has five words';
     let t = 'INT. ROOM - DAY\n\n';
     for (let occ = 0; occ < 800; occ++) t += `CHAR${occ % 200}\n${P}\n\n`;
     assertWordOracle('single-spaced wrapped 200x4', t);
-    // The guard must not join here — normalizeScreenplay returns single-
-    // spaced text UNCHANGED, so only "line one has five words" (5 words) is
-    // real dialogue; the guard reading more per occurrence would still
-    // satisfy `guardWords >= pipelineWords` (safe direction) but a huge
-    // over-read would be worth flagging as a design regression, not just a
-    // silent pass — assert it stays close to the true 5-word single line
-    // per occurrence (4 occurrences => ~20, generous upper bound 40).
+    // A Fountain dialogue element runs from its cue to the next blank line, so
+    // all three wrapped lines (15 words) are real dialogue for each of the 4
+    // occurrences = 60. This bound used to be 40, mirroring the parser bug in
+    // which only the first line was typed `dialogue`; it is re-derived here
+    // rather than widened, and it still catches the thing it was for — an
+    // UNBOUNDED over-join, which would read far past the blank line and defeat
+    // legitimate large-cast scripts.
     const g = guardVoiceWordCounts(t).get('CHAR0') ?? 0;
-    assert.ok(g <= 40, `expected the guard to read only the first wrapped line per occurrence here (~20 words for 4 occurrences), got ${g} — an unbounded over-join would defeat legitimate large-cast scripts`);
+    assert.ok(g <= 80, `expected the guard to read the three wrapped lines per occurrence here (15 words x 4 occurrences = 60), got ${g} — an unbounded over-join would defeat legitimate large-cast scripts`);
   });
 
   it('(V.O.)/(O.S.)/(CONT\'D) suffix variants pool into the SAME base name on both sides', () => {
@@ -2221,14 +2221,36 @@ describe('A3: boneyard-aware cue counting', () => {
     return p.join('\n');
   }
 
-  it('sanity: the boneyard-wrapped A1 payload still reflows to real character blocks (normalizeScreenplay has no boneyard awareness, and merges the `/*` marker onto the preceding dialogue line)', () => {
+  it('the boneyard-wrapped A1 payload no longer reflows to real character blocks — the strip runs BEFORE the reconstruction (2026-09-12)', () => {
+    // INVERTED, and the inversion is the fix. This test used to assert the
+    // gap in its own title: "normalizeScreenplay has no boneyard awareness,
+    // and merges the `/*` marker onto the preceding dialogue line", so 6,000
+    // cue occurrences inside a boneyard reflowed into thousands of REAL
+    // character blocks and the analyzer scored text the writer marked as a
+    // comment. The strip now runs on the raw lines, where parseFountain can
+    // still see `/*` at a line start, and only then does the double-spaced
+    // reconstruction run — see normalizeScreenplayUncached's own comment for
+    // why the ORDER is the whole fix and why the double-spaced DECISION is
+    // still taken on the raw text.
+    //
+    // The rejection below is UNCHANGED and still fires on the raw text's
+    // boneyard frequent-cue-line bound, which is the point: the payload is
+    // still rejected, and it is now also harmless if it ever reached the
+    // analyzer.
     const text = buildBoneyardWrappedA1(200, 6000);
     const normalized = normalizeScreenplay(text);
-    assert.notEqual(normalized, text, 'sanity: the payload must actually trigger the double-spaced reflow');
-    assert.ok(!normalized.split('\n').some((l) => l.trim() === '/*'), 'the `/*` marker must be merged onto the preceding line, not standing alone (that IS the mechanism this bypass exploits)');
+    assert.notEqual(normalized, text, 'sanity: the payload must still be transformed');
     const blocks = parseFountain(normalized);
     const characterBlocks = blocks.filter((b) => b.type === 'character').length;
-    assert.ok(characterBlocks > 5000, `expected the boneyard-wrapped payload to reflow to thousands of real character blocks, got ${characterBlocks}`);
+    assert.ok(
+      characterBlocks <= 1,
+      `expected the boneyard's 6,000 cue occurrences to be stripped before the reflow could see them, got `
+      + `${characterBlocks} character blocks. Only the ONE cue outside the boneyard (SETUP) may survive.`,
+    );
+    assert.ok(
+      !normalized.includes('THIS IS AN ALL CAPITALS SPEECH LINE'),
+      'boneyard content must not reach the analyzer at all',
+    );
   });
 
   it('the boneyard-wrapped A1 payload (distinct=200, occurrences=6,000) IS rejected via the boneyard frequent-cue-line bound', () => {
