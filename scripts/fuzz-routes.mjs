@@ -554,9 +554,12 @@ async function concurrencyAttack(base) {
   // not a session-lifecycle refusal. `SessionCapacityError`
   // (server/lib/session-store.ts, MAX_SESSIONS) is a real 503 source
   // elsewhere in this server, but it cannot fire in THIS case:
-  // gameLimiter (120/min/IP) admits only ~90 of the 200 requests past the
-  // per-IP ceiling before the window is spent, well under MAX_SESSIONS=100,
-  // so the session table never fills here. Both are deliberate, caught,
+  // POST /api/scriptide/doctor is stateless by design (server/routes/
+  // scriptide.ts, the comment above the route: no sessionId, no
+  // getOrCreateSession, nothing touches the session table), so MAX_SESSIONS
+  // cannot fire at ANY admission count — and the count is not the reason:
+  // gameLimiter admits ~119-120 of the 200 per window, of which the doctor
+  // pool serves ~90 and sheds the rest behind the budget. Both are deliberate, caught,
   // formatted responses — the doctor budget's own test coverage is
   // tests/core/doctor-analysis-budget.test.ts, session capacity's is
   // tests/core/session-eviction.test.ts — never an uncaught exception, which
