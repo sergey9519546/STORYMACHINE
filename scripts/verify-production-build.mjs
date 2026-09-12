@@ -2,27 +2,36 @@
 // verify-production-build.mjs — the ONE suite that boots the app the way a
 // self-hoster actually runs it and drives it end to end.
 //
-// THE GAP THIS CLOSES: every other browser suite in this repo (and every
-// route-level test) boots server/app.ts with NODE_ENV unset, so it always
-// takes the Vite-dev-middleware branch. The Dockerfile, docker-compose.yml,
-// and release.yml's published image all run the OTHER branch: `npm run
-// build` then the server serving the static `dist/` it produced, with
+// THE GAP THIS CLOSES: the route-level tests, and six of the eight browser
+// suites, boot server/app.ts with NODE_ENV unset, so they take the
+// Vite-dev-middleware branch. The Dockerfile, docker-compose.yml, and
+// release.yml's published image all run the OTHER branch: `npm run build`
+// then the server serving the static `dist/` it produced, with
 // NODE_ENV=production — different static serving, different Cache-Control,
 // different compression, and a Content-Security-Policy header that literally
 // does not exist in dev (see server/app.ts's own CSP comment). Nothing in
 // this repo had ever exercised that branch before this suite existed.
 //
-// WHAT THIS SPAWNS, AND WHY IT IS NOT bootKeylessServer(): every other
-// suite's boot (scripts/lib/browser-verify.mjs) runs `node
-// --experimental-strip-types server.ts` — a deliberate shortcut for THOSE
-// suites, which only care about dev-mode behavior. The Dockerfile's actual
+// (2026-09-12: smoke-p0-live-flow.mjs now also serves the built dist/ under
+// NODE_ENV=production — it is the gate that blocks `publish`, so it certifies
+// the published bundle's golden path. It does NOT overlap this suite: it
+// boots the same `node --experimental-strip-types server.ts` every gate uses
+// and asserts nothing about headers, compression, caching, the /assets/ 404
+// boundary, attacks or bundle size. The REAL DEPLOY COMMAND and the
+// production-only response shape are still proven here and only here.)
+//
+// WHAT THIS SPAWNS, AND WHY IT IS NOT bootKeylessServer(): that helper
+// (scripts/lib/browser-verify.mjs) runs `node --experimental-strip-types
+// server.ts` — a deliberate shortcut, in dev mode and in the built-dist mode
+// smoke-p0-live-flow.mjs uses, because neither is making a claim about the
+// deploy command itself. The Dockerfile's actual
 // CMD is `npx tsx server.ts`; this suite spawns the repo's own installed
 // node_modules/.bin/tsx directly (what `npx tsx` resolves to locally, with
 // no network hop) so it is proving the REAL deploy command, not a
 // same-semantics stand-in. bootKeylessServer is still used for the ONE
 // dev-mode instance this suite boots for comparison (section 6) — that half
-// deliberately wants the same dev-mode boot every other suite already
-// trusts.
+// deliberately wants the Vite-dev-middleware boot the six dev-mode suites
+// already trust, which is the point of a dev-vs-prod comparison.
 //
 // SCOPE (mirrors the task brief section by section):
 //   1. npm run build, then boot production exactly like the Dockerfile CMD.

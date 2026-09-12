@@ -426,31 +426,41 @@ function newestMtime(target) {
  *
  * Returns `{ built, reason, distMs, newestInput }`.
  */
-export function ensureBuiltDist({ repo, logPrefix = 'verify' } = {}) {
+/**
+ * Why `dist/` is (or is not) usable as a served artifact for THIS tree:
+ * `{ reason, newest, distMs }`, where a null `reason` means current. Exported
+ * separately from `ensureBuiltDist` so both directions are testable without
+ * spending a real `npm run build` — a staleness rule that has never been shown
+ * to fire is a staleness rule that certifies stale bytes.
+ */
+export function distStaleness({ repo } = {}) {
   const cwd = repo ?? process.cwd();
   const stamp = path.join(cwd, 'dist', 'index.html');
   const assets = path.join(cwd, 'dist', 'assets');
   const rel = (p) => path.relative(cwd, p) || p;
+  let newest = null;
+  for (const input of DIST_BUILD_INPUTS) {
+    const hit = newestMtime(path.join(cwd, input));
+    if (hit && (newest === null || hit.ms > newest.ms)) newest = hit;
+  }
+  if (!existsSync(stamp)) return { reason: 'dist/index.html does not exist', newest, distMs: null };
+  if (!existsSync(assets)) return { reason: 'dist/assets/ does not exist', newest, distMs: statSync(stamp).mtimeMs };
+  const distMs = statSync(stamp).mtimeMs;
+  if (newest && newest.ms > distMs) {
+    return {
+      reason: `dist/index.html is older than ${rel(newest.path)} `
+        + `(${new Date(distMs).toISOString()} < ${new Date(newest.ms).toISOString()})`,
+      newest,
+      distMs,
+    };
+  }
+  return { reason: null, newest, distMs };
+}
 
-  const staleness = () => {
-    let newest = null;
-    for (const input of DIST_BUILD_INPUTS) {
-      const hit = newestMtime(path.join(cwd, input));
-      if (hit && (newest === null || hit.ms > newest.ms)) newest = hit;
-    }
-    if (!existsSync(stamp)) return { reason: 'dist/index.html does not exist', newest, distMs: null };
-    if (!existsSync(assets)) return { reason: 'dist/assets/ does not exist', newest, distMs: statSync(stamp).mtimeMs };
-    const distMs = statSync(stamp).mtimeMs;
-    if (newest && newest.ms > distMs) {
-      return {
-        reason: `dist/index.html is older than ${rel(newest.path)} `
-          + `(${new Date(distMs).toISOString()} < ${new Date(newest.ms).toISOString()})`,
-        newest,
-        distMs,
-      };
-    }
-    return { reason: null, newest, distMs };
-  };
+export function ensureBuiltDist({ repo, logPrefix = 'verify' } = {}) {
+  const cwd = repo ?? process.cwd();
+  const rel = (p) => path.relative(cwd, p) || p;
+  const staleness = () => distStaleness({ repo: cwd });
 
   const before = staleness();
   if (!before.reason) {

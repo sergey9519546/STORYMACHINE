@@ -190,14 +190,18 @@ look:
   of `npm test` at all. `verify:a11y` is the systematic accessibility pass:
   an axe-core sweep of every primary surface in both themes, plus a fully
   keyboard-only run of the primary journey (land → paste → analyze → read a
-  finding → jump to it → export). `verify:production` is the odd one out:
-  every other suite boots with `NODE_ENV` unset, so they all exercise
-  `server/app.ts`'s Vite-dev-middleware branch — never the one the
-  Dockerfile, `docker-compose.yml`, and the published image actually run
-  (`npm run build` then serve `dist/` with `NODE_ENV=production`, its own
-  CSP, compression, and cache headers). It runs that build and boots the
-  Dockerfile's own `CMD` before driving the same writer journey against it,
-  plus a battery of production-only checks — see
+  finding → jump to it → export). Two of the eight boot
+  `NODE_ENV=production` and serve the built `dist/` — `verify:p0-flow` (the
+  golden-path smoke gate, since 2026-09-12: it is what blocks `publish` in
+  `release.yml`, so it certifies the bundle that gets published, and it builds
+  `dist/` itself when stale) and `verify:production`. The other six boot with
+  `NODE_ENV` unset and exercise `server/app.ts`'s Vite-dev-middleware branch
+  instead, which is what `npm run dev` gives a developer; every boot now prints
+  which of the two it is serving and fails if it came up as the other.
+  `verify:production` is still the one that proves the DEPLOY path end to end:
+  it runs `npm run build` and boots the Dockerfile's own `CMD` (`npx tsx`, its
+  own CSP, compression, and cache headers) before driving the same writer
+  journey against it, plus a battery of production-only checks — see
   `scripts/verify-production-build.mjs`'s header
   (`verify:production` alone measures ~25s, build included). Measured
   directly: **just over three minutes** wall clock with Chromium pre-cached,

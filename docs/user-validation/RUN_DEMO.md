@@ -86,6 +86,21 @@ expected verdict/health and **zero genuine console errors**. Run it before
 every live session; it takes a few seconds. (If Playwright's browser binaries
 aren't cached, run `npx playwright install chromium` once.)
 
+**One difference from your own hand-click, and it is deliberate.** Since
+2026-09-12 this check serves the **built `dist/`** under
+`NODE_ENV=production` — the same static bundle the published image serves —
+and it prints which front end it is serving on every run
+(`[smoke] serving: the BUILT dist/ …`). It builds `dist/` itself if it is
+missing or older than the source, so it stays a single command. The `npm run
+dev` server you stand up above is the **Vite dev-middleware** front end, so
+the two are not byte-identical: dev has HMR noise and no CSP, the built one
+has neither. That difference is why step 5's console rule names the HMR lines
+as acceptable for YOUR run and the smoke check tolerates none. If you want the
+moderator server to match the smoke check exactly, run `npm run build` and
+then `NODE_ENV=production npm start` instead of `npm run dev` — but the
+keyless sample flow is identical either way, and `npm run dev` remains the
+documented path.
+
 ## If something breaks
 
 - **Server won't boot:** most common cause is a stale/corrupted

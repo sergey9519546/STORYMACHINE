@@ -211,19 +211,24 @@ jobs:
   # own header for the full account, including one KNOWN, filed-not-fixed
   # issue it deliberately still asserts rather than hides.
   #
-  # verify-production-build is the odd one out among the eight: every OTHER
-  # suite boots with NODE_ENV unset, so all of them exercise server/app.ts's
-  # Vite-dev-middleware branch — never the branch the Dockerfile, compose
-  # file, and this repo's own published image actually run (`npm run build`
-  # then serve `dist/` with NODE_ENV=production: different static serving,
-  # Cache-Control, compression, and a CSP header that plain doesn't exist in
-  # dev). This suite runs `npm run build` itself and boots the SAME command
-  # the Dockerfile's CMD does, so the browser job now also proves the
-  # production path — not just dev — works end to end. See the suite's own
-  # header for what it found and fixed (2026-09-04): the static server had no
-  # response compression, no cache-header differentiation between hashed
-  # assets and index.html, and a miss under /assets/ silently 200'd the SPA
-  # shell instead of 404ing.
+  # WHICH FRONT END EACH SUITE DRIVES. server/app.ts serves either Vite dev
+  # middleware (NODE_ENV unset) or the built dist/ (NODE_ENV=production:
+  # different static serving, Cache-Control, compression, and a CSP header
+  # that plain doesn't exist in dev). Two of the eight take the production
+  # branch — smoke-p0-live-flow (since 2026-09-12; it is the gate that blocks
+  # `publish` in release.yml, so it certifies the bundle that gets published,
+  # and it builds dist/ itself when stale, which is why this job still needs
+  # no build step) and verify-production-build. The other six boot with
+  # NODE_ENV unset. Every boot reads the mode back off the wire and prints it,
+  # so a suite can no longer certify one app while its header describes the
+  # other.
+  #
+  # verify-production-build remains the one that proves the DEPLOY command:
+  # it runs `npm run build` itself and boots the SAME `npx tsx` CMD the
+  # Dockerfile does. See the suite's own header for what it found and fixed
+  # (2026-09-04): the static server had no response compression, no
+  # cache-header differentiation between hashed assets and index.html, and a
+  # miss under /assets/ silently 200'd the SPA shell instead of 404ing.
   #
   # These used to run on exactly ONE machine. Three of their own headers
   # asserted they "must not be wired into CI" because "CI has no browser
