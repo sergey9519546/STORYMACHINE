@@ -3153,4 +3153,46 @@ describe('ROUND 9: a forced cue `@` is a cue the guard must count', () => {
       new RegExp(`more than ${MAX_FOUNTAIN_FREQUENT_CUE_LINES} distinct all-caps character-cue-shaped lines that each occur more than ${FREQUENT_CUE_OCCURRENCE_THRESHOLD} times`),
     );
   });
+
+  // ── The other direction, as a PROPERTY rather than an argument ──────────
+  // The fourth disjunct is by far the widest of the four: ANY trimmed line
+  // starting with `@` and carrying a body. What keeps that from turning an
+  // ordinary draft into a rejected one is not the disjunct — it is the WALK,
+  // which only ever asks about a line in cue position. The suite asserted the
+  // weak half of that (a 30-speech forced-cue draft is accepted); this is the
+  // half that makes the widening defensible, and it is the shape a writer who
+  // quotes handles actually produces (round-2 review, non-blocking 2).
+  it('a document whose every DIALOGUE line opens with `@handle` counts its cues and nothing else', () => {
+    const SCENES = 60;
+    const SPEECHES_PER_SCENE = 20;
+    const CUES = SCENES * SPEECHES_PER_SCENE;   // 1,200 cues AND 1,200 handle lines
+    const parts: string[] = [];
+    for (let sc = 0; sc < SCENES; sc++) {
+      parts.push(`INT. ROOM ${sc} - DAY`, '');
+      for (let k = 0; k < SPEECHES_PER_SCENE; k++) {
+        parts.push(`SPEAKER${k % 8}`, `@handle${k} said it would come to this, and here we are.`, '');
+      }
+    }
+    const text = parts.join('\n');
+
+    // The load-bearing number. If the disjunct counted every `@` line rather
+    // than every `@` line IN CUE POSITION, this would read 2,400 — the 1,200
+    // real cues plus the 1,200 handles — and the widening would be charging
+    // ordinary drafts for a bypass they are not.
+    assert.equal(
+      guardCueOccurrences(text), CUES,
+      `the walk must count the ${CUES} cues and NOT the ${CUES} dialogue lines that merely start with "@". `
+      + 'A count of 2,400 means the fourth disjunct is being asked about lines that are not in cue position, '
+      + 'which is what would make the widening cost something.',
+    );
+    // And the same number the base's walk read: this document's guard count is
+    // not changed by teaching the guard the marker at all.
+    assert.equal(guardCueOccurrences(text.replace(/^@/gm, '')), CUES,
+      'stripping the handles must not change the count either — the marker is not what is being counted');
+    assert.equal(
+      fountainShapeRejectionReason(text), null,
+      'a 60-scene draft whose dialogue quotes handles must be ACCEPTED. If this fails, the widened guard is '
+      + 'turning away ordinary writing, which is the one cost the fourth disjunct could have had.',
+    );
+  });
 });
