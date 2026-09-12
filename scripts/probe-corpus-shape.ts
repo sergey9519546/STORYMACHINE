@@ -73,6 +73,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runScriptDoctor } from '../server/nvm/analyze/doctor.ts';
 import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
+import { parseFountain, FORCED_CUE_MARKER } from '../src/lib/fountain.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -105,6 +106,36 @@ interface Row {
   critical: number;
   major: number;
   minor: number;
+  /** Cue lines the writer FORCED with Fountain's `@` — see countForcedCues. */
+  forcedCues: number;
+}
+
+/** How many of this document's character cues are forced with `@`.
+ *
+ *  Round 3 taught the parser Fountain's forced cue, and this column is how the
+ *  owner sees which of the 761 drafts that change can possibly have touched:
+ *  before it, `@MARY` was action prose and so was every line of her speech;
+ *  after it, she is a speaker with dialogue. A script whose count is 0 cannot
+ *  have moved because of that change — and a corpus of all-zero counts settles
+ *  the question for the whole corpus in one column.
+ *
+ *  It counts BLOCKS the parser typed as a cue, not lines matching `/^@/`, so an
+ *  `@` opening an action line or sitting inside a speech (a handle, an address)
+ *  is not counted — those are exactly the lines the change deliberately leaves
+ *  alone, and a regex would have reported them as affected.
+ *
+ *  COST: one extra `parseFountain` per script. Against the two full analyses
+ *  each row already pays (`runScriptDoctor` + `analyzeFountainText`) it is
+ *  inside the run-to-run noise — `npm run probe-corpus-shape -- --public`,
+ *  three consecutive runs each way on one machine: 2162 / 2157 / 2235 ms with
+ *  the column, 2191 / 2146 / 2122 ms with the call replaced by a constant. */
+function countForcedCues(text: string): number {
+  let n = 0;
+  for (const b of parseFountain(text)) {
+    if (b.type !== 'character' && b.type !== 'dual_dialogue') continue;
+    if (b.text.trim().startsWith(FORCED_CUE_MARKER)) n++;
+  }
+  return n;
 }
 
 function walk(dir: string): string[] {
@@ -185,6 +216,7 @@ for (const full of files) {
     critical: report.bySeverity.critical,
     major: report.bySeverity.major,
     minor: report.bySeverity.minor,
+    forcedCues: countForcedCues(text),
   });
 }
 
@@ -201,13 +233,13 @@ const REPORTED = rows.filter((r) => r.submitted !== undefined);
 const UNREPORTED = rows.length - REPORTED.length;
 
 if (CSV) {
-  console.log('file,isDoubleSpaced,submittedWordCount,wordCount,notScreenplayWords,notScreenplayPct,health,verdict,sceneCount,critical,major,minor');
+  console.log('file,isDoubleSpaced,submittedWordCount,wordCount,notScreenplayWords,notScreenplayPct,health,verdict,sceneCount,critical,major,minor,forcedCueLines');
   for (const r of rows) {
     const g = gapOf(r);
     console.log([
       JSON.stringify(r.file), r.doubleSpaced ?? '', r.submitted ?? '', r.words,
       g ? g.gap : '', g ? g.share.toFixed(2) : '',
-      r.health, r.verdict, r.scenes, r.critical, r.major, r.minor,
+      r.health, r.verdict, r.scenes, r.critical, r.major, r.minor, r.forcedCues,
     ].join(','));
   }
   process.exit(0);
@@ -220,7 +252,7 @@ console.log(`Corpus: ${label}`);
 console.log(`Scripts read: ${rows.length}${skippedShort ? ` (${skippedShort} skipped: under ${MIN_LINES} lines)` : ''}`);
 console.log('Nothing was written to disk and no screenplay text is printed.\n');
 
-const head = `${'script'.padEnd(38)} ${'2x'.padEnd(3)} ${'submitted'.padStart(9)} ${'words'.padStart(7)} ${'gap'.padStart(7)} ${'gap%'.padStart(6)} ${'health'.padStart(6)} ${'verdict'.padEnd(10)} ${'sc'.padStart(4)} ${'c/m/n'.padStart(12)}`;
+const head = `${'script'.padEnd(38)} ${'2x'.padEnd(3)} ${'submitted'.padStart(9)} ${'words'.padStart(7)} ${'gap'.padStart(7)} ${'gap%'.padStart(6)} ${'health'.padStart(6)} ${'verdict'.padEnd(10)} ${'sc'.padStart(4)} ${'c/m/n'.padStart(12)} ${'@cue'.padStart(5)}`;
 console.log(head);
 console.log('-'.repeat(head.length));
 for (const r of rows) {
@@ -231,7 +263,8 @@ for (const r of rows) {
     + `${(r.submitted === undefined ? '—' : String(r.submitted)).padStart(9)} ${String(r.words).padStart(7)} `
     + `${(g ? String(g.gap) : '—').padStart(7)} `
     + `${(g ? pct(g.gap, r.submitted!) : '—').padStart(6)} ${r.health.toFixed(1).padStart(6)} ${r.verdict.padEnd(10)} `
-    + `${String(r.scenes).padStart(4)} ${`${r.critical}/${r.major}/${r.minor}`.padStart(12)}`,
+    + `${String(r.scenes).padStart(4)} ${`${r.critical}/${r.major}/${r.minor}`.padStart(12)} `
+    + `${String(r.forcedCues).padStart(5)}`,
   );
 }
 
@@ -261,6 +294,10 @@ for (const [name, group] of [
   console.log(`  scenes                     mean ${mean(group.map((r) => r.scenes)).toFixed(1)}, range ${Math.min(...group.map((r) => r.scenes))}–${Math.max(...group.map((r) => r.scenes))}`);
   console.log(`  issues per script          critical ${mean(group.map((r) => r.critical)).toFixed(1)}, major ${mean(group.map((r) => r.major)).toFixed(1)}, minor ${mean(group.map((r) => r.minor)).toFixed(1)}`);
   console.log(`  verdicts                   ${[...verdicts].map(([v, n]) => `${v} ${n}`).join(', ')}`);
+  const forced = group.filter((r) => r.forcedCues > 0);
+  console.log(`  scripts with a forced cue  ${forced.length} of ${group.length}`
+    + (forced.length === 0 ? '  (so round 3\'s `@` change cannot have moved one of them)'
+      : `, ${group.reduce((a, r) => a + r.forcedCues, 0)} cue lines in total, max ${Math.max(...group.map((r) => r.forcedCues))} in one script`));
 }
 
 console.log(`
@@ -276,6 +313,11 @@ console.log(`
     and cue-extension fold (either row, wherever a draft carries a forced
     marker or a non-canonical extension — the 32 committed scripts carry
     neither, which is why no benchmark could catch them).
+  * The @cue column is which scripts round 3's forced-cue change can have
+    touched, and it is the whole answer for that change: \`@NAME\` used to be
+    action prose and its speech with it, so a 0 there means that script's
+    health, characters and dialogue counts cannot have moved because of it.
+    A non-zero count is where to look first if anything did move.
   * sceneCount CANNOT move because of the marker strip: it removes a marker
     only when the whole document re-parses to the same block types. A scene
     count that changed against a pre-branch run is evidence of something else

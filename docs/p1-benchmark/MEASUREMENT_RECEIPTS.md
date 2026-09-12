@@ -2591,8 +2591,42 @@ the measurement doc it names)*
 | 6 | report truth at the scoring seam | Every dimension summary states its count (231-scene fixture: "a handful of minor notes" over **342 issues** → "169 minor note(s) … the score is density-normalised"). Priority ranking weights concentration: on the one-bad-scene fixture the defect went from **absent from all ten slots** to slots 4-7, with criticals still leading and no rule owning more than 2 slots. Line numbering restored — the strippers BLANK rather than delete, so a location is a line of the writer's file. Public benchmark **unchanged**; output identity PASS modulo 8 named keys. | `docs/scoring/REPORT_SEAM_2026-09-12.md` |
 | 7 | the voice pair grid's WORK is bounded | `MAX_VOICE_SCORED_SPEAKERS = 40`. The grid goes flat: at cast 223 it is **24,753 pairs / 189.7 ms → 780 pairs / 9.3 ms**, at cast 500 **124,750 / 945.6 ms → 780 / 11.8 ms**. End to end on the sibling review's shape, cast 223 **300 → 139 ms** and cast 1200 **7,130 → 1,543 ms**. A 20/30/40/60-character ensemble feature is ACCEPTED and voice-scored (on `main`, cast 20 and above are REJECTED outright). Public benchmark unchanged; health unchanged on all 45 fixtures. **No constant in `server/lib/validation.ts` was changed** — see row note below. | `docs/scoring/VOICE_PAIR_CAP_2026-09-12.md` |
 | 8 | what the full suite found: the guard's mirror, the normaliser's order, and four assertions that pinned the old bug | The legacy shape-guard walk under-counted a single-spaced wrapped speech (**guardWords 20 vs pipelineWords 60**) — the `guardWords >= pipelineWords` oracle was FALSE, which is the unsafe direction. Fixed by mirroring the new dialogue-block rule. `stripNonPrinting` now runs BEFORE the double-spaced reconstruction, so a boneyard holding **6,000 cue occurrences** no longer reflows into thousands of real character blocks. `normalizeScreenplay` and `stripTitlePage` gain a one-entry memo: the A1 payload's guard path **102 ms → 63 ms**. All 45 reports byte-identical. | this entry, and the commit message |
-| 9 | *(round 2)* the forced-element markers stop being scored as prose | Fountain's markers are never printed; `parseFountain` left them in the block's text. Applied where they are REDUNDANT (declaring the element the line already is, so not one printed character changes), measured on the 32 public scripts at `85273742`: forced-action `!` **32 of 32 moved, mean +1.056, largest +7.0, one verdict PROMOTED PASS → CONSIDER**; forced-heading `.` **32 of 32, mean +0.659**; forced-transition `>` **5 of 6 applicable, mean −4.080, largest −15.7**. After: **0 of 32** on all three. The forced cue `@` is NOT fixed and is pinned as a known gap at **32 of 32, largest −26.8** — it needs parser and renderer work. 45 of 45 output-identity fixtures byte-identical; benchmark unchanged; no floor touched. | `docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md` §3 |
+| 9 | *(round 2)* the forced-element markers stop being scored as prose | Fountain's markers are never printed; `parseFountain` left them in the block's text. Applied where they are REDUNDANT (declaring the element the line already is, so not one printed character changes), measured on the 32 public scripts at `85273742`: forced-action `!` **32 of 32 moved, mean +1.056, largest +7.0, one verdict PROMOTED PASS → CONSIDER**; forced-heading `.` **32 of 32, mean +0.659**; forced-transition `>` **5 of 6 applicable, mean −4.080, largest −15.7**. After: **0 of 32** on all three. The forced cue `@` was NOT fixed in this row and was pinned as a known gap at **32 of 32, largest −26.8** — it needed parser and renderer work; row 11 is that work. 45 of 45 output-identity fixtures byte-identical; benchmark unchanged; no floor touched. | `docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md` §3 |
 | 10 | *(round 2)* one spelling of a cue extension is one speaker | `CHARACTER_CUE_RE` admitted only canonical spellings, so `MARY (V.O)` was not a cue and her speech was action prose: **12 of 14 applicable scripts moved** at `85273742` when every extension was respelled without its periods (`(V.O.)` → `(V.O)` alone: **8 of 8**). After: **0 of 14**. The extension set is now written down once and admits `(O.C.)`, which all five previous copies of it omitted. 45 of 45 byte-identical; benchmark unchanged; no floor touched. | `docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md` §3 |
+| 11 | *(round 3)* Fountain's forced character cue `@` is a cue everywhere | The marker row 9 pinned, closed on both sides. `parseFountain` types `@NAME` as a cue and the lines below it as dialogue; `renderableText` — one definition replacing three byte-identical copies in `screenplay-layout.ts`, `fdx.ts` and `docx.ts` — strips it for every exporter; `fdxToFountain` forces it back on for a Final Draft name that is not cue-shaped. Redundant `@` on every cue of the 32 committed scripts: **32 of 32 moved, mean −1.172, largest −26.8 on room-12 → 0 of 32, mean 0.000**. On a fixture carrying forced cues, each of the four renderers printed the marker on **4 of 4** cue lines → **0 of 4**, and the FDX/DOCX element went Action → Character with the speech as Dialogue. 45 of 45 output-identity fixtures byte-identical; `npm run benchmark:public` unchanged to the digit (0.8438 / 0.7896 · 0.5938 / 0.5234 · 1.0000 / 0.9814); no floor touched, `--lock` not run. | `docs/audits/2026-09-12-adversarial/forcedcue-lane-report.md` |
+
+**WHAT THE OWNER COMPARES FOR ROW 11, AND IT IS ONE COLUMN.** The forced cue
+is the one change on this branch whose reach can be answered by counting,
+because the engine's behaviour before it was total: `@MARY` was action prose
+and so was every line of her speech, so a draft with no forced cue cannot have
+moved and a draft with one almost certainly did. `npm run probe-corpus-shape`
+gained a **`@cue`** column (and `forcedCueLines` in `--csv`) that counts the
+cue BLOCKS the parser typed from the marker — not lines matching `/^@/`, so an
+`@` opening an action line or sitting inside a speech is correctly not counted,
+those being the lines this change deliberately leaves alone. Run it on this
+branch and on a pre-branch checkout:
+
+```
+REAL_SCRIPT_CORPUS_DIR=/path/to/corpus npm run probe-corpus-shape -- --csv > after.csv
+```
+
+Read the `@cue` column FIRST. If every row is 0, this change moved nothing on
+the corpus and nothing else about it needs checking — the summary block says so
+in words. If any row is non-zero, those are the scripts to compare, in the
+order the rest of this entry already gives: submitted-vs-analyzed word count,
+then per-script health / verdict / sceneCount / severity mix, then the 72-row
+manifest. On the 32 committed scripts the count is **0 of 32**, which is why no
+benchmark in this repository could have caught the defect and why the public
+benchmark is unchanged to the digit. No AUC-24 number is stated, implied or
+projected for this row, here or anywhere else.
+
+Two costs of the change, stated rather than left to be found. Character counts
+can RISE on a draft that forces its cues, because a forced cue is a speaker
+where it used to be a line of action — that is the fix, and it moves
+`characters`, `dialogueLineCount` and everything downstream of them. And
+`fdxToFountain` now emits `@` for a Final Draft Character name that is not
+cue-shaped, so an imported document can gain characters the same way; names
+that were already cue-shaped import byte-identically.
 
 **WHAT THE OWNER'S AUC-24 RUN CAN AND CANNOT SETTLE (commit 2).** The three
 parse fixes are byte-identical on every committed fixture, so AUC-24 **cannot**
