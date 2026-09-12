@@ -320,3 +320,159 @@ demonstrable here: every in-repo caller (both export routes,
 passes `buildLogline`'s own output, and the gate fires on none of the 20 CC0
 scripts in `data/screenplays/` (checked directly). Worth a line in the
 module's header rather than a code change.
+
+## Round 2
+
+Reviewed object: `511688b8` (three round-2 commits — `a622cc3f`, `01260b05`,
+`511688b8` — on the round-1 tip `4328a6eb`; branch
+`lane/verify-covers-tier`, on origin). Same reviewer. Worked from
+`git archive 511688b8 | tar -x` under `<session scratch>/verify-review/r2`
+(and a second clean copy `r2m` for mutations), beside the round-1 exports.
+`/home/user/wt-verify` untouched; nothing pushed; the only change to
+`/home/user/STORYMACHINE` is this file.
+
+**Every round-1 forgery file was replayed byte-for-byte on the round-2 tip**
+(20 files from `<session scratch>/verify-review/f-tip/`), not rebuilt — the
+same bytes I proved verified at exit 0 in round 1.
+
+### The eight items, in the failure direction
+
+| # | item | reproduction on `511688b8` | verdict |
+|---|---|---|---|
+| 1 | `TIER_CLAIM_LABELS` derived from a `tier:` column, equality asserted both ways | `U-letter-drop-pageest-rows-forge-length.md` and `U-html-drop-pageest-forge-length.html` → **exit 1**, `the verify block is missing 2 claims the reader summary page states: Estimated pages, Estimated runtime (minutes)` | **closed** |
+| 2 | the four conditional claims required when the page states them | `U-letter-drop-percentile-row-forge-body.md` → **exit 1**, `missing claim: Health percentile reading`. Bounds-removal half: `TAMPER` case → `the summary page states no reference bounds — every genuine reader summary page states them exactly once, so that statement has been removed` | **closed** |
+| 3 | gate on structure, two independent conditions; region multi-anchored | `U-letter-rename-tier-heading.md` → **exit 1**, all nine named; `U-html-rename-tier-class.html` → **exit 1**; the round-1 "tier cut out" tamper → **exit 1**, `the page still shows: the verify block’s scope sentence, a reader-summary section class, the reader-summary stylesheet rules, the page-break rule…` | **closed at the mechanism; its stated LIMIT is still false — see below** |
+| 4 | three logline states, each verifiable | `U-letter-block-logline-unknown-body.md` (round 1: exit 0) → **exit 1**, `the logline line says loglineState = not stated (the page says it was rendered without the script text), but this report's verify block says loglineState = derived`. `derived` and `not derived` both verified on genuine artifacts (the latter on a synthetic 10-scene draft whose dialogue-share gate fires) | **closed** |
+| 5 | the three missing round trips, each failing on its own | `parseHealthLine` pattern disabled → `artifact-claims.test.ts` **99/5**; `parseLetterTierVerdictLine` pattern disabled → **101/3**; `verdictFromWord` forced to `null` → **100/4** (baseline 104/0). Each kills independently, in that file alone | **closed** |
+| 6 | the four corrected sentences true | see finding 1 below | **NOT closed** |
+| 7 | `buildHeadline` through `formatLengthLine`, byte-identical, headline asserted | `buildHeadline(report, claims)` returns `` `Health …/100 (Grade) · ${formatLengthLine(claims)}` ``; a live keyless export of the r2 tree is **byte-identical** to the round-1 export for `letter.md`, `letter.txt` and `cov.html` (timestamps masked); no golden appears in `git diff 4328a6eb..511688b8`; `grep -c "letter headline" tests/scripts/verify-report.test.ts` = 3 | **closed** |
+| 8 | numbers re-derived | 353 links and the moving markdown count are corrected; two new figures are off — see finding 2 | **mostly closed** |
+
+Back-compatibility and no-false-fire, all independently constructed:
+
+| case | result |
+|---|---|
+| `tests/fixtures/verify-report/pre-tier-{coverage.html,letter.md}` against `MULTI_SCENE_FOUNTAIN` (extracted from the test) | **exit 0** both; all ten tier fields named `not claimed`. Independently confirmed genuinely pre-tier: 0 hits for `reader-tier`/`READER SUMMARY`/`Reader summary`, 0 for the scope sentence, 0 for `tier-label`/`tier-page`/`break-after: page` |
+| the round-1 "tier cut out of today's HTML" tamper | **exit 1** — correctly no longer offered as back-compat evidence |
+| 12 genuine artifacts (6 CC0 scripts × HTML + letter) from a live keyless r2 server | **exit 0**, 12 of 12 |
+| a genuinely **in-band** draft (10 scenes, 325 words) — percentile band `top 60%`, the reference bounds on their **own line** rather than in the not-comparable parenthetical, logline state `not derived` | **exit 0** both shapes; `percentileReading`, `referenceBounds` and `loglineState` each report `yes`. The new bounds refusal does not false-fire on the rendering it was written against |
+| genuine CRLF / BOM / CRLF+BOM copies (letter and HTML) | **exit 0**, 5 of 5 |
+
+Gates, re-derived on a clean `git archive` of `511688b8`:
+
+```
+node scripts/check-scoring-receipt.mjs 537c1aa3..511688b8 → no scoring-path files changed. OK. (0)
+GIT_SHA=identity-baseline … --compare → OUTPUT IDENTITY: PASS — all 45 reports byte-identical (0)
+tests/scripts/verify-report.test.ts      → 153 pass / 0 fail
+tests/core/artifact-claims.test.ts       → 104 pass / 0 fail
+tests/routes/export-verify.test.ts       →  58 / 0      tests/core/reader-tier.test.ts    → 22 / 0
+tests/core/coverage-html.test.ts         →  54 / 0      tests/core/coverage-letter.test.ts→ 47 / 0
+tests/core/percentile-comparability.test → 23 / 0      tests/core/p0-sample-drift.test.ts→  4 / 0
+tests/core/page-refs.test.ts             →  12 / 0      tests/core/public-benchmark.test  → 28 / 0
+PW_CHROMIUM_PATH=… npm run verify:surfaces → 215/215 assertions passed (0)
+check-docs / honesty-audit / check-brain / check-no-console → all exit 0
+```
+
+`verify:surfaces` carries the two new `#verify` assertions and both pass — the
+scope sentence and `npm run verify-report` are visible to a driven browser, so
+round 1's left-undone item 5 is closed. Both trailers on all three round-2
+commits; no model identifier in the round-2 diff.
+
+### VERDICT: REVISE — one item, and it needs no code change
+
+Items 1, 2, 4, 5 and 7 are closed under replay of my own round-1 attacks, and
+item 3's mechanism is a large, real improvement: the one-character bypass that
+re-enabled every forgery is gone, partial deletion is refused whatever the
+markup says, and the region no longer unanchors. I accept the mechanism and the
+`R2.3` removal residue as stated. The one thing I cannot sign off is the
+sentence the round shipped to describe that mechanism's limit.
+
+1. **The corrected honest-limit sentence is still false, in the same four
+   places, and I have the counterexample.** README.md:160, ARCHITECTURE.md §4,
+   `docs/brain/Surfaces/Surface - Exports.md` and `docs/CLAIMS_REGISTER.md`
+   row 97 all now say some form of:
+
+   > a forger who strips every signal leaves a document that **no longer
+   > renders a summary page in any recognisable form**, and it is then the
+   > pre-2026-09-11 report it resembles
+
+   The first half ("N independent edits, not an unforgeable property") is true
+   and well put. The second half is not. Stripping every signal costs the
+   forger nothing a reader can see, because every signal is a *machine-readable
+   label*, not the page itself.
+
+   Reproduction — **14 mechanical edits**, five of them single find/replace
+   passes, on a genuine coverage HTML from the live keyless r2 server:
+
+   ```
+   # 1  class="(reader-tier|tier-*)"  ->  class="rs-*"        (23 sites, one pass)
+   # 2  .(reader-tier|tier-*){ , :    ->  .rs-*               (17 sites, one pass)
+   # 3  break-after: page             ->  page-break-after: always
+   # 4  the tier caption reworded
+   # 5  the verify block's scope sentence replaced
+   # 6-14  the nine tier claim rows deleted
+   # then: Length -> 9,999 scenes · 999,999 words · ~500 pages / ~500 min (est.)
+   #       tier-page -> p. 999 ; heading -> The 9 things to fix first
+   #       percentile -> Health percentile: top 5%
+   node --experimental-strip-types scripts/verify-report.mjs \
+     <session scratch>/verify-review/f-r2/MIN-html-14edits.html \
+     data/screenplays/chain-of-custody.fountain
+     → VERIFIED — authentic and reproducible under this engine.        exit 0
+   ```
+
+   Because edits 1 and 2 rename the markup classes **and** the stylesheet
+   selectors together, **zero classes are left unstyled** (checked: every
+   `rs-*` class in the file has a matching rule). The page renders exactly as
+   the genuine one does, and what it renders is:
+
+   > *A summary for a reader deciding whether to read the script.* NELL is the
+   > most-present speaker across 13 scenes. **Length** 9,999 scenes · 999,999
+   > words · ~500 pages / ~500 min (est.) **Verdict** CONSIDER · Health 76.3 /
+   > 100 **Health percentile: top 5%** — **The 9 things to fix first** …
+
+   That is a recognisable summary page by any standard a producer would use,
+   with an inflating forgery on it (`top 5%`), and the command the page tells
+   them to run says VERIFIED. The letter is the same story in **17 edits**
+   (`f-r2/MIN-letter-final.md`) — relabel `**Logline.** → **Premise.**`,
+   `**Length.** → **Size.**`, `**Verdict.** → **Rating.**`, unspace the health
+   reading, reword the caption, rename the heading, delete the scope sentence,
+   delete the block's own `Verdict:` row (itself a signal), delete the nine
+   rows.
+
+   This is not the `R2.3` residue: `R2.3` covers a forger who **removes** a
+   claim's rendering and states nothing false. Here the page states four things
+   that are false, one of them flattering, and nothing warns the reader.
+
+   No code change is needed — the mechanism is what it is, and "N independent
+   edits" is the right frame. What is needed is that the second half stop
+   describing a cost the forger does not pay. Suggested replacement for all
+   four sites:
+
+   > …N independent edits rather than one, not an unforgeable property. Every
+   > one of those signals is a machine-readable label — a class name, a
+   > heading's wording, a stylesheet selector, the scope sentence — so a forger
+   > who renames all of them keeps a page that still reads as a reader summary
+   > to a human while this tool treats it as the pre-2026-09-11 report it now
+   > resembles. Measured on 2026-09-12: 14 mechanical edits to an exported
+   > coverage HTML, 17 to a letter.
+
+   Naming the measured number is better than "N", and it is the number this
+   review produced; if the lane measures a smaller set, use theirs.
+
+2. **Two more figures in the round-2 gate table do not reproduce** — the item
+   the round was supposed to close. On a clean `git archive` of `511688b8`:
+   `check-no-console` reports **23** tsconfig quarantine entries (the table
+   says 24), and `honesty-audit` reports **450** tracked markdown files (the
+   table says 461). The 461 is the count in a worktree carrying uncommitted
+   audit files, not in the committed tree — which is the same "quoted a moving
+   number as a fixed result" the round's own closing paragraph warns about, one
+   line after quoting it. Both gates exit 0; drop the two counts or mark them
+   worktree-local.
+
+Neither item touches the engine, the claim set, the gate or any test. Item 1 is
+four sentences; item 2 is two numbers. Re-check will be a handful of greps.
+
+*(One note for the record, not a finding: `tests/scripts/verify-report.test.ts`
+first measured 152/1 for me. The failure was my own contamination — two
+scratch `.mjs` helpers I had copied into the export tree — and the suite is
+153/0 on a clean archive, as the lane reports.)*
