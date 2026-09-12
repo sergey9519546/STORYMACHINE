@@ -417,7 +417,11 @@ The comparison to make, split by whether `isDoubleSpaced` fires and BEFORE
 reading AUC-24, is in the receipt: submitted-vs-analyzed word count, then
 per-script health / verdict / sceneCount / severity mix, then the 72-row
 manifest. A rank statistic that does not move is not evidence that these two
-did nothing.
+did nothing. **Steps one and two are one command as of round 3** —
+`REAL_SCRIPT_CORPUS_DIR="<corpus>" npm run probe-corpus-shape` (add `-- --csv`
+to diff two runs) — because until then `submittedWordCount` was read by nothing
+and the double-spaced decision was module-private, so the instruction could not
+be carried out.
 
 **Cannot settle** whether the correction is right. Whether a boneyard is a
 comment is answered by the Fountain specification, not by a statistic. If AUC-24
@@ -438,7 +442,7 @@ purpose — the instrument for it is the P1 benchmark).
 | gate | result |
 |---|---|
 | `npm run lint` | **0** |
-| `check-no-console` | OK — 304 files, 23 quarantine entries |
+| `check-no-console` | OK — 304 files, **24** quarantine entries *(corrected in round 3: `tsconfig.json`'s `exclude` array is 24 entries and the gate prints how many it applied; it is 24 on every tree in this batch and byte-unchanged since `1e8241f5`, so 23 was a transcription error, not a widened exemption)* |
 | `npm run check-docs` | clean |
 | `npm run honesty-audit` | clean — 458 files, **474** markdown files, 93 claims rows *(round 2; round 1 recorded 470 and the reviewer measured 472 — the count drifts with every markdown file the batch adds, and this branch added two by bringing this report and its review onto it)* |
 | `npm run check-brain` | fresh — 104 notes, 386 links |
@@ -750,7 +754,7 @@ rather than relax it.
 | gate | result |
 |---|---|
 | `npm run lint` | **EXIT=0** |
-| `npm run check-no-console` | OK — 304 files, 23 quarantine entries |
+| `npm run check-no-console` | OK — 304 files, **24** quarantine entries *(corrected in round 3; see §7)* |
 | `npm run check-server-reachability` | OK |
 | `npm run build` | **EXIT=0**, 2.48 s |
 | `npm run check-docs` | clean |
@@ -823,3 +827,239 @@ construct a document where a marker is removed and a block boundary moves. The
 second is **`normalizeCueExtensions`'s line gate**: it rewrites only a line that
 is a cue name followed by nothing but recognised extension tails, and the
 failure mode to hunt for is a line of prose or a wryly-directed cue it eats.
+
+---
+
+## Round 3
+
+**Brief:** four of the round-2 review's non-blocking items, built before the
+owner runs — items 1, 2, 4 and 5 of
+`docs/audits/2026-09-12-adversarial/scoring-review.md` lines 537–875 (verdict
+**READY-FOR-OWNER**). Items 3 and 6 stay as written. **Worktree**
+`/home/user/wt-scoring`, branch `scoring/adversarial-2026-09-12`, pushed after
+every commit. **Round-2 tip** `b798a0c4`; **round-3 tip** `06843c39` plus the
+commit carrying this section. Still scoring-path work, still never merged here.
+
+| # | commit | item | what it does |
+|---|---|---|---|
+| 16 | `43081743` | **1** | `submittedWordCount` and `isDoubleSpaced` are reported; `isDoubleSpacedText` exported; `npm run probe-corpus-shape` makes the receipt's steps 1 and 2 one command |
+| 17 | `51a19352` | **2** | the receipt's "WHAT TO COMPARE" names rows 9 and 10 as corpus-visible, and says what they cannot move |
+| 18 | `08579b4c` | **4** | the one line the extension fold DOES change the class of, in both "will not eat" paragraphs, asserted |
+| 19 | `06843c39` | **5** | 23 quarantine entries reads 24, counted from `tsconfig.json` |
+| 20 | *this commit* | — | this section |
+
+### R3.1 Item 1 — the owner's first instruction was not runnable
+
+The receipt told the owner to compare `submittedWordCount` against `wordCount`
+per script, split by `isDoubleSpaced`, before reading any rank statistic.
+Neither number could be obtained. Demonstrated on a `git archive b798a0c4`
+export and on this tree:
+
+```
+b798a0c4: submittedWordCount = undefined | isDoubleSpaced = undefined | wordCount = 338
+b798a0c4: isDoubleSpacedText exported? undefined
+round 3 : submittedWordCount = 427 | isDoubleSpaced = false | wordCount = 338
+round 3 : isDoubleSpacedText exported? function
+```
+
+`427 → 338` on `room-12` is the figure the round-1 review counted by hand, now
+produced by the analyzer rather than by a reviewer's probe.
+
+**Three parts, and the second is the one that matters most.**
+
+1. `FountainAnalysis` gains `submittedWordCount` and `isDoubleSpaced`.
+   Diagnostic only; nothing scores from them. They are deliberately **not** on
+   `ScriptDoctorReport`, which is why the 45 committed output-identity fixtures
+   are byte-identical rather than "identical except for an added field" — the
+   brief's better outcome, taken.
+2. `isDoubleSpacedText(raw)` is exported and `normalizeScreenplayUncached` now
+   **calls it**, with the line prep both share factored into `rawLines`. The
+   decision the analyzer reports and the decision the normalizer takes are one
+   piece of code. A second copy of that predicate would have been the defect
+   this whole branch exists to close, one level down.
+3. `npm run probe-corpus-shape` is steps 1 and 2 as one command.
+
+**The command.**
+
+```
+REAL_SCRIPT_CORPUS_DIR="<corpus>" npm run probe-corpus-shape
+REAL_SCRIPT_CORPUS_DIR="<corpus>" npm run probe-corpus-shape -- --csv
+npm run probe-corpus-shape -- --public      # smoke test on the committed 32
+```
+
+Per script: `isDoubleSpaced`, `submittedWordCount`, `wordCount`, the gap and
+its share of the submission, `health`, `verdict`, `sceneCount` and the
+critical/major/minor split; then the same summary for each of the two groups;
+then how to read it. It computes no AUC, asserts no floor, re-locks nothing,
+**writes no file**, prints no screenplay text and sends nothing anywhere — the
+corpus is read on the owner's machine only. Gating mirrors `measure-real`
+exactly: unset skips with **exit 0**, a set-but-broken path is fatal with
+**exit 2**.
+
+```
+npm run probe-corpus-shape -- --public                                    EXIT=0
+
+script                                 2x  submitted   words     gap   gap% health verdict      sc        c/m/n
+---------------------------------------------------------------------------------------------------------------
+…screenplays/chain-of-custody.fountain —         824     772      52   6.3%   77.3 CONSIDER     13      3/42/81
+…a/screenplays/close-quarters.fountain —         840     790      50   6.0%   77.5 CONSIDER     13      3/41/83
+data/screenplays/code-blue.fountain    —         951     884      67   7.0%   77.3 CONSIDER     14     2/42/112
+…ta/screenplays/counter-offer.fountain —        1521    1496      25   1.6%   78.6 CONSIDER     10     1/31/141
+…a/screenplays/dead-frequency.fountain —        1830    1806      24   1.3%   81.7 CONSIDER     12     2/32/139
+…/screenplays/transfer-window.fountain —         454     379      75  16.5%   55.8 PASS         10      2/42/88
+   … 26 more rows …
+
+── DOUBLE-SPACED (the reconstruction branch — the scraped-PDF / FDX shape) ──
+  none
+
+── SINGLE-SPACED (the clean branch) ──
+  scripts                       32 of 32
+  words NOT screenplay          total 2299, mean 71.8, median 61.5, max 151
+  as a share of the submission  mean 8.58%, median 6.72%, max 20.84%
+  scripts with a non-zero gap   32 of 32
+  health                        mean 74.88, median 77.05, range 51.6–81.7
+  scenes                        mean 11.0, range 9–14
+  issues per script             critical 2.7, major 38.8, minor 93.8
+  verdicts                      CONSIDER 30, PASS 2
+```
+
+That row is the calibration the owner reads the private run against: **0 of 32
+double-spaced**, 32 of 32 with a non-zero gap, mean **8.58%** of each
+submission not screenplay. A private-corpus run whose gaps are all zero means
+those drafts carry no title page and no non-printing text, and the denominator
+correction cannot have moved anything on them.
+
+**Cost, disclosed.** The probe analyses each script twice — once through
+`runScriptDoctor` for health/verdict/severity, once through
+`analyzeFountainText` for the two diagnostic fields. That is the price of
+keeping the fields off the report so the 45 fixtures do not move, and the probe
+pays it rather than the product.
+
+**Tests.** `tests/core/corpus-shape-fields.test.ts`, 8 assertions, every one
+two-sided so a field that always returned 0, always returned `wordCount` or
+always returned `false` fails at least one: `submittedWordCount` is
+`fastWordCount` of the raw bytes on all 32; it is never below `wordCount` and
+is strictly above it on all 32; an 800-repetition boneyard moves it by 3,000+
+while `wordCount`, `sceneCount` and both line counts stand still;
+`isDoubleSpaced` is false on all 32 and **true on a double-spaced re-emission
+of every one of them**; the reported decision matches the branch
+`normalizeScreenplay` actually takes; neither fires on empty input.
+
+**Fail-first.** The suite cannot even load on the `b798a0c4` export:
+`SyntaxError: The requested module '…/screenplay-normalizer.ts' does not
+provide an export named 'isDoubleSpacedText'`, EXIT=1. That is the item in one
+line — the assertions could not be written before the fields existed.
+
+Three hand-built `FountainAnalysis` literals in tests gained the two fields
+(`l37-l38`, `story-graph-ops`, `script-doctor`). Making the fields optional
+would have been the smaller diff and the weaker type.
+
+### R3.2 Item 2 — four changes reach the corpus, not two
+
+The receipt's "WHAT TO COMPARE" scoped itself to the two double-spaced-path
+changes. Rows 9 and 10 — the forced-marker strip and the cue-extension fold —
+are corpus-visible too, and the corpus is where they will actually fire: the 32
+committed scripts carry **zero** forced markers and **zero** non-canonical
+extensions, which is precisely why no CI benchmark could catch either defect,
+while scraped PDFs and FDX exports are the text that carries them. They also
+differ from rows 3 and 8 in firing on **either** document shape, so the
+`isDoubleSpaced` split does not cover them.
+
+The paragraph now also says what they **cannot** do: move `sceneCount`. The
+marker strip removes a marker only when the whole document re-parses to the
+same block types, so a scene boundary cannot dissolve — a changed scene count
+in the owner's run is evidence of something else, said in advance so it is not
+misattributed to this branch.
+
+### R3.3 Item 4 — the one line the fold does change the class of
+
+`DOOR SLAMS (OS)` becomes a character cue with the next line as dialogue. It is
+a consistency fix, and the measurement is what says so — on a `git archive
+85273742` export:
+
+| line | at `85273742` | here |
+|---|---|---|
+| `DOOR SLAMS (O.S.)` | `scene_heading, character, dialogue` | same |
+| `DOOR SLAMS (OS)` | `scene_heading, action, action` | `character, dialogue` |
+| `DOOR SLAMS (O.S)` | `scene_heading, action, action` | `character, dialogue` |
+| `A PHONE BUZZES (VO)` | `scene_heading, action, action` | `character, dialogue` |
+| `MARY (into phone)` | `scene_heading, action, action` | unchanged |
+| `THE SIGN READS KEEP OUT (beat)` | `scene_heading, action, action` | unchanged |
+
+The canonical spelling was **already** a cue. The fold does not create the
+class; it removes a spelling-dependent inconsistency inside a class the parser
+has always had. Whether an all-caps line ending in `(O.S.)` should be a cue at
+all is a question about `CHARACTER_CUE_RE`'s shape, and it is not answered by
+spelling one of four aliases differently from the other three.
+
+The clause is in both places that carry the "will not eat" promise
+(`PARSE_FORMAT_INVARIANCE_2026-09-12.md` §3.2 and `normalizeCueExtensions`'s
+block comment), and it is **asserted**: a new test pins the canonical parse,
+requires all three aliases to match it, and requires both non-extension
+parentheticals to stay action, so the fold cannot widen what counts as a cue
+without going red. Fail-first: 9 of 60 fail on the `85273742` export (round 2's
+eight plus this one); 60 of 60 pass here.
+
+### R3.4 Item 5 — 23 reads 24
+
+Counted, not taken: `tsconfig.json`'s `exclude` array — the single source the
+no-console exemption set is derived from — holds **24** entries;
+`git log -1 -- tsconfig.json` is `1e8241f5`, well before this branch; and
+`git diff 85273742..HEAD -- 'tsconfig*.json'` has an empty diffstat. 23 was a
+transcription error in round 1's table, not a widened exemption, and both
+occurrences say so rather than only changing the digit.
+
+### R3.5 Nothing moved
+
+| check | result |
+|---|---|
+| output identity, `b798a0c4` → round-3 tip | **PASS — all 45 reports byte-identical** (`GIT_SHA=LANEPIN` pinned equal) |
+| output identity, `main @ 8aa1f696` → round-3 tip | **FAIL — 45 differ**, unchanged from rounds 1 and 2 and expected |
+| `npm run benchmark:public` | 0.8438 / 0.7896 · 0.5938 / 0.5234 · 1.0000 / 0.9814 — **to the digit**, three times over the round |
+| `scripts/lib/auc.ts` | untouched in round 3; `AUC24_FLOOR` still 0.622 |
+| manifest and split fixtures | untouched |
+
+The new fields are the reason the first row reads PASS rather than "PASS modulo
+one added key": putting them on `FountainAnalysis` instead of
+`ScriptDoctorReport` keeps every committed report byte-for-byte what it was.
+
+### R3.6 Gates
+
+| gate | result |
+|---|---|
+| `npm run lint` | **EXIT=0** |
+| `npm run build` | **EXIT=0** |
+| `npm run check-no-console` | OK — 304 files, **24** quarantine entries |
+| `npm run check-server-reachability` | OK |
+| `npm run check-docs` | clean |
+| `npm run honesty-audit` | clean — 458 files, 474 markdown files, 93 claims rows |
+| `npm run check-brain` | fresh — 104 notes, 386 links |
+| `npm run gates` | **EXIT=0**, 9.27 s; 1 of 1 verified row RAN; mutation check raised `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` to 0.8938 and the suite FAILED on that floor by name, no passing twin |
+| `npm run test:metamorphic` | 8 hard passes, 1 documented known-failing witness |
+| `node scripts/check-scoring-receipt.mjs 78ec4464..HEAD` | **EXIT=1**, exactly ONE PENDING entry — the intended state |
+| `npm run probe-corpus-shape` (unset env) | **EXIT=0**, honest skip |
+| `tests/core/corpus-shape-fields.test.ts` | **8 / 8** |
+| `tests/core/parse-format-invariance.test.ts` | **60 / 60** |
+| `tests/core/fountain-analyzer.test.ts` · `script-doctor` · `l37-l38` · `story-graph-ops` | 69 / 69 · 90 / 90 · 15 / 15 · 8 / 8 |
+| `tests/core/public-benchmark.test.ts` · `calibration` | 33 / 33 · 25 / 25 |
+| `tests/security/fountain-shape-guard-cue-parity.test.ts` | 650 / 650 |
+| `npm test` | **13,407 tests, 0 fail, 91 skipped, 5 pre-existing todo, exit 0** — 232 s, once, alone, on an idle machine (round 2: 13,398; the nine new tests are round 3's) |
+
+### R3.7 What round 3 did not do
+
+* **Items 3 and 6 stay as written**, per the brief: `@` and `.` remain the two
+  markers with the most corpus exposure and the least verifiability from here,
+  and `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` is still the sibling lane's to
+  re-derive on the merged tree with the analyzer cap in place.
+* **The probe does not compare two trees for you.** It prints one tree's rows;
+  the owner runs it on a pre-branch checkout as well and diffs the `--csv`.
+  Building a two-tree differ would need a checkout mechanism inside a script
+  whose whole job is to read a local corpus, and the diff is one shell command.
+* **No AUC-24 number is stated, implied or projected**, and the probe cannot
+  produce one: it computes no AUC at all, by design, so that a shape reading
+  and a rank reading can never be confused for each other.
+* **`submittedWordCount` and `isDoubleSpaced` are still off `ScriptDoctorReport`.**
+  If a product surface ever wants to show a writer "how much of what you sent
+  is screenplay", that is a report field and a fixture re-lock, and it should be
+  measured as its own change rather than arriving as a side effect of a
+  diagnostic.
