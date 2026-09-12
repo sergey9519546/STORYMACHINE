@@ -352,7 +352,20 @@ analysis seam, before both strips, because those read block types from
 The fold applies only to a line that is a cue name followed by nothing but
 parenthetical tails, and only when EVERY tail is a recognised extension, so
 `MARY (into phone)` — a wryly-directed cue this parser has never accepted — is
-left exactly as it was.
+left exactly as it was, and so is `THE SIGN READS KEEP OUT (beat)`.
+
+**One line DOES change class, and it is a consistency fix rather than a new
+ambiguity** *(named in round 3, from the round-2 review's non-blocking item 4)*.
+An all-caps action-shaped line ending in an extension — `DOOR SLAMS (OS)` — is
+now a character cue with the next line as its dialogue. It was already one when
+spelled canonically: measured on a `git archive 85273742` export,
+`DOOR SLAMS (O.S.)` parsed `character` + `dialogue` there while
+`DOOR SLAMS (OS)`, `DOOR SLAMS (O.S)` and `A PHONE BUZZES (VO)` parsed
+`action` + `action`. So the fold does not create the class — it removes a
+**spelling-dependent** inconsistency inside a class the parser has always had.
+Whether an all-caps line ending in `(O.S.)` should be a cue at all is a
+separate question about `CHARACTER_CUE_RE`'s shape, and it is not answered by
+spelling one of its four aliases differently from the other three.
 
 **Five copies of one rule, and what the fifth copy cost.** The extension set
 lived inline in `CHARACTER_CUE_RE` and again, byte-identically, in

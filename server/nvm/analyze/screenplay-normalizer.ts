@@ -390,6 +390,18 @@ function typesByLine(text: string): FountainBlockType[] {
 // parser has never accepted, and folding is not the change that would fix it —
 // leaving it alone keeps this from ever eating a parenthetical direction or a
 // line of prose that happens to end in brackets.
+//
+// WHAT IT DOES CHANGE THE CLASS OF, said plainly because it is the one case
+// (2026-09-12 round 3): an all-caps ACTION-shaped line ending in an extension,
+// `DOOR SLAMS (OS)`, becomes a character cue with the next line as dialogue.
+// That is a consistency fix, not a new ambiguity — `DOOR SLAMS (O.S.)` was
+// ALREADY a cue before this fold (measured on a git archive 85273742 export:
+// canonical spelling character+dialogue, every alias spelling action+action),
+// so the fold removes a spelling-dependent inconsistency inside a class the
+// parser has always had. Whether such a line should be a cue at all is a
+// question about CHARACTER_CUE_RE's shape and is not answered by spelling one
+// of its four aliases differently from the other three. Asserted in
+// tests/core/parse-format-invariance.test.ts.
 const EXTENSION_ALIASES: Array<[RegExp, string]> = [
   [/^V\.?\s*O\.?$/i, 'V.O.'],
   [/^O\.?\s*S\.?$/i, 'O.S.'],

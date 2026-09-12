@@ -32,6 +32,7 @@ import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 import type { ScriptDoctorReport } from '../../server/nvm/analyze/types.ts';
 import { parseFountain } from '../../src/lib/fountain.ts';
 import { analyzeFountainText } from '../../server/nvm/analyze/fountain-analyzer.ts';
+import { normalizeScreenplay } from '../../server/nvm/analyze/screenplay-normalizer.ts';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
@@ -405,6 +406,30 @@ I counted your footsteps.
       + "admit does not merely rename the speaker: the cue is not a cue, so the speech under it is scored as "
       + 'ACTION PROSE. (O.C.) is the case that was missing.',
     );
+  });
+
+  it('an all-caps action-shaped line with an extension was ALREADY a cue — the fold only levels the spelling', () => {
+    // The one class change the fold makes, asserted as the consistency fix it
+    // is rather than left for a reader to discover. On a git archive 85273742
+    // export the canonical spelling parsed character+dialogue while every
+    // alias parsed action+action; the fold makes the four agree. It does NOT
+    // create the class — that is CHARACTER_CUE_RE's shape, a separate question.
+    const doc = (line: string) => `INT. HALL - NIGHT\n\n${line}\nWho is there?\n`;
+    const typesOf = (line: string) => parseFountain(normalizeScreenplay(doc(line)))
+      .filter((b) => b.type !== 'empty').map((b) => b.type).join(',');
+    const canonical = typesOf('DOOR SLAMS (O.S.)');
+    assert.equal(canonical, 'scene_heading,character,dialogue',
+      'the canonical spelling has always been read as a cue here; if that changed, this test is about the wrong thing');
+    for (const alias of ['DOOR SLAMS (OS)', 'DOOR SLAMS (O.S)', 'A PHONE BUZZES (VO)']) {
+      assert.equal(typesOf(alias), canonical,
+        `${JSON.stringify(alias)} parses differently from its canonical twin. Spelling is not meaning.`);
+    }
+    // And the other direction: a parenthetical that is not an extension is
+    // still not a cue, so the fold has not widened what counts as one.
+    for (const notACue of ['MARY (into phone)', 'THE SIGN READS KEEP OUT (beat)']) {
+      assert.equal(typesOf(notACue), 'scene_heading,action,action',
+        `${JSON.stringify(notACue)} became a cue. The fold must never eat a parenthetical direction.`);
+    }
   });
 
   it('every spelling of the same extension produces the same report', async () => {
