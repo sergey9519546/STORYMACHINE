@@ -61,6 +61,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
     },
     {
+      "id": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
+      "type": "branch",
+      "title": "Branch — Adversarial 2026-09-12",
+      "path": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
       "type": "branch",
       "title": "Branch — Advice-Rule-Fixes",
@@ -824,23 +830,15 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
-      "to": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md"
+      "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
       "to": "docs/brain/Gates/Gate - Public Benchmark.md"
-    },
-    {
-      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
-      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
-    },
-    {
-      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
-      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
-    },
-    {
-      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
-      "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
@@ -848,23 +846,27 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
-      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
-    },
-    {
-      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
-      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
-    },
-    {
-      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
-      "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
-    },
-    {
-      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
-      "to": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md"
-    },
-    {
-      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
       "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
       "from": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
@@ -897,6 +899,10 @@
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
       "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
     },
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",

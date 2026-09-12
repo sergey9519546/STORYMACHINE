@@ -45,6 +45,19 @@ better on every statistic was tried, measured, and reverted when the full
 suite showed it had put a character name into the clue channel; floors
 restored to the byte.
 
+**Known defect on the branch (found 2026-09-12, not yet corrected there):**
+the branch re-derived `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` to 1,500,000 by
+bracketing fixture WEIGHTS below the lightest pinned DoS payload; the
+independent review of the main-side lane that made the same change
+(`docs/audits/2026-09-12-adversarial/rulebook-review.md`) showed weight is
+not a cost proxy across shapes — a 223-speaker × 30-word document under
+that bound costs 27–36 s in `runScriptDoctor`, over the 30 s analysis
+budget, where the old 300,000 bound's worst case was 6.4 s. The main-side
+lane is re-deriving the bound from measured cost; the branch's bound
+commit needs the same correction before the owner lands it, and the
+stacked branch [[Branch - Adversarial 2026-09-12]] is building the
+analyzer-side pair cap that makes the shape cheap.
+
 **Why it is parked:** its receipt is PENDING. The scarcity saturation is
 identity at 15 scenes or fewer, so the public benchmark and the calibration
 corpus are blind to the half that matters at feature length; on the private
