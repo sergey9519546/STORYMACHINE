@@ -19,6 +19,8 @@
 // whole supported subset deterministically, without pulling in a parsing
 // library just to read a handful of element/attribute shapes.
 
+import { CHARACTER_CUE_RE, FORCED_CUE_MARKER } from '../../src/lib/fountain.ts';
+
 type FdxKind =
   | 'scene_heading'
   | 'action'
@@ -84,6 +86,20 @@ function formatTransition(text: string): string {
   const withColon = upper.endsWith(':') ? upper : `${upper}:`;
   const autoDetected = AUTO_DETECTED_TRANSITION_RE.test(withColon) || GENERIC_TRANSITION_RE.test(withColon);
   return autoDetected ? withColon : `> ${withColon}`;
+}
+
+// Character → uppercase, forced with Fountain's "@" when the uppercased name
+// would not be read back as a cue. This is the third of the same pattern as
+// formatSceneHeading's "." and formatTransition's ">": Final Draft stores the
+// ELEMENT TYPE, Fountain infers it from the line's shape, and a name whose
+// shape the inference does not admit — a caseless script ("田中"), a name
+// carrying punctuation the cue alphabet excludes ("DR. O'NEILL, JR.") — comes
+// back as an ACTION line, taking its whole speech with it as action prose.
+// Asking the parser itself (CHARACTER_CUE_RE) rather than re-deriving the
+// grammar here is what keeps the two from drifting apart.
+function formatCharacter(text: string): string {
+  const upper = text.toUpperCase();
+  return CHARACTER_CUE_RE.test(upper) ? upper : `${FORCED_CUE_MARKER}${upper}`;
 }
 
 // Parenthetical → wrapped in "(...)" directly under the character. Final
@@ -180,7 +196,7 @@ export function fdxToFountain(fdxXml: string): { fountain: string; warnings: str
 
       case 'character':
         openNewBlock();
-        lines.push(para.text.toUpperCase());
+        lines.push(formatCharacter(para.text));
         inSpeech = true;
         break;
 

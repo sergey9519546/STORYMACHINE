@@ -27,7 +27,7 @@
 
 import { CompletionContext, CompletionResult, Completion, CompletionSource } from '@codemirror/autocomplete';
 import { EditorState } from '@codemirror/state';
-import { parseFountain } from '../../lib/fountain.ts';
+import { parseFountain, stripCueDecorations } from '../../lib/fountain.ts';
 
 export interface ScreenplayCompleteOptions {
   /** Character names to suggest at cue position — read live so a ref-backed getter works. */
@@ -86,19 +86,21 @@ export function dedupeUpper(names: Iterable<string>): string[] {
 }
 
 // Cue names already used in the script (character + dual_dialogue blocks),
-// with dual-dialogue's trailing `^` and extensions like (V.O.)/(O.S.)/(CONT'D)
-// stripped so the bare name is what's offered.
+// with the forced-cue `@`, dual-dialogue's trailing `^` and extensions like
+// (V.O.)/(O.S.)/(CONT'D) stripped so the bare name is what's offered.
+//
+// This was a fifth hand-rolled copy of that strip — round 2 folded four of
+// them (fountain-analyzer.ts, locate.ts, prioritize.ts, truth-extraction.ts)
+// onto `stripCueDecorations` and this one, on the editor side of the repo, was
+// not in that sweep. It is now, which is also how it learned `@`: without it,
+// typing `@田中` once would offer `@田中` back as a completion forever.
 export function harvestCueNames(state: EditorState, excludeLine: number): string[] {
   const blocks = parseFountain(state.doc.toString());
   const names: string[] = [];
   for (const block of blocks) {
     if (block.type !== 'character' && block.type !== 'dual_dialogue') continue;
     if (block.lineNumber === excludeLine) continue;
-    const name = block.text
-      .trim()
-      .replace(/\^\s*$/, '')
-      .replace(/\s*\(.*?\)\s*$/, '')
-      .trim();
+    const name = stripCueDecorations(block.text);
     if (name) names.push(name);
   }
   return names;
