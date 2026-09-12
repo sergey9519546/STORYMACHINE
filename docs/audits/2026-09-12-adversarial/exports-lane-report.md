@@ -262,7 +262,7 @@ leaving copy asserted for a state that no longer occurs:
 | tile value (feature length) | `N/A` | `N/A` (unchanged — the tile is where the value goes) |
 | tile tooltip (feature length) | *"Character pairs whose dialogue is statistically distinguishable (Burrows's Delta)… Higher is better…"* | *"Not measured: this reading needs at least two characters with dialogue and enough dialogue from each one across the whole draft to compare…"* |
 | tile tooltip (a short) | the same sentence | the same sentence — it is correct beside a value |
-| exported coverage report | the channel is absent entirely | `Voice Separation · 6/6 Pairs` + the reading instruction, or `not measured` + the reason |
+| exported coverage report (the **HTML** one — the letter carries no Voice Separation row, as it carries no graph-health row; this fix reaches one exported document, not two) | the channel is absent entirely | `Voice Separation · 6/6 Pairs` + the reading instruction, or `not measured` + the reason |
 
 The export row is gated on the FIELD's presence, not on `scored`: an absent
 `voiceAnalysis` means the caller attached none, which is a different statement
@@ -364,7 +364,7 @@ Log: `faillogs/f18-failfirst.log`.
 | lint | `npx tsc --noEmit` | **0** |
 | no-console | `node scripts/check-no-console.mjs` | **0** — 307 files, 23 quarantine entries |
 | docs quality | `npm run check-docs` | **0** — "No AI writing patterns detected" |
-| honesty audit | `node scripts/honesty-audit.mjs` | **0** — 465 files, 473 markdown, 114 claims rows, clean |
+| honesty audit | `node scripts/honesty-audit.mjs` | **0** — 465 files, **474** markdown, 114 claims rows, clean *(corrected in round 2: this table was written before this lane's own docs commit added the brain note, and said 473; both runs exit 0 — review non-blocking 4)* |
 | brain graph | `node scripts/brain-graph.mjs --check` | **0** — 106 notes, 397 links, fresh |
 | brain coverage | `tests/core/brain-coverage.test.ts` | **7/7** |
 | scoring receipt | `node scripts/check-scoring-receipt.mjs 312f4f34..HEAD` | **0** — *"no scoring-path files changed"* |
