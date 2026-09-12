@@ -2979,16 +2979,44 @@ export async function runScriptDoctor(
     // parser fix and the normalizer join together left 111 of 128 pairs still
     // moving (max 2.0 points) purely through this seam.
     //
-    // The join is applied rather than the whole normalizer. `normalizeScreenplay`
-    // ALSO reconstructs double-spaced imports (uppercasing cues, reflowing
-    // action paragraphs), and handing the passes that reconstruction is a
-    // larger change whose effect lands entirely on the private AUC-24 corpus —
-    // scraped PDFs are exactly the double-spaced case — so it cannot be
-    // measured here. `joinWrappedDialogue` is a no-op on every input whose
-    // speeches are already one line (all 32 benchmark scripts, all 20
-    // calibration samples), which is why it is the half that can be shown
-    // safe from this tree. The other half is recorded as measured-and-not-taken
-    // in docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md.
+    // ── THE WHOLE NORMALIZER IS APPLIED, NOT JUST THE JOIN ──────────────────
+    // CORRECTED 2026-09-12 (round 2). At 716ee817 this line WAS
+    // `joinWrappedDialogue(fountain)` and the paragraph that used to sit here
+    // described that. `ef683d4e` changed it to the expression below — so that
+    // the passes read exactly the text the analyzer reads, which is the whole
+    // point of this seam — and the comment did not follow. Three places on the
+    // branch went on saying the stronger half had been "measured and not
+    // taken". It was taken; this is what it costs and what it buys.
+    //
+    // WHAT IT MEANS. `normalizeScreenplay` is the fold + the non-printing strip
+    // + the marker strip + (on a double-spaced import only) the full
+    // reconstruction: wrapped fragments joined, action paragraphs reflowed,
+    // cues uppercased, the blank line between cue and speech closed. The 14
+    // passes now receive that text. On a single-spaced draft the difference
+    // from `joinWrappedDialogue` alone is the fold and the strips; on a
+    // double-spaced import it is the reconstruction as well.
+    //
+    // MEASURED, on a double-spaced re-emission of data/screenplays/
+    // dead-frequency.fountain — every line hard-wrapped at 45 columns with a
+    // blank line after every line, which is the shape a scraped PDF arrives in;
+    // not one word changed:
+    //
+    //   compiled.fountain = stripTitlePage(normalizeScreenplay(f))  81.4, 182 issues
+    //   compiled.fountain = joinWrappedDialogue(f)                  82.3, 158 issues
+    //   the same file NOT re-emitted (either expression)            81.7, 173 / 172
+    //
+    // The stronger version is 0.3 from the un-re-emitted reading; the weaker
+    // one is 0.6 away, on a document whose only difference is where the line
+    // breaks fall. That is the argument for it: this seam exists to make the
+    // score independent of how the text arrived, and handing the passes a text
+    // the analyzer does not read is the defect, not the fix.
+    //
+    // WHAT IT COSTS. That entire effect lands on the private AUC-24 corpus —
+    // scraped PDFs are exactly the double-spaced case — and NO fixture in this
+    // repository is double-spaced, so its size there cannot be measured from
+    // this tree. It is disclosed as a named cost in the lane report and in
+    // docs/p1-benchmark/MEASUREMENT_RECEIPTS.md's pending entry, beside the
+    // strip-order change it compounds with.
     fountain: stripTitlePage(normalizeScreenplay(fountain)),
     annotations: mergedAnalysis.annotations,
     structureSummary: buildStructureSummaryLine(mergedAnalysis),

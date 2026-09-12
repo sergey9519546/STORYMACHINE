@@ -60,7 +60,10 @@ reads whitespace.
    indentation is the speech's own); only continuation lines are trimmed, so a
    speech that was never wrapped comes back out unchanged. `normalizeScreenplay`
    applies it on the clean path.
-3. `compiled.fountain` is `joinWrappedDialogue(fountain)`.
+3. `compiled.fountain` is `stripTitlePage(normalizeScreenplay(fountain))` —
+   the same text the analyzer reads, on every path. **This line said
+   `joinWrappedDialogue(fountain)` until round 2 of this review, and that was
+   wrong from `ef683d4e` onwards** (see §1.6).
 
 ### 1.3 What it moved
 
@@ -103,19 +106,55 @@ base tree: **35 of 37 assertions fail**. On this tree: **37 of 37 pass**. The
 two that pass on both are the escape-clause test and the dialogue-flatten
 both-directions control, which is the point of having them.
 
-### 1.6 The half measured and NOT taken
+### 1.6 The stronger half WAS taken, and three places said it was not
 
-`compiled.fountain = normalizeScreenplay(fountain)` — i.e. handing the passes
-the same reconstruction the analyzer gets on EVERY path, not just the clean
-one — is the stronger version of fix 3. It is not taken here. On a
-double-spaced import `normalizeScreenplay` also uppercases cues and reflows
-action paragraphs, and the documents that take that branch are exactly the
-scraped PDFs of the private AUC-24 corpus, so the change cannot be measured
-from this tree at all: it would be a scoring change whose entire blast radius
-is invisible here. `joinWrappedDialogue` is the half that is provably a no-op
-on every committed fixture. The owner's `npm run measure-real` is what would
-settle the other half, and it should be measured as its own change, not
-smuggled in with this one.
+**Corrected in round 2, from the independent review's one blocking finding.**
+
+At `716ee817` (the dialogue-reflow commit) `compiled.fountain` was
+`joinWrappedDialogue(fountain)`, and this section said the whole normalizer was
+the stronger version, measured and deliberately not taken. At `ef683d4e` (the
+next commit) the line became `stripTitlePage(normalizeScreenplay(fountain))` —
+which is right, because the seam exists to make the passes read the analyzer's
+text — and this section, `doctor.ts`'s comment above the line, and the lane
+report's §5 all went on saying the opposite. Nothing was concealed and nothing
+was smuggled: it is drift between two commits, and it is corrected here rather
+than reverted, because the stronger version is the one the branch should ship.
+
+**What it actually does.** `normalizeScreenplay` is the typographic fold, the
+non-printing strip, the forced-marker strip and — on a double-spaced import
+only — the full reconstruction: wrapped fragments joined, action paragraphs
+reflowed, cues uppercased, the blank line between a cue and its speech closed.
+The 14 revision passes now receive that text. On a single-spaced draft the
+difference from the join alone is the fold and the strips; on a double-spaced
+import it is the reconstruction as well.
+
+**Measured.** `data/screenplays/dead-frequency.fountain` re-emitted in the shape
+a scraped PDF arrives in — every line hard-wrapped at 45 columns with a blank
+line after every line, not one word changed — scored on a `git archive`
+export of `85273742` and on the same export with this one line reverted to the
+expression the branch documented:
+
+```
+node --experimental-strip-types <scratch>/ds.mjs      (run from each tree root)
+
+  compiled.fountain = stripTitlePage(normalizeScreenplay(f))   health 81.4, 182 issues, c/m/n 2/32/148
+  compiled.fountain = joinWrappedDialogue(f)  (as documented)  health 82.3, 158 issues, c/m/n 2/28/128
+  the same file NOT re-emitted                                 health 81.7, 173 issues / 172 issues
+```
+
+0.9 health and 24 issues between the two expressions, on exactly the document
+shape the private corpus is made of. Read the third row with them: the version
+this branch ships is **0.3** from the un-re-emitted reading of the same
+screenplay, and the version it documented is **0.6** away. The stronger half
+halves the format gap it exists to close, which is the affirmative case for
+keeping it, and it is also why its whole effect is invisible from this tree:
+**no fixture in this repository is double-spaced.**
+
+**What the owner must do with it** is in
+`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`'s pending entry, beside the
+strip-order change of row 8, because the two compound: on a double-spaced
+import the analyzer's text and the passes' text both change. It is the
+corpus-visible change on this branch with the largest expected effect.
 
 ## 2. The other ten transforms (findings 5, 13, and the writer's-loop finding 1)
 

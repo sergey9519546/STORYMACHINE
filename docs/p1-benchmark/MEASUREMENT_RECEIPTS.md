@@ -2591,6 +2591,8 @@ the measurement doc it names)*
 | 6 | report truth at the scoring seam | Every dimension summary states its count (231-scene fixture: "a handful of minor notes" over **342 issues** → "169 minor note(s) … the score is density-normalised"). Priority ranking weights concentration: on the one-bad-scene fixture the defect went from **absent from all ten slots** to slots 4-7, with criticals still leading and no rule owning more than 2 slots. Line numbering restored — the strippers BLANK rather than delete, so a location is a line of the writer's file. Public benchmark **unchanged**; output identity PASS modulo 8 named keys. | `docs/scoring/REPORT_SEAM_2026-09-12.md` |
 | 7 | the voice pair grid's WORK is bounded | `MAX_VOICE_SCORED_SPEAKERS = 40`. The grid goes flat: at cast 223 it is **24,753 pairs / 189.7 ms → 780 pairs / 9.3 ms**, at cast 500 **124,750 / 945.6 ms → 780 / 11.8 ms**. End to end on the sibling review's shape, cast 223 **300 → 139 ms** and cast 1200 **7,130 → 1,543 ms**. A 20/30/40/60-character ensemble feature is ACCEPTED and voice-scored (on `main`, cast 20 and above are REJECTED outright). Public benchmark unchanged; health unchanged on all 45 fixtures. **No constant in `server/lib/validation.ts` was changed** — see row note below. | `docs/scoring/VOICE_PAIR_CAP_2026-09-12.md` |
 | 8 | what the full suite found: the guard's mirror, the normaliser's order, and four assertions that pinned the old bug | The legacy shape-guard walk under-counted a single-spaced wrapped speech (**guardWords 20 vs pipelineWords 60**) — the `guardWords >= pipelineWords` oracle was FALSE, which is the unsafe direction. Fixed by mirroring the new dialogue-block rule. `stripNonPrinting` now runs BEFORE the double-spaced reconstruction, so a boneyard holding **6,000 cue occurrences** no longer reflows into thousands of real character blocks. `normalizeScreenplay` and `stripTitlePage` gain a one-entry memo: the A1 payload's guard path **102 ms → 63 ms**. All 45 reports byte-identical. | this entry, and the commit message |
+| 9 | *(round 2)* the forced-element markers stop being scored as prose | Fountain's markers are never printed; `parseFountain` left them in the block's text. Applied where they are REDUNDANT (declaring the element the line already is, so not one printed character changes), measured on the 32 public scripts at `85273742`: forced-action `!` **32 of 32 moved, mean +1.056, largest +7.0, one verdict PROMOTED PASS → CONSIDER**; forced-heading `.` **32 of 32, mean +0.659**; forced-transition `>` **5 of 6 applicable, mean −4.080, largest −15.7**. After: **0 of 32** on all three. The forced cue `@` is NOT fixed and is pinned as a known gap at **32 of 32, largest −26.8** — it needs parser and renderer work. 45 of 45 output-identity fixtures byte-identical; benchmark unchanged; no floor touched. | `docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md` §3 |
+| 10 | *(round 2)* one spelling of a cue extension is one speaker | `CHARACTER_CUE_RE` admitted only canonical spellings, so `MARY (V.O)` was not a cue and her speech was action prose: **12 of 14 applicable scripts moved** at `85273742` when every extension was respelled without its periods (`(V.O.)` → `(V.O)` alone: **8 of 8**). After: **0 of 14**. The extension set is now written down once and admits `(O.C.)`, which all five previous copies of it omitted. 45 of 45 byte-identical; benchmark unchanged; no floor touched. | `docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md` §3 |
 
 **WHAT THE OWNER'S AUC-24 RUN CAN AND CANNOT SETTLE (commit 2).** The three
 parse fixes are byte-identical on every committed fixture, so AUC-24 **cannot**
@@ -2715,3 +2717,55 @@ non-printing text those drafts contain into the *only* thing the run has left to
 discover, and it is why row 8 — which is otherwise a guard fix with 45
 byte-identical reports — belongs in the owner's reading rather than in a
 footnote.
+
+**AND IT IS NOT THE ONLY HALF OF THAT SEAM. THE 14 REVISION PASSES NOW RECEIVE
+THE RECONSTRUCTED DOUBLE-SPACED TEXT (commit 3, `ef683d4e`) — added in round 2
+after an independent review found this entry, `doctor.ts`'s own comment and the
+lane report all saying it had not been done.** At `716ee817`
+`compiled.fountain` was `joinWrappedDialogue(fountain)`. At `ef683d4e` it became
+`stripTitlePage(normalizeScreenplay(fountain))`, which is the right version —
+the seam exists so the passes read the text the analyzer reads — and three
+places went on describing the weaker one. Nothing was concealed; it is drift
+between two commits, and it is corrected rather than reverted.
+
+**This is the corpus-visible change on this branch with the largest expected
+effect, because the private corpus IS the double-spaced scraped-PDF shape.** On
+such a document `normalizeScreenplay` runs the full reconstruction — wrapped
+fragments joined, action paragraphs reflowed, cues uppercased, the blank line
+between cue and speech closed — and all fourteen passes now read that instead
+of the raw submission. No fixture in this repository is double-spaced, so its
+size here can only be shown on a synthetic re-emission:
+
+```
+data/screenplays/dead-frequency.fountain, every line hard-wrapped at 45 columns
+with a blank line after every line (the scraped-PDF shape); no word changed.
+node --experimental-strip-types <scratch>/ds.mjs, run from each tree root.
+
+  git archive 85273742, as shipped                             health 81.4, 182 issues, c/m/n 2/32/148
+  the same export, this one line reverted as documented        health 82.3, 158 issues, c/m/n 2/28/128
+  the same file NOT re-emitted                                 health 81.7, 173 / 172 issues
+```
+
+0.9 health and 24 issues between the two expressions. Read the third row with
+them: the shipped version is **0.3** from the un-re-emitted reading of the same
+screenplay and the documented one is **0.6** away, so the stronger half halves
+the format gap it exists to close. That is the argument for keeping it, and it
+is not an argument about AUC-24 — nobody here can predict its sign.
+
+**WHAT TO COMPARE, AND IN WHAT ORDER.** This change and the strip-order change
+above COMPOUND: on a double-spaced import both the analyzer's text and the
+passes' text change, and every corpus document of that shape takes both. So,
+split by whether `isDoubleSpaced` fires, and **before reading AUC-24**:
+
+1. `submittedWordCount` against `wordCount`, per script — how much text left the
+   denominator, and on which document shape.
+2. Per-script `health`, `verdict`, `sceneCount` and issue counts by severity,
+   against the pre-branch run. Issue COUNTS are where this half shows first: it
+   moved 24 issues on one synthetic document without moving health by one point.
+3. The 72-row real-corpus manifest, which will need re-locking either way.
+4. Only then AUC-24. A rank statistic that does not move is **not** evidence
+   that these two changes did nothing — they move both halves of every matched
+   pair, which is largely rank-neutral by construction.
+
+If AUC-24 falls, the finding is about what those drafts contain and what shape
+they arrive in. Read them. Do not move `AUC24_FLOOR`.
