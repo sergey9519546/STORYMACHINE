@@ -72,20 +72,61 @@ non-printing constructs (boneyard `/* … */`, inline notes `[[ … ]]`, synopse
 `= …`, section headings `# …`) have no FDX, PDF or DOCX equivalent. `.docx` has
 no importer at all.
 
-`src/lib/export-roundtrip.ts` states that per format. The Ship panel prints
-`EXPORT_ROUNDTRIP_SUMMARY` as an always-visible paragraph under the export grid
-and `EXPORT_ROUNDTRIP_NOTE[format]` in each button's hover title, so a reader who
-never hovers still gets the fact (`docs/CLAIMS_REGISTER.md` rows 111-113).
+## What the disclosure said, and what was actually happening
+
+The 2026-09-12 review measured the FDX sentence against the code and found it
+untrue in both directions at once.
+
+Three of the four constructs it called "not carried" **were** carried — as
+PRINTED TEXT. `src/lib/fdx.ts` mapped `section` and `synopsis` to FDX's `Action`
+type and an inline `[[note]]` rode along inside the action line it sat in, so a
+writer's `# ACT ONE` outline heading arrived in Final Draft as an action line in
+the script. Promotion, not omission — a bigger change to the returned report
+than dropping it would have been.
+
+And five constructs that DO print did not survive. Measured on
+`tests/fixtures/fountain-constructs/every-construct.fountain`, one round trip:
+
+| written | came back as (before) | now |
+|---|---|---|
+| `DAN ^` | `DAN` — dual dialogue gone | `DAN ^` |
+| `> THE END <` | `THE END` — an all-caps action line | `> THE END <` |
+| `~Somewhere a radio plays` | the same line, unmarked | `~Somewhere a radio plays` |
+| `===` | `==` — a synopsis marker | `===` |
+| `!INT. THE MIND OF A KILLER` | a **scene heading** — the round trip invented a scene, 2 → 3 | an action line, still forced |
+
+The repair is split the way the format splits. The three printing constructs FDX
+has no ELEMENT for cross over on attributes FDX already defines —
+`Alignment="Center"`, `<Text Style="Italic">`, `StartsNewPage="Yes"` — and dual
+dialogue needed nothing new at all: `src/lib/fdx.ts` had always written
+`<DualDialogue>`, and `server/lib/fdx-import.ts` simply never read it. The
+non-printing four are now omitted from the FDX body outright, which is what "not
+carried" always claimed. On all 21 committed screenplays the exported FDX is
+**byte-identical** to what it was before, so no writer's existing export moved.
+
+The `!` force marker is the one partial case, and it is disclosed as such
+(`FDX_CONSTRUCT_FATE`'s `'unforced'`): it comes back where Fountain would
+otherwise misread the line and not where it would not, because prefixing `!` to
+text the writer never forced is a rewrite rather than a repair.
+
+`src/lib/export-roundtrip.ts` states all of that per format. The Ship panel
+prints `EXPORT_ROUNDTRIP_SUMMARY` as an always-visible paragraph under the export
+grid and `EXPORT_ROUNDTRIP_NOTE[format]` in each button's hover title, so a
+reader who never hovers still gets the fact (`docs/CLAIMS_REGISTER.md`
+rows 111-113).
 
 `tests/core/export-roundtrip.test.ts` is what turns that from a hedge into a
-claim: the round trip is compared against the source with exactly those four
-constructs stripped, so a round trip that lost one PRINTING line fails even
-though the word count would still look about right. It also pins the
-`contentHash` where it should be preserved — a draft already in the importer's
-canonical shape round-trips byte-identically, to the same hash and the same
-report, and a second round trip changes nothing — and asserts that no
-`docxToFountain` exists, so the "cannot be brought back" sentence cannot outlive
-its truth.
+claim. `FDX_CONSTRUCT_FATE` is the disclosure as a table, and the suite asserts
+it row by row on the construct fixture in BOTH directions — what must come back,
+and what must not be in the exported file at all. For the three real scripts the
+round trip is compared against the source with exactly the non-printing
+constructs stripped, as a MULTISET of lines (so a lost duplicate is visible), and
+the word gap is asserted at the measured 0 with two words of margin rather than
+the 1% — 174 words — it used to allow. It also pins the `contentHash` where it
+should be preserved — a draft already in the importer's canonical shape
+round-trips byte-identically, to the same hash and the same report, and a second
+round trip changes nothing — and asserts that no `docxToFountain` exists, so the
+"cannot be brought back" sentence cannot outlive its truth.
 
 `.fountain` is the one format that comes back byte for byte. It is not silent
 either: ScriptIDE's `exportFountain` PREPENDS a title page when the draft has
@@ -100,5 +141,6 @@ therefore the hash, and the note says so.
 - `src/lib/export-title-page.ts`; `src/lib/fountain-title-block.ts`
 - `src/components/scriptide/ShipPanel.tsx`
 - `tests/core/export-roundtrip.test.ts`; `tests/core/fdx-import.test.ts`
+- `tests/fixtures/fountain-constructs/every-construct.fountain`
 - `docs/audits/2026-09-12-adversarial/writer-loop.md` finding 18
 - `docs/CLAIMS_REGISTER.md` rows 111-113

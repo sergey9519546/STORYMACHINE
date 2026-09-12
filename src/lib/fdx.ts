@@ -28,9 +28,33 @@ const FDX_TYPE: Partial<Record<FountainBlockType, string>> = {
   shot:          'Shot',
   centered:      'Action',
   lyrics:        'Action',
-  section:       'Action',
-  synopsis:      'Action',
 };
+
+// ── Printing vs non-printing, and how each one crosses into FDX ─────────────
+//
+// 2026-09-12 (adversarial review round 2). `section` and `synopsis` used to map
+// to 'Action' here, and an inline `[[note]]` rode along inside the action text
+// it sat in. Fountain DEFINES all three as text that is never printed, so the
+// effect was the opposite of dropping them: a writer's `# ACT ONE` outline
+// heading and their `= Maya finds the log.` synopsis came out of Final Draft as
+// ACTION LINES IN THE SCRIPT. Measured on a marked-up copy of
+// data/screenplays/chain-of-custody.fountain, both came back typed `action`
+// after a round trip. They are now omitted from the body, which is what "not
+// carried" always claimed.
+//
+// The three PRINTING constructs the exporter used to flatten cross over in real
+// FDX vocabulary instead — attributes this format already defines, never an
+// invented element:
+//
+//   centered  `> … <`  ->  Paragraph Alignment="Center"
+//   lyric     `~…`     ->  a single Text run with Style="Italic" (Fountain
+//                          renders lyrics italic; FDX has no lyric element, and
+//                          leaving the `~` in the text would print a stray
+//                          tilde in Final Draft — the same defect as above)
+//   page break `===`   ->  Paragraph StartsNewPage="Yes" with empty text
+//
+// server/lib/fdx-import.ts reads all three back, so each one survives the round
+// trip as itself rather than as a bare action line.
 
 // A meaningful (non-empty/boneyard/note, past-title-page) block reduced to
 // what the paragraph/wrapper builder needs: the ORIGINAL Fountain block type
@@ -41,13 +65,31 @@ interface FdxEntry {
   blockType: FountainBlockType;
   fdxType: string;
   text: string;
+  /** Paragraph Alignment attribute — set for centered text, omitted otherwise
+   *  so every paragraph this exporter wrote before today is byte-unchanged. */
+  alignment?: 'Center';
+  /** Text run Style attribute — set for lyrics, omitted otherwise. */
+  style?: 'Italic';
+  /** A Fountain page break (`===`): an empty paragraph that starts a new page. */
+  pageBreak?: true;
 }
+
+/** A Fountain page break is a line of three or more `=`. The parser has no
+ *  `page_break` type — such a line lands in `synopsis` because it starts with
+ *  `=` — so the shape is tested here rather than read off the block type.
+ *  (src/lib/fountain.ts is scoring-path and is not touched to add one.) */
+const PAGE_BREAK_RE = /^={3,}$/;
 
 // Strip Fountain's leading force/markup characters from a block's display text
 // so the FDX paragraph carries clean prose (e.g. "!action" → "action",
 // ".INT HOUSE" → "INT HOUSE", a trailing "^" dual-dialogue marker, "> " centering).
 function cleanBlockText(block: FountainBlock): string {
   let t = block.text.trim();
+  // Inline notes are non-printing text sitting inside a printing line. They
+  // used to ride into the FDX paragraph verbatim, so "MAYA pours coffee.
+  // [[check this]]" printed the reminder in the script. Removed here, with the
+  // space it leaves collapsed so the sentence still reads as written.
+  if (t.includes('[[')) t = t.replace(/\[\[[\s\S]*?\]\]/g, '').replace(/[ \t]{2,}/g, ' ').trim();
   if (block.type === 'scene_heading' && t.startsWith('.')) t = t.slice(1).trim();
   if (block.type === 'action' && t.startsWith('!')) t = t.slice(1);
   if (block.type === 'character' || block.type === 'dual_dialogue') {
@@ -70,7 +112,12 @@ function isDualDialogueMember(t: FountainBlockType): boolean {
 }
 
 function paragraphXml(e: FdxEntry, indent: string): string {
-  return `${indent}<Paragraph Type="${e.fdxType}">\n${indent}  <Text>${escapeXml(e.text)}</Text>\n${indent}</Paragraph>`;
+  if (e.pageBreak) {
+    return `${indent}<Paragraph Type="${e.fdxType}" StartsNewPage="Yes">\n${indent}  <Text></Text>\n${indent}</Paragraph>`;
+  }
+  const align = e.alignment ? ` Alignment="${e.alignment}"` : '';
+  const style = e.style ? ` Style="${e.style}"` : '';
+  return `${indent}<Paragraph Type="${e.fdxType}"${align}>\n${indent}  <Text${style}>${escapeXml(e.text)}</Text>\n${indent}</Paragraph>`;
 }
 
 // Walk the flat entry list, wrapping every contiguous dual-dialogue run
@@ -131,8 +178,11 @@ function buildTitlePageXml(info: ExportTitlePage): string {
 
 /**
  * Convert a Fountain script string to Final Draft (.fdx) XML.
- * Title-page lines (Title:, Credit:, Author:, etc.) and notes/boneyard blocks
- * are skipped from the body — FDX keeps those in separate structures.
+ * Title-page lines (Title:, Credit:, Author:, etc.) are skipped from the body —
+ * FDX keeps those in a separate structure — and so is every Fountain construct
+ * that is defined as never printed: boneyard comments, notes (on their own line
+ * and inline), section headings and synopses. A `===` page break is printing and
+ * is carried, as a paragraph that starts a new page.
  *
  * `titlePage` is either a plain title string or a {title, author, contact}
  * object; when omitted (or empty), the Fountain text's own leading title
@@ -147,7 +197,12 @@ export function fountainToFdx(fountain: string, titlePage?: TitlePageInput): str
   let pastTitlePage = false;
 
   for (const block of blocks) {
+    // Never printed, and therefore never carried: boneyard comments, notes on
+    // their own line, section headings and synopses. A page break is the one
+    // `synopsis`-typed block that IS printing, so it is separated out first.
     if (block.type === 'empty' || block.type === 'boneyard' || block.type === 'note') continue;
+    const isPageBreak = block.type === 'synopsis' && PAGE_BREAK_RE.test(block.text.trim());
+    if (!isPageBreak && (block.type === 'section' || block.type === 'synopsis')) continue;
 
     const text = cleanBlockText(block);
 
@@ -159,9 +214,19 @@ export function fountainToFdx(fountain: string, titlePage?: TitlePageInput): str
       pastTitlePage = true;
     }
 
+    if (isPageBreak) {
+      entries.push({ blockType: block.type, fdxType: 'Action', text: '', pageBreak: true });
+      continue;
+    }
     if (text === '') continue;
     const fdxType = FDX_TYPE[block.type] ?? 'Action';
-    entries.push({ blockType: block.type, fdxType, text });
+    entries.push({
+      blockType: block.type,
+      fdxType,
+      text,
+      ...(block.type === 'centered' ? { alignment: 'Center' as const } : {}),
+      ...(block.type === 'lyrics' ? { style: 'Italic' as const } : {}),
+    });
   }
 
   const info = resolveExportTitlePage(fountain, titlePage);

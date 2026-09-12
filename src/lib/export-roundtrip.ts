@@ -14,6 +14,22 @@
 // deleted; a transition that already ends in a terminator keeps it). What is
 // left is FORMAT, not defect, and this module is where it is said out loud.
 //
+// ── Round 2 (2026-09-12): the sentence was false in BOTH directions ─────────
+//
+// The review measured the claim above against the code and found it wrong
+// twice over. Three of the four constructs it said were "not carried" WERE
+// carried — as printed text: src/lib/fdx.ts mapped `section` and `synopsis` to
+// FDX's Action type, and an inline `[[note]]` rode into the action line it sat
+// in, so a writer's `# ACT ONE` came out of Final Draft as an action line in
+// the script. And five constructs that DO print did not survive: dual dialogue,
+// centered text, lyrics, a forced action line and a page break all came back as
+// bare action, one of them (`!INT. THE MIND OF A KILLER`) as a scene heading,
+// which made the round trip invent a scene.
+//
+// Both halves are fixed rather than reworded — see FDX_CONSTRUCT_FATE below,
+// which is the disclosure as a table and is what the round-trip suite asserts
+// construct by construct.
+//
 // ── MEASURED, on this repository's own inputs ───────────────────────────────
 //
 // `tests/core/export-roundtrip.test.ts` re-derives every number below.
@@ -26,6 +42,11 @@
 //   .fdx          17,450   the boneyard comments (1,843 words in this fixture)
 //   PDF text      17,447   the same, plus whatever page geometry cannot recover
 //   .docx              —   there is no .docx importer at all
+//
+// (That fixture uses nothing but boneyard comments, which is why it could not
+// catch the round-2 findings. tests/fixtures/fountain-constructs/
+// every-construct.fountain carries one of each construct and is measured
+// alongside it.)
 //
 // The FDX figure was 17,442 before the title-page and draft-date fixes, and the
 // report on the returned file said health 84.8 against the original's 84.4. The
@@ -53,10 +74,11 @@ export const EXPORT_ROUNDTRIP_NOTE: Record<ExportFormat, string> = {
     'Comes back whole — the same text, byte for byte. A draft with no title page '
     + 'gets one added on the way out, which changes its content hash.',
   fdx:
-    'Comes back whole, except Fountain comments, notes, synopses and section '
-    + 'headings: Final Draft has no equivalent for text that is never printed, so '
-    + 'they are not carried. Everything that prints — title page, scene headings, '
-    + 'action, dialogue, transitions — survives the round trip.',
+    'Everything that prints comes back: title page, scene headings, action, '
+    + 'dialogue, transitions, dual dialogue, centered text, lyrics and page '
+    + 'breaks. Fountain text that never prints — boneyard comments, notes '
+    + '(inline ones too), synopses and section headings — is left out rather '
+    + 'than carried, because Final Draft has no equivalent for it.',
   pdf:
     'Can be brought back, but a PDF carries no structure: each line is '
     + 'reconstructed from where it sits on the page, so line breaks and a few '
@@ -77,9 +99,10 @@ export const EXPORT_ROUNDTRIP_NOTE: Record<ExportFormat, string> = {
  */
 export const EXPORT_ROUNDTRIP_SUMMARY =
   'Coming back in: .fountain and .fdx re-import without losing anything that '
-  + 'prints; .fdx drops Fountain comments and notes, which Final Draft has no '
-  + 'construct for. A PDF is re-read from its page layout, so some line breaks are '
-  + 'inferred. A .docx cannot be re-imported at all.';
+  + 'prints; .fdx leaves out Fountain comments, notes, synopses and section '
+  + 'headings, which Final Draft has no construct for. A PDF is re-read from its '
+  + 'page layout, so some line breaks are inferred. A .docx cannot be re-imported '
+  + 'at all.';
 
 /**
  * The Fountain constructs that are DEFINED as never printed, and are therefore
@@ -90,6 +113,35 @@ export const EXPORT_ROUNDTRIP_SUMMARY =
  * set and nothing else — which is what turns the sentence above from a hedge
  * into a claim with a gate under it.
  */
+/**
+ * What an FDX round trip does to every construct `src/lib/fountain.ts` parses.
+ * This is the disclosure sentence above, itemised, and
+ * tests/core/export-roundtrip.test.ts asserts each row on
+ * tests/fixtures/fountain-constructs/every-construct.fountain — so the sentence
+ * cannot drift from the behaviour without a test failing.
+ *
+ *   'survives'  — comes back as the same Fountain construct it went out as.
+ *   'dropped'   — never printed, and deliberately not carried into the FDX
+ *                 body (rather than promoted to a printed action line).
+ *   'unforced'  — the one partial case: `!` is Fountain's force MARKER, not
+ *                 content. It comes back only where Fountain would otherwise
+ *                 misread the line (`!INT. …` keeps it and stays action);
+ *                 where the line reads as action without it, it is dropped.
+ *                 Forcing every all-caps action line instead would prefix `!`
+ *                 to text the writer never forced.
+ */
+export const FDX_CONSTRUCT_FATE = {
+  'dual dialogue (^)':            'survives',
+  'centered text (> … <)':        'survives',
+  'lyrics (~ …)':                 'survives',
+  'page break (===)':             'survives',
+  'forced action (! …)':          'unforced',
+  'boneyard comments (/* … */)':  'dropped',
+  'inline notes ([[ … ]])':       'dropped',
+  'synopses (= …)':               'dropped',
+  'section headings (# …)':       'dropped',
+} as const satisfies Record<string, 'survives' | 'dropped' | 'unforced'>;
+
 export const NON_PRINTING_FOUNTAIN_CONSTRUCTS = [
   'boneyard comments (/* … */)',
   'inline notes ([[ … ]])',

@@ -7,10 +7,14 @@
 // ...</Paragraph></Content> body structure — the same paragraph-type
 // vocabulary src/lib/fdx.ts writes (Scene Heading, Action, Character,
 // Parenthetical, Dialogue, Transition, Shot) plus the generic "General" type
-// real Final Draft documents also use. Title-page metadata, revision marks,
-// scene numbers, character/element style tables, and other FDX furniture
-// are intentionally ignored — the doctor only needs the script body as
-// Fountain text.
+// real Final Draft documents also use; the <DualDialogue> wrapper; and the
+// three paragraph/text attributes that carry a Fountain printing construct FDX
+// has no element for — Alignment="Center" (centered text), Text Style="Italic"
+// (a lyric) and StartsNewPage="Yes" (a page break). Revision marks, scene
+// numbers, character/element style tables, and other FDX furniture are
+// intentionally ignored — the doctor only needs the script body as Fountain
+// text; the title page is separated out and re-emitted as a Fountain title
+// block (see below).
 //
 // Why a tolerant regex/state-machine walk instead of an XML parser
 // dependency: Node has no built-in XML parser, and FDX's paragraph/text
@@ -26,6 +30,72 @@ type FdxKind =
   | 'parenthetical'
   | 'dialogue'
   | 'transition';
+
+// ── Printing constructs FDX has no element for (2026-09-12, review round 2) ──
+//
+// Five Fountain constructs the product's own parser supports came back from an
+// FDX round trip as something else. MEASURED, one round trip through
+// fountainToFdx -> fdxToFountain on a marked-up screenplay:
+//
+//   written                        came back as
+//   DAN ^                          DAN                  (dual dialogue lost)
+//   > THE END <                    THE END              (an all-caps action line)
+//   ~Somewhere a radio plays       Somewhere a radio…   (a plain action line)
+//   !FORCED ACTION LINE IN CAPS    FORCED ACTION LINE…  (the force gone)
+//   !INT. THE MIND OF A KILLER     INT. THE MIND OF…    (a SCENE HEADING — the
+//                                                        round trip invented a
+//                                                        scene: 2 -> 3)
+//   ===                            ==                   (a synopsis marker)
+//
+// Four of the six are repaired here, in the importer, because the exporter was
+// already writing enough to reconstruct them: <DualDialogue> (which
+// src/lib/fdx.ts has always emitted and this file simply did not read),
+// Alignment="Center", Text Style="Italic" and StartsNewPage="Yes". The fifth and
+// sixth are the forced action line, repaired by re-forcing on the way back —
+// see NEEDS_FORCED_ACTION_RE.
+
+/** Fountain's own block-opening markers, as they apply to a line standing alone
+ *  in the document this importer emits (every action paragraph is written
+ *  between blank lines). A paragraph Final Draft calls Action whose text
+ *  matches any of these would be re-read as a DIFFERENT block type — a scene
+ *  heading, a section, a synopsis, a note, a lyric, a centered line, a
+ *  transition — so the `!` force marker is put back in front of it.
+ *
+ *  The character-cue case is deliberately NOT here. It is the one test in
+ *  src/lib/fountain.ts that depends on the NEXT line being non-blank, and this
+ *  importer always writes a blank line after an action paragraph, so it cannot
+ *  fire; forcing on it would prefix `!` to ordinary all-caps action lines
+ *  ("BLACK.", "SILENCE.") on every real script, which is a rewrite, not a
+ *  repair. */
+const NEEDS_FORCED_ACTION_RE = new RegExp(
+  [
+    '^\\.',                                    // forced scene heading
+    '^(INT|EXT|EST|I/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT/EXT|INT\u00c9RIEUR|EXT\u00c9RIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]',
+    '^#',                                       // section heading
+    '^=',                                       // synopsis (and a page break)
+    '^~',                                       // lyric
+    '^!',                                       // an already-forced line
+    '^\\[\\[[\\s\\S]*\\]\\]$',                    // a note on its own line
+    '^>[\\s\\S]*<$',                              // centered
+    '^(FADE IN:|FADE OUT\\.|CUT TO:|DISSOLVE TO:)$', // auto-detected transition
+  ].join('|'),
+  'iu',
+);
+
+/** The generic ALL-CAPS transition shape, which src/lib/fountain.ts tests
+ *  case-sensitively — so it is kept out of the case-insensitive union above. */
+const GENERIC_TRANSITION_LINE_RE = /^[A-Z ]+ TO:$/;
+
+/** An Action paragraph's text, forced with `!` when Fountain would otherwise
+ *  read it as some other block. The marker is Fountain's own and is what
+ *  src/lib/fdx.ts's cleanBlockText strips on the way out, so this is the exact
+ *  inverse of the export. */
+function formatAction(text: string): string {
+  const t = text.trim();
+  const misread = NEEDS_FORCED_ACTION_RE.test(t)
+    || (GENERIC_TRANSITION_LINE_RE.test(t) && t === t.toUpperCase());
+  return misread ? `!${t}` : t;
+}
 
 // FDX paragraph Type → our internal Fountain block kind. "Shot" and
 // "General" have no dedicated Fountain syntax (Fountain shots are just
@@ -205,9 +275,34 @@ export function fdxToFountain(fdxXml: string): { fountain: string; warnings: str
   const contentMatch = /<Content\b[^>]*>([\s\S]*?)<\/Content>/i.exec(withoutTitlePage);
   const contentXml = contentMatch ? contentMatch[1] : '';
 
-  const rawParagraphs: Array<{ type: string; text: string }> = [];
+  // Every <DualDialogue> wrapper's span in the body, so a paragraph can be told
+  // whether it sits inside one. src/lib/fdx.ts has always written this element
+  // — this importer simply never read it, which is why the `^` that makes a
+  // second speaker share the page came back missing.
+  const dualSpans: Array<{ start: number; end: number }> = [];
+  const DUAL_RE = /<DualDialogue\b[^>]*>[\s\S]*?<\/DualDialogue>/gi;
+  let dm: RegExpExecArray | null;
+  while ((dm = DUAL_RE.exec(contentXml)) !== null) {
+    dualSpans.push({ start: dm.index, end: dm.index + dm[0].length });
+  }
+  const dualGroupAt = (index: number): number =>
+    dualSpans.findIndex(sp => index >= sp.start && index < sp.end);
+
+  interface RawParagraph {
+    type: string;
+    text: string;
+    /** Index of the <DualDialogue> wrapper this paragraph sits in, or -1. */
+    dualGroup: number;
+    /** Alignment="Center" — Fountain's `> … <`. */
+    centered: boolean;
+    /** The whole paragraph is one italic <Text> run — Fountain's `~lyric`. */
+    lyric: boolean;
+    /** StartsNewPage="Yes" on an empty paragraph — Fountain's `===`. */
+    pageBreak: boolean;
+  }
+  const rawParagraphs: RawParagraph[] = [];
   const PARAGRAPH_RE = /<Paragraph\b([^>]*)>([\s\S]*?)<\/Paragraph>/gi;
-  const TEXT_RE = /<Text\b[^>]*>([\s\S]*?)<\/Text>/gi;
+  const TEXT_RE = /<Text\b([^>]*)>([\s\S]*?)<\/Text>/gi;
 
   let pm: RegExpExecArray | null;
   while ((pm = PARAGRAPH_RE.exec(contentXml)) !== null) {
@@ -215,19 +310,49 @@ export function fdxToFountain(fdxXml: string): { fountain: string; warnings: str
     const inner = pm[2];
     const typeMatch = /\bType\s*=\s*"([^"]*)"/i.exec(attrs);
     const rawType = typeMatch ? typeMatch[1] : '';
+    const centered = /\bAlignment\s*=\s*"Center"/i.test(attrs);
+    const startsNewPage = /\bStartsNewPage\s*=\s*"Yes"/i.test(attrs);
 
     // Concatenate ALL <Text> runs inside the paragraph — Final Draft splits
     // styled spans (e.g. a bold or italic word mid-sentence) into sibling
     // <Text> elements that together make up the paragraph's full text.
     let rawText = '';
+    let runs = 0;
+    let italicRuns = 0;
     TEXT_RE.lastIndex = 0;
     let tm: RegExpExecArray | null;
-    while ((tm = TEXT_RE.exec(inner)) !== null) rawText += tm[1];
+    while ((tm = TEXT_RE.exec(inner)) !== null) {
+      runs++;
+      if (/\bStyle\s*=\s*"[^"]*Italic/i.test(tm[1])) italicRuns++;
+      rawText += tm[2];
+    }
 
     const text = decodeXmlEntities(rawText).trim();
+
+    // A page break is an EMPTY paragraph that starts a new page, so it has to
+    // be recognised before the empty-paragraph skip below — otherwise the one
+    // construct whose whole content is its attribute is the one that is lost.
+    if (text === '' && startsNewPage) {
+      rawParagraphs.push({ type: rawType, text: '', dualGroup: -1, centered: false, lyric: false, pageBreak: true });
+      continue;
+    }
     if (text === '') continue; // spacer / empty paragraph — nothing to carry over
 
-    rawParagraphs.push({ type: rawType, text });
+    // A wholly italic paragraph is read back as a Fountain lyric. FDX has no
+    // lyric element and Fountain renders lyrics italic, so this is the closest
+    // true statement the format allows in both directions. On a third-party
+    // document it can read an italicised action paragraph as a lyric — which
+    // still renders italic, so the writer's intent survives either way.
+    const lyric = runs > 0 && italicRuns === runs;
+
+    rawParagraphs.push({
+      type: rawType,
+      text,
+      dualGroup: dualGroupAt(pm.index),
+      centered,
+      lyric,
+      pageBreak: false,
+    });
   }
 
   if (rawParagraphs.length === 0) {
@@ -239,6 +364,11 @@ export function fdxToFountain(fdxXml: string): { fountain: string; warnings: str
 
   const lines: string[] = [];
   let inSpeech = false; // inside a Character → [Parenthetical/Dialogue]* run
+  // Character cues already emitted inside the <DualDialogue> wrapper currently
+  // being walked. Fountain marks the SECOND and later speakers of a
+  // side-by-side exchange with a trailing `^`; the first is an ordinary cue.
+  let dualGroupSeen = -1;
+  let cuesInDualGroup = 0;
 
   // Blank-line discipline: Fountain needs a blank line between blocks, but
   // NOT between the Character/Parenthetical/Dialogue lines of one speech.
@@ -249,6 +379,17 @@ export function fdxToFountain(fdxXml: string): { fountain: string; warnings: str
   };
 
   for (const para of rawParagraphs) {
+    if (para.dualGroup !== dualGroupSeen) {
+      dualGroupSeen = para.dualGroup;
+      cuesInDualGroup = 0;
+    }
+
+    if (para.pageBreak) {
+      openNewBlock();
+      lines.push('===');
+      continue;
+    }
+
     let kind = KNOWN_TYPES[para.type];
     if (!kind) {
       if (!unknownTypesWarned.has(para.type)) {
@@ -270,11 +411,15 @@ export function fdxToFountain(fdxXml: string): { fountain: string; warnings: str
         lines.push(formatTransition(para.text));
         break;
 
-      case 'character':
+      case 'character': {
         openNewBlock();
-        lines.push(para.text.toUpperCase());
+        const cue = para.text.toUpperCase();
+        const dual = para.dualGroup >= 0 && cuesInDualGroup > 0;
+        if (para.dualGroup >= 0) cuesInDualGroup++;
+        lines.push(dual ? `${cue} ^` : cue);
         inSpeech = true;
         break;
+      }
 
       case 'parenthetical':
         if (!inSpeech) openNewBlock();
@@ -289,7 +434,11 @@ export function fdxToFountain(fdxXml: string): { fountain: string; warnings: str
       case 'action':
       default:
         openNewBlock();
-        lines.push(para.text);
+        // Centering and lyric formatting are carried on the paragraph, not in
+        // its text, so they are re-marked here rather than being flattened.
+        if (para.centered) lines.push(`> ${para.text} <`);
+        else if (para.lyric) lines.push(`~${para.text}`);
+        else lines.push(formatAction(para.text));
         break;
     }
   }
