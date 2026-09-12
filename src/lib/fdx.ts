@@ -113,6 +113,13 @@ function buildTitlePageXml(info: ExportTitlePage): string {
       parts.push(`      <Paragraph Type="Contact"><Text>${escapeXml(line)}</Text></Paragraph>`);
     }
   }
+  // 2026-09-12 (adversarial finding #18): the draft date. FDX's own title-page
+  // vocabulary has a "Draft Date" paragraph type, and server/lib/fdx-import.ts
+  // maps it straight back to Fountain's `Draft date:` key — so this is the last
+  // non-boneyard line an export-and-reimport round trip used to lose.
+  if (info.draftDate) {
+    parts.push(`      <Paragraph Type="Draft Date"><Text>${escapeXml(info.draftDate)}</Text></Paragraph>`);
+  }
   return [
     '  <TitlePage>',
     '    <Content>',

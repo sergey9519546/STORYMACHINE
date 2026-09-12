@@ -71,19 +71,102 @@ function formatSceneHeading(text: string): string {
   return /^(INT|EXT|EST|INT\.\/EXT|I\/E)[. ]/i.test(upper) ? upper : `.${upper}`;
 }
 
-// Transition → uppercase, ending in ":". Force it with a leading "> " when
-// the text wouldn't be auto-detected by Fountain's own transition heuristic
-// (the FADE IN:/FADE OUT./CUT TO:/DISSOLVE TO: set, or the general
-// "ALL CAPS TO:" pattern) so a custom transition like "SMASH TO:" or
-// "MATCH CUT TO:" survives the round trip instead of silently becoming a
-// plain action line.
+// Transition → uppercase, terminated. Force it with a leading "> " when the
+// text wouldn't be auto-detected by Fountain's own transition heuristic (the
+// FADE IN:/FADE OUT./CUT TO:/DISSOLVE TO: set, or the general "ALL CAPS TO:"
+// pattern) so a custom transition like "SMASH TO:" or "MATCH CUT TO:" survives
+// the round trip instead of silently becoming a plain action line.
+//
+// 2026-09-12 (adversarial finding #18). The terminator was appended whenever the
+// text did not already end in ":", so a transition ALREADY terminated with a
+// period came back mangled:
+//
+//     FADE OUT.   ->  withColon "FADE OUT.:"  ->  no auto-detect  ->  "> FADE OUT.:"
+//
+// MEASURED: all six `FADE OUT.` transitions in
+// tests/fixtures/feature-length/assembled-feature.fountain, and the one in
+// data/screenplays/runoff.fountain, came back that way — a writer who
+// round-tripped a draft through Final Draft got "> FADE OUT.:" on every page
+// break. A transition that already carries a terminator keeps it; only an
+// unterminated one gets a colon.
 const AUTO_DETECTED_TRANSITION_RE = /^(FADE IN:|FADE OUT\.|CUT TO:|DISSOLVE TO:)$/;
 const GENERIC_TRANSITION_RE = /^[A-Z ]+ TO:$/;
 function formatTransition(text: string): string {
   const upper = text.toUpperCase();
-  const withColon = upper.endsWith(':') ? upper : `${upper}:`;
-  const autoDetected = AUTO_DETECTED_TRANSITION_RE.test(withColon) || GENERIC_TRANSITION_RE.test(withColon);
-  return autoDetected ? withColon : `> ${withColon}`;
+  const terminated = /[:.]$/.test(upper) ? upper : `${upper}:`;
+  const autoDetected = AUTO_DETECTED_TRANSITION_RE.test(terminated) || GENERIC_TRANSITION_RE.test(terminated);
+  return autoDetected ? terminated : `> ${terminated}`;
+}
+
+// ── The title page ─────────────────────────────────────────────────────────
+//
+// 2026-09-12 (adversarial finding #18). This importer used to DELETE the whole
+// <TitlePage> subtree with a one-line regex, on the reasoning that "the doctor
+// only needs the script body". The result: a writer who exported to Final Draft
+// and imported the file back lost their Title, Credit, Author and Draft date —
+// and the report on the returned file no longer matched the report on the file
+// they sent, because the title-page words are part of the analysed text.
+// MEASURED on tests/fixtures/feature-length/assembled-feature.fountain:
+// 19,293 words -> 17,442, of which the title block is the recoverable part.
+//
+// The subtree is still kept OUT of the body (a Title paragraph is not an action
+// line); it is now re-emitted as the Fountain title block it came from, above
+// the body, where src/lib/fountain-title-block.ts and the exporter's own
+// resolveExportTitlePage both read it.
+//
+// FDX title-page paragraph Type -> Fountain title-block key. The four this
+// repository's own exporter writes (src/lib/fdx.ts's buildTitlePageXml) plus the
+// ones real Final Draft documents carry. An unrecognised Type is skipped rather
+// than guessed into a key: an invented key would render as a line of body text
+// in any other Fountain tool.
+const TITLE_PAGE_KEYS: Record<string, string> = {
+  'Title': 'Title',
+  'Credit': 'Credit',
+  'Author': 'Author',
+  'Authors': 'Authors',
+  'Source': 'Source',
+  'Draft Date': 'Draft date',
+  'Contact': 'Contact',
+  'Copyright': 'Copyright',
+  'Notes': 'Notes',
+};
+
+/** Fountain title-block lines for an FDX <TitlePage> subtree, or [] when there
+ *  is none. Repeated paragraphs of one Type (Final Draft's multi-line Contact
+ *  address, which src/lib/fdx.ts writes one paragraph per line) become that
+ *  key's indented continuation lines — Fountain's own multi-line value
+ *  convention, and the shape src/lib/fountain-title-block.ts parses back. */
+function titlePageLines(titlePageXml: string): string[] {
+  const byKey = new Map<string, string[]>();
+  const order: string[] = [];
+  const PARAGRAPH_RE = /<Paragraph\b([^>]*)>([\s\S]*?)<\/Paragraph>/gi;
+  const TEXT_RE = /<Text\b[^>]*>([\s\S]*?)<\/Text>/gi;
+  let pm: RegExpExecArray | null;
+  while ((pm = PARAGRAPH_RE.exec(titlePageXml)) !== null) {
+    const typeMatch = /\bType\s*=\s*"([^"]*)"/i.exec(pm[1]);
+    const key = TITLE_PAGE_KEYS[(typeMatch ? typeMatch[1] : '').trim()];
+    if (!key) continue;
+    let rawText = '';
+    TEXT_RE.lastIndex = 0;
+    let tm: RegExpExecArray | null;
+    while ((tm = TEXT_RE.exec(pm[2])) !== null) rawText += tm[1];
+    // A title-page value is one line: a newline inside it would end the whole
+    // title block at the first blank line and drop every key after it.
+    const text = decodeXmlEntities(rawText).replace(/\s*\n\s*/g, ' ').trim();
+    if (text === '') continue;
+    if (!byKey.has(key)) { byKey.set(key, []); order.push(key); }
+    byKey.get(key)!.push(text);
+  }
+
+  const lines: string[] = [];
+  for (const key of order) {
+    const values = byKey.get(key)!;
+    lines.push(`${key}: ${values[0]}`);
+    // Continuations are indented with a TAB, which Fountain's CONTINUATION_LINE
+    // convention accepts and which no key line can be mistaken for.
+    for (const extra of values.slice(1)) lines.push(`\t${extra}`);
+  }
+  return lines;
 }
 
 // Parenthetical → wrapped in "(...)" directly under the character. Final
@@ -106,9 +189,18 @@ export function fdxToFountain(fdxXml: string): { fountain: string; warnings: str
   // Final Draft always writes the script body's <Content> before the cover
   // page's <TitlePage><Content>...</Content></TitlePage>. Title-page
   // paragraphs (Title/Credit/Author/Contact/etc.) are a different structural
-  // layer from the script body and must never leak into the Fountain output,
-  // so drop the whole <TitlePage> subtree before looking for the body.
-  const withoutTitlePage = fdxXml.replace(/<TitlePage\b[^>]*>[\s\S]*?<\/TitlePage>/i, '');
+  // layer from the script body and must never leak into the BODY, so the whole
+  // <TitlePage> subtree is separated out before looking for the body.
+  //
+  // 2026-09-12 (adversarial finding #18): separated, not discarded. It used to be
+  // replaced with '' and thrown away, which is how an export-and-reimport round
+  // trip silently deleted a writer's title page. It is re-emitted as a Fountain
+  // title block above the body — see titlePageLines above.
+  const titlePageMatch = /<TitlePage\b[^>]*>[\s\S]*?<\/TitlePage>/i.exec(fdxXml);
+  const withoutTitlePage = titlePageMatch
+    ? fdxXml.slice(0, titlePageMatch.index) + fdxXml.slice(titlePageMatch.index + titlePageMatch[0].length)
+    : fdxXml;
+  const titleBlock = titlePageMatch ? titlePageLines(titlePageMatch[0]) : [];
 
   const contentMatch = /<Content\b[^>]*>([\s\S]*?)<\/Content>/i.exec(withoutTitlePage);
   const contentXml = contentMatch ? contentMatch[1] : '';
@@ -202,5 +294,10 @@ export function fdxToFountain(fdxXml: string): { fountain: string; warnings: str
     }
   }
 
-  return { fountain: `${lines.join('\n')}\n`, warnings };
+  // The title block leads the document, then a blank line, then the body —
+  // Fountain's own convention (the block ends at the first blank line), and the
+  // exact shape src/lib/fountain-title-block.ts and src/lib/fdx.ts's own
+  // title-page skip both expect.
+  const withTitle = titleBlock.length > 0 ? [...titleBlock, '', ...lines] : lines;
+  return { fountain: `${withTitle.join('\n')}\n`, warnings };
 }

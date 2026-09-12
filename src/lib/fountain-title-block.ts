@@ -18,6 +18,10 @@ export interface ParsedFountainTitleBlock {
   title?: string;
   author?: string;
   contact?: string;
+  /** `Draft date:` — parsed since 2026-09-12 (adversarial finding #18) so that
+   *  an export carries it and a re-import gets it back. Only the value; the key
+   *  is re-emitted by whoever writes a title page. */
+  draftDate?: string;
 }
 
 // A top-level "Key: value" line. Fountain key names are letters/digits/space
@@ -70,11 +74,16 @@ export function parseFountainTitleBlock(scriptText: string): ParsedFountainTitle
   const title = fields.get("title");
   const author = fields.get("author") ?? fields.get("authors");
   const contact = fields.get("contact") ?? fields.get("contact info");
+  const draftDate = fields.get("draft date");
+  // The null test is unchanged on purpose: a block carrying ONLY a draft date is
+  // still "no title page this app can use", so a script that opens with a stray
+  // `Draft date:` line does not suddenly acquire one.
   if (!title && !author && !contact) return null;
 
   const result: ParsedFountainTitleBlock = {};
   if (title) result.title = title;
   if (author) result.author = author;
   if (contact) result.contact = contact;
+  if (draftDate) result.draftDate = draftDate;
   return result;
 }

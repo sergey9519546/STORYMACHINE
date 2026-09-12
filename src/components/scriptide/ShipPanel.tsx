@@ -29,6 +29,9 @@
  */
 import React from "react";
 import { Download, FileText, ShieldCheck, X } from "lucide-react";
+import {
+  EXPORT_ROUNDTRIP_NOTE, EXPORT_ROUNDTRIP_SUMMARY, type ExportFormat,
+} from "../../lib/export-roundtrip.ts";
 import SnapshotManager from "./SnapshotManager";
 
 interface Snapshot {
@@ -58,13 +61,20 @@ interface ShipPanelProps {
   onClose: () => void;
 }
 
+// 2026-09-12 (adversarial finding #18): each action now carries the format it
+// IS and what that format does on the way BACK IN. The round-trip sentence is
+// src/lib/export-roundtrip.ts's, shared with the test that measures it, so the
+// button cannot promise a fidelity the importer does not deliver.
 const EXPORT_ACTIONS = (props: ShipPanelProps) =>
   [
-    { label: "PDF", hint: "Print-ready pages", icon: FileText, fn: props.onExportPDF },
-    { label: "Fountain", hint: "Plain-text .fountain source", icon: FileText, fn: props.onExportFountain },
-    { label: "Final Draft", hint: ".fdx for FDX-native tools", icon: FileText, fn: props.onExportFDX },
-    { label: "Word", hint: ".docx for notes and redlines", icon: FileText, fn: props.onExportDOCX },
-  ] as const;
+    { label: "PDF", hint: "Print-ready pages", format: "pdf", icon: FileText, fn: props.onExportPDF },
+    { label: "Fountain", hint: "Plain-text .fountain source", format: "fountain", icon: FileText, fn: props.onExportFountain },
+    { label: "Final Draft", hint: ".fdx for FDX-native tools", format: "fdx", icon: FileText, fn: props.onExportFDX },
+    { label: "Word", hint: ".docx for notes and redlines", format: "docx", icon: FileText, fn: props.onExportDOCX },
+  ] as const satisfies ReadonlyArray<{
+    label: string; hint: string; format: ExportFormat;
+    icon: typeof FileText; fn: () => void;
+  }>;
 
 export default function ShipPanel(props: ShipPanelProps) {
   const { title, isEmptyDraft, onClose } = props;
@@ -108,13 +118,19 @@ export default function ShipPanel(props: ShipPanelProps) {
             <p className="sm-slug">Empty draft — type a scene before exporting.</p>
           )}
           <div className="grid grid-cols-2 gap-2">
-            {EXPORT_ACTIONS(props).map(({ label, hint, icon: Icon, fn }) => (
+            {EXPORT_ACTIONS(props).map(({ label, hint, format, icon: Icon, fn }) => (
               <button
                 key={label}
                 type="button"
                 onClick={fn}
                 disabled={isEmptyDraft}
-                title={hint}
+                // Both sentences: what the file is, and what happens if it comes
+                // back. The hover title is the only place a per-format note fits
+                // without turning four buttons into four paragraphs; the
+                // paragraph under the grid is the always-visible version, so a
+                // reader who never hovers still gets the fact.
+                title={`${hint}. ${EXPORT_ROUNDTRIP_NOTE[format]}`}
+                data-export-format={format}
                 className="sm-btn flex flex-col items-start gap-0.5 !justify-start px-3 py-3 text-left disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <span className="flex items-center gap-1.5">
@@ -127,6 +143,13 @@ export default function ShipPanel(props: ShipPanelProps) {
               </button>
             ))}
           </div>
+          {/* Finding #18 (2026-09-12): export -> re-import is not lossless, and
+              nothing in the product said so. Measured per format in
+              src/lib/export-roundtrip.ts and pinned by
+              tests/core/export-roundtrip.test.ts. */}
+          <p className="text-xs leading-relaxed text-[var(--sm-ink-soft)]" data-export-roundtrip>
+            {EXPORT_ROUNDTRIP_SUMMARY}
+          </p>
         </section>
 
         <div className="my-5 border-t border-[var(--sm-hair)]" />

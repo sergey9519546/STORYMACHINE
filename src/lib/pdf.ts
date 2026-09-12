@@ -99,6 +99,15 @@ function buildTitlePageLines(info: ExportTitlePage): LayoutLine[] {
     }
   }
 
+  // The draft date (2026-09-12, adversarial finding #18): bottom RIGHT, the
+  // industry convention, and the corner the contact block does not occupy — so a
+  // title page carrying both prints both rather than one over the other.
+  if (info.draftDate) {
+    const text = `Draft date: ${info.draftDate}`;
+    const rightEdge = PAGE_WIDTH - 1 * PT_PER_INCH;
+    lines.push({ text, xPt: rightEdge - text.length * CHAR_WIDTH, yPt: 1 * PT_PER_INCH });
+  }
+
   return lines;
 }
 

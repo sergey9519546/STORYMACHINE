@@ -18,6 +18,16 @@ export interface ExportTitlePage {
   title?: string;
   author?: string;
   contact?: string;
+  /** The Fountain title page's `Draft date:` value (2026-09-12, adversarial
+   *  finding #18).
+   *
+   *  It was absent from this model, so every exporter dropped it: exporting the
+   *  231-scene fixture to FDX and importing it back returned a title page with
+   *  Title, Credit and Author restored and `Draft date: 2026-09-06` gone —
+   *  measured as the ONE remaining non-boneyard line lost by that round trip.
+   *  It is the field a producer holding two drafts of the same script uses to
+   *  tell them apart, which is precisely the case an export exists for. */
+  draftDate?: string;
 }
 
 /** Accepts either a plain title string (the legacy shorthand every exporter
@@ -32,11 +42,16 @@ function normalize(input: TitlePageInput): ExportTitlePage | undefined {
   const title = raw.title?.trim();
   const author = raw.author?.trim();
   const contact = raw.contact?.trim();
+  const draftDate = raw.draftDate?.trim();
+  // A draft date ALONE is not a title page: it is a stamp on one, and a cover
+  // sheet carrying nothing but "Draft date: …" is the page of blank placeholders
+  // this function exists to refuse. It rides along with the other three.
   if (!title && !author && !contact) return undefined;
   return {
     ...(title ? { title } : {}),
     ...(author ? { author } : {}),
     ...(contact ? { contact } : {}),
+    ...(draftDate ? { draftDate } : {}),
   };
 }
 

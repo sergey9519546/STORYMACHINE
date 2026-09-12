@@ -68,9 +68,15 @@ function cleanText(block: FountainBlock): string {
 // half of that convention).
 function titleParagraph(
   text: string,
-  opts: { size?: number; bold?: boolean; italics?: boolean; align?: 'center' | 'left'; spaceBefore: number },
+  opts: { size?: number; bold?: boolean; italics?: boolean; align?: 'center' | 'left' | 'right'; spaceBefore: number },
 ): string {
-  const jc = opts.align === 'center' ? '<w:jc w:val="center"/>' : '';
+  // 'left' stays unspecified rather than emitting <w:jc w:val="left"/>: left is
+  // Word's default for these styles, and every title page exported before
+  // 2026-09-12 has no <w:jc> on those paragraphs. Adding one would change bytes
+  // for a fact that was already true.
+  const jc = opts.align === 'center'
+    ? '<w:jc w:val="center"/>'
+    : (opts.align === 'right' ? '<w:jc w:val="right"/>' : '');
   const rPr = `<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/>${opts.bold ? '<w:b/>' : ''}${opts.italics ? '<w:i/>' : ''}<w:sz w:val="${opts.size ?? 24}"/>`;
   return `    <w:p><w:pPr><w:spacing w:before="${opts.spaceBefore}"/>${jc}</w:pPr><w:r><w:rPr>${rPr}</w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
 }
@@ -90,6 +96,14 @@ function buildTitlePageParagraphs(info: ExportTitlePage): string[] {
     contactLines.forEach((line, i) => {
       paras.push(titleParagraph(line, { align: 'left', spaceBefore: i === 0 ? TW(2.5) : 0 }));
     });
+  }
+  // The draft date (2026-09-12, adversarial finding #18) — right-aligned under
+  // the contact block, matching the PDF's bottom-right placement so the two
+  // exported cover sheets carry the same fields in the same corners.
+  if (info.draftDate) {
+    paras.push(titleParagraph(`Draft date: ${info.draftDate}`, {
+      align: 'right', spaceBefore: info.contact ? 0 : TW(2.5),
+    }));
   }
 
   // Hard page break: the script body (pushed below) always starts fresh.
