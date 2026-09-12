@@ -365,3 +365,241 @@ suite: inside context A its per-button reloads put ~50 requests into the same
 
 Nothing in this lane was narrowed, skipped, or silently widened relative to the
 brief's seven items.
+
+---
+
+## Round 2
+
+**Worktree:** `/home/user/wt-writer` · **Branch:** `lane/writer-loop-client`,
+now from `main` at `f94d587e` · **Round-1 reviewed object:** `718a0b1d` ·
+**Round-2 tip:** `d0d1b759`, pushed after every commit.
+
+```
+d0d1b759 fix(coverage): revert the unmount abort — it breaks the golden path under StrictMode
+f5e42b35 fix(verify,coverage): give the gates their own rate-limit budget; disclose the PDF repair's edit
+cb456436 fix(verify): the waitForFunction fix reaches all four suites, with a guard
+7734452b fix(debris): remove a stray probe comment, correct two dangling claims pointers
+```
+
+14 files, +910 / −53 on top of the reviewed tip. Every fail-first number below is
+measured against **718a0b1d** (the tree the review read), not against
+`f94d587e` — these are fixes to this lane's own work.
+
+### The seven review items
+
+| # | item | done | evidence |
+|---|---|---|---|
+| 1 | `verify:surfaces` green, fixed at the cause | **yes** | 3/3 idle runs **246/246, exit 0**; peak request window measured |
+| 2 | stray `// probe` | **yes** | deleted; `percentile-copy.ts` |
+| 3 | two dangling claims pointers | **yes** | rows 103→94, 102→95, plus a guard |
+| 4 | the eight remaining `waitForFunction` misuses | **yes** | all eight fixed; grep-style guard added |
+| 5 | "Paste from PDF?" rewrites the draft silently | **yes** | disclosed before AND after; button withheld when it cannot act; row 100 corrected |
+| 6 | stale docstring naming `onLoadSampleIntoEditor` | **yes** | names `onRepairDraft` and why |
+| 7 | follow-up B proved at source, not behaviour | **yes, and more** | said below; the gap was attempted, measured, and reverted |
+
+### Item 1 — the gate is green, and the review's diagnosis is now a number
+
+The reviewer was right and my round-1 report was wrong: I recorded this gate as
+"0 — 242/242 assertions passed" and blamed load for the rest. The cause is the
+limiter, and the suite now measures it.
+
+**The measurement.** `scripts/verify-p2-p3-surfaces.mjs` gained a permanent
+budget meter: it timestamps every `/api/` request the suite causes — from the
+browser (a `request` listener on all eight contexts, paired with
+`wireConsoleCapture` so a new context cannot be added unmetered) and from the
+script's own probes (one `globalThis.fetch` wrapper, rather than ten call
+sites) — and prints the busiest 60-second window. Identical across all three
+runs:
+
+```
+[verify] API-request budget: 133 /api/ requests total, peak 124 in any 60 s window
+         (gameLimiter production ceiling 120/min; the gate's server runs with
+          VERIFY_RATE_LIMIT_MULTIPLIER=10, i.e. 1200)
+```
+
+**124 against a ceiling of 120.** That is the whole defect, and it explains the
+flakiness exactly: the suite sits four requests over the line, so whether the
+feature-length phase's doctor POST was the 121st or the 119th depended on
+scheduling — which is why it failed three times for the reviewer and passed
+sometimes for me. It was never load.
+
+**The fix, and what it is not.** `server/lib/session-store.ts` resolves
+`VERIFY_RATE_LIMIT_MULTIPLIER` once at module load, default **1**, and the three
+limiters take `rateLimitMax(n)`.
+`scripts/lib/keyless-browser-certification.mjs` — the one place that sets it —
+gives every browser gate's own isolated server 10×. Not "off": a runaway loop in
+a gate should still trip a ceiling, and 1200 leaves ~10× headroom over today's
+measured 124 for the phases a future lane adds.
+
+`tests/core/rate-limit-verification-override.test.ts` (9 assertions) is the
+safety catch, and it checks the property rather than the intention:
+
+- unset gives the production numbers (120 / 20 / 10) — asserted in a process that
+  runs with the variable absent, like every deployment;
+- ten hostile values (`'0'`, `'-5'`, `'51'`, `'Infinity'`, `'NaN'`,
+  `'10; rm -rf /'`, …) all fall back to the production ceiling, and `'9.9'`
+  floors to 9× — each probed in a child process, because the resolution is a
+  module-scope constant;
+- **no deployment path names it**: Dockerfile, docker-compose.yml, package.json,
+  server.ts, .env.example, all of `.github/`, `server/` and `src/` — 173 files
+  scanned;
+- every file that merely *names* it is on an explicit allowlist with a reason,
+  scanned with `git grep --untracked` so a new file is caught before it is
+  committed.
+
+Two alternatives are recorded beside the code with why they lost: a per-phase
+identity needs `TRUST_PROXY` (trading a limiter artifact for a proxy-trust
+artifact in every other assertion the suite makes), and waiting out the window
+papers over the count and breaks the next time a phase is added.
+
+**And a lost request can no longer delete a phase.** The three `HEALTH` waits are
+recorded failures, not throws. An unhandled throw ends `main()`, which is how one
+429 removed 24 assertions while the run printed "218/218 passed".
+
+**Three runs, idle machine, no edits between them:**
+
+| run | load at start | result |
+|---|---|---|
+| 1 | 2.12 / 4 cpus | **246/246, exit 0** — peak 124/60 s |
+| 2 | 2.16 / 4 cpus | **246/246, exit 0** — peak 124/60 s |
+| 3 | 2.91 / 4 cpus | **246/246, exit 0** — peak 124/60 s |
+
+246, not 242: the phases that used to be deleted now run, and item 5 added four.
+
+**A fourth run is not counted, and here is why.** My first attempt failed
+(`P2-generative :: Sample coverage still produces a verdict with Labs ON`)
+because I edited `CoverageSummary.tsx` while it was running. The gates drive the
+DEV build — `server/app.ts` mounts Vite middleware unless `NODE_ENV=production` —
+so a live edit reaches the browser mid-suite. That run is void and excluded; the
+three above are on the committed tree with no edits in between.
+
+### Item 5 — what the PDF repair does, said out loud
+
+The reviewer's judgement is accepted in full: the messaging was honest, the
+*action* was not disclosed. Reproduced exactly —
+`normalizeScreenplay` collapses blank-line runs and joins wrapped lines, so
+
+```
+BEFORE  "The room was cold.\n\n\n\n\nMaya opened the door.\n\n\n\n\nShe said nothing.\n\n\n\n\nThe tape was still running.\n"
+AFTER   "The room was cold. Maya opened the door. She said nothing. The tape was still running.\n"
+```
+
+four beats become one paragraph. Three changes:
+
+1. **Before the click** — the button's `title` says "Rewrites your draft with the
+   screenplay normaliser — blank lines collapsed, wrapped lines joined — and runs
+   coverage on the result. Ctrl+Z undoes it." A writer should not have to press a
+   button to learn that it rewrites their draft.
+2. **After the click** — the outcome sentence names the edit and the undo:
+   *"…Your draft was rewritten to do it: blank lines collapsed and wrapped lines
+   joined. Press Ctrl+Z (⌘Z on a Mac) to put it back. To get coverage, add a
+   scene heading such as INT. KITCHEN - DAY."*
+3. **Where it cannot act, it is not offered.** The button renders only when
+   `normalizeScreenplay(fountain) !== fountain`, computed once per refusal in a
+   memo and read by the click, so what the card offers and what it does cannot
+   drift. The no-op branch survives as a documented defensive path, not a normal
+   one.
+
+**Claims row 100 is rewritten and says so.** Its round-1 text called the result
+"the re-spaced draft now in the editor for the writer to keep working in". That
+was false in the only state where the control acts, and the row now says that in
+those words.
+
+Driven in both states (`P2-format`, four new assertions):
+
+```
+[PASS] a paste the normaliser cannot change is offered no "Paste from PDF?" button at all — buttons rendered=0
+[PASS] the button discloses that it REWRITES the draft, before the click, and names the undo
+[PASS] the repair really does rewrite the writer's draft — beforeLen=112 afterLen=88 changed=true
+[PASS] the outcome names the edit AND the undo, and the button is not re-offered
+```
+
+### Item 7 — proved at source, and the gap is worse than "not closed"
+
+**Said plainly, as asked:** the supersede-abort is proved by source and by a
+guard that fails without it. The reviewer could construct no UI path that starts
+two concurrent analyses, and neither can I: during a run the header control is
+replaced by Cancel and the banner button is disabled, so both re-run affordances
+are unreachable while the abort would matter. The round-1 commit message's "two
+full 14-pass analyses competing for the doctor pool" describes the **test
+harness's** double-click, not a writer's path. That sentence overclaimed.
+
+**The gap the reviewer named is real, and it is not a one-line fix — measured.**
+I built the obvious repair (`abortRef.current?.abort()` in an unmount cleanup)
+and the gate caught what it does. `src/main.tsx` renders under `<StrictMode>`, so
+in the dev build every gate drives, React mounts → effects → cleanups → effects.
+The cleanup aborts the panel's *first* sample run, and the mount effect's B-4
+guards (`sampleRunRef` / `lastRunTextRef`, which exist to stop a second analysis
+of byte-identical text) then correctly refuse to start another:
+
+```
+[FAIL] P3 :: Sample coverage produces a rendered verdict (Doctor reachable end to end)
+       — summary panel verdict text present=false
+```
+
+That is the golden path. It is reverted (`d0d1b759`). What ships is the finding,
+written above `abortRef` where the next person to reach for that cleanup reads it
+first, plus a test asserting the naive fix is **not** in the tree and the note
+**is**. Closing it properly means distinguishing a real unmount from StrictMode's
+simulated one, or making the run-once guards survivable across an aborted run —
+a change to the golden path's concurrency contract, and the right size for its
+own brief.
+
+### Items 2, 3, 4, 6 — the small ones
+
+- **2.** `// probe` deleted from `src/lib/percentile-copy.ts`.
+- **3.** `StartScreen.tsx` row 103 → **94**, `CoverageSummary.tsx` row 102 → **95**.
+  `tests/core/claims-row-citations.test.ts` now parses the register for the rows
+  it defines and walks `src/`, `server/`, `scripts/`, `tests/` and `docs/brain/`
+  for every citation, expanding ranges, so a pointer into the register must land
+  on a row that exists. `docs/audits/**` is excluded by design — dated snapshots
+  legitimately quote the register as it stood. Fail-first on 718a0b1d: **pass 1 /
+  fail 2**, naming both.
+- **4.** All eight remaining misuses fixed
+  (`verify-a11y.mjs:383,387,817,995,1743`, `verify-focus-traps.mjs:175,365`,
+  `verify-ui-polish-affordances.mjs:123`), including the 45 s and 40 s budgets
+  that were silently 30 s. `tests/scripts/wait-for-function-options-position.test.ts`
+  walks each call from its opening paren tracking bracket depth, so it reads both
+  the one-line and pretty-printed forms, distinguishes the defect from a genuine
+  page argument, and runs the scanner over six hand-written shapes first so a
+  scanner that never fires cannot pass. Fail-first: **12 of 12 calls flagged on
+  `f94d587e`; exactly the 8 the review named on `718a0b1d`**.
+- **6.** The `tryPdfRepair` docstring names `onRepairDraft` and says why
+  `onLoadSampleIntoEditor` would be wrong.
+
+### Round-2 gates
+
+| gate | command | result |
+|---|---|---|
+| lint | `npx tsc --noEmit` | **0** |
+| no-console | `check-no-console.mjs` | **0** |
+| docs | `npm run check-docs` | **0** |
+| honesty audit | `honesty-audit.mjs` | **0** — 460 files, 100 claims rows, clean |
+| brain | `brain-graph.mjs --check` | **0** — 103 notes, 358 links, fresh |
+| scoring receipt | `check-scoring-receipt.mjs f94d587e..HEAD` | **0** — *"no scoring-path files changed"* |
+| output identity | `--compare` vs `git archive f94d587e`, `GIT_SHA=r2pin` both trees | **PASS — 45/45 byte-identical** |
+| public benchmark | `tests/core/public-benchmark.test.ts` | **28/28** |
+| browser | `PW_CHROMIUM_PATH=… npm run verify:surfaces` ×3, idle | **246/246, exit 0, three times** |
+| full suite | `npm test` | **0** — 13291 tests, 13199 pass, **0 fail**, 91 skipped, 1 todo |
+
+Touched suites, each run individually: `coverage-format-unrecognized-card` 18,
+`rate-limit-verification-override` 9, `claims-row-citations` 3,
+`wait-for-function-options-position` 2, `limiters` 2,
+`keyless-browser-certification` 2, `coverage-rerun-one-control` 8,
+`coverage-handoff` 8, `percentile-copy-consistency` 30,
+`honesty-audit-claims` 5 — all green.
+
+### Still open, and named rather than left quiet
+
+- **The unmount-abort gap** (item 7 above) — real, attempted, measured, reverted.
+- **Finding 3's deeper half** — "outdated" is still a strip-level flag rather than
+  a property of the report the panel shows, and `onLoadFountain` still clears it
+  on a programmatic install of unanalysed text. Same bug, different brief.
+- **`computeJumpSpan` has no production caller.** The reviewer is right. Keeping
+  it is the conservative choice and it is documented; retiring it belongs in a
+  change that can prove nothing else wants it.
+- **Finding 4's real cause** — the badge ranks `build.rawScore` while the number
+  beside it is clamped. Scoring-path; the tooltip states the mismatch.
+- **`server/lib/coverage-html.ts`** still prints `Graph Health n/100` and
+  `→ Health deduction −n` unlabelled, and has no dimension badge to gate. Left to
+  the export lane, with the functions named in Round 1 above.
