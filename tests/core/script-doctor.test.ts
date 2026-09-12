@@ -1431,6 +1431,9 @@ function buildAnalysisFixture(sceneCount: number, wordCount: number): FountainAn
   return {
     records: [], annotations: [], structure: baseStructureState(),
     characters: [], sceneCount, dialogueLineCount: 0, actionLineCount: 0, wordCount,
+    // diagnostic-only, added 2026-09-12 round 3 so the owner's corpus run can
+    // split by document shape; no formula reads either of them
+    submittedWordCount: wordCount, isDoubleSpaced: false,
   };
 }
 

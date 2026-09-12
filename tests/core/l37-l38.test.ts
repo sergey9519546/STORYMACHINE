@@ -41,6 +41,9 @@ function analysis(records: ScreenplaySceneRecord[]): FountainAnalysis {
     dialogueLineCount: 0,
     actionLineCount: 0,
     wordCount: 1000,
+    // diagnostic-only fields (2026-09-12 round 3); nothing here scores from them
+    submittedWordCount: 1000,
+    isDoubleSpaced: false,
   } as FountainAnalysis;
 }
 

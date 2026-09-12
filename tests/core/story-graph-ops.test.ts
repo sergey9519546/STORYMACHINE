@@ -159,6 +159,8 @@ describe('Story Graph Ops — Movies guide mapping', () => {
       dialogueLineCount: 0,
       actionLineCount: 0,
       wordCount: 50,
+      submittedWordCount: 50,
+      isDoubleSpaced: false,
     } as FountainAnalysis;
 
     const built = buildStoryGraph(analysis);

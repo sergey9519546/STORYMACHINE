@@ -165,7 +165,7 @@ import {
   CUE_LETTER_CLASS,
   type FountainBlock,
 } from '../../../src/lib/fountain.ts';
-import { normalizeScreenplay, titlePageBlockCount } from './screenplay-normalizer.ts';
+import { normalizeScreenplay, titlePageBlockCount, isDoubleSpacedText } from './screenplay-normalizer.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord, ScenePurpose } from '../screenplay/memory.ts';
 import type { SceneAnnotation } from '../screenplay/compile-types.ts';
@@ -2486,6 +2486,8 @@ function emptyAnalysis(): FountainAnalysis {
     dialogueLineCount: 0,
     actionLineCount: 0,
     wordCount: 0,
+    submittedWordCount: 0,
+    isDoubleSpaced: false,
     recurringImagery: [],
   };
 }
@@ -2723,8 +2725,11 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   // The title page is excluded by the same principle and by construction: it
   // is no longer in `rawScenes` at all (see titlePageBlockCount).
   //
-  // `submittedWordCount` keeps the raw figure for anything that legitimately
-  // wants "how much did the writer send" rather than "how much is screenplay".
+  // `submittedWordCount` keeps the raw figure for "how much did the writer
+  // send" rather than "how much is screenplay". It is REPORTED on
+  // FountainAnalysis (2026-09-12, round 3) — until then it was a local nothing
+  // read, which made MEASUREMENT_RECEIPTS.md's first owner instruction
+  // impossible to carry out. It scores nothing.
   const PRINTING_BLOCK_TYPES = new Set<FountainBlock['type']>([
     'scene_heading', 'action', 'character', 'dual_dialogue', 'parenthetical',
     'dialogue', 'transition', 'centered', 'lyrics', 'shot',
@@ -2772,6 +2777,8 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
 
   return {
     records, annotations, structure, characters, sceneCount, dialogueLineCount, actionLineCount, wordCount,
+    submittedWordCount,
+    isDoubleSpaced: isDoubleSpacedText(fountain),
     recurringImagery,
     voiceAnalysis,
     subtextRatio,

@@ -20,6 +20,7 @@
     "generate-p0-sample": "node --experimental-strip-types scripts/generate-p0-sample-report.ts",
     "measure-slop": "node --experimental-strip-types scripts/measure-slop-discrimination.ts",
     "measure-real": "node --experimental-strip-types scripts/measure-real-script-discrimination.ts",
+    "probe-corpus-shape": "node --experimental-strip-types scripts/probe-corpus-shape.ts",
     "benchmark:public": "node --experimental-strip-types scripts/benchmark-public.ts",
     "lock-auc24": "node --experimental-strip-types scripts/lock-auc24.mjs",
     "honesty-audit": "node scripts/honesty-audit.mjs",

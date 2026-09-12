@@ -417,7 +417,11 @@ The comparison to make, split by whether `isDoubleSpaced` fires and BEFORE
 reading AUC-24, is in the receipt: submitted-vs-analyzed word count, then
 per-script health / verdict / sceneCount / severity mix, then the 72-row
 manifest. A rank statistic that does not move is not evidence that these two
-did nothing.
+did nothing. **Steps one and two are one command as of round 3** —
+`REAL_SCRIPT_CORPUS_DIR="<corpus>" npm run probe-corpus-shape` (add `-- --csv`
+to diff two runs) — because until then `submittedWordCount` was read by nothing
+and the double-spaced decision was module-private, so the instruction could not
+be carried out.
 
 **Cannot settle** whether the correction is right. Whether a boneyard is a
 comment is answered by the Fountain specification, not by a statistic. If AUC-24

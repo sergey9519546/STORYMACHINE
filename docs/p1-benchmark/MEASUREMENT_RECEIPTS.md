@@ -2767,5 +2767,37 @@ split by whether `isDoubleSpaced` fires, and **before reading AUC-24**:
    that these two changes did nothing — they move both halves of every matched
    pair, which is largely rank-neutral by construction.
 
+**STEPS 1 AND 2 ARE ONE COMMAND (added 2026-09-12, round 3).** They were prose
+when they were written, and not runnable prose: `submittedWordCount` was a
+local in `fountain-analyzer.ts` that nothing read and that appeared on no type,
+and the double-spaced decision was private to `screenplay-normalizer.ts`, so
+neither number nor the split could be obtained. Both are now reported on
+`FountainAnalysis` — diagnostic only, on no scoring path, and deliberately NOT
+on `ScriptDoctorReport`, so the 45 committed output-identity fixtures stay
+byte-identical — and:
+
+```
+REAL_SCRIPT_CORPUS_DIR="<corpus>" npm run probe-corpus-shape
+REAL_SCRIPT_CORPUS_DIR="<corpus>" npm run probe-corpus-shape -- --csv
+npm run probe-corpus-shape -- --public     # smoke test on the 32 committed scripts
+```
+
+prints, per script, `isDoubleSpaced` / `submittedWordCount` / `wordCount` /
+the gap and its share of the submission / `health` / `verdict` / `sceneCount` /
+critical-major-minor, then the same summary for each of the two groups. It
+computes no AUC, asserts no floor and writes no file; the corpus is read on the
+owner's machine and nothing leaves it, and no screenplay text is printed. Run
+it once on a pre-branch checkout and once here and diff the `--csv`. With
+`REAL_SCRIPT_CORPUS_DIR` unset it skips with exit 0, like every other
+corpus-gated command in this repository.
+
+For calibration, the same command on the 32 committed scripts
+(`-- --public`): 0 of 32 double-spaced, 32 of 32 with a non-zero gap, a mean of
+**8.58%** of each submission not screenplay (max 20.84%, room-12, whose
+`submittedWordCount` 427 against `wordCount` 338 is the figure the round-1
+review counted by hand). A private-corpus run whose gaps are all zero means
+those drafts carry no title page and no non-printing text, and the denominator
+correction cannot have moved anything on them.
+
 If AUC-24 falls, the finding is about what those drafts contain and what shape
 they arrive in. Read them. Do not move `AUC24_FLOOR`.

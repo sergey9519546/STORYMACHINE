@@ -60,7 +60,30 @@ export interface FountainAnalysis {
   sceneCount: number;
   dialogueLineCount: number;
   actionLineCount: number;
+  /** The SCREENPLAY's printed words — the scoring denominator. Excludes the
+   *  title page, the boneyard, notes, synopses and section headings, because
+   *  Fountain never prints any of them. */
   wordCount: number;
+  // ── THE TWO FIELDS THE OWNER'S CORPUS RUN NEEDS (2026-09-12, round 3) ─────
+  // MEASUREMENT_RECEIPTS.md's pending entry tells the owner to compare
+  // `submittedWordCount` against `wordCount` per script, split by whether
+  // `isDoubleSpaced` fires, BEFORE reading any rank statistic. Until round 3
+  // that instruction could not be carried out: `submittedWordCount` was a
+  // local in fountain-analyzer.ts read by nothing and on no type, and the
+  // double-spaced decision was module-private to screenplay-normalizer.ts.
+  // Both are reported here, in the analyzer's own output, so the instruction
+  // is mechanical. They are DIAGNOSTIC ONLY — nothing scores from them, and
+  // they are deliberately NOT on ScriptDoctorReport, so the 45 committed
+  // output-identity fixtures stay byte-identical.
+  /** Whitespace tokens in the submission EXACTLY as it arrived — no
+   *  normalisation, no strip. `submittedWordCount - wordCount` is how much of
+   *  what the writer sent is not screenplay. */
+  submittedWordCount: number;
+  /** Whether this submission takes `normalizeScreenplay`'s double-spaced
+   *  reconstruction branch — the scraped-PDF / FDX-export shape. The single
+   *  definition of the decision is `isDoubleSpacedText` in
+   *  screenplay-normalizer.ts; this is that function's answer for this text. */
+  isDoubleSpaced: boolean;
   /** Recurring content-word objects that did NOT earn clue status (D4,
    *  DETECTOR_DEFECTS_2026-08-03.md): a noun that recurs across scenes with
    *  nothing in the text ever marking it as unknown. Reported so the

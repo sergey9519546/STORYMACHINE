@@ -109,6 +109,29 @@ function looksLikeContinuation(prev: string, next: string): boolean {
 // document-wide ratio is kept only as a fallback for the rare scene/passage
 // with no character cues to check (a pure-action montage) — at a much
 // higher bar than before, since without cue evidence it is flying blind.
+/** THE double-spaced decision, taken on a raw submission — the public form of
+ *  `isDoubleSpaced` below, which takes lines that have already been split and
+ *  right-trimmed. `normalizeScreenplayUncached` calls this, so the decision the
+ *  analyzer reports and the decision the normalizer takes are the same code and
+ *  cannot drift.
+ *
+ *  Exported for MEASUREMENT_RECEIPTS.md's pending entry (2026-09-12, round 3):
+ *  it tells the owner to split the corpus by whether this fires before reading
+ *  any rank statistic, and until round 3 nothing outside this module could
+ *  answer the question. `server/lib/validation.ts`'s shape guard mirrors the
+ *  same decision on the raw text and must keep agreeing with it. */
+export function isDoubleSpacedText(raw: string): boolean {
+  if (!raw || typeof raw !== 'string') return false;
+  return isDoubleSpaced(rawLines(raw));
+}
+
+/** The line prep the double-spaced decision is taken on: CRLF folded, trailing
+ *  whitespace dropped, nothing else. Written once so the exported form above
+ *  and the normalizer below cannot prepare their input differently. */
+function rawLines(raw: string): string[] {
+  return raw.replace(/\r\n?/g, '\n').split('\n').map((l) => l.replace(/\s+$/, ''));
+}
+
 function isDoubleSpaced(lines: string[]): boolean {
   let cueCount = 0, cueFollowedByBlank = 0;
   for (let i = 0; i < lines.length - 1; i++) {
@@ -574,7 +597,6 @@ function normalizeScreenplayUncached(raw: string): string {
   // server/lib/validation.ts's guard mirrors that decision on the raw text and
   // the two must agree. Blanking boneyard lines adds blank lines, which would
   // move the decision if it were taken after.
-  const allLines = raw.replace(/\r\n?/g, '\n').split('\n').map(l => l.replace(/\s+$/, ''));
   // fold typography -> canonical cue extensions -> drop what is never printed
   // -> drop the markers that say what an element is. The extension fold runs
   // BEFORE the strips because both of them read block types from parseFountain,
@@ -584,7 +606,7 @@ function normalizeScreenplayUncached(raw: string): string {
   const cleaned = stripForcedMarkers(stripNonPrinting(normalizeCueExtensions(foldTypography(raw))));
   // Preserve a title page verbatim if present (key: value lines before first blank/heading).
   // Clean input still gets the dialogue join: a wrapped speech is one element.
-  if (!isDoubleSpaced(allLines)) return joinWrappedDialogue(cleaned); // structurally idempotent on clean input
+  if (!isDoubleSpacedText(raw)) return joinWrappedDialogue(cleaned); // structurally idempotent on clean input
 
   const lines = cleaned.replace(/\r\n?/g, '\n').split('\n').map(l => l.replace(/\s+$/, '')).filter(l => l.trim() !== '');
   const out: string[] = [];
