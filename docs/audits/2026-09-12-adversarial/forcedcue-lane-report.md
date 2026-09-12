@@ -291,7 +291,7 @@ the status would have passed on the unfixed guard.
 
 **And one mistake of my own, recorded because it is the same mistake in
 miniature.** The parity oracle's rejection assertion was written against a
-literal, passed, and was then "made robust" by swapping in this file's
+literal, passed, and was then rewritten to use this file's
 `REJECTION_RE` without re-running the file. `REJECTION_RE` is built from
 `MAX_FOUNTAIN_DISTINCT_CUE_LINES` (1500); this payload trips
 `MAX_FOUNTAIN_FREQUENT_CUE_LINES` (50 lines occurring more than 15 times).
