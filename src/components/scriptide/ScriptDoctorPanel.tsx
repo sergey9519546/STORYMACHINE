@@ -58,6 +58,13 @@ import {
   // of this change's scope.
   ordinal, percentileBand, percentileSentenceFor, exactRankTooltipFor,
 } from "../../lib/percentile-copy.ts";
+// Finding #9 (2026-09-12): ONE label for the diagnostic scores these panels
+// render, so the report presents exactly one number as the health of the
+// document. See src/lib/diagnostic-copy.ts's header.
+import {
+  DIAGNOSTIC_NOT_IN_HEALTH_LABEL,
+  diagnosticNotInHealthSentence,
+} from "../../lib/diagnostic-copy.ts";
 import {
   draftRankSentence, draftRankExportPayload, type DraftRankExportPayload,
 } from "../../lib/draft-rank-copy.ts";
@@ -1080,9 +1087,21 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
 
   return (
     <div>
-      <h3 className="text-[10px] font-bold uppercase tracking-widest mb-1 text-[var(--sm-ink-mute)]">
-        Story Structure Analysis
-      </h3>
+      {/* Finding #9 (2026-09-12): the badge sits in the heading row, where a
+          reader meets the section, and the sentence below names the specific
+          number. Before this, "Health score: 35/100" sat two cards under the
+          header's HEALTH 78 with nothing distinguishing them. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
+        <h3 className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
+          Story Structure Analysis
+        </h3>
+        <span
+          className="text-[9px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest"
+          data-diagnostic-not-health
+        >
+          {DIAGNOSTIC_NOT_IN_HEALTH_LABEL}
+        </span>
+      </div>
       {/* a11y fix (2026-09-06, theme-convention gate) — invariant panel, no
           dark:bg- ancestor: see StoryMetricsSection's identical fix above. */}
       <p className="text-[11px] font-mono text-[var(--sm-ink-mute)] leading-snug mb-3">
@@ -1110,10 +1129,17 @@ function StoryGraphSection({ storyGraph }: { storyGraph: import("../../../server
           <span>{summary.strengthCount} strengths</span>
         </div>
         <div className="mt-2 text-[10px] font-mono text-[var(--sm-ink-mute)]">
-          Health score: {storyGraph.graphHealth}/100 · 
+          Graph health score: {storyGraph.graphHealth}/100 · 
           Promise closure: {Math.round(graph.promisePaymentRatio * 100)}% · 
           Forward flow: {Math.round(graph.forwardEdgeRatio * 100)}%
         </div>
+        {/* Finding #9: this line used to read "Health score: 35/100" — the same
+            two words the header uses for the document's one health number. It is
+            now named for what it measures, and captioned with what it is not.
+            server/nvm/analyze/types.ts:403-405 is the authority. */}
+        <p className="mt-1 text-[10px] font-mono text-[var(--sm-ink-mute)] leading-snug" data-diagnostic-not-health>
+          {diagnosticNotInHealthSentence('The graph health score')}
+        </p>
       </div>
 
       {/* Critical Issues */}
@@ -5569,9 +5595,20 @@ export default function ScriptDoctorPanel({
                 functions, subplots, graph health. Each renders only when present. */}
             {reportIsComplete && (report.graphHealth || report.disclosureAnalysis?.scored || (report.characterFunctions?.length ?? 0) > 0 || (report.subplots?.totalSubplots ?? 0) > 0 || (report.ruleBreaking?.findings?.length ?? 0) > 0) && (
               <div>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-[var(--sm-ink-mute)]">
-                  Structural Analysis
-                </h3>
+                {/* Finding #9: same badge, same reason — "Graph Health 37/100
+                    −9hp" rendered the deduction in the header's own "hp" unit,
+                    in stamp red, with no caption, directly under HEALTH 78. */}
+                <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-mute)]">
+                    Structural Analysis
+                  </h3>
+                  <span
+                    className="text-[9px] font-mono text-[var(--sm-ink-mute)] uppercase tracking-widest"
+                    data-diagnostic-not-health
+                  >
+                    {DIAGNOSTIC_NOT_IN_HEALTH_LABEL}
+                  </span>
+                </div>
                 <div className="space-y-2">
                   {/* a11y fix (2026-09-06, theme-convention gate): every card
                       in this GODMODE block has a REAL dark:bg-zinc-900
@@ -5587,6 +5624,13 @@ export default function ScriptDoctorPanel({
                         <span className="text-xs font-bold text-black dark:text-gray-100">Graph Health</span>
                         <span className="text-xs font-mono text-black dark:text-gray-100">{report.graphHealth.graphHealthScore}/100 {report.graphHealth.graphDeduction > 0 && <span className="text-[var(--sm-stamp-on-light)] dark:!text-red-400">−{report.graphHealth.graphDeduction}hp</span>}</span>
                       </div>
+                      {/* Finding #9: the caption the number never had. Rendered
+                          on the card that carries it, not only in the section
+                          header above, because a reader scrolling into the middle
+                          of a long report meets the number first. */}
+                      <p className="text-[10px] font-mono text-gray-600 dark:text-gray-400 leading-snug" data-diagnostic-not-health>
+                        {diagnosticNotInHealthSentence('Graph Health')}
+                      </p>
                       {report.graphHealth.findings.length > 0 && (
                         <ul className="text-[11px] text-gray-600 dark:text-gray-400 space-y-0.5 mt-1">
                           {report.graphHealth.findings.map((f, i) => <li key={i}>• {f}</li>)}

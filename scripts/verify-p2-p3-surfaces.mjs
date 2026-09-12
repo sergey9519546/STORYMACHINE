@@ -1075,6 +1075,47 @@ async function main() {
     `${letterMarkdown.length} bytes, filename=${letterDownload.suggestedFilename()}`,
   );
 
+  // ── Finding #9 (2026-09-12), presentation half: ONE number in the report may
+  // be presented as the health of the draft. On the sample the panel stated
+  // three — HEALTH 78 in the header, "Health score: 35/100" in Story Structure
+  // Analysis, and "Graph Health 37/100 −9hp" in Structural Analysis, the last in
+  // the header's own "hp" unit, in stamp red, with no caption.
+  // server/nvm/analyze/types.ts:403-405 says those panels are diagnostics that
+  // are NOT part of health/verdict. The panel is still open on the same complete
+  // sample report the exports above used.
+  const diagnosticLabelCount = await pageA.locator('[data-diagnostic-not-health]').count();
+  record(
+    'P3-onehealth',
+    'every diagnostic score in the report carries a visible "diagnostic — not part of Health" label',
+    diagnosticLabelCount >= 2,
+    `labelled slots rendered=${diagnosticLabelCount}`,
+  );
+  const diagnosticLabelText = await pageA
+    .locator('[data-diagnostic-not-health]')
+    .evaluateAll((els) => els.map((el) => el.textContent.replace(/\s+/g, ' ').trim()));
+  record(
+    'P3-onehealth',
+    'each label actually says it is not part of Health (an empty marker would pass the count above)',
+    diagnosticLabelText.length > 0 && diagnosticLabelText.every((t) => /not part of (the )?Health/i.test(t)),
+    `labels=${JSON.stringify(diagnosticLabelText.slice(0, 4))}`,
+  );
+  const healthWordings = await pageA.evaluate(() => {
+    const text = document.body.innerText;
+    return {
+      // The mid-report diagnostic must no longer borrow the header's own two
+      // words for a number that is not the document's health.
+      bareHealthScoreLine: (text.match(/(?<![A-Za-z])Health score: \d+\/100/g) ?? []).length,
+      graphHealthScoreLine: (text.match(/Graph health score: \d+\/100/gi) ?? []).length,
+      graphHealthRow: (text.match(/Graph Health\s*\n?\s*\d+\/100/gi) ?? []).length,
+    };
+  });
+  record(
+    'P3-onehealth',
+    'the Story Structure diagnostic is named "Graph health score", not "Health score" (the words the header uses for the one real number)',
+    healthWordings.bareHealthScoreLine === 0 && healthWordings.graphHealthScoreLine >= 1,
+    JSON.stringify(healthWordings),
+  );
+
   // ── Shape & Rhythm (2026-09-04) — server/nvm/analyze/structural-signals.ts
   // surfaced, advisory-only, in ScriptDoctorPanel.tsx. The panel is still
   // open on the same complete sample report the export checks above just
