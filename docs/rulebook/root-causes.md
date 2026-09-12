@@ -6,13 +6,17 @@ Program v2 Type 4 rules: named, plain-language diagnoses for co-occurrence clust
 
 Wave 1193 additions (Program v2, Type 4 — cross-pass duplicate-family merging; adversarial-review response) — a review of the shipped product praised root-cause clustering but flagged that near-duplicate ISSUE FAMILIES (different rule names, different passes, but the same single craft observation) reach the user un-merged: e.g. SEED_EMOTIONAL_DECOUPLED (intention.ts, Wave 451), CLUE_SEED_EMOTION_FLAT (payoff.ts, Wave 328), PROACTIVE_EMOTION_DECOUPLED (intention.ts, Wave 339), and ARC_SEED_EMOTIONAL_AFTERMATH_VOID (character-arc.ts, Wave 505) can all fire on the same script and surface as four separate lines, when a writer reads them as one note said four times. This is a DIFFERENT failure mode from the Wave 1185/1189 templates above: a template names a co-occurrence of genuinely DIFFERENT symptoms that together prove one wound; a duplicate family merges near-restatements of the SAME symptom that different passes happened to name differently (or, in the dual-authorship cases below, literally the same rule name computed independently by two passes). Every entry here was verified by reading the actual check logic in passes/*.ts, not assumed from rule-name similarity — the rulebook has hundreds of X_Y_DECOUPLED combinatorial rules (co-occurrence mode across dozens of channel pairs) and most pairs that merely share the "DECOUPLED" or "MONOTONE" stem audit genuinely different channels (e.g. REVELATION_SUSPENSE_DECOUPLED appears in both belief.ts and structure.ts under the SAME name but with DIFFERENT logic — belief.ts uses average-mode suspenseDelta, structure.ts uses categorical every-scene-flat — so it is correctly NOT a family here; conflating those two would be a false merge). seed-scene-emotional-flatline — SEED_EMOTIONAL_DECOUPLED, CLUE_SEED_EMOTION_FLAT, PROACTIVE_EMOTION_DECOUPLED, ARC_SEED_EMOTIONAL_AFTERMATH_VOID (the reviewer's named example). SEED_EMOTIONAL_DECOUPLED and CLUE_SEED_EMOTION_FLAT are the same check (every seed scene has emotionalShift === 'neutral', n≥8, ≥3 seed scenes) implemented independently in intention.ts and payoff.ts. PROACTIVE_EMOTION_DECOUPLED audits the same neutral-emotion failure over the broader proactive-scene set (clock-raised OR seeded, not seed alone). ARC_SEED_EMOTIONAL_AFTERMATH_VOID checks the AFTERMATH channel (the scene immediately AFTER a seed, not the seed scene itself) — a related but not identical signal, kept in the family because all four converge on one writer-facing note ("your seeding carries no feeling") and a script that fails one very often fails the others too. payoff-scene-emotional-flatline — PAYOFF_EMOTION_DECOUPLED, which is defined TWICE under the identical rule name: intention.ts (Wave 521, co-occurrence mode — payoff scenes vs. ≥2 emotional scenes elsewhere, zero overlap) and payoff.ts (Wave 317, simpler "every payoff scene is neutral" condition). Same rule constant, two independent authors, two LocatedIssues on any script that fails both — the purest case of unmerged duplication this mechanism exists to catch. payoff-scene-relational-flatline — PAYOFF_RELATIONSHIP_DECOUPLED, same dual-authorship pattern: intention.ts (Wave 591) and payoff.ts (Wave 328) both independently check "no payoff scene carries a relationship shift" under the identical rule name. revelation-relational-flatline — REVELATION_RELATIONSHIP_DECOUPLED, same pattern again: belief.ts (Wave 334) and intention.ts (Wave 591) both check "no revelation scene carries a relationship shift" under the identical rule name. All four families are document-anchored aggregate checks (the underlying rules' locations are all whole-script summaries like "All N seed scenes — emotionally neutral", never "Scene N"), so — like the Wave 1193 templates above — there is no line span to overlap: the merge fires whenever 2+ of a family's member rules appear anywhere in the report, contributed by 2+ DISTINCT passes (a family converging within a SINGLE pass would mean one pass fired the same observation twice, which the existing rule contract doesn't allow — the cross-pass requirement is what makes this a genuine "two authors said the same thing" case rather than a false positive).
 
+### Deadline pressure is bunched, not spread (`clock-zone-imbalance`)
+
+Requires: `ARC_CLOCK_ZONE_IMBALANCE` + `CAUSALITY_CLOCK_ZONE_IMBALANCE` + `CONFLICT_CLOCK_ZONE_IMBALANCE` + `DIALOGUE_CLOCK_ZONE_IMBALANCE` + `INTENTION_CLOCK_ZONE_IMBALANCE` + `PAYOFF_CLOCK_ZONE_IMBALANCE` + `RELATIONAL_CLOCK_ZONE_IMBALANCE` + `STRUCTURE_CLOCK_ZONE_IMBALANCE` + `THEME_CLOCK_ZONE_IMBALANCE`
+
 ### Payoffs land with no feeling attached (`payoff-scene-emotional-flatline`)
 
-Requires: 
+Requires: `PAYOFF_EMOTION_DECOUPLED`
 
 ### Payoffs never move a relationship (`payoff-scene-relational-flatline`)
 
-Requires: 
+Requires: `PAYOFF_RELATIONSHIP_DECOUPLED`
 
 ### Planted material never pays off (`promises-unkept`)
 
@@ -20,11 +24,23 @@ Requires: `CHEKHOV_GUN_UNFIRED` + `SETUP_PAYOFF_IMBALANCE`
 
 ### Discoveries never change how anyone relates to anyone (`revelation-relational-flatline`)
 
-Requires: 
+Requires: `REVELATION_RELATIONSHIP_DECOUPLED`
 
 ### Seeded threads carry no feeling (`seed-scene-emotional-flatline`)
 
-Requires: 
+Requires: `SEED_EMOTIONAL_DECOUPLED` + `CLUE_SEED_EMOTION_FLAT` + `PROACTIVE_EMOTION_DECOUPLED` + `ARC_SEED_EMOTIONAL_AFTERMATH_VOID`
+
+### Planted clues raise no suspense once they land (`seed-suspense-aftermath-void`)
+
+Requires: `ARC_SEED_SUSPENSE_AFTERMATH_VOID` + `BELIEF_SEED_SUSPENSE_AFTERMATH_VOID` + `CAUSALITY_SEED_SUSPENSE_AFTERMATH_VOID` + `CONFLICT_SEED_SUSPENSE_AFTERMATH_VOID` + `DIALOGUE_SEED_SUSPENSE_AFTERMATH_VOID` + `INTENTION_SEED_SUSPENSE_AFTERMATH_VOID` + `ORIGINALITY_SEED_SUSPENSE_AFTERMATH_VOID` + `PAYOFF_SEED_SUSPENSE_AFTERMATH_VOID` + `RELATIONAL_SEED_SUSPENSE_AFTERMATH_VOID` + `RHYTHM_SEED_SUSPENSE_AFTERMATH_VOID` + `THEME_SEED_SUSPENSE_AFTERMATH_VOID` + `VOICE_SEED_SUSPENSE_AFTERMATH_VOID`
+
+### Physical staging is bunched, not spread (`staging-zone-imbalance`)
+
+Requires: `BELIEF_STAGING_ZONE_IMBALANCE` + `PHYSICAL_STAGING_ZONE_IMBALANCE` + `SCENE_STAGING_ZONE_IMBALANCE` + `VISUAL_STAGING_ZONE_IMBALANCE` + `VOICE_STAGING_ZONE_IMBALANCE`
+
+### Stakes-raising scenes are bunched, not spread (`stakes-zone-imbalance`)
+
+Requires: `ARC_STAKES_ZONE_IMBALANCE` + `BELIEF_STAKES_ZONE_IMBALANCE` + `CAUSALITY_STAKES_ZONE_IMBALANCE` + `CONFLICT_STAKES_ZONE_IMBALANCE` + `DIALOGUE_STAKES_ZONE_IMBALANCE` + `INTENTION_STAKES_ZONE_IMBALANCE` + `ORIGINALITY_STAKES_ZONE_IMBALANCE` + `PACING_STAKES_ZONE_IMBALANCE` + `PAYOFF_STAKES_ZONE_IMBALANCE` + `RELATIONAL_STAKES_ZONE_IMBALANCE` + `RHYTHM_STAKES_ZONE_IMBALANCE` + `STAKES_ZONE_IMBALANCE` + `STRUCTURE_STAKES_ZONE_IMBALANCE` + `THEME_STAKES_ZONE_IMBALANCE` + `VOICE_STAKES_ZONE_IMBALANCE`
 
 ### The story has no turning mechanism (`static-spine`)
 

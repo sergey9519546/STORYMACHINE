@@ -427,6 +427,26 @@ export interface RootCauseTemplateInfo {
 
 const TYPE4_MARKER_RE = /Wave (\d+) additions \(Program v2, Type 4/;
 
+// The two object shapes this extractor reads from cluster.ts (RootCauseTemplate
+// and the newer DuplicateFamily) name their member-rule field differently —
+// `requiredRules` on the first ten templates, `memberRules` on the eight
+// duplicate-family entries — and on four of the eight the array itself wraps
+// across multiple source lines. Matching only `requiredRules:` and only within
+// a single line (the pre-2026-09-12 behavior) silently produced an empty
+// member-rule list for every `memberRules` entry and an empty title for
+// whichever of those also pushed `title:` past a fixed lookahead window —
+// reproduced in docs/audits/2026-09-12-adversarial/engine-logic.md finding 14.
+// Both fields always precede the object's `explanation:`/`observation:` field
+// (the fixed shape both interfaces declare), so this collects every line from
+// `id:` up to that terminator and matches against the JOINED text instead of
+// line-by-line — correct regardless of how many lines the array wraps to.
+const FIELD_TERMINATOR_RE = /^\s*(?:explanation|observation):/;
+// Defensive cap only: id -> (requiredRules|memberRules) -> title always
+// appears before explanation:/observation: in every object this file reads
+// today. If a future shape ever drops that order, this stops the scan from
+// running away rather than silently misparsing.
+const FIELD_BLOCK_SAFETY_MAX_LINES = 40;
+
 export function extractRootCauseTemplates(filePath: string = CLUSTER_FILE): RootCauseTemplateInfo[] {
   const src = readFileSync(filePath, 'utf8');
   const lines = src.split('\n');
@@ -438,19 +458,18 @@ export function extractRootCauseTemplates(filePath: string = CLUSTER_FILE): Root
   for (let i = 0; i < lines.length; i++) {
     const m = idRe.exec(lines[i]);
     if (!m) continue;
-    // requiredRules and title are the following two fields in the same
-    // object literal (fixed shape — see the RootCauseTemplate interface in
-    // cluster.ts).
-    let requiredRules: string[] = [];
-    let title = '';
-    for (let j = i; j < Math.min(i + 6, lines.length); j++) {
-      const rr = /requiredRules:\s*\[([^\]]*)\]/.exec(lines[j]);
-      if (rr) requiredRules = rr[1].split(',').map(s => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
-      // Title is single-quoted normally, but double-quoted wherever the text
-      // itself contains an apostrophe (e.g. "Consequences don't land").
-      const tt = /title:\s*'([^']*)'/.exec(lines[j]) ?? /title:\s*"([^"]*)"/.exec(lines[j]);
-      if (tt) title = tt[1];
+    const block: string[] = [];
+    for (let j = i; j < lines.length && j < i + FIELD_BLOCK_SAFETY_MAX_LINES; j++) {
+      if (j > i && FIELD_TERMINATOR_RE.test(lines[j])) break;
+      block.push(lines[j]);
     }
+    const joined = block.join('\n');
+    const rr = /(?:requiredRules|memberRules):\s*\[([^\]]*)\]/.exec(joined);
+    const requiredRules = rr ? rr[1].split(',').map(s => s.trim().replace(/^'|'$/g, '')).filter(Boolean) : [];
+    // Title is single-quoted normally, but double-quoted wherever the text
+    // itself contains an apostrophe (e.g. "Consequences don't land").
+    const tt = /title:\s*'([^']*)'/.exec(joined) ?? /title:\s*"([^"]*)"/.exec(joined);
+    const title = tt ? tt[1] : '';
     const w = nearestMarkerFor(markers, i);
     templates.push({
       id: m[1], requiredRules, title,
@@ -761,7 +780,33 @@ function renderExcellenceDoc(detectors: ExcellenceDetector[]): string {
   return lines.join('\n');
 }
 
+// An entry with no title or no Requires list is not a catalog entry — it is
+// a parse failure rendered as if it were content (`### ` + nothing, `Requires:
+// ` + nothing; see finding 14). Refuse to emit rather than publish it, and
+// name every affected cluster in one error so whoever runs `npm run rulebook`
+// gets a fix target, not a silent 16-line diff to review by hand.
+export function assertRootCauseTemplatesWellFormed(templates: RootCauseTemplateInfo[]): void {
+  const badTitle = templates.filter(t => t.title.trim() === '').map(t => t.id);
+  const badRequires = templates.filter(t => t.requiredRules.length === 0).map(t => t.id);
+  if (badTitle.length === 0 && badRequires.length === 0) return;
+  const parts: string[] = [];
+  if (badTitle.length > 0) {
+    parts.push(`empty title: ${badTitle.join(', ')}`);
+  }
+  if (badRequires.length > 0) {
+    parts.push(`empty Requires list: ${badRequires.join(', ')}`);
+  }
+  throw new Error(
+    'generate-rulebook: refusing to emit root-causes.md — the following cluster(s) in ' +
+    `${path.relative(REPO_ROOT, CLUSTER_FILE)} extracted with ${parts.join('; ')}. ` +
+    'Either the extractor in extractRootCauseTemplates() cannot read this cluster\'s ' +
+    'shape (fix the extractor, not the cluster), or the cluster itself was committed ' +
+    'without a title/memberRules — either way this is not a catalog entry.',
+  );
+}
+
 function renderRootCausesDoc(templates: RootCauseTemplateInfo[]): string {
+  assertRootCauseTemplatesWellFormed(templates);
   const byWave = new Map<number, RootCauseTemplateInfo[]>();
   const unattributed: RootCauseTemplateInfo[] = [];
   for (const t of templates) {
@@ -865,25 +910,43 @@ function renderGenreDoc(modifiers: GenreModifierInfo[]): string {
   return lines.join('\n');
 }
 
+// ── Generation (shared by the CLI entry point and the idempotence test) ─────
+
+/** Writes every file `npm run rulebook` produces (README.md, one doc per
+ *  pass, excellence.md, root-causes.md, genre.md) under `outDir`. Split out
+ *  of `main()` so tests/core/rulebook.test.ts can regenerate into a temp
+ *  directory and diff it against the committed docs/rulebook/** — the
+ *  standard generated-artifact freshness guard — without needing a fresh
+ *  coverage.json inside that temp directory: `coverageReportPath` defaults
+ *  to the real, already-committed report and is only ever READ, never
+ *  written, by this function. */
+export function generateRulebook(
+  outDir: string = OUT_DIR,
+  coverageReportPath: string = COVERAGE_REPORT_PATH,
+): { totalRules: number; passCount: number } {
+  mkdirSync(outDir, { recursive: true });
+
+  const extractions = extractAllPasses();
+  const coverage = readCoverageReport(coverageReportPath);
+  const { markdown: readme, totalRules } = renderReadme(extractions, coverage);
+  writeFileSync(path.join(outDir, 'README.md'), readme + '\n');
+
+  for (const e of extractions) {
+    writeFileSync(path.join(outDir, `${e.pass}.md`), renderPassDoc(e) + '\n');
+  }
+
+  writeFileSync(path.join(outDir, 'excellence.md'), renderExcellenceDoc(extractExcellenceDetectors()) + '\n');
+  writeFileSync(path.join(outDir, 'root-causes.md'), renderRootCausesDoc(extractRootCauseTemplates()) + '\n');
+  writeFileSync(path.join(outDir, 'genre.md'), renderGenreDoc(extractGenreModifiers()) + '\n');
+
+  return { totalRules, passCount: extractions.length };
+}
+
 // ── CLI entry point ─────────────────────────────────────────────────────────
 
 function main(): void {
-  mkdirSync(OUT_DIR, { recursive: true });
-
-  const extractions = extractAllPasses();
-  const coverage = readCoverageReport();
-  const { markdown: readme, totalRules } = renderReadme(extractions, coverage);
-  writeFileSync(path.join(OUT_DIR, 'README.md'), readme + '\n');
-
-  for (const e of extractions) {
-    writeFileSync(path.join(OUT_DIR, `${e.pass}.md`), renderPassDoc(e) + '\n');
-  }
-
-  writeFileSync(path.join(OUT_DIR, 'excellence.md'), renderExcellenceDoc(extractExcellenceDetectors()) + '\n');
-  writeFileSync(path.join(OUT_DIR, 'root-causes.md'), renderRootCausesDoc(extractRootCauseTemplates()) + '\n');
-  writeFileSync(path.join(OUT_DIR, 'genre.md'), renderGenreDoc(extractGenreModifiers()) + '\n');
-
-  console.log(`rulebook: ${totalRules} rules across ${extractions.length} passes -> ${path.relative(REPO_ROOT, OUT_DIR)}/`);
+  const { totalRules, passCount } = generateRulebook();
+  console.log(`rulebook: ${totalRules} rules across ${passCount} passes -> ${path.relative(REPO_ROOT, OUT_DIR)}/`);
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === __filename;
