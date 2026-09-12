@@ -46,6 +46,7 @@
 // critical whole-script problem is never hidden, only ordered differently in
 // this one list.
 
+import { stripCueDecorations } from '../../../src/lib/fountain.ts';
 import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
 import type { IssueAnchor, LocatedIssue, RootCauseFinding } from './types.ts';
 import type { CharacterFunctionProfile, SupportingFunction } from '../quality/character-function.ts';
@@ -203,14 +204,9 @@ export function buildPrioritizedIssues(
 const CHARACTER_PREFIX_RE = /^Character:\s*(.+)$/i;
 const BARE_CUE_RE = /^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9 '.\-]*$/u;
 
-function normalizeCueText(raw: string): string {
-  return raw
-    .replace(/\^\s*$/, '')
-    .replace(/\(\s*V\.O\.\s*\)/gi, '')
-    .replace(/\(\s*O\.S\.\s*\)/gi, '')
-    .replace(/\(\s*CONT'?D\s*\)/gi, '')
-    .trim();
-}
+/** The one definition, in src/lib/fountain.ts — this was the third of four
+ *  copies, and every copy omitted (O.C.). */
+const normalizeCueText = stripCueDecorations;
 
 /** The character a 'character'-anchored issue's `location` names, resolved
  *  against the report's own character list (case-insensitively, decorations

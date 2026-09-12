@@ -88,7 +88,7 @@
  * practice, not a priori name-listing.
  */
 
-import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
+import { parseFountain, stripCueDecorations, type FountainBlock } from '../../../src/lib/fountain.ts';
 import { normalizeScreenplay } from './screenplay-normalizer.ts';
 import { TruthLedger, type TruthFact, type Contradiction } from './truth-ledger.ts';
 
@@ -153,17 +153,11 @@ function segmentRawScenes(blocks: FountainBlock[]): RawScene[] {
   return scenes;
 }
 
-/** Strip Fountain character-cue decorations down to the bare name — same
- *  normalization fountain-analyzer.ts applies, duplicated locally (small,
- *  stable, not worth importing an unexported helper for). */
-function normalizeCharacterName(raw: string): string {
-  return raw
-    .replace(/\^\s*$/, '')
-    .replace(/\(\s*V\.O\.\s*\)/gi, '')
-    .replace(/\(\s*O\.S\.\s*\)/gi, '')
-    .replace(/\(\s*CONT'?D\s*\)/gi, '')
-    .trim();
-}
+/** Strip Fountain character-cue decorations down to the bare name. Was the
+ *  fourth local copy ("not worth importing an unexported helper for"); the
+ *  helper is exported now, and it knows about (O.C.), which none of the four
+ *  copies did. */
+const normalizeCharacterName = stripCueDecorations;
 
 interface SceneFacts {
   sceneIdx: number;

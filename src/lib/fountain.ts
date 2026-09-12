@@ -74,15 +74,58 @@ export const CUE_INITIAL_CLASS = '\\p{Lu}\\p{Lt}';
 /** Characters a cue may CONTINUE with: capitals plus combining marks. */
 export const CUE_LETTER_CLASS = `${CUE_INITIAL_CLASS}\\p{M}`;
 
+// ── THE CUE EXTENSION SET IS WRITTEN DOWN ONCE (2026-09-12, round 2) ───────
+// A character cue may carry one or more never-printed-as-prose extensions —
+// `(V.O.)`, `(O.S.)`, `(O.C.)`, `(CONT'D)`. Until this change the alternation
+// lived inline in the cue regex, it admitted exactly ONE tail, and it omitted
+// `(O.C.)` entirely, so `MARY (O.C.)` and `MARY (V.O.) (CONT'D)` both failed
+// the cue test and their speeches parsed as ACTION PROSE. Four other modules
+// carried a byte-identical three-line strip of the same decorations
+// (fountain-analyzer.ts, locate.ts, prioritize.ts, truth-extraction.ts), each
+// with a comment saying it was not worth exporting a helper for; that is five
+// definitions of one concept, and the omission of `(O.C.)` from all five is
+// what five copies of a rule buys. This is the one definition.
+//
+// SPELLING IS NOT MEANING. `(V.O)`, `(VO)` and `(v.o.)` are the same extension
+// as `(V.O.)`, and a draft that spells it either way is the same speaker in
+// the same mode. The canonical spellings below are what the parser accepts;
+// `normalizeCueExtensions` in server/nvm/analyze/screenplay-normalizer.ts
+// folds the variants onto them at the analysis seam, so the fold is applied to
+// the text that is scored and never to the writer's own file.
+export const CUE_EXTENSIONS = ['V.O.', 'O.S.', 'O.C.', "CONT'D"] as const;
+const CUE_EXTENSION_ALTERNATION = CUE_EXTENSIONS
+  .map((e) => `\\(${e.replace(/[.]/g, '\\.')}\\)`)
+  .join('|');
+/** One or more canonical extensions at the end of a cue line, each optionally
+ *  preceded by whitespace. Zero tails is also legal — a bare cue. */
+const CUE_EXTENSION_TAIL_SRC = `(?:\\s*(?:${CUE_EXTENSION_ALTERNATION}))*`;
+
 /** The parser's own cue test. Equivalent to the pre-2026-09-03 literal
  *  `/^[A-Z][A-Z0-9 \t'.#\-]*\s*\^?\s*(\s*\(V\.O\.\)|\s*\(O\.S\.\)|\s*\(CONT'D\))?$/`
- *  with the two ASCII classes widened; built with `new RegExp` so the class
- *  bodies above stay the one place the alphabet is written down. */
+ *  with the two ASCII classes widened, `(O.C.)` added and repetition allowed;
+ *  built with `new RegExp` so the class bodies above stay the one place the
+ *  alphabet is written down. */
 export const CHARACTER_CUE_RE = new RegExp(
   `^[${CUE_INITIAL_CLASS}][${CUE_LETTER_CLASS}0-9 \\t'.#\\-]*\\s*\\^?\\s*`
-  + `(\\s*\\(V\\.O\\.\\)|\\s*\\(O\\.S\\.\\)|\\s*\\(CONT'D\\))?$`,
+  + `${CUE_EXTENSION_TAIL_SRC}$`,
   'u',
 );
+
+/** Strip a cue line's never-printed decorations — every extension in
+ *  `CUE_EXTENSIONS` and the trailing `^` dual-dialogue marker — down to the
+ *  bare character name. THE one definition: fountain-analyzer.ts, locate.ts,
+ *  prioritize.ts and truth-extraction.ts each carried their own copy, and all
+ *  four were missing `(O.C.)`, so an off-camera line made a second speaker out
+ *  of one character. Case-insensitive and whitespace-tolerant on input because
+ *  it is also applied to text that has not been through the analysis seam. */
+export function stripCueDecorations(raw: string): string {
+  let out = raw.replace(/\^\s*$/, '');
+  for (const ext of CUE_EXTENSIONS) {
+    const body = ext.replace(/[.]/g, "\\.").replace(/'/g, "'?");
+    out = out.replace(new RegExp(`\\(\\s*${body}\\s*\\)`, 'gi'), '');
+  }
+  return out.trim();
+}
 
 /** Camera-direction ("shot") lines are all-caps too, and were gated by the
  *  same ASCII class; widened for the same reason. The CAMERA_TERMS gate is

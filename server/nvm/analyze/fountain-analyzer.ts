@@ -160,6 +160,7 @@
 
 import {
   parseFountain,
+  stripCueDecorations,
   CUE_INITIAL_CLASS,
   CUE_LETTER_CLASS,
   type FountainBlock,
@@ -500,16 +501,15 @@ interface SceneUnit {
   rawText: string;
 }
 
-/** Strip Fountain character-cue decorations ((V.O.), (O.S.), (CONT'D), the
- *  trailing ^ dual-dialogue marker) down to the bare character name. */
-function normalizeCharacterName(raw: string): string {
-  return raw
-    .replace(/\^\s*$/, '')
-    .replace(/\(\s*V\.O\.\s*\)/gi, '')
-    .replace(/\(\s*O\.S\.\s*\)/gi, '')
-    .replace(/\(\s*CONT'?D\s*\)/gi, '')
-    .trim();
-}
+/** Strip Fountain character-cue decorations (every extension in
+ *  `CUE_EXTENSIONS` — (V.O.), (O.S.), (O.C.), (CONT'D) — and the trailing ^
+ *  dual-dialogue marker) down to the bare character name. The rule itself
+ *  lives in src/lib/fountain.ts beside the cue alphabet and the cue regex that
+ *  admits the same set: this file used to carry its own copy, and that copy —
+ *  like the three others in locate.ts, prioritize.ts and truth-extraction.ts —
+ *  was missing (O.C.), so an off-camera line made a second speaker out of one
+ *  character. */
+const normalizeCharacterName = stripCueDecorations;
 
 /** Walk one scene's blocks into the flat shape every heuristic below reads.
  *  `dual_dialogue`-typed blocks are cue lines in a side-by-side pair (see

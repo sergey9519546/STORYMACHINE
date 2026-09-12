@@ -42,7 +42,7 @@
 // runs on every keystroke-pause debounce tick — an accidental O(issues*lines)
 // rescan would show up as real typing lag on a long screenplay.
 
-import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
+import { parseFountain, stripCueDecorations, type FountainBlock } from '../../../src/lib/fountain.ts';
 import type { PassName, RevisionIssue } from '../revision/passes/types.ts';
 import type { LocatedIssue, IssueAnchor } from './types.ts';
 
@@ -144,20 +144,11 @@ const CHARACTER_PREFIX_RE = /^Character:\s*(.+)$/i;
 // 'document' regardless of this regex matching).
 const BARE_CUE_RE = /^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9 '.\-]*$/u;
 
-/** Strip Fountain character-cue decorations ((V.O.), (O.S.), (CONT'D), the
- *  trailing ^ dual-dialogue marker) down to the bare character name.
- *  Duplicated from fountain-analyzer.ts's (private, unexported)
- *  normalizeCharacterName — that module owns scene-record construction and
- *  is out of scope for this feature to touch, so the handful of lines are
- *  copied here rather than exported solely for this one caller. */
-function normalizeCueText(raw: string): string {
-  return raw
-    .replace(/\^\s*$/, '')
-    .replace(/\(\s*V\.O\.\s*\)/gi, '')
-    .replace(/\(\s*O\.S\.\s*\)/gi, '')
-    .replace(/\(\s*CONT'?D\s*\)/gi, '')
-    .trim();
-}
+/** Strip Fountain character-cue decorations down to the bare character name.
+ *  This was a local copy of fountain-analyzer.ts's private normalizeCharacterName
+ *  ("not worth exporting for one caller"); there were four such copies and all
+ *  four omitted (O.C.). The rule now lives once, in src/lib/fountain.ts. */
+const normalizeCueText = stripCueDecorations;
 
 /** Every scene's [startLine, endLine] (1-based, inclusive), in the SAME
  *  0-based sceneIdx order fountain-analyzer.ts's segmentScenes assigns —

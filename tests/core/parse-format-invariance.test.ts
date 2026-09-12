@@ -31,6 +31,7 @@ import path from 'node:path';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 import type { ScriptDoctorReport } from '../../server/nvm/analyze/types.ts';
 import { parseFountain } from '../../src/lib/fountain.ts';
+import { analyzeFountainText } from '../../server/nvm/analyze/fountain-analyzer.ts';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
@@ -259,9 +260,24 @@ const FORMAT_TRANSFORMS: Array<[string, (t: string) => string, string]> = [
   ['a redundant forced-transition `>` on every transition line', redundantMarker('transition', '>'),
     'the parser has no forced-transition branch at all, so `>CUT TO:` was scored as an ACTION LINE, `>` and '
     + 'all. 5 of the 6 applicable scripts moved at 85273742, mean -4.080, largest -15.7 on room-12.'],
+
+  // ── Cue extension spelling (round 2) ────────────────────────────────────
+  // CHARACTER_CUE_RE admits only the canonical spellings, so a cue carrying
+  // any other one is not a cue and its whole speech is action prose.
+  ['every cue extension respelled without its periods',
+    (t) => t.replace(/\(\s*V\.O\.\s*\)/g, '(V.O)').replace(/\(\s*O\.S\.\s*\)/g, '(O.S)').replace(/\(\s*CONT'D\s*\)/g, '(CONTD)'),
+    'what a typist emits. 12 of the 14 applicable scripts moved at 85273742, largest -1.3 on soft-launch.'],
+  ['every cue extension respelled with no punctuation at all',
+    (t) => t.replace(/\(\s*V\.O\.\s*\)/g, '(VO)').replace(/\(\s*O\.S\.\s*\)/g, '(OS)').replace(/\(\s*CONT'D\s*\)/g, '(CONTD)'),
+    'the same extension again — (VO) is (V.O.).'],
+  ['every cue extension in lower case',
+    (t) => t.replace(/\(\s*(V\.O\.|O\.S\.|CONT'D)\s*\)/g, (_m, e) => `(${String(e).toLowerCase()})`),
+    'spelling is not meaning: the same speaker in the same mode.'],
+  ['a curly apostrophe inside (CONT\u2019D)', (t) => t.replace(/\(CONT'D\)/g, '(CONT\u2019D)'),
+    'the typographic fold reaches inside the extension too — every word processor emits this one.'],
 ];
 
-describe('format is not writing: fourteen transforms, 32 scripts, exact equality (findings 5 and 13, and round 2)', () => {
+describe('format is not writing: eighteen transforms, 32 scripts, exact equality (findings 5 and 13, and round 2)', () => {
   for (const [label, fn, why] of FORMAT_TRANSFORMS) {
     it(`${label} does not move any of the 32 scripts`, async () => {
       const moved: string[] = [];
@@ -348,5 +364,59 @@ describe('the forced cue `@` is a known, quantified gap (round 2)', () => {
       + '(or something has changed the corpus): move this row into FORMAT_TRANSFORMS as an invariance '
       + 'assertion, check that every renderer strips the marker too, and delete this test. Do not relax it.',
     );
+  });
+});
+
+// ── ONE SPEAKER, HOWEVER THE EXTENSION IS SPELLED (round 2) ────────────────
+describe('a cue extension is a decoration, not part of the name', () => {
+  const SCRIPT = (voSpelling: string, ocSpelling: string) => `INT. KITCHEN - NIGHT
+
+MARY pours coffee and waits.
+
+MARY
+I can hear you out there.
+
+MARY ${ocSpelling}
+Don't pretend the light isn't on.
+
+INT. HALLWAY - CONTINUOUS
+
+The door is shut. A shadow moves under it.
+
+MARY ${voSpelling}
+I counted your footsteps.
+`;
+
+  it('the same speaker with an off-camera or voice-over extension is ONE character, and still SPEAKS', () => {
+    // Both halves matter, and the first alone cannot catch the bug: before the
+    // fix `MARY (O.C.)` was not a cue at all, so the character list was still
+    // ['MARY'] — the off-camera speech had simply become action prose and
+    // vanished from the dialogue. The dialogue-line count is what sees that.
+    const a = analyzeFountainText(SCRIPT('(V.O.)', '(O.C.)'));
+    assert.deepEqual(
+      a.characters, ['MARY'],
+      'MARY, MARY (O.C.) and MARY (V.O.) are one speaker. (O.C.) was missing from the cue regex and from '
+      + 'all four copies of the decoration strip until 2026-09-12 round 2 — got '
+      + `${JSON.stringify(a.characters)}`,
+    );
+    assert.equal(
+      a.dialogueLineCount, 3,
+      `only ${a.dialogueLineCount} of the 3 speeches parsed as dialogue. An extension the cue regex does not `
+      + "admit does not merely rename the speaker: the cue is not a cue, so the speech under it is scored as "
+      + 'ACTION PROSE. (O.C.) is the case that was missing.',
+    );
+  });
+
+  it('every spelling of the same extension produces the same report', async () => {
+    const canonical = await runScriptDoctor(SCRIPT('(V.O.)', '(O.C.)'));
+    for (const [vo, oc] of [['(V.O)', '(O.C)'], ['(VO)', '(OC)'], ['(v.o.)', '(o.c.)']] as const) {
+      const got = await runScriptDoctor(SCRIPT(vo, oc));
+      assert.deepEqual(
+        surface(got), surface(canonical),
+        `spelling the extensions ${vo}/${oc} moved the score. Spelling is not meaning: the fold lives in `
+        + 'normalizeCueExtensions (server/nvm/analyze/screenplay-normalizer.ts) and the canonical set in '
+        + 'CUE_EXTENSIONS (src/lib/fountain.ts).',
+      );
+    }
   });
 });

@@ -353,6 +353,52 @@ function typesByLine(text: string): FountainBlockType[] {
   return out;
 }
 
+// ── ONE SPELLING OF AN EXTENSION IS ONE SPEAKER (2026-09-12, round 2) ──────
+// `(V.O.)`, `(V.O)`, `(VO)` and `(v.o.)` are one extension; Final Draft, Celtx,
+// Highland and every human typist emit all four. `CHARACTER_CUE_RE` admits
+// only the canonical spelling, so `MARY (V.O)` is not a cue at all — the line
+// is ACTION PROSE and so is the speech beneath it. Measured on the 32 public
+// scripts, respelling every extension without its periods moved 12 of the 14
+// applicable scripts (largest -1.3); `(V.O.)` -> `(V.O)` alone moved 8 of 8.
+//
+// The fold is deliberately narrow: it applies only to a line that is a cue
+// name followed by nothing but parenthetical tails, and only when EVERY tail
+// is a recognised extension. `MARY (into phone)` is a wryly-directed cue this
+// parser has never accepted, and folding is not the change that would fix it —
+// leaving it alone keeps this from ever eating a parenthetical direction or a
+// line of prose that happens to end in brackets.
+const EXTENSION_ALIASES: Array<[RegExp, string]> = [
+  [/^V\.?\s*O\.?$/i, 'V.O.'],
+  [/^O\.?\s*S\.?$/i, 'O.S.'],
+  [/^O\.?\s*C\.?$/i, 'O.C.'],
+  [/^CONT'?\s*D\.?$/i, "CONT'D"],
+];
+const CUE_TAIL_LINE_RE = new RegExp(
+  `^([ \\t]*)([${CUE_INITIAL_CLASS}][${CUE_LETTER_CLASS}0-9 \\t'.#\\-]*?)(\\s*\\^)?((?:\\s*\\([^)]*\\))+)[ \\t]*$`,
+  'u',
+);
+
+export function normalizeCueExtensions(text: string): string {
+  if (!text || !text.includes('(')) return text;
+  let changed = false;
+  const out = text.split('\n').map((line) => {
+    const m = CUE_TAIL_LINE_RE.exec(line);
+    if (!m) return line;
+    const [, indent, name, caret, tails] = m;
+    const canon: string[] = [];
+    for (const t of tails.match(/\([^)]*\)/g) ?? []) {
+      const inner = t.slice(1, -1).trim();
+      const alias = EXTENSION_ALIASES.find(([re]) => re.test(inner));
+      if (!alias) return line;   // not an extension — leave the whole line alone
+      canon.push(alias[1]);
+    }
+    const rebuilt = `${indent}${name.trimEnd()}${caret ? ' ^' : ''}${canon.map((c) => ` (${c})`).join('')}`;
+    if (rebuilt !== line) changed = true;
+    return rebuilt;
+  });
+  return changed ? out.join('\n') : text;
+}
+
 // ── A TITLE PAGE IS METADATA, NOT PROSE (2026-09-12, finding 5) ────────────
 // Every real draft opens with `Title:` / `Credit:` / `Author:` / `Draft date:`.
 // `segmentScenes` prepends everything before the first heading into scene one's
@@ -529,10 +575,13 @@ function normalizeScreenplayUncached(raw: string): string {
   // the two must agree. Blanking boneyard lines adds blank lines, which would
   // move the decision if it were taken after.
   const allLines = raw.replace(/\r\n?/g, '\n').split('\n').map(l => l.replace(/\s+$/, ''));
-  // fold typography -> drop what is never printed -> drop the markers that say
-  // what an element IS. The marker strip runs LAST of the three because it
-  // decides what to remove from the block types the two before it produce.
-  const cleaned = stripForcedMarkers(stripNonPrinting(foldTypography(raw)));
+  // fold typography -> canonical cue extensions -> drop what is never printed
+  // -> drop the markers that say what an element is. The extension fold runs
+  // BEFORE the strips because both of them read block types from parseFountain,
+  // and a cue the parser cannot see is a speech it types as action; the marker
+  // strip runs LAST because it decides what to remove from the block types the
+  // steps before it produce.
+  const cleaned = stripForcedMarkers(stripNonPrinting(normalizeCueExtensions(foldTypography(raw))));
   // Preserve a title page verbatim if present (key: value lines before first blank/heading).
   // Clean input still gets the dialogue join: a wrapped speech is one element.
   if (!isDoubleSpaced(allLines)) return joinWrappedDialogue(cleaned); // structurally idempotent on clean input
