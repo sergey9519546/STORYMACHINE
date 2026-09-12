@@ -565,6 +565,12 @@
       "path": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md"
     },
     {
+      "id": "docs/brain/Sessions/Session - 2026-09-12 Adversarial Review.md",
+      "type": "session",
+      "title": "Session — 2026-09-12: The Adversarial Review",
+      "path": "docs/brain/Sessions/Session - 2026-09-12 Adversarial Review.md"
+    },
+    {
       "id": "docs/brain/Surfaces/Surface - Collab Room.md",
       "type": "surface",
       "title": "Surface — Collab Room",
@@ -2013,6 +2019,42 @@
     {
       "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Surfaces/Surface - Start Screen.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Summary.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Rulebook Freshness.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",

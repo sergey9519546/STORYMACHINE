@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-11, main @ c181dfe1 (eight session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-12, main @ 39996b6d (nine session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -34,6 +34,111 @@ Product-surface verification was covered by the orchestrator's own full
 browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
+
+**2026-09-12 — the adversarial review: eight lanes, twenty-one review
+rounds, no lane through on its first pass.** The owner asked for a
+principal-level adversarial review of the current features and logic, run as
+an orchestrator over Sonnet and Opus subagents, with the objective of finding
+the best achievable version of THIS product and moving it there. Three
+read-only investigators took main at c087a6ca apart first — the writer's loop
+driven in a browser (18 findings: a production note in a comment raised health
+~10 and flipped a verdict; a forged letter verdict passed the verifier; RE-RUN
+COVERAGE ran nothing), the engine re-derived on an independent scorer (14: the
+density channel's zero-gradient dead zone; reversing every scene of the
+feature fixture raised health; a Fountain-legal dialogue reflow moved health 11
+points; the gates reporter satisfied by a gutted suite), and the server, data
+and test soundness of everything merged since 2026-09-06 (the verifier checked
+none of the producer tier's numbers). Their findings became build lanes, each
+through `docs/LANE_STANDARD.md`'s independent review, every review written
+into `docs/audits/2026-09-12-adversarial/` before its verdict
+([[Audit - 2026-09-12 Adversarial Review]]). **Six landed on main:**
+
+- **`verify-covers-tier`** (9cd1805c, REVISE 8 → REVISE → MERGE): one claim
+  set behind both exporters and both verifiers, nine more verified fields,
+  page references through the PDF paginator, and the forgery limit stated
+  truthfully with its counterexample committed — a 14-of-17-edit forgery
+  still verifies, and the document now says so.
+- **`instrument-integrity`** (ad9c7802, REVISE 4 → MERGE): the gates
+  reporter proves its own liveness by raising one floor in memory and
+  requiring the suite to FAIL on it by name; one scene segmenter for every
+  harness, since the AUC-24 recipe could not see `EST.`, `I/E.` or forced
+  headings and returned mixed-heading scripts unchanged; CLIMAX_RELOCATE
+  moves the final scene to position one as every document said, with the
+  floors re-locked from a rerun (the instrument got stronger, the engine
+  reads it slightly worse, and the score did not move); an anchor on every
+  `path:line` pointer in the claims register.
+- **`writer-loop-client`** (e440a0a8, REVISE 7 → MERGE → round-3
+  confirmation): RE-RUN issues a real run; a jump span belongs to its own
+  finding or the card says it has no location; the front door's headline
+  card is generated from a doctor run and guarded by a drift test; one health
+  number; clamped dimension badges with one shared caption; the surfaces
+  gate no longer starves on the rate limiter. Round 3 fixed, once at the
+  cause, a readiness race three suites had each rediscovered: `innerText`
+  reflects CSS `text-transform`, so the doctor's own "RUNNING PASS 1 OF 14…"
+  counter satisfied a poll asking for a verdict.
+- **`rulebook-and-guard-bound`** (0507b008, REVISE → REVISE → MERGE): the
+  rulebook regenerates idempotently with four restored clusters and a
+  zero-diff guard; the voice-eligible weight bound is derived from measured
+  cost — the first derivation (1,500,000) was rejected because a 223-speaker
+  document of 30-word speeches costs 27 seconds under it, the second
+  (675,000) admits a worst shape of 12–14 s CPU against a 30 s budget, and
+  the test asserts CPU under half the budget AND wall under the whole of it.
+- **`writer-followups`** (e9b4cff8, REVISE → REVISE → MERGE): the gate
+  rate-limit multiplier reaches only the browser gates, so the fuzzer, the
+  load test and the production verifier run on the production limiter —
+  which showed the fuzzer had been measuring a server production never runs
+  (18 probes absorbed as 429, both WebSocket attacks skipped). It now boots
+  two servers and the 200-concurrent case proves both halves: legitimate
+  traffic gets through AND a 429 appears. The review also caught the 503s
+  misattributed to session capacity; every one is the doctor analysis budget.
+- **`exports-truth`** (54e97efd, REVISE 2 → MERGE → MERGE): one priorities
+  list on four surfaces; Graph Health's unapplied deduction never rendered as
+  applied; every cross-reference names a heading the report renders; export
+  → re-import measured and disclosed, then made true in both directions —
+  dual dialogue, centered text, lyrics, page breaks and forced action survive
+  the FDX round trip, and section headings, synopses and notes are omitted
+  rather than printed as action; the letter's promise matches its length
+  (three to four pages, gated on the shape the route ships).
+
+**Owner-gated, never merged here:** `scoring/adversarial-2026-09-12`
+(READY-FOR-OWNER at 3124a94e after three review rounds) — a live gradient (0
+of 32 scripts flat, 0 of 1,001 sampled densities), parse and format
+invariance (now fourteen transforms, 0 of 32 each, where ten had moved the
+score), forced-element markers and cue-extension spelling folded at the
+parser seam, permutation-ensemble invariants, the voice-pair cap (cast 223:
+24,753 pairs to 780), and the owner's first instruction made one command —
+`npm run probe-corpus-shape` splits a corpus by document shape and prints word
+counts, health, verdict and severity before any AUC is read. The review's one
+blocking item was truth, not arithmetic: the pipeline seam took the whole
+normaliser while three places said it took half; it is kept and disclosed as
+its own cost, because the private corpus IS the double-spaced scraped-PDF
+shape. Four public-benchmark floors moved DOWN; the reviewer reverted the
+denominator fix alone and read exactly the isolation table's cell, so the
+re-lock stands. The receipt is PENDING and no AUC-24 number is stated,
+implied or projected anywhere. Stacked on it, `scoring/forced-cue` (in
+flight) honours Fountain's `@` marker, the largest remaining format
+sensitivity (32 of 32 public scripts, up to −26.8).
+
+**Still open in this batch:** `lane/p0-flow-race` — the smoke gate's
+earliest-instant race, shown by a reviewer to fail 3 of 8 runs on main
+itself, was a gate race and not a product defect (the built-in sample's
+doctor POST answers in 0–49 ms, so the "earliest instant" landed after the
+run as often as before it); the lane holds the run in flight rather than
+trusting it to be, and its review returned REVISE because the regression
+detector caught the removed clause 4 of 6 times, not deterministically.
+
+**What the process learned, all recorded:** two lanes numbered their claims
+register rows from the same base and both were reviewed MERGE, so for a day
+"row 96" named two sentences — the client lane's rows were renumbered at
+merge, seven brain-note citations moved with them, and the citation test now
+fails on a duplicate, on a gap, and on a pointer whose target row does not
+carry the claim beside it. Two merge-gate suites failed under load (the
+shape guard's CPU-budget boundary and one 40-second verdict wait) and passed
+on the idle machine, which is why merge gates run as separate steps on a
+quiet machine. The container was rebuilt again mid-batch and the session
+limit killed agents three times; every worktree, lane branch and review
+survived because §7 of the lane standard had already made the sandbox
+disposable.
 
 **2026-09-07 — the innovation batch, and the rebuild that cost it its
 record.** The owner asked for the project to be *pushed forward* — what
