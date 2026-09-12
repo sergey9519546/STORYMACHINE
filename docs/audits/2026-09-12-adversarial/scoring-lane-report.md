@@ -1063,3 +1063,169 @@ one added key": putting them on `FountainAnalysis` instead of
   is screenplay", that is a report field and a fixture re-lock, and it should be
   measured as its own change rather than arriving as a side effect of a
   diagnostic.
+
+---
+
+## Round 4
+
+**Brief:** the round-3 review's four non-blocking items, all small
+(`docs/audits/2026-09-12-adversarial/scoring-review.md` lines 876–1156, verdict
+**READY-FOR-OWNER**). Item 5 is carried forward unchanged. **Worktree**
+`/home/user/wt-scoring`, branch `scoring/adversarial-2026-09-12`, pushed after
+every commit. **Round-3 tip** `3124a94e`; **round-4 tip** `08df4e96` plus the
+commit carrying this section. No full `npm test` this round, per the brief —
+touched files only.
+
+| # | commit | item | what it does |
+|---|---|---|---|
+| 21 | `87c5db3c` | **1** | `--silent` on the `--csv` form, so the header is line 1 and not line 5 |
+| 22 | `768599b9` | **2** | the pre-branch half of the comparison made self-contained — and NaN-free |
+| 23 | `839b1c16` | **3** | the probe's output is a local artifact; the paths are the corpus's index |
+| 24 | `08df4e96` | **4** | the diagnostic double-spaced decision stops being computed twice per report |
+| 25 | *this commit* | — | this section |
+
+### R4.1 Item 1 — `--silent`
+
+```
+npm run probe-corpus-shape -- --public --csv | head -4
+  (blank) · "> storymachine@1.0.0-rc.1 probe-corpus-shape" · "> node …" · (blank)
+npm run --silent probe-corpus-shape -- --public --csv | head -1
+  file,isDoubleSpaced,submittedWordCount,wordCount,notScreenplayWords,…
+```
+
+`--silent` is now in the receipt's code block and in the script's own RUN
+comment, in both places with the sentence saying it is load-bearing for the
+`--csv` form and for nothing else — a plain `diff` of two banner-prefixed files
+is unaffected, because the banner is identical on both sides; a spreadsheet or
+a csv-aware differ is not.
+
+### R4.2 Item 2 — the pre-branch half, and the NaN it printed
+
+The receipt said "run it once on a pre-branch checkout and once here and diff
+the `--csv`", and the script does not exist on that tree. Verified on a
+`git archive 8aa1f696` export — `main`, the realistic pre-branch tree — copied
+across and run under type stripping, EXIT=0:
+
+```
+pre-branch  "data/screenplays/chain-of-custody.fountain",,,824,,,76.3,CONSIDER,13,1,43,134
+this tree   "data/screenplays/chain-of-custody.fountain",false,824,772,52,6.31,77.3,CONSIDER,13,3,42,81
+```
+
+The empty diagnostic columns are the finding rather than a defect: neither
+field existed there, and on that tree **`wordCount` IS the raw submission** —
+824 there is the same number as `submittedWordCount` 824 here. The denominator
+correction, visible in one diff.
+
+**The script also stopped printing `NaN`,** which is what it did on that tree
+before this commit (`…,,,824,NaN,NaN,76.3,…`). `submitted` and `doubleSpaced`
+are now typed optional, read through a widened view, and every consumer says
+"not reported" instead of computing with `undefined`: an empty CSV cell (which
+means something to a csv reader, where `NaN` does not), `—` / `?` in the table,
+exclusion from both group summaries, and a five-line NOTE under the table
+explaining what such a tree is. Output on THIS tree is unchanged — 32 of 32
+rows, total gap 2299, mean 8.58%, no NOTE printed.
+
+### R4.3 Item 3 — the output is a local artifact
+
+The disclosure said the probe prints file names, and file names are not
+screenplay text, so the copyright boundary held as written. What it did not say
+is what those names ARE on the private corpus: the titles of 761 real
+screenplays. Individually a path is harmless; collectively the 761 rows are the
+corpus's index, and this repository has never published it.
+
+Both the script's COPYRIGHT BOUNDARY block and the receipt now say the output
+must not be pasted anywhere — not into the receipt, a ticket, a commit message
+or a chat — that the table and any `--csv` file stay on the machine that
+produced them, and that a number which has to travel should be an aggregate
+from the two group summaries. `--public` is named as the one exception, because
+those 32 files are committed here already. No flag: a `--no-names` option would
+be a second output mode to keep honest for a boundary one sentence states
+exactly.
+
+### R4.4 Item 4 — the memo, with its cost before and after
+
+Since round 3 the double-spaced decision was computed **twice per report**:
+once in `normalizeScreenplayUncached` to choose its branch, once at the end of
+`analyzeFountainText` to report it — the second purely for a field nothing
+scores from. A one-entry memo, same pattern and same reasoning as the existing
+`normalizeScreenplay` and `stripTitlePage` memos.
+
+**Measured** on the 231-scene feature
+(`tests/fixtures/feature-length/assembled-feature.fountain`, 113,954 chars,
+2,928 lines), n=200 after a 20-call warmup, on a `git archive 3124a94e` export
+and on this tree:
+
+| call | before (`3124a94e`) | after |
+|---|---|---|
+| same input repeated — **the second caller in a report** | wall **2.4776** ms · cpu **2.3308** ms | wall **0.0001** ms · cpu **0.0003** ms |
+| distinct input — a cold call, unchanged work | wall 3.7764 ms · cpu 2.5709 ms | wall 2.6193 ms · cpu 2.6342 ms |
+
+The second row is the same work on both sides and its spread is run-to-run
+noise. The first row is the whole of the change: the second question about the
+same bytes now costs a string compare instead of 2.33 ms of CPU.
+
+**End to end it is below the noise, and this round says so rather than quoting
+the favourable run.** Six FRESH 231-scene documents per run — a unique trailing
+note each, so neither the report cache nor any memo can hide the work — three
+runs a side:
+
+```
+BEFORE  wall 883.2 / 808.3 / 953.3 ms per report      cpu 911.0 / 888.8 / 916.2
+AFTER   wall 812.0 / 799.7 / 822.9 ms per report      cpu 904.3 / 909.3 / 933.1
+```
+
+2.4 ms out of ~900 is 0.27%, and the before-side wall spread alone is 145 ms.
+Reading `883 → 812` as the result would be reading noise.
+
+**The assertion pins the risk, not the saving.** A tenth test in
+`corpus-shape-fields.test.ts` alternates a clean document and a double-spaced
+one five times and requires each to keep its own answer, then checks the
+analyzer's reported field afterwards. A one-entry cache that is not keyed
+correctly would put a script in the wrong half of the owner's split — worse
+than the cost it saves.
+
+### R4.5 Nothing moved
+
+| check | result |
+|---|---|
+| output identity, `3124a94e` → round-4 tip | **PASS — all 45 reports byte-identical** (`GIT_SHA=LANEPIN` pinned equal) |
+| `npm run benchmark:public` | 0.8438 / 0.7896 · 0.5938 / 0.5234 · 1.0000 / 0.9814 — **to the digit**, fourth round running |
+| `scripts/lib/auc.ts` | untouched in round 4; `AUC24_FLOOR` still 0.622 |
+| manifest and split fixtures | untouched |
+| `probe-corpus-shape` output on this tree | unchanged: 32 of 32 rows, total gap 2299, mean 8.58%, max 20.84% |
+
+### R4.6 Gates
+
+| gate | result |
+|---|---|
+| `npm run lint` · `npm run build` | **EXIT=0** · **EXIT=0** |
+| `npm run check-no-console` | OK — 304 files, 24 quarantine entries |
+| `npm run check-server-reachability` · `check-docs` | OK · clean |
+| `npm run honesty-audit` | clean — 458 files, 474 markdown files, 93 claims rows |
+| `npm run check-brain` | fresh — 104 notes, 386 links |
+| `npm run gates` | **EXIT=0** |
+| `npm run test:metamorphic` | 8 hard passes, 1 documented known-failing witness |
+| `node scripts/check-scoring-receipt.mjs 78ec4464..HEAD` | **EXIT=1**, exactly ONE PENDING entry |
+| `npm run probe-corpus-shape` (unset env) | **EXIT=0**, honest skip |
+| `tests/core/corpus-shape-fields.test.ts` | **9 / 9** |
+| `tests/core/parse-format-invariance.test.ts` | **60 / 60** |
+| `tests/core/fountain-analyzer.test.ts` · `public-benchmark` · `calibration` | 69 / 69 · 33 / 33 · 25 / 25 |
+| `tests/security/fountain-shape-guard-cue-parity.test.ts` | 650 / 650 |
+| `npm test` | **not run this round, by instruction.** The last full run is round 3's: 13,407 tests, 0 fail, exit 0 |
+
+### R4.7 What round 4 did not do
+
+* **Item 5 is carried forward unchanged**, as the brief says:
+  `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1,500,000` must not land before the
+  sibling lane's 675,000 re-derivation is applied on the merged tree with the
+  analyzer cap in place, and `@` remains the largest measured format
+  sensitivity — 32 of 32, up to −26.8 — pinned and unfixed, needing its own
+  lane. A sibling lane (`scoring/forced-cue`) is building that on `3124a94e`;
+  its worktree was not touched by this round.
+* **No `--no-names` flag** for item 3, and no second output mode to keep
+  honest: the boundary is one sentence and the discipline is the owner's.
+* **The end-to-end saving was not claimed.** It exists in the targeted
+  measurement and is invisible at report scale; both numbers are printed
+  side by side rather than the flattering one alone.
+* **No full `npm test`**, per the brief. Touched files were run individually
+  and are listed above.
