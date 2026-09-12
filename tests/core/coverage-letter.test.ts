@@ -742,3 +742,80 @@ describe('renderCoverageLetter — honesty (no number outruns the report)', () =
     }
   });
 });
+
+// ── How long the letter actually is ─────────────────────────────────────────
+//
+// 2026-09-12 (adversarial review round 2, blocking item 2). Nine places in the
+// tree described this document as "one-to-two-page", including the button title
+// a writer reads before pressing it. That was true of the letter this lane
+// inherited and false of the one it shipped: finding #8 replaced the body's
+// re-sorted slice of three with the whole ranked list, and findings #4/#14 added
+// the Craft Dimensions section.
+//
+// The promise is now the measurement, and this is the measurement. The range is
+// three to four pages and it HOLDS for a 231-scene feature as well as a 9-scene
+// short, because the length is bounded by the engine rather than by the
+// renderer: server/nvm/analyze/doctor.ts:1920 caps `topPriorities` at ten.
+
+describe('the letter is as long as every description of it says', () => {
+  const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+  /** Pages of plain text at 500 words to the page — one page of 12pt Courier
+   *  prose, and the basis every measurement of this document has used. */
+  const pages = (text: string): number => text.split(/\s+/).filter(Boolean).length / 500;
+
+  // Measured 2026-09-12 across all 20 CC0 screenplays in data/screenplays plus
+  // the feature fixture: 3.3 pp .. 3.6 pp. The three below are the extremes of
+  // that run plus the longest script in the repository.
+  const SCRIPTS = [
+    'tests/fixtures/feature-length/assembled-feature.fountain',
+    'data/screenplays/runoff.fountain',
+    'data/screenplays/the-detour.fountain',
+  ];
+
+  for (const rel of SCRIPTS) {
+    it(`${rel.split('/').pop()}: three to four pages, as the copy promises`, async () => {
+      const { runScriptDoctor } = await import('../../server/nvm/analyze/doctor.ts');
+      const report = await runScriptDoctor(readFileSync(path.join(REPO_ROOT, rel), 'utf8'));
+      const { text } = renderCoverageLetter(report, { title: rel });
+      const pp = pages(text);
+      assert.ok(pp >= 3 && pp < 5,
+        `${rel} renders a ~${pp.toFixed(1)}-page letter; every description of this document `
+        + 'says three to four pages. Either the renderer grew or the promise is stale — '
+        + 'the promise is stale only if you have re-measured and updated all nine of them.');
+    });
+  }
+
+  it('no description of the letter still promises one to two pages', () => {
+    // The nine places, by file. A sentence a writer reads before pressing a
+    // button is a claim like any other, and this is what stops it drifting back.
+    const SITES = [
+      'server/lib/coverage-letter.ts',
+      'server/routes/coverage-letter.ts',
+      'server/lib/validation.ts',
+      'src/components/scriptide/ScriptDoctorPanel.tsx',
+      'tests/routes/export-coverage-letter.test.ts',
+      'docs/brain/Surfaces/Surface - Coverage Letter.md',
+    ];
+    for (const site of SITES) {
+      const src = readFileSync(path.join(REPO_ROOT, site), 'utf8');
+      // The retired wording may still be QUOTED — server/lib/coverage-letter.ts
+      // explains why it was corrected, and an explanation that cannot name the
+      // sentence it retired is worth less. Every occurrence must be in quotes;
+      // one used as a description again is the regression this case exists for.
+      const quoted = [...src.matchAll(/one-to-two-page/g)]
+        .every(m => src[(m.index ?? 0) - 1] === '"');
+      assert.ok(quoted,
+        `${site} still describes the coverage letter as one-to-two-page`);
+      assert.ok(src.includes('three-to-four-page'),
+        `${site} does not state the measured length`);
+    }
+  });
+
+  it('the writer sees the same length on the button as the module states', () => {
+    const panel = readFileSync(
+      path.join(REPO_ROOT, 'src/components/scriptide/ScriptDoctorPanel.tsx'), 'utf8');
+    assert.ok(panel.includes('Download a three-to-four-page coverage letter (Markdown)'),
+      'the coverage-letter button title must state the measured length');
+  });
+});

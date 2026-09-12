@@ -1,4 +1,4 @@
-// POST /api/export/coverage-letter — the one-to-two-page connected-prose
+// POST /api/export/coverage-letter — the three-to-four-page connected-prose
 // coverage LETTER (server/routes/coverage-letter.ts,
 // server/lib/coverage-letter.ts). Conventions and fixture text match
 // tests/routes/export-coverage.test.ts (the dashboard-style HTML sibling):

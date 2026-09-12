@@ -1,4 +1,4 @@
-// POST /api/export/coverage-letter — the one-to-two-page connected-prose
+// POST /api/export/coverage-letter — the three-to-four-page connected-prose
 // coverage LETTER (upgrade-writer-experience discovery #7), sibling to POST
 // /api/export/coverage's dashboard-style HTML export (server/routes/
 // export.ts, server/lib/coverage-html.ts).

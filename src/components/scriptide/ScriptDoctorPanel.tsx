@@ -2939,7 +2939,7 @@ export default function ScriptDoctorPanel({
   const [pitchkitError, setPitchkitError] = useState<string | null>(null);
   const pitchkitAbortRef = useRef<AbortController | null>(null);
 
-  // "Coverage letter" (POST /api/export/coverage-letter): the one-to-two-page
+  // "Coverage letter" (POST /api/export/coverage-letter): the three-to-four-page
   // connected-prose sibling of Export report's dashboard-style HTML. Its own
   // independent in-flight/error state, same rationale as exportStatus above.
   // Unlike Export report, this route has no deep-read variant either (like
@@ -4465,7 +4465,7 @@ export default function ScriptDoctorPanel({
             Pitch kit
           </button>
         )}
-        {/* Coverage letter: the one-to-two-page connected-prose sibling of
+        {/* Coverage letter: the three-to-four-page connected-prose sibling of
             Export report above (POST /api/export/coverage-letter). Disabled
             with a visible reason — not hover-only, per Retrospective #5
             above — whenever there's no complete report to export yet, since
@@ -4482,7 +4482,7 @@ export default function ScriptDoctorPanel({
                 aria-label="Export a connected-prose coverage letter as Markdown"
                 title={
                   coverageLetterDisabledReason
-                    ?? "Download a one-to-two-page coverage letter (Markdown): logline, root causes, priorities, and a recommendation"
+                    ?? "Download a three-to-four-page coverage letter (Markdown): logline, root causes, priorities, and a recommendation"
                 }
                 className="sm-btn border-[var(--sm-cream)]/30 text-[var(--sm-cream)] hover:border-[var(--sm-cream)] disabled:opacity-40 flex items-center gap-1.5"
               >

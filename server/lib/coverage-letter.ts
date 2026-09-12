@@ -1,10 +1,39 @@
-// Deterministic coverage LETTER — the one-to-two-page connected-prose sibling
+// Deterministic coverage LETTER — the three-to-four-page connected-prose sibling
 // of server/lib/coverage-html.ts's dashboard-style export (upgrade-writer-
 // experience discovery #7). A studio coverage report reads like a reader's
 // memo, not a table of counts: a logline-level summary, a reader's comments
 // (root causes and the priorities that follow from them), and a
 // recommendation — so this renders paragraphs and short lists, never a
 // heatmap or a raw per-pass appendix.
+//
+// ── HOW LONG IT IS, MEASURED (2026-09-12, adversarial review round 2) ───────
+//
+// Every description of this letter — here, the route, the panel's button title,
+// the validation schema, the route test, the brain note: nine places, not the
+// four the review counted — used to say "one-to-two-page". That was true when
+// the body printed three findings, and it stopped being true the same day, in
+// two steps this lane took: finding #8 made the body render the whole ranked
+// list instead of a re-sorted slice of three, and findings #4/#14 added the
+// Craft Dimensions section.
+//
+// Plain text, words / 500 (a page of 12pt Courier prose), over the 20 CC0
+// screenplays in data/screenplays plus the 231-scene feature fixture:
+//
+//   before this lane   runoff 1,017 w (~2.0 pp) · chain-of-custody 928 w (~1.9 pp)
+//   after              3.3 pp .. 3.6 pp across all 21, runoff 1,739 w (~3.5 pp)
+//
+// The three-to-four-page range holds because the length is BOUNDED BY THE
+// ENGINE, not by this renderer: doctor.ts:1920 caps `topPriorities` at ten, so
+// a 231-scene feature and a 9-scene short produce letters within 0.3 pp of each
+// other. tests/core/coverage-letter.test.ts asserts the range.
+//
+// Why the sentence was corrected rather than the letter cut back: the shortest
+// this document can be is its non-priorities content, which measures ~1,009
+// words (~2.0 pp) with an EMPTY priorities body — the reader summary, the
+// producer tier, the verdict summary, the checks-that-found-nothing list, Craft
+// Dimensions and the how-to-read caveats. No bound on the body reaches
+// "one-to-two-page", so keeping the promise would have meant deleting a section
+// a reader is owed. The measured sentence is the honest one.
 //
 // Pure function over an already-computed ScriptDoctorReport (server/nvm/
 // analyze/types.ts): no I/O, no Date.now(), no randomness, so the same report
@@ -765,7 +794,7 @@ function renderText(d: LetterData): string {
 }
 
 /**
- * Render a ScriptDoctorReport into a shareable, one-to-two-page coverage
+ * Render a ScriptDoctorReport into a shareable, three-to-four-page coverage
  * LETTER — connected prose (logline-level summary, comments, recommendation)
  * rather than a dashboard of counts. Pure function: same report + same opts
  * -> byte-identical markdown and text every time. Every sentence traces to a

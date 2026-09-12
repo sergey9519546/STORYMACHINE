@@ -9,7 +9,7 @@ status: active
 
 **Files:** `server/lib/coverage-letter.ts` (`renderCoverageLetter`,
 `buildCaveats`), served from `POST /api/export/coverage-letter` in
-`server/routes/coverage-letter.ts` — "the one-to-two-page connected-prose
+`server/routes/coverage-letter.ts` — "the three-to-four-page connected-prose
 export," distinct from [[Surface - Coverage HTML]] and `server/routes/export.ts`.
 
 **What it shows:** a prose coverage letter whose caveats section carries

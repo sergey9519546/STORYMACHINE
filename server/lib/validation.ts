@@ -2452,7 +2452,7 @@ export const DoctorBodySchema = z.object({
 export const DeepDoctorBodySchema = DoctorBodySchema;
 
 // POST /api/export/coverage-letter (server/routes/coverage-letter.ts,
-// server/lib/coverage-letter.ts) — the one-to-two-page connected-prose
+// server/lib/coverage-letter.ts) — the three-to-four-page connected-prose
 // coverage LETTER, sibling to POST /api/export/coverage's dashboard-style
 // HTML. Same two-format body contract as DoctorBodySchema (exactly one of
 // fountain/fdx, optional title) plus an optional `author` byline — the only
