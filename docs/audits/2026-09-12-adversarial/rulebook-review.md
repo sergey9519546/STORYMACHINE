@@ -597,3 +597,89 @@ cost-derived and shape-robust (R12, R13), the new tests fail on the unfixed
 tree (R14), no pinned rejection flipped and bypass B's margin is 2.844× (R15),
 the rejection copy is true and actionable (R16), and all twelve gates pass
 including 657/657 and 45/45 unqualified identity (R17).
+
+---
+
+## Round 3
+
+Reviewed object: `547d630b` — one commit on `df5cde59` (the round-2 object
+`d43022fe` rebased onto main), on `origin/lane/rulebook-and-guard-bound`. Same
+reviewer, confirmation pass only: two files, 52 insertions / 21 deletions,
+`server/lib/validation.ts` **comment lines only** (verified: the diff contains
+no non-comment `+`/`-` line in that file, and
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` is still `675_000` at `validation.ts:680`).
+
+### Round-2 items, re-checked
+
+**Item 9 — the timing assertion. Fixed, verbatim and derived.**
+`tests/security/fountain-shape-guard-cue-parity.test.ts:3067-3081` now matches
+`tests/core/doctor-analysis-budget.test.ts:646-655` in form: `process.cpuUsage()`
+around the call, `cpuMs < DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS / 2` and
+`wallMs < DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS`, both imported from
+`server/lib/doctor-budget.ts` rather than written as numbers. No timing literal
+remains in the file — the only `20_000`/`20000` occurrences left (`:454`,
+`:852`) are unrelated word-count sanity checks, and `1_920_000` at `:3135` is
+bypass B's weight.
+
+**R18 — fail-first reproduces on my box.** Same two-part check applied by hand:
+```
+uniform-min N=150 (the committed case) | guard ACCEPTED | cpu 12,764ms vs half-budget 15,000 -> PASS | wall 12,781ms vs 30,000 -> PASS
+uniform-min N=223 (round-1's document) | guard REJECTED | cpu 26,653ms vs half-budget 15,000 -> FAIL | wall 26,686ms vs 30,000 -> PASS
+```
+The lane reports 29,034 ms of CPU for N=223 on its box; I measure 26,653 ms —
+different boxes, same verdict, and the margin at N=150 is 15%. Note the second
+row: the **wall** half of the pair still PASSES on round-1's 27 s document. Only
+the CPU-against-half-budget assertion catches it, which is precisely the
+argument for using the repo's two-part form rather than any single wall-clock
+ceiling.
+
+**Item 10 — the header comparator. Fixed, and the cited numbers are right.**
+`validation.ts:615-630` now cites cast 44 at weight **672,408**, measured
+6.9–7.5 s, and states the spread against the uniform-min worst case as ~1.9×,
+WIDER than 1.7×, with the convergence claim deleted and replaced by the correct
+reason the bound is safe (it is derived from the worst shape). Verified on the
+committed generator in the round-3 tree:
+```
+probe-cast 44 weight 672,408 | guard ACCEPTED
+probe-cast 45 weight 686,340 | guard REJECTED
+```
+So the document the comment now cites is one the bound admits, its weight is
+exact, and the discarded cast-45 comparator is confirmed to be rejected by this
+very bound.
+
+**Item 12 — the ride-along wording. Fixed.** `validation.ts:648-652` now says
+the `MAX_FOUNTAIN_FREQUENT_CUE_LINES` framing is "(ABOVE, not below)" and that
+"that comment was not itself edited; the contradiction is gone because this
+value was lowered to something the framing is actually true of."
+
+**Item 11** (the suite now carries a ~14 s cost) was not taken up; it was
+non-blocking and the file's new comment block already explains why the real
+`runScriptDoctor` run is there. Fine as is.
+
+### Gates re-run
+
+| Gate | Result |
+|---|---|
+| `tests/security/fountain-shape-guard-cue-parity.test.ts` | **657/657, exit 0** (18.2 s) |
+| `npx tsc --noEmit` | 0 errors, exit 0 |
+| `check-scoring-receipt df5cde59..547d630b` | "no scoring-path files changed. OK." exit 0 |
+| `check-docs` | "No AI writing patterns detected." exit 0 |
+| `honesty-audit` | "scanned 459 files … clean." exit 0 |
+
+Output identity was not re-run this round and does not need to be: the only
+`server/**` change is comment text, `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` is
+unchanged, and round 2's run against `main @ 9cd1805c` already returned 45/45
+byte-identical with `GIT_SHA` pinned and no `--ignore-keys`. Both trailers
+present on `547d630b`.
+
+### Verdict: **MERGE**
+
+Both round-2 items are closed with the fixes I asked for, in the form I asked
+for, and both reproduce on my box: the timing assertion is the repository's own
+two-part CPU/wall form derived from `DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS` (N=150
+passes at 12,764 ms CPU, 15% margin; round 1's N=223 document fails it at
+26,653 ms, while a wall-only check would not have), and the header comparator
+now cites a document the bound actually admits, at the right weight, with the
+unreproducible convergence claim removed rather than defended. Nothing else in
+the lane moved. Finding 14 and finding 10 are both answered, and the round-3
+tree is the strongest of the three.
