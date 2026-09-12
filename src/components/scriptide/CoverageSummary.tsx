@@ -128,6 +128,13 @@ const STAT_DEFINITIONS = {
     'Characters with under 30 words of dialogue are left out of the pairs, not scored against anybody:',
   voiceSeparationUnscored:
     'Not scored: fewer than two characters have enough dialogue (30 words) to compare.',
+  /** Appended when the cast is larger than the pair grid covers. The grid is
+   *  O(distinct^2), so the WORK is bounded at MAX_VOICE_SCORED_SPEAKERS (40)
+   *  rather than the document being refused — before 2026-09-12 a twenty-
+   *  speaking-character ensemble got no analysis at all. These characters were
+   *  not judged and are named so the absence is never silent. */
+  voiceSeparationNotScored:
+    'The pair grid covers the 40 characters with the most dialogue. These have enough dialogue but were not voice-scored:',
   resolvedQs:
     "Substantive questions raised in dialogue that a later line goes on to answer, out of every question raised. Higher (closer to the total) is better — the gap is open threads left dangling.",
 } as const;
@@ -452,11 +459,17 @@ export default function CoverageSummary({
     const va = report?.voiceAnalysis;
     const excluded = va?.excludedCharacters ?? [];
     const base = STAT_DEFINITIONS.voiceSeparation;
+    const notScored = va?.notVoiceScoredCharacters ?? [];
     if (va && !va.scored) return `${base} ${STAT_DEFINITIONS.voiceSeparationUnscored}`;
-    if (excluded.length === 0) return base;
-    const shown = excluded.slice(0, 6).join(', ');
-    const rest = excluded.length > 6 ? ` and ${excluded.length - 6} more` : '';
-    return `${base} ${STAT_DEFINITIONS.voiceSeparationExcluded} ${shown}${rest}.`;
+    const name = (list: string[]): string => {
+      const shown = list.slice(0, 6).join(', ');
+      return `${shown}${list.length > 6 ? ` and ${list.length - 6} more` : ''}`;
+    };
+    const clauses: string[] = [];
+    if (excluded.length > 0) clauses.push(`${STAT_DEFINITIONS.voiceSeparationExcluded} ${name(excluded)}.`);
+    if (notScored.length > 0) clauses.push(`${STAT_DEFINITIONS.voiceSeparationNotScored} ${name(notScored)}.`);
+    if (clauses.length === 0) return base;
+    return `${base} ${clauses.join(' ')}`;
   })();
   const root = report?.rootCauses?.[0];
   const reportIsComplete = report ? isWholeDraftAnalysisComplete(report) : false;

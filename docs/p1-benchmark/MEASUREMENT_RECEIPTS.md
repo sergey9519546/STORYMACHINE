@@ -2589,6 +2589,7 @@ the measurement doc it names)*
 | 4 | the density channel's gradient, asserted | **No scoring-path file changed.** A property test only: the dead zone finding 1 measured on main is GONE on this base — 0 of 32 scripts flat (main: 9 of 32), 0 of 1001 sampled densities in [0.05, 3.00] flat (main: 187), and +48 CRITICAL on the 231-scene feature moves the raw score by 2.148 (main: 1.491e-7 per minor, 0.0 on the displayed health). | `docs/scoring/DENSITY_GRADIENT_2026-09-12.md` |
 | 5 | ensemble order invariants + the calibration confound, disclosed | **No scoring-path file changed.** Order claims move from one committed permutation to 20 seeded ones: 21-scene fixture permutation AUC **0.7500** (5 of 20 still beat the intact draft; main: 13 of 20), 231-scene **1.0000**, and the 231-scene REVERSAL still **+4.7** — pinned as a named, still-failing witness. The calibration corpus's word budget is not controlled: Spearman(band, words) **0.7526** exceeds Spearman(band, health) 0.7099; equalising the budget collapses the band gap **25.32 → 16.58** and the all-pairs AUC **0.9600 → 0.7600**; the `--control` line's "5 of 5 ordered" holds for only 96 of 120 orderings. The corpus is NOT re-authored. | `docs/scoring/CALIBRATION_CONFOUND_2026-09-12.md` |
 | 6 | report truth at the scoring seam | Every dimension summary states its count (231-scene fixture: "a handful of minor notes" over **342 issues** → "169 minor note(s) … the score is density-normalised"). Priority ranking weights concentration: on the one-bad-scene fixture the defect went from **absent from all ten slots** to slots 4-7, with criticals still leading and no rule owning more than 2 slots. Line numbering restored — the strippers BLANK rather than delete, so a location is a line of the writer's file. Public benchmark **unchanged**; output identity PASS modulo 8 named keys. | `docs/scoring/REPORT_SEAM_2026-09-12.md` |
+| 7 | the voice pair grid's WORK is bounded | `MAX_VOICE_SCORED_SPEAKERS = 40`. The grid goes flat: at cast 223 it is **24,753 pairs / 189.7 ms → 780 pairs / 9.3 ms**, at cast 500 **124,750 / 945.6 ms → 780 / 11.8 ms**. End to end on the sibling review's shape, cast 223 **300 → 139 ms** and cast 1200 **7,130 → 1,543 ms**. A 20/30/40/60-character ensemble feature is ACCEPTED and voice-scored (on `main`, cast 20 and above are REJECTED outright). Public benchmark unchanged; health unchanged on all 45 fixtures. **No constant in `server/lib/validation.ts` was changed** — see row note below. | `docs/scoring/VOICE_PAIR_CAP_2026-09-12.md` |
 
 **WHAT THE OWNER'S AUC-24 RUN CAN AND CANNOT SETTLE (commit 2).** The three
 parse fixes are byte-identical on every committed fixture, so AUC-24 **cannot**
@@ -2634,3 +2635,31 @@ fixtures opens with its own CC0 licence record — 24 to 151 words — which the
 DIAGNOSED, while it went on being COUNTED. The benchmark's separation was partly
 a measurement of this repository's filing habits. Full table:
 `PUBLIC_BENCHMARK_2026-09-06.md` §14.3.
+
+**ON THE VOICE-ELIGIBLE BOUND, FOR THE OWNER AND THE SIBLING LANE (row 7).**
+`docs/audits/2026-09-12-adversarial/rulebook-review.md` records that
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1,500,000` — the value this lane's base
+branch also adopted — admits a 223-speaker x 30-word document costing **27.3 s**
+on that reviewer's box, over the 30 s analysis budget, and the sibling lane
+`lane/rulebook-and-guard-bound` has since re-derived it from cost to **675,000**.
+That finding is correct and its method is right. Two things about it have to
+reach the owner together:
+
+1. **It is a `main` measurement, and this base is not `main`.** Measured here on
+   the same shape and the same recipe: `main @ 8aa1f696` costs 5,919 ms at cast
+   100 and REJECTS cast 223; this branch costs **300 ms** at cast 223 before the
+   cap and **139 ms** after it, because `scoring/feature-length-defects` already
+   landed the per-character abstention rewrite (42,062 ms -> 191 ms on a 200-name
+   payload). A 1,200-speaker, 269 KB document costs 1.5 s here.
+2. **The bound must be re-derived on the MERGED tree, with the cap in place.**
+   A cost-derived bound measured against an O(distinct^2) grid is a bound against
+   a cost that no longer exists once the grid is flat. This lane therefore
+   changed **no constant** in `server/lib/validation.ts`: two lanes editing one
+   bound from two different cost models is how a bound stops meaning anything.
+
+**The combination to measure** is the analyzer cap plus a cost-derived bound.
+The cap removes the shape's superlinear term; the bound then only has to cover
+the thirteen other passes, which are linear in document size. The base branch's
+own bound commit (`111d72ed` on this rebased branch — 300,000 -> 1,500,000 on
+`scoring/feature-length-defects`) needs the same correction the sibling lane
+applied, and it should be applied once, on the merged tree, from a rerun.

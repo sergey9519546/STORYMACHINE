@@ -89,6 +89,12 @@ export interface FountainAnalysis {
      *  Abstention is PER CHARACTER: `scored` is false only when fewer than
      *  two characters clear the floor, not when any one falls under it. */
     excludedCharacters?: string[];
+    /** Characters that HAD enough dialogue but fell outside the top
+     *  `MAX_VOICE_SCORED_SPEAKERS` by pooled word count (voice-delta.ts), in
+     *  the input's own key order. The pair grid is O(distinct^2), so the WORK
+     *  is bounded rather than the document refused — see that constant's
+     *  header. Empty on every document with a cast at or under the cap. */
+    notVoiceScoredCharacters?: string[];
   };
   /** Subtext ratio (ratio of subtext/action/indirect dialogue to direct exposition) */
   subtextRatio?: number;
@@ -327,6 +333,12 @@ export interface ScriptDoctorReport {
      *  Abstention is PER CHARACTER: `scored` is false only when fewer than
      *  two characters clear the floor, not when any one falls under it. */
     excludedCharacters?: string[];
+    /** Characters that HAD enough dialogue but fell outside the top
+     *  `MAX_VOICE_SCORED_SPEAKERS` by pooled word count (voice-delta.ts), in
+     *  the input's own key order. The pair grid is O(distinct^2), so the WORK
+     *  is bounded rather than the document refused — see that constant's
+     *  header. Empty on every document with a cast at or under the cap. */
+    notVoiceScoredCharacters?: string[];
   };
   subtextRatio?: number;
   questionLatencyOverall?: {

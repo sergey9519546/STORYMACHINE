@@ -236,6 +236,55 @@ function pooledWordCount(lines: string[]): number {
  * Abstains (scored: false) only when FEWER THAN TWO characters clear the
  * floor — the one condition under which there is no pair to compute.
  */
+// ── BOUND THE WORK, NOT THE DOCUMENT (2026-09-12, engine-logic finding 10) ──
+// The Burrows's-Delta pair grid is O(distinct^2). The repository's response to
+// that cost has been a SHAPE GUARD that refuses to analyze the document at all
+// (`MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`, server/lib/validation.ts), and the
+// adversarial review's finding 10 is about what that costs a writer: a
+// twenty-speaking-character ensemble — a heist, a courtroom drama, a war film,
+// a TV pilot — got "trim the cast or split the draft" and NO ANALYSIS AT ALL.
+//
+// A degraded voice section on a forty-character ensemble is strictly better
+// than no score. So the WORK is bounded here: the pair grid is computed over
+// the MAX_VOICE_SCORED_SPEAKERS eligible characters with the most dialogue,
+// and every other eligible character is reported by name in
+// `notVoiceScoredCharacters` — a different thing from `excludedCharacters`,
+// which keeps its meaning ("too little text to have a voice to compare"). The
+// document is still fully analyzed by every other pass.
+//
+// MEASURED on this branch, the review's own worst shape (`cast` speakers, each
+// cue followed by five six-word paragraphs, 40 cues per scene):
+//
+//   cast   chars    analyzeVoices   runScriptDoctor      (uncapped)
+//    100   22,352        45 ms            121 ms
+//    223   49,967       190 ms            300 ms
+//    500  112,165       946 ms          1,268 ms
+//   1200  269,539          —            7,130 ms
+//
+// Two things follow, and both matter to the guard's re-derivation.
+//
+// FIRST, `analyzeVoices` is not where the 27.3 s the sibling lane's reviewer
+// measured on `main` comes from. On THIS base the same 223x30 document is
+// 300 ms end to end — 91x cheaper — because `scoring/feature-length-defects`
+// already landed the per-character abstention rewrite (42,062 ms -> 191 ms on
+// a 200-name payload). On `main` the identical document costs 5,919 ms at cast
+// 100 and is REJECTED above it. Any bound derived from cost on `main` is
+// derived from a scorer this branch has already replaced.
+//
+// SECOND, the cap makes the grid flat in cast size, so the cost argument for
+// the guard weakens further. The numbers after the cap are in
+// docs/scoring/VOICE_PAIR_CAP_2026-09-12.md. Choosing the guard's constant is
+// the sibling lane's work (`lane/rulebook-and-guard-bound`, which re-derived it
+// from cost to 675,000) and is deliberately NOT duplicated here: this commit
+// changes no constant in server/lib/validation.ts.
+/** How many eligible speakers the pair grid covers. Forty, because that is the
+ *  cast the review names as the thing that must get a score ("a degraded voice
+ *  section on a 40-character ensemble is strictly better than no score"), and
+ *  because 40 speakers is 780 pairs — the grid stops growing there whatever the
+ *  document does. It is a WORK bound, not a quality threshold: nothing about a
+ *  41st speaker is judged, and they are named in the report. */
+export const MAX_VOICE_SCORED_SPEAKERS = 40;
+
 export function analyzeVoices(
   dialogueByCharacter: Record<string, string[]>,
 ): {
@@ -244,19 +293,40 @@ export function analyzeVoices(
   /** Characters held out of the pair set for having under VOICE_MIN_WORDS
    *  pooled words, in the input's own key order. Empty when none were. */
   excludedCharacters: string[];
+  /** Characters that HAD enough text but fell outside the top
+   *  MAX_VOICE_SCORED_SPEAKERS by pooled word count, in the input's own key
+   *  order. Empty on every document with a cast at or under the cap — which
+   *  is every fixture in this repository. */
+  notVoiceScoredCharacters: string[];
 } {
   const characters = Object.keys(dialogueByCharacter);
 
-  const eligible: string[] = [];
+  const allEligible: string[] = [];
   const excludedCharacters: string[] = [];
   for (const char of characters) {
-    if (pooledWordCount(dialogueByCharacter[char]) >= VOICE_MIN_WORDS) eligible.push(char);
+    if (pooledWordCount(dialogueByCharacter[char]) >= VOICE_MIN_WORDS) allEligible.push(char);
     else excludedCharacters.push(char);
+  }
+
+  // The cap, applied by pooled word count descending. The sort is over a COPY
+  // and ties break on the input's key order (`indexOf` on the original array),
+  // so the selection is deterministic for any two documents with the same
+  // speakers — the report has to be byte-reproducible.
+  let notVoiceScoredCharacters: string[] = [];
+  let eligible = allEligible;
+  if (allEligible.length > MAX_VOICE_SCORED_SPEAKERS) {
+    const wordsOf = new Map(allEligible.map((c) => [c, pooledWordCount(dialogueByCharacter[c])]));
+    const ranked = allEligible.slice().sort((a, b) =>
+      (wordsOf.get(b)! - wordsOf.get(a)!) || (allEligible.indexOf(a) - allEligible.indexOf(b)));
+    const kept = new Set(ranked.slice(0, MAX_VOICE_SCORED_SPEAKERS));
+    // Both lists stay in the INPUT's key order, like excludedCharacters.
+    eligible = allEligible.filter((c) => kept.has(c));
+    notVoiceScoredCharacters = allEligible.filter((c) => !kept.has(c));
   }
 
   // Abstain: fewer than two characters carry enough text to pair at all.
   if (eligible.length < 2) {
-    return { pairs: [], scored: false, excludedCharacters };
+    return { pairs: [], scored: false, excludedCharacters, notVoiceScoredCharacters };
   }
 
   // Compute all pairwise deltas over the ELIGIBLE set only. No pair is ever
@@ -292,5 +362,5 @@ export function analyzeVoices(
     }
   }
 
-  return { pairs, scored: true, excludedCharacters };
+  return { pairs, scored: true, excludedCharacters, notVoiceScoredCharacters };
 }
