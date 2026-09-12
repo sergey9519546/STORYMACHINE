@@ -1154,3 +1154,184 @@ run, and the two new fields on no scoring path.
 
 *Round 3. Reviewed SHA **`3124a94e`**; round 2's was `b798a0c4`, round 1's
 `85273742`.*
+
+---
+
+## Round 4 — re-check of `4cf5b2f3`
+
+**Object:** five commits over `3124a94e` (`87c5db3c`, `768599b9`, `839b1c16`,
+`08df4e96`, `4cf5b2f3`); origin is at the reviewed SHA and the worktree is
+clean at it. Scope: my round-3 non-blocking items 1–4, plus the regression
+surface. Method unchanged; `git archive` exports of `3124a94e` and `8aa1f696`
+in `<session scratch>`, nothing committed or pushed, `--lock` never run, no
+full `npm test`, no private corpus touched.
+
+### R4.a Item 1 — `--silent` on the `--csv` form
+
+```
+npm run --silent probe-corpus-shape -- --public --csv > shape.csv        EXIT=0
+  line 1: file,isDoubleSpaced,submittedWordCount,wordCount,notScreenplayWords,…
+  32 data rows · 0 occurrences of NaN
+```
+
+Header on line 1, as claimed. The RUN comment and the receipt's code block both
+carry `--silent`, and both explain that it is load-bearing on `--csv` **and on
+nothing else** — including the true qualifier that a plain `diff` of two
+un-silenced files is unaffected because the banner is identical on both sides.
+That is the correction stated more precisely than I stated it.
+
+### R4.b Item 2 — the pre-branch half, and it is now better than self-contained
+
+Run on a `git archive 8aa1f696` export with the script copied across:
+
+```
+cd <scratch>/base && node --experimental-strip-types scripts/probe-corpus-shape.ts --public      EXIT=0
+  …/chain-of-custody.fountain   ?         —     824       —      —   76.3 CONSIDER  13  1/43/134
+  data/screenplays/room-12.fountain  ?    —     427       —      —   33.5 PASS      10  1/48/148
+  NOTE: 32 of 32 rows have no submittedWordCount / isDoubleSpaced. …
+  DOUBLE-SPACED … none        SINGLE-SPACED … none
+cd <scratch>/base && … --csv                                                                     EXIT=0
+  32 rows · 0 occurrences of NaN · empty cells in the two diagnostic columns
+```
+
+`?` for the shape column, `—` for submitted/gap/gap%, **zero NaN** in either
+form, the unreported rows excluded from the group summaries rather than
+silently mis-grouped into one of them, and a NOTE that names the count and the
+reason. Exactly the behaviour claimed.
+
+**The lane found something here I had not, and it is the best line of the
+round.** On a pre-branch tree `wordCount` IS the raw submission, so the
+pre-branch `wordCount` column and this tree's `submittedWordCount` column are
+the same number — which turns the empty cells from a gap into an anchor for the
+diff. The receipt cites one file for it; I checked all 32:
+
+```
+paste pre-branch wordCount (col 4)  against  tip submittedWordCount (col 3)
+  ->  0 of 32 differ
+```
+
+Every script agrees, `chain-of-custody` 824 = 824 and `room-12` 427 = 427
+included — the latter being the same 427 I counted by hand in round 1. So the
+owner's cross-tree comparison now has a column-to-column identity to check
+itself against before any number is interpreted.
+
+### R4.c Item 3 — the output is a local artifact
+
+The script gains a "THE OUTPUT IS A LOCAL ARTIFACT. DO NOT PASTE IT ANYWHERE"
+block and the receipt the matching sentence. Both draw the distinction the
+right way round: the paths are **not** screenplay text, so the copyright
+boundary is unchanged, but collectively they are the corpus's index, which this
+repository has never published — with the practical rule ("quote an aggregate
+from the group summaries if a number has to travel") and the one exception
+(`--public`, whose 32 files are committed here). That is precisely the point I
+raised, and it is scoped rather than over-claimed.
+
+### R4.d Item 4 — the memo, measured
+
+```
+<session scratch>/memo.mjs on the 113,954-char feature fixture
+  at 4cf5b2f3   first 7.2450 ms   second 0.0007 ms
+  at 3124a94e   first 6.4658 ms   second 3.2909 ms
+```
+
+The second caller's cost collapses, which is the claim. My absolute figures
+differ from the lane's 2.4776 → 0.0001 because my first call carries cold-import
+JIT warm-up, but the conclusion is the same to two orders of magnitude. The
+memo is the same one-entry pattern as `normalizeScreenplay`'s and
+`stripTitlePage`'s, on a pure function, so it cannot go stale; the early
+`if (!raw …) return false` means an empty string never populates it.
+
+**And the staleness risk is asserted, not asserted-away.** The tenth assertion
+alternates two documents with **opposite** answers five times over, plus a
+same-bytes repeat inside each round, then checks the analyzer's reported field
+after the interleaving. A one-entry cache keyed on anything but the exact input
+fails it. That is the right test for this mechanism.
+
+The end-to-end framing is honest: the lane reports 883/808/953 ms against
+812/800/823 ms per report and calls it **below noise** rather than a win. It is
+— ~2.5-3.3 ms saved on a ~800 ms report — and saying so is the correct reading
+of two overlapping ranges.
+
+### R4.e The regression surface
+
+```
+npm run benchmark:public                                                      EXIT=0
+  0.8438 / 0.7896 · 0.5938 / 0.5234 · 1.0000 / 0.9814
+```
+
+Identical **to the digit** for the fourth consecutive round. `scripts/lib/auc.ts`,
+`public-corpus-manifest.json` and `public-benchmark-split.json` are all absent
+from the round-4 diffstat; `AUC24_FLOOR` still 0.622; no re-lock run.
+
+```
+GIT_SHA=R4PIN, --tree <scratch>/r3tree (3124a94e) and --tree . (4cf5b2f3)
+--compare  ->  OUTPUT IDENTITY: PASS — all 45 reports byte-identical            EXIT=0
+
+node scripts/check-scoring-receipt.mjs 78ec4464..HEAD
+  EXIT=1 — exactly ONE "PENDING ENTRY"
+```
+
+| gate | result |
+|---|---|
+| `npm run lint` · `check-no-console` · `check-docs` · `honesty-audit` · `check-brain` | EXIT=0 (all five) |
+| `npm run gates` | **EXIT=0**; mutation check raised `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` to 0.8938 and the suite **FAILED on that floor by name**, no passing twin |
+| `tests/core/corpus-shape-fields.test.ts` | **9 / 9**, EXIT=0 |
+| `tests/core/parse-format-invariance.test.ts` | **60 / 60**, EXIT=0 |
+
+The probe's safety properties are unchanged by the round-4 rewrite of its
+output path, re-checked rather than assumed: zero write/network/child-process
+primitives in the file; `touch`-marker then `find -newer` over the worktree
+after a run is **empty**; unset `REAL_SCRIPT_CORPUS_DIR` still skips with
+EXIT=0.
+
+## VERDICT: **READY-FOR-OWNER**
+
+Four small items, four clean builds, and one of them — the pre-branch
+`wordCount` ≡ `submittedWordCount` identity — is a genuinely better answer than
+the item I raised. Nothing in the round touches a floor, a fixture report or a
+scored number: six AUCs to the digit, 45 of 45 byte-identical, `auc.ts` not in
+the diffstat, receipt still exiting 1 on one PENDING entry. The one behaviour
+change (the memo) is on a pure function, is measured, is framed as below noise
+end to end rather than as a win, and is pinned by a staleness test that would
+fail a mis-keyed cache.
+
+I have no further items. The branch is waiting only on the owner's
+`REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`, with
+`npm run probe-corpus-shape` to run first.
+
+### Non-blocking
+
+1. **Cosmetic, in the receipt's pending entry only.** The `--silent`
+   explanation paragraph now sits between the code block and the "prints, per
+   script, …" sentence that describes it, and the local-artifact paragraph runs
+   straight into "Run it once on a pre-branch checkout" without a break. Every
+   sentence is correct; the seams just read out of order. A reflow, not a
+   revision, and not worth a round on its own — fold it into whatever touches
+   that entry next.
+2. **Carried forward, unchanged and still binding, from rounds 1-3:**
+   `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1,500,000` must not land before the
+   sibling lane's 675,000 re-derivation is applied on the merged tree with the
+   analyzer cap in place; and the forced cue `@` remains the largest measured
+   format sensitivity on this branch (32 of 32, up to −26.8), pinned with its
+   size and deliberately unfixed, needing parser and renderer work as its own
+   lane.
+
+### What the owner's run settles and what it cannot
+
+Unchanged in substance from round 3 — round 4 moves no number. What it changes
+is that both halves of the pre-branch comparison are now executable from the
+receipt alone: copy the script across, run
+`npm run --silent probe-corpus-shape -- --csv > shape.csv` on each side, and
+check the pre-branch `wordCount` column against this tree's
+`submittedWordCount` column (they must agree, as they do on all 32 public
+scripts) before reading anything else. Then per-script health, verdict, scene
+count and severity mix; then the 72-row manifest; then, and only then, AUC-24 —
+remembering that four changes reach the corpus, that they move both halves of
+every matched pair, and that a rank statistic which does not move is not
+evidence that they did nothing. If AUC-24 falls, read the drafts.
+`AUC24_FLOOR` does not move.
+
+---
+
+*Round 4. Reviewed SHA **`4cf5b2f3`**; round 3's was `3124a94e`, round 2's
+`b798a0c4`, round 1's `85273742`.*
