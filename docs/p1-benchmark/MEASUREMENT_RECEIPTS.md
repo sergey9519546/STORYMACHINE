@@ -2754,8 +2754,26 @@ is not an argument about AUC-24 — nobody here can predict its sign.
 
 **WHAT TO COMPARE, AND IN WHAT ORDER.** This change and the strip-order change
 above COMPOUND: on a double-spaced import both the analyzer's text and the
-passes' text change, and every corpus document of that shape takes both. So,
-split by whether `isDoubleSpaced` fires, and **before reading AUC-24**:
+passes' text change, and every corpus document of that shape takes both.
+
+**FOUR CHANGES REACH THE CORPUS, NOT TWO (corrected 2026-09-12, round 3).**
+Rows 9 and 10 — the forced-marker strip and the cue-extension fold — are
+corpus-visible as well, and the corpus is where they will actually fire: the
+32 committed benchmark scripts carry **zero** forced markers of any kind and
+**zero** non-canonical extension spellings (measured; it is why neither defect
+could be caught by a benchmark that runs on every CI run), while scraped PDFs
+and FDX exports are exactly the text that carries them. `@` forced cues and
+`.` forced headings are the two with the most exposure in converted drafts, and
+they are respectively the marker this branch did NOT fix and the one it fixed
+but cannot verify from here. Unlike rows 3 and 8, rows 9 and 10 fire on either
+document shape, not only the double-spaced one.
+
+One thing rows 9 and 10 **cannot** do: move `sceneCount`. The marker strip
+removes a marker only when the whole document re-parses to the same block
+types, so a scene boundary cannot dissolve — a scene count that changed against
+a pre-branch run is evidence of something else and should be read as such.
+
+So, split by whether `isDoubleSpaced` fires, and **before reading AUC-24**:
 
 1. `submittedWordCount` against `wordCount`, per script — how much text left the
    denominator, and on which document shape.
