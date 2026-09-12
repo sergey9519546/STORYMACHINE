@@ -39,6 +39,25 @@ const coverageSummary = readFileSync(
 );
 const scriptIde = readFileSync(path.join(REPO, 'src/components/ScriptIDE.tsx'), 'utf8');
 
+/** Strip `/* ... *\/` and `// ...` comments. Good enough for this file — no
+ *  string literal here contains either sequence — and load-bearing for
+ *  `abortCallSites` below: without it, the doc comment above `abortRef`
+ *  naming the pattern in backticks would count as a real call site once the
+ *  trailing-`;` requirement is dropped (round-3 review item 2). */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+}
+
+/** Real `abortRef.current?.abort()` call sites, comments excluded. No
+ *  trailing-`;` requirement: `useEffect(() => () => abortRef.current?.abort(),
+ *  [])` — an arrow-expression-body cleanup with no semicolon inside the
+ *  call — is exactly as real a reintroduction of the unmount-abort gap as
+ *  either statement-form route, and the `;`-anchored version of this
+ *  function let it through 21/0 (round-3 review item 2, route (C)). */
+function abortCallSites(src: string): number {
+  return (stripComments(src).match(/abortRef\.current\?\.abort\(\)/g) ?? []).length;
+}
+
 describe('the compact card shows the hint, not just the reason', () => {
   it('captures the hint off the error the stream client already throws', () => {
     assert.match(coverageSummary, /FormatUnrecognizedError,/);
@@ -88,11 +107,14 @@ describe('the compact card shows the hint, not just the reason', () => {
     // (B) a separate, normally-formatted `useEffect` doing the same thing
     // (planted and measured pass 18/fail 0 against the old regex — see the
     // self-check below, which proves this count assertion catches both).
-    // Real call sites end in `;` (`abortRef.current?.abort();`); the doc
-    // comment above `abortRef` also names the pattern, in backticks with no
-    // trailing semicolon, so it does not add to this count.
+    // Comments stripped first (see stripComments above), so the doc comment
+    // above `abortRef` naming the pattern in backticks does not add to this
+    // count. No trailing-`;` requirement — round-3 review item 2 found that
+    // requiring one let `useEffect(() => () => abortRef.current?.abort(),
+    // []);` (an arrow-expression-body cleanup, no semicolon inside the call)
+    // through at 21/0.
     assert.equal(
-      (coverageSummary.match(/abortRef\.current\?\.abort\(\);/g) ?? []).length,
+      abortCallSites(coverageSummary),
       2,
       'exactly two abort() call sites should exist — run()\'s supersede prefix and cancelRun — '
         + 'a third means the unmount-abort gap (see the note above abortRef) was reintroduced',
@@ -119,13 +141,13 @@ describe('the compact card shows the hint, not just the reason', () => {
 
 // A scanner nothing plants against proves nothing (same discipline as
 // tests/scripts/wait-for-function-options-position.test.ts's six hand-written
-// shapes). This runs the SAME counting rule the guard above uses against the
-// real source, plus two synthetic reintroductions of the unmount-abort gap —
-// the two routes the round-2 review measured by hand — so a future edit to
-// the counting rule itself has to keep catching both.
-describe('the abort-count guard catches both known reintroduction routes', () => {
-  const abortCallSites = (src: string) => (src.match(/abortRef\.current\?\.abort\(\);/g) ?? []).length;
-
+// shapes). This runs the SAME counting rule (abortCallSites, shared with the
+// guard above — one implementation, not a second copy) against the real
+// source, plus three synthetic reintroductions of the unmount-abort gap —
+// the two routes the round-2 review measured by hand, plus the third
+// (semicolon-less) route round-3 found surviving both — so a future edit to
+// the counting rule itself has to keep catching all three.
+describe('the abort-count guard catches every known reintroduction route', () => {
   it('the real source has exactly two — the guard is not vacuous on the untouched tree', () => {
     assert.equal(abortCallSites(coverageSummary), 2);
   });
@@ -157,6 +179,22 @@ describe('the abort-count guard catches both known reintroduction routes', () =>
     );
     assert.notEqual(planted, coverageSummary, 'the useRef(false) anchor line was not found');
     assert.equal(abortCallSites(planted), 3, 'route (B) must move the count off 2');
+  });
+
+  it('route (C): the concise double-arrow cleanup, which has no semicolon inside the call', () => {
+    // Round-3 review item 2: `useEffect(() => () => abortRef.current?.abort(),
+    // []);` — the arrow-expression body means there is no `;` immediately
+    // after `abort()` (the ONE `;` in the whole statement lands after the
+    // closing `)` of `useEffect(...)`), so a call-site regex anchored on a
+    // trailing `;` cannot see it. Measured against the pre-round-3 version of
+    // abortCallSites: 21 pass / 0 fail — survived untouched.
+    const planted = coverageSummary.replace(
+      'const userCancelledRef = useRef(false);',
+      'const userCancelledRef = useRef(false);\n\n'
+        + '  useEffect(() => () => abortRef.current?.abort(), []);',
+    );
+    assert.notEqual(planted, coverageSummary, 'the useRef(false) anchor line was not found');
+    assert.equal(abortCallSites(planted), 3, 'route (C) must move the count off 2');
   });
 });
 
