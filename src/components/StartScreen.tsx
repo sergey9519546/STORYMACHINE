@@ -633,7 +633,17 @@ export default function StartScreen({
                       { n: "1", t: "Enter", d: "Sample · file · blank" },
                       { n: "2", t: "Write", d: "Page · scenes · cast" },
                       { n: "3", t: "Coverage", d: "Verdict · top issue" },
-                      { n: "4", t: "Ship", d: "Export · simulate" },
+                      // Finding #10 (2026-09-12): "simulate" is Labs-only, and
+                      // `onOpenStoryMachine` is undefined when Labs is off
+                      // (App.tsx passes it only then). Naming it in the core
+                      // four-step loop on the default surface both broke P2's
+                      // "zero exposure to simulation jargon" exit gate and
+                      // promised a step this surface cannot reach.
+                      {
+                        n: "4",
+                        t: "Ship",
+                        d: onOpenStoryMachine ? "Export · simulate" : "Export · verify",
+                      },
                     ].map((step) => (
                       <li key={step.n} className="sm-card flex items-start gap-3">
                         <span className="font-[family-name:var(--sm-font-display)] text-3xl leading-none text-[var(--sm-stamp-on-light)]">
@@ -728,7 +738,32 @@ export default function StartScreen({
                   </div>
                 </section>
 
-                {/* L2 — OASIS explore */}
+                {/* L2 — OASIS explore.
+                    LABS-GATED (finding #10, 2026-09-12). `onOpenStoryMachine`
+                    is passed by App.tsx only when `labsEnabled && showStoryMachine`
+                    (src/lib/feature-flags.ts, default OFF), and line ~559's
+                    "Advanced: Simulation" control has always been gated on it.
+                    This whole section was NOT: it rendered a full-width dark
+                    hero ("WHEN YOU NEED PRESSURE / STORY MACHINE SIMULATE"), a
+                    four-cell feature grid, a numbered workflow whose steps 3 and
+                    4 describe a Labs-only feature as part of the core loop, and
+                    an "Open simulation" button calling `onOpenStoryMachine?.()`
+                    — i.e. a normal, enabled, focusable button that did nothing
+                    at all on the default keyless start screen.
+
+                    The section is GATED, not deleted: with Labs on, every byte
+                    below renders and behaves exactly as it always did.
+                    NORTH_STAR §1 is explicit that this is the right shape — "a
+                    Labs-gated feature degrades by not rendering at all — hide,
+                    don't disable. A permanently-inert control … is a worse
+                    answer than its absence" — and a disabled-with-a-reason
+                    control is NOT the alternative here, because the reason would
+                    have to name the simulation feature and P2's exit gate is
+                    zero exposure to simulation jargon before a writer's first
+                    coverage report. The route back in stays open from inside the
+                    editor: Toolbar overflow -> "Labs & Settings"
+                    (asserted by scripts/verify-p2-p3-surfaces.mjs). */}
+                {onOpenStoryMachine && (
                 <section aria-labelledby="oasis-heading" className="sm-panel sm-panel--ink">
                   <div className="grid grid-cols-1 lg:grid-cols-12">
                     <div className="sm-panel-body lg:col-span-7">
@@ -775,7 +810,7 @@ export default function StartScreen({
                       </ol>
                       <button
                         type="button"
-                        onClick={() => onOpenStoryMachine?.()}
+                        onClick={() => onOpenStoryMachine()}
                         className={`sm-btn w-full bg-[var(--sm-cream)] text-[var(--sm-ink)] hover:bg-[var(--sm-stamp)] hover:text-[var(--sm-cream)] sm:w-auto ${FOCUS_RING}`}
                       >
                         <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
@@ -784,6 +819,7 @@ export default function StartScreen({
                     </div>
                   </div>
                 </section>
+                )}
 
                 {/* L1 — trust chips + primary re-entry */}
                 <section
@@ -823,13 +859,21 @@ export default function StartScreen({
                     >
                       Editor
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onOpenStoryMachine?.()}
-                      className={`sm-btn text-[var(--sm-ink-mute)] ${FOCUS_RING}`}
-                    >
-                      Simulate
-                    </button>
+                    {/* Finding #10: gated on the same flag as every other
+                        simulation entry point. This button called
+                        `onOpenStoryMachine?.()` — with Labs off that optional
+                        call is a no-op, so it shipped as an enabled, focusable
+                        control that produced no navigation and no state change.
+                        Hide, don't disable (NORTH_STAR §1). */}
+                    {onOpenStoryMachine && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenStoryMachine()}
+                        className={`sm-btn text-[var(--sm-ink-mute)] ${FOCUS_RING}`}
+                      >
+                        Simulate
+                      </button>
+                    )}
                   </div>
                 </section>
               </div>

@@ -495,6 +495,81 @@ async function main() {
   const advancedSimCountOff = await advancedSimBtnOff.count();
   record('P2', 'StartScreen "Advanced: Simulation" (Labs-gated) is ABSENT with Labs OFF', advancedSimCountOff === 0, `found ${advancedSimCountOff} matching button(s)`);
 
+  // ── Finding #10 (2026-09-12): NO DEAD CONTROLS on the default start screen.
+  //
+  // "Open simulation" and "Simulate" called `onOpenStoryMachine?.()`. With Labs
+  // off App.tsx passes that prop as undefined, so the optional call is a no-op:
+  // two normal, enabled, focusable buttons that produced no navigation and no
+  // state change, beside a full-width OASIS hero and a numbered workflow
+  // describing a Labs-only feature as part of the core loop. NORTH_STAR §1 —
+  // hide, don't disable.
+  //
+  // This walks EVERY visible, enabled button on the fresh default screen and
+  // requires each to either navigate, change the page, or be honestly disabled
+  // with a reason. Each click is taken on a RELOADED page so one button's
+  // navigation cannot hide the next one's inertness.
+  const startScreenButtonNames = await pageA.evaluate(() =>
+    [...document.querySelectorAll('button')]
+      .filter((b) => !b.disabled && b.offsetParent !== null)
+      .map((b) => (b.getAttribute('aria-label') || b.innerText || '').replace(/\s+/g, ' ').trim())
+      .filter((n) => n.length > 0),
+  );
+  record(
+    'P2-deadcontrols',
+    'the default start screen really does render buttons to audit',
+    startScreenButtonNames.length >= 3,
+    `buttons=${JSON.stringify(startScreenButtonNames)}`,
+  );
+  const inertStartScreenButtons = [];
+  for (const name of startScreenButtonNames) {
+    await pageA.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+    await pageA.getByRole('button', { name: /try sample coverage/i }).first()
+      .waitFor({ timeout: timing.ms(15000) });
+    const before = await pageA.evaluate(() => ({
+      url: location.href,
+      text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 4000),
+    }));
+    const target = pageA.getByRole('button', { name, exact: true }).first();
+    const clickable = await target.isVisible().catch(() => false);
+    if (!clickable) continue;
+    await target.click({ timeout: timing.ms(10000) }).catch(() => {});
+    await pageA.waitForTimeout(timing.ms(900));
+    const after = await pageA.evaluate(() => ({
+      url: location.href,
+      text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 4000),
+    }));
+    if (after.url === before.url && after.text === before.text) inertStartScreenButtons.push(name);
+  }
+  record(
+    'P2-deadcontrols',
+    'every visible, enabled button on the keyless default start screen produces a navigation or a state change',
+    inertStartScreenButtons.length === 0,
+    `inert=${JSON.stringify(inertStartScreenButtons)} audited=${startScreenButtonNames.length}`,
+  );
+  const oasisSectionOff = await pageA.locator('[aria-labelledby="oasis-heading"]').count();
+  const simulateJargonOff = await pageA.evaluate(() => {
+    const t = document.body.innerText;
+    return {
+      storyMachineSimulate: /Story Machine Simulate/i.test(t),
+      simulateIfNeeded: /Simulate if needed/i.test(t),
+      railStep: /Export · simulate/i.test(t),
+    };
+  });
+  record(
+    'P2-deadcontrols',
+    'the Labs-only OASIS section does not render at all with Labs OFF (hide, don\'t disable)',
+    oasisSectionOff === 0
+      && !simulateJargonOff.storyMachineSimulate
+      && !simulateJargonOff.simulateIfNeeded
+      && !simulateJargonOff.railStep,
+    `oasisSections=${oasisSectionOff} jargon=${JSON.stringify(simulateJargonOff)}`,
+  );
+
+  // Back to a clean default screen for the assertions that follow.
+  await pageA.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await pageA.getByRole('button', { name: /try sample coverage/i }).first()
+    .waitFor({ timeout: timing.ms(15000) });
+
   // ── Toolbar / overflow gating + the Ship-task bypass check, using a
   // blank draft so no doctor call is needed yet. ──────────────────────────
   const startFreshBtn = pageA.getByRole('button', { name: /start fresh/i }).first();
