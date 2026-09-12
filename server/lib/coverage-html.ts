@@ -31,6 +31,17 @@ import { isNamedRootCause } from '../nvm/analyze/cluster.ts';
 // printed two different lists under one heading and disagreed with the HTML
 // exported from the same contentHash. See server/lib/priority-selection.ts.
 import { orderedPriorities } from './priority-selection.ts';
+// ONE label for "this number is a diagnostic, not the health of your draft", and
+// ONE rendering of a deduction the engine computed and did NOT take (2026-09-12,
+// adversarial findings #9 and #11). This section used to print
+// `→ Health deduction  −9` directly under a report headlining Health 78 — a
+// sentence claiming nine points came off, for a field
+// server/nvm/analyze/types.ts:403-405 documents as "NOT part of health/verdict".
+// Shared with the in-app panel; see src/lib/diagnostic-copy.ts.
+import {
+  DIAGNOSTIC_NOT_IN_HEALTH_LABEL, diagnosticNotInHealthSentence,
+  UNAPPLIED_DEDUCTION_LABEL, unappliedDeductionReading,
+} from '../../src/lib/diagnostic-copy.ts';
 // ONE root-cause wording (2026-09-11) — see server/lib/root-cause-pipeline.ts.
 import { rootCauseStatements } from './root-cause-pipeline.ts';
 // The producer tier (2026-09-11) — one printed page above the full report; see
@@ -955,6 +966,25 @@ const STYLES = `
     .sig-idx { text-align: center; padding-top: 2px; }
     .sig-note { font-size: 11px; color: #57606a; margin: 8px 0 0; }
     .sig-legend { font-size: 11px; color: #57606a; margin: 0 0 10px; }
+    /* ── Diagnostic, not health (2026-09-12, adversarial findings #9/#11) ──
+       The badge sits in the section heading, where a reader meets the block;
+       the note sits on the card that carries the number, because a reader
+       scrolling into the middle of a long report meets the number first. Muted
+       and smaller than the heading it qualifies: it is a qualification, not a
+       claim of its own — the same treatment .sig-note already gets two rules
+       above, and deliberately NOT the stamp red the panel used to print the
+       deduction in, which is what made an unapplied figure read as a penalty. */
+    .diagnostic-badge {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9px;
+      font-weight: normal;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #57606a;
+      margin-left: 8px;
+      white-space: nowrap;
+    }
+    .diagnostic-note { color: #57606a; }
     /* ── Priorities / appendix ── */
     .priority-list, .appendix-list {
       margin: 0;
@@ -1363,13 +1393,25 @@ function buildGodmodeSection(report: ScriptDoctorReport): string {
   // wraps its own `<li>` run in one `<ul>` — no other markup changes.
 
   // Graph Health (L5)
+  //
+  // 2026-09-12 (adversarial finding #11). Two renderings were wrong about the
+  // same field. The label said "Health deduction" and the value said "−9" — a
+  // minus sign in front of a points figure means, to every reader, that the
+  // points came off. They did not: `graphDeduction` is a POTENTIAL 0-15 value
+  // that server/nvm/analyze/types.ts:403-405 documents as "NOT part of
+  // health/verdict until repaired graph extraction passes real-writing
+  // calibration". Both strings now come from src/lib/diagnostic-copy.ts, the
+  // same module the in-app panel renders the same field through, and the card
+  // carries the diagnostic sentence the panel carries. Nothing is removed: the
+  // score, the magnitude and every finding under it still print.
   if (report.graphHealth) {
     const gh = report.graphHealth;
     const meter = '█'.repeat(Math.round(gh.graphHealthScore / 5));
     parts.push(`<div class="metric-row"><span class="metric-label">Graph Health</span><span class="metric-value">${gh.graphHealthScore}/100</span></div>`);
     if (gh.graphDeduction > 0) {
-      parts.push(`<div class="metric-row sub"><span class="metric-label">→ Health deduction</span><span class="metric-value">−${gh.graphDeduction}</span></div>`);
+      parts.push(`<div class="metric-row sub"><span class="metric-label">${escapeHtml(UNAPPLIED_DEDUCTION_LABEL)}</span><span class="metric-value">${escapeHtml(unappliedDeductionReading(gh.graphDeduction))}</span></div>`);
     }
+    parts.push(`<p class="dim-basis diagnostic-note" style="margin:0 0 10px;">${escapeHtml(diagnosticNotInHealthSentence('Graph Health'))}</p>`);
     if (gh.findings.length > 0) {
       parts.push('<ul class="issue-minor-list">');
       for (const finding of gh.findings) {
@@ -1434,7 +1476,10 @@ function buildGodmodeSection(report: ScriptDoctorReport): string {
 
   if (parts.length === 0) return '';
 
-  return `<section class="section"><h2>Structural Analysis</h2><div class="metrics-grid">${parts.join('\n')}</div></section>`;
+  // The section's own badge, in the heading row where a reader meets the block —
+  // the same two-part treatment (badge above, sentence on the card) the in-app
+  // panel's Structural Analysis section carries, from the same module.
+  return `<section class="section"><h2>Structural Analysis <span class="diagnostic-badge">${escapeHtml(DIAGNOSTIC_NOT_IN_HEALTH_LABEL)}</span></h2><div class="metrics-grid">${parts.join('\n')}</div></section>`;
 }
 
 /**

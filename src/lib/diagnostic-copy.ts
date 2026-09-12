@@ -43,3 +43,48 @@ export function diagnosticNotInHealthSentence(subject: string): string {
 /** The one number on the report that IS the health of the document, named so a
  *  reader of a diagnostic caption knows where to look instead. */
 export const THE_ONE_HEALTH_NUMBER = 'the Health score in the header';
+
+// ── A deduction the engine computed and did NOT take ────────────────────────
+//
+// 2026-09-12, adversarial finding #11. The panel rendered the graph diagnostic
+// as `37/100 −9hp`, the `−9hp` in stamp red, in the same "hp" unit as the
+// headline health, with no caption. `server/nvm/analyze/types.ts:403-405` says
+// what that number is, verbatim: "`graphDeduction` is a potential 0-15 point
+// value, NOT part of health/verdict until repaired graph extraction passes
+// real-writing calibration." The exported coverage HTML was worse — it labelled
+// the row "→ Health deduction" and printed "−9", which is a sentence claiming
+// nine points came off the health above it.
+//
+// A minus sign in front of a points figure means one thing to every reader:
+// this was taken off. So the figure is never rendered signed. The label states
+// the conditional, the value states the magnitude and the fact that it is not
+// applied, and the caption above (diagnosticNotInHealthSentence) states what
+// the whole card is. One implementation, because the defect was two surfaces
+// each inventing their own rendering of the same field.
+//
+// NOT a removal: the number itself still renders on both surfaces, and the
+// findings under it are untouched. What changed is that it no longer reads as
+// arithmetic that has already happened.
+
+/** The row label for an unapplied deduction. Conditional by construction —
+ *  "would", not "did" — so the label alone cannot be misread. */
+export const UNAPPLIED_DEDUCTION_LABEL = 'Would deduct if enabled';
+
+/**
+ * The row VALUE for an unapplied deduction: `up to 9 pts — not applied`.
+ *
+ * Never signed, and never in the headline's "hp" unit. `Math.max(0, …)` because
+ * a potential deduction is a magnitude: a negative arrival would otherwise
+ * render "up to -3 pts", reintroducing the minus sign this function exists to
+ * remove. A non-finite value degrades to 0 rather than printing "up to NaN pts".
+ */
+export function unappliedDeductionReading(points: number): string {
+  const n = Number.isFinite(points) ? Math.max(0, Math.round(points)) : 0;
+  return `up to ${n} pt${n === 1 ? '' : 's'} — not applied`;
+}
+
+/** Label and value as one string, for a surface with a single text slot (the
+ *  panel's value cell, where the label and the reading share one line). */
+export function unappliedDeductionLine(points: number): string {
+  return `${UNAPPLIED_DEDUCTION_LABEL}: ${unappliedDeductionReading(points)}`;
+}

@@ -253,6 +253,25 @@
     .sig-idx { text-align: center; padding-top: 2px; }
     .sig-note { font-size: 11px; color: #57606a; margin: 8px 0 0; }
     .sig-legend { font-size: 11px; color: #57606a; margin: 0 0 10px; }
+    /* ── Diagnostic, not health (2026-09-12, adversarial findings #9/#11) ──
+       The badge sits in the section heading, where a reader meets the block;
+       the note sits on the card that carries the number, because a reader
+       scrolling into the middle of a long report meets the number first. Muted
+       and smaller than the heading it qualifies: it is a qualification, not a
+       claim of its own — the same treatment .sig-note already gets two rules
+       above, and deliberately NOT the stamp red the panel used to print the
+       deduction in, which is what made an unapplied figure read as a penalty. */
+    .diagnostic-badge {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9px;
+      font-weight: normal;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #57606a;
+      margin-left: 8px;
+      white-space: nowrap;
+    }
+    .diagnostic-note { color: #57606a; }
     /* ── Priorities / appendix ── */
     .priority-list, .appendix-list {
       margin: 0;

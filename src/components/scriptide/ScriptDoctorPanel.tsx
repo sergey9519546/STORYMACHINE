@@ -70,6 +70,11 @@ import {
 import {
   DIAGNOSTIC_NOT_IN_HEALTH_LABEL,
   diagnosticNotInHealthSentence,
+  // Finding #11 (2026-09-12): the `−9hp` beside the graph score was an
+  // explicitly UNAPPLIED deduction rendered as applied — stamp red, same unit
+  // as the headline health. One rendering, shared with the exported coverage
+  // HTML, which labelled the same field "→ Health deduction".
+  unappliedDeductionLine,
 } from "../../lib/diagnostic-copy.ts";
 import {
   draftRankSentence, draftRankExportPayload, type DraftRankExportPayload,
@@ -5660,12 +5665,27 @@ export default function ScriptDoctorPanel({
                     <div className="border-2 border-black dark:border-white/20 bg-white dark:bg-zinc-900 p-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-black dark:text-gray-100">Graph Health</span>
-                        <span className="text-xs font-mono text-black dark:text-gray-100">{report.graphHealth.graphHealthScore}/100 {report.graphHealth.graphDeduction > 0 && <span className="text-[var(--sm-stamp-on-light)] dark:!text-red-400">−{report.graphHealth.graphDeduction}hp</span>}</span>
+                        {/* Finding #11 (2026-09-12): this read
+                            `37/100 −9hp`, the −9hp in stamp red, for a value
+                            types.ts:403-405 says is "NOT part of health/verdict".
+                            The score still renders; the potential deduction now
+                            states that it is potential, unsigned, out of the
+                            headline's unit, and in muted rather than penalty
+                            colour. See src/lib/diagnostic-copy.ts. */}
+                        <span className="text-xs font-mono text-black dark:text-gray-100">{report.graphHealth.graphHealthScore}/100</span>
                       </div>
                       {/* Finding #9: the caption the number never had. Rendered
                           on the card that carries it, not only in the section
                           header above, because a reader scrolling into the middle
                           of a long report meets the number first. */}
+                      {report.graphHealth.graphDeduction > 0 && (
+                        <p
+                          className="text-[10px] font-mono text-gray-600 dark:text-gray-400 leading-snug"
+                          data-unapplied-deduction
+                        >
+                          {unappliedDeductionLine(report.graphHealth.graphDeduction)}
+                        </p>
+                      )}
                       <p className="text-[10px] font-mono text-gray-600 dark:text-gray-400 leading-snug" data-diagnostic-not-health>
                         {diagnosticNotInHealthSentence('Graph Health')}
                       </p>

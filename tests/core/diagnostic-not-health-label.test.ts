@@ -65,9 +65,27 @@ describe('the copy module', () => {
 
 describe('ScriptDoctorPanel labels every diagnostic score it renders', () => {
   it('imports the shared copy rather than writing its own', () => {
-    assert.match(
-      panel,
-      /import \{\s*\n\s*DIAGNOSTIC_NOT_IN_HEALTH_LABEL,\s*\n\s*diagnosticNotInHealthSentence,\s*\n\} from "\.\.\/\.\.\/lib\/diagnostic-copy\.ts";/,
+    // 2026-09-12 (adversarial finding #11): the assertion used to pin the
+    // import's exact three lines, which meant ADDING a third shared symbol to
+    // the same import — `unappliedDeductionLine`, so the panel stops
+    // hand-writing `−{graphDeduction}hp` — failed a test about whether the copy
+    // is shared. It now asserts what it is about: one import statement, from
+    // that module, carrying every symbol the panel renders diagnostic copy with.
+    const importBlock = panel.match(
+      /import \{([\s\S]*?)\} from "\.\.\/\.\.\/lib\/diagnostic-copy\.ts";/,
+    );
+    assert.ok(importBlock, 'the panel must import its diagnostic copy from src/lib/diagnostic-copy.ts');
+    for (const symbol of [
+      'DIAGNOSTIC_NOT_IN_HEALTH_LABEL',
+      'diagnosticNotInHealthSentence',
+      'unappliedDeductionLine',
+    ]) {
+      assert.ok(importBlock[1].includes(symbol), `the panel must import ${symbol} from the shared module`);
+    }
+    assert.equal(
+      (panel.match(/from "\.\.\/\.\.\/lib\/diagnostic-copy\.ts"/g) ?? []).length,
+      1,
+      'one import of the shared module, not several',
     );
   });
 
@@ -116,7 +134,18 @@ describe('ScriptDoctorPanel labels every diagnostic score it renders', () => {
     assert.ok(card.length > 0, 'Graph Health card not found');
     // The number and the deduction still render — nothing is removed.
     assert.match(card, /\{report\.graphHealth\.graphHealthScore\}\/100/);
-    assert.match(card, /−\{report\.graphHealth\.graphDeduction\}hp/);
+    // 2026-09-12 (adversarial finding #11): this used to require the literal
+    // `−{report.graphHealth.graphDeduction}hp` — the exact rendering the finding
+    // names, a potential deduction printed signed, in stamp red, in the headline
+    // health's own unit, for a field types.ts:403-405 documents as NOT part of
+    // health. The magnitude is still required to render (nothing removed); what
+    // is now required is that it renders through the shared, unsigned copy.
+    assert.match(card, /unappliedDeductionLine\(report\.graphHealth\.graphDeduction\)/);
+    assert.doesNotMatch(
+      card.replace(/\{\/\*[\s\S]*?\*\/\}/g, ''),
+      /−\{report\.graphHealth\.graphDeduction\}/,
+      'an unapplied deduction must never render with a minus sign',
+    );
     // …and now the card says what they are.
     assert.match(card, /diagnosticNotInHealthSentence\('Graph Health'\)/);
     assert.match(card, /data-diagnostic-not-health/);

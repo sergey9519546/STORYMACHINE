@@ -253,6 +253,25 @@
     .sig-idx { text-align: center; padding-top: 2px; }
     .sig-note { font-size: 11px; color: #57606a; margin: 8px 0 0; }
     .sig-legend { font-size: 11px; color: #57606a; margin: 0 0 10px; }
+    /* ── Diagnostic, not health (2026-09-12, adversarial findings #9/#11) ──
+       The badge sits in the section heading, where a reader meets the block;
+       the note sits on the card that carries the number, because a reader
+       scrolling into the middle of a long report meets the number first. Muted
+       and smaller than the heading it qualifies: it is a qualification, not a
+       claim of its own — the same treatment .sig-note already gets two rules
+       above, and deliberately NOT the stamp red the panel used to print the
+       deduction in, which is what made an unapplied figure read as a penalty. */
+    .diagnostic-badge {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9px;
+      font-weight: normal;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #57606a;
+      margin-left: 8px;
+      white-space: nowrap;
+    }
+    .diagnostic-note { color: #57606a; }
     /* ── Priorities / appendix ── */
     .priority-list, .appendix-list {
       margin: 0;
@@ -651,8 +670,9 @@
 <li>This draft keeps generating real turns, not just one per act — dramatic turning points land repeatedly in both the front half (Scenes 2, 4, 6) and the back half (Scenes 9, 10, 12) of the document.</li>
     </ul>
   </section>
-<section class="section"><h2>Structural Analysis</h2><div class="metrics-grid"><div class="metric-row"><span class="metric-label">Graph Health</span><span class="metric-value">37/100</span></div>
-<div class="metric-row sub"><span class="metric-label">→ Health deduction</span><span class="metric-value">−9</span></div>
+<section class="section"><h2>Structural Analysis <span class="diagnostic-badge">Diagnostic — not part of Health</span></h2><div class="metrics-grid"><div class="metric-row"><span class="metric-label">Graph Health</span><span class="metric-value">37/100</span></div>
+<div class="metric-row sub"><span class="metric-label">Would deduct if enabled</span><span class="metric-value">up to 9 pts — not applied</span></div>
+<p class="dim-basis diagnostic-note" style="margin:0 0 10px;">Graph Health is a diagnostic reading of the story graph. It is not part of the Health score or the verdict above, and nothing here has been added to or subtracted from them.</p>
 <ul class="issue-minor-list">
 <li class="issue-minor">Promise-payment ratio is 0.08 — 12 unpaid setup(s) may feel like plot holes.</li>
 <li class="issue-minor">Escalation monotonicity is 0.00 — tension does not consistently rise across acts.</li>
@@ -2689,12 +2709,12 @@
         <div><dt>Reference bounds</dt><dd><code>20 samples / 9–10 scenes / 256–337 words</code></dd></div>
         <div><dt>Logline</dt><dd><code>derived</code></dd></div>
         <div><dt>Page references</dt><dd><code>1 PROTAGONIST_PASSIVITY_CLIMAX#82581cda7f91871b p. 5; 2 NO_REVERSALS_LONG_STORY#9bed77ed917160b0 no page; 3 WEAK_MIDPOINT#db081ff82116ca78 p. 4</code></dd></div>
-        <div><dt>Engine commit</dt><dd><code>3bb623ccbf58a7b2f2bd916d4301c71ac0fc1d5c</code></dd></div>
+        <div><dt>Engine commit</dt><dd><code>dcad8e10681cbec1cfbbe139c95368b9078c46bf</code></dd></div>
         <div><dt>Rulebook count</dt><dd><code>3217</code></dd></div>
       </dl>
       <div class="verify-scope">What is checked: every value listed above, recomputed from the script text you supply — including each finding’s page reference, re-resolved through the same paginator that lays out the PDF, and the counts and readings on the reader summary page. What is not checked: wording — the prose of this report, the finding descriptions, the logline’s text (only whether one was derived), the title and author, and the draft-rank line, all of which are supplied by whoever exported this report rather than derived by the engine.</div>
     </div>
-    <div class="footer-generated">Generated September 12, 2026 at 12:31:33 AM UTC</div>
+    <div class="footer-generated">Generated September 12, 2026 at 10:28:03 AM UTC</div>
   </footer>
   </div>
 </body>
