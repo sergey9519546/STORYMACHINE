@@ -425,3 +425,238 @@ saying untrue things, and it ships two sentences that are not true.
    The lane states this for 11 (§1 correction 2) and asserts it as a test; for
    17 the §3 table's "exported coverage report" row could be read as covering
    both. Worth one clarifying word in the report, not a change to the code.
+
+## Round 2 — re-check of `a89589a4`
+
+Reviewed object: `a89589a47b29eab43114d405509227a1ef0e1d00`, twelve commits over
+`eb8cf9b291ad85b362993188457a658096ffe2d1` (the round-1 eight, replayed by the
+rebase, plus `e9a07911`, `306eb8bd`, `36f6cb53`, `a89589a4`; round 2 alone is
+19 files, +863 / −59). Same reviewer, warm context, same rules: foreground,
+nothing killed by pattern, no full `npm test`, no write to the worktree.
+
+Both baselines for this round are FRESH exports in a new scratch directory
+(`<session scratch>/r2rev/base-eb` = `eb8cf9b2`, `…/base-4af` = `4af8ae97`),
+each verified file-by-file against the blob before anything was measured in it
+— `sha256(base-eb/server/lib/fdx-import.ts)` = `88a7d7730c993cf5…`,
+`base-4af/…` = `9e4411f100a6a9ca…` (the lane's own cited hash),
+`doctor.ts` = `e8acebfff34ba505…` on both. The round-1 warning about a stale
+`base/` is not repeated here.
+
+### Blocking item 1 — the FDX round trip: **closed**
+
+I re-ran my own round-1 probes unchanged against the tip, plus three new ones.
+
+**The five printing constructs** (`<session scratch>/probe.mjs`, one round trip
+through the real `fountainToFdx` → `fdxToFountain`):
+
+| written | round 1 (`4af8ae97`) | round 2 tip |
+|---|---|---|
+| `MAYA ^` | `MAYA` | **`MAYA ^`** |
+| `> THE END <` | `THE END` | **`> THE END <`** |
+| `~Somewhere a radio plays` | `Somewhere a radio plays` | **`~Somewhere a radio plays`** |
+| `===` | `==` | **`===`** |
+| `!FORCED ACTION LINE IN CAPS` | bare caps | bare caps — the one disclosed `'unforced'` case |
+
+The forced-marker rule is the interesting one, so I attacked it rather than
+reading it (`<session scratch>/r2rev/force.mjs`, block types via the product's
+own `parseFountain`): `!INT. THE MIND OF A KILLER` and `!CUT TO:` both come
+back **with the `!` and as `action`**; `!SUPER: THREE YEARS EARLIER` followed
+immediately by a line of prose — the case where dropping the marker could
+create a character cue — comes back as **two `action` blocks, not a cue**,
+because the importer separates paragraphs with a blank line, and an unforced
+all-caps line behaves identically. So `'unforced'` is a marker that is dropped
+where it has nothing to do, not a construct that is corrupted.
+
+**The three wrongly-carried non-printing constructs**
+(`<session scratch>/probe3.mjs` and `probe4.mjs`, re-run unchanged):
+
+```
+probe3, tip:  the FDX body is Scene Heading + Action("MAYA pours coffee.") + <DualDialogue>
+              — "# ACT ONE", "= Maya finally says it." and "[[check this]]" are gone,
+              and the action line keeps its prose.
+probe4, tip:  chain-of-custody + one "# ACT ONE" + one "= Maya finds the log."
+              round 1:  772 → 778 words, health 75.4 → 75.0, both markers printed as action
+              round 2:  772 words, health 75.4 — section survives as action? false · synopsis? false
+```
+
+The markers now cost the returned report nothing at all. I also checked the
+stronger form of the claim — that the words are absent from the FDX **file**,
+not just from the way back: on the new `every-construct.fountain` fixture,
+`ACT ONE`, `Maya finds the log` and `check this line` are all `false` in the
+exported FDX string, and the exporter emits only `Scene Heading, Action,
+Character, Parenthetical, Dialogue, Transition` plus the four title-page types,
+with `Style="Italic"`, `Alignment="Center"` and `StartsNewPage="Yes"` as the
+only added attributes — Final Draft's own vocabulary, nothing invented.
+
+**Omission precision** — the risk a new "leave it out" rule creates is that it
+eats text that merely looks non-printing. It does not
+(`<session scratch>/r2rev/omit.mjs`): `The sign reads = OUT OF ORDER.`,
+`He was #1 on the list.` and `Room #4, = the one with the door.` all survive
+verbatim, in the right block types.
+
+**"Byte-identical on all 21 committed screenplays" — verified, with one
+clarification the lane should make.** `sha256` of `fountainToFdx` output per
+script, 20 CC0 + the feature fixture:
+
+```
+tip vs 4af8ae97 (round-1 tip)  → diff exit 0, 21/21 identical
+tip vs eb8cf9b2 (pre-lane)     → 20/21 identical; assembled-feature differs by exactly one line:
+                                 +  <Paragraph Type="Draft Date"><Text>2026-09-06</Text></Paragraph>
+```
+
+The claim is true for the comparison that matters to round 2 (the exporter
+rewrite is byte-neutral), and the single pre-lane difference is round 1's own
+intended draft-date fix on the only committed script carrying a `Draft date:`
+line. Worth one word in the report so a reader does not check it against the
+wrong base.
+
+**The disclosure now matches the measurement, row by row.** All nine
+`FDX_CONSTRUCT_FATE` rows reproduce on my probes; `EXPORT_ROUNDTRIP_NOTE.fdx`
+and `EXPORT_ROUNDTRIP_SUMMARY` say "left out rather than carried" (true) and
+list the four surviving constructs by name (true). Register rows **111** and
+**113** carry the corrected sentences and cite the per-construct assertions.
+The claim I falsified in round 1 no longer exists in the tree.
+
+### Blocking item 2 — the letter's promise: **closed**, and the arithmetic holds
+
+Measured independently, same method as round 1 (plain-text letter, words / 500):
+
+| | pre-lane `eb8cf9b2` | tip `a89589a4` |
+|---|---|---|
+| runoff | 1,017 w — 2.03 pp | 1,739 w — 3.48 pp |
+| chain-of-custody | 928 w — 1.86 pp | 1,706 w — 3.41 pp |
+| the-detour | 925 w — 1.85 pp | 1,625 w — 3.25 pp |
+| assembled-feature | 1,223 w — 2.45 pp | 1,789 w — 3.58 pp |
+| **all 21 committed scripts** | 1.80 – 2.45 pp | **3.25 – 3.58 pp** |
+
+Every figure in the lane's table reproduces to the word. **"(i) impossible" is
+true as stated**, and I re-derived it rather than taking it: rendering the same
+reports with `topPriorities: []` gives **891 w (1.78 pp)** for runoff and
+**797 w (1.59 pp)** for chain-of-custody — and those are without the Root
+Causes section, which adds ~190 words more, so the non-priorities content alone
+is ~2.0–2.2 pp. No bound on the body can reach "one-to-two-page"; the only
+route there is deleting a merged section, which the standing directive forbids.
+The option-(i) comparison also holds: a three-item body plus a compact tail
+saves a few dozen words against the full list, not a page. **(ii) is the right
+call and the promise is now true.** All nine sites say three-to-four-page,
+including the one a writer reads (`ScriptDoctorPanel.tsx:4485`), and the gate
+in `coverage-letter.test.ts` fails if either half drifts.
+
+One correction the lane should make, which is why non-blocking 1 below exists:
+**the stated range is measured on a report shape no route ever renders.** Both
+`lenall.mjs` and the new gate build the report from `runScriptDoctor` alone,
+with no `rootCauses`; `server/routes/coverage-letter.ts:148` and the panel both
+attach `buildRootCausePipeline` output, and that section is worth ~0.35 pp. As
+the product actually ships it:
+
+```
+21 scripts, rootCauses attached: min 3.53 pp (the-detour) · max 3.96 pp (counter-offer) · 0 at or over 4.0
+counter-offer: lane's harness 1,791 w (3.58 pp) · as the route ships it 1,979 w (3.96 pp)
+```
+
+The promise still holds — 3.96 < 4 — but with about 20 words of margin on the
+longest letter, and the gate's own window (`pp >= 3 && pp < 5`) is 1.4 pp wider
+than the sentence it protects.
+
+### The other four items — all closed
+
+* **N1, the fourth surface.** Re-run on a fresh `git archive 4af8ae97` export:
+  unreverted **14 / 0**; with the exact revert the round-1 review named
+  (`() => orderedPriorities(report?.topPriorities)` → `() => report?.topPriorities ?? []`)
+  **12 pass / 2 fail**, naming the panel by the defect. The pins are read with
+  comments stripped and the second one matches *any* raw read outside the one
+  shared call rather than a fixed string, so it is a property, not a grep.
+* **N2, one wording.** `VOICE_SEPARATION_NOT_MEASURED_VALUE` +
+  `voiceSeparationLongValue()` in the copy module; `coverage-html.ts` no longer
+  types the literal.
+* **N3, multiset and tolerance.** `export-roundtrip.test.ts:112` tallies each
+  distinct line (a lost duplicate is now visible); the word gap is `<= 2`
+  against a measured 0, replacing the 1% / 174-word window.
+* **N4 / N6**, the stale 473 and finding 17's reach: corrected in the report.
+
+### Gates, re-run by the reviewer
+
+```
+node scripts/honesty-audit.mjs
+  → scanned 465 files, plus 479 tracked markdown files …, plus the claims register (115 rows) — clean.   exit 0
+node scripts/check-scoring-receipt.mjs eb8cf9b2..HEAD
+  → range "eb8cf9b2..HEAD" — no scoring-path files changed. OK.                                          exit 0
+GIT_SHA=identity-baseline node scripts/check-doctor-output-identity.mjs --tree <session scratch>/r2rev/base-eb --out id-before   exit 0 (45)
+GIT_SHA=identity-baseline node scripts/check-doctor-output-identity.mjs --tree .                              --out id-after     exit 0 (45)
+node scripts/check-doctor-output-identity.mjs --compare id-before id-after
+  → OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).                     exit 0 (no --ignore-keys)
+```
+
+Touched suites on the tip, each run individually — every count matches the
+lane's round-2 table:
+
+```
+export-roundtrip 35/0 · coverage-letter 52/0 · priority-selection-one-list 14/0
+voice-separation-abstention 15/0 · fdx-import 8/0 · export-xml-wellformed 11/0
+coverage-html 54/0 · report-cross-references 12/0 · dimension-badge-export-parity 8/0
+```
+
+Fail-first, re-run on the fresh blob-verified `git archive 4af8ae97` export
+(three of the four claims, two required):
+
+| suite | lane's claim | measured |
+|---|---|---|
+| `export-roundtrip` | 14 of 35 fail | **21 pass / 14 fail**, and they are the right fourteen (every construct row except `boneyard: dropped`, the scene-count case, the FDX-vocabulary case, the verbatim golden, idempotence) |
+| `coverage-letter` | 2 of the new cases fail | **50 pass / 2 fail** — the two copy cases; the three page-count cases pass there, exactly as the lane states |
+| `priority-selection-one-list` | 2 of 3 fail on the named revert | **12 pass / 2 fail** with the revert applied |
+
+Re-driving the export routes on the tip returns artifacts **byte-identical to
+round 1's** (`/api/export/coverage` 196,463 / 229,828 / 897,177 B;
+`/api/export/coverage-letter` hashes `cb1c8707ce9e` / `96f529970a75` /
+`6c27c8693c40`), so every round-1 driven conclusion — one priorities list
+across four renderings, zero dangling cross-references, the unapplied-deduction
+and voice rows — still holds without re-deriving it. The offline verifier still
+returns `VERIFIED … exit 0` on the tip's letter. The round-1 orchestrator note
+about duplicate register rows is resolved on this base: `uniq -d` over the row
+numbers is now empty, 115 rows, no collision with this lane's 107–115.
+
+## VERDICT: **MERGE**
+
+Both blocking items are closed with the stronger version of the fix rather than
+the cheaper one: the round trip was repaired in both directions instead of the
+disclosure being narrowed to match the defect, and the letter's nine
+descriptions were corrected to a measurement that I re-derived independently
+and that holds for a 231-scene feature and a 9-scene short alike. The four
+non-blocking items are done. The scoring surface is untouched — 45/45
+byte-identical against a blob-verified `eb8cf9b2`, no scoring-path file in the
+range — and the exported FDX of all 21 committed screenplays is unchanged by
+this round, so no writer's existing export moved.
+
+### Non-blocking
+
+1. **The letter's stated range is measured on a report the product never
+   renders.** `tests/core/coverage-letter.test.ts:777` and the lane's
+   `lenall.mjs` both render a bare `runScriptDoctor` report; every caller
+   (`server/routes/coverage-letter.ts:148` and the panel) attaches
+   `buildRootCausePipeline` output first, worth ~0.35 pp. Shipped range is
+   **3.53 – 3.96 pp**, not 3.3 – 3.6 (register row 115 and the test's comment
+   both carry the smaller figure). The promise survives, with ~20 words of
+   margin on `counter-offer.fountain`. Two one-line fixes: build the gate's
+   report the way the route does, and bound it at `<= 4.0` so it enforces the
+   sentence rather than a window a page and a half wider.
+2. **"Byte-identical on all 21 committed screenplays" needs its base named.**
+   True against `4af8ae97` (21/21). Against the pre-lane `eb8cf9b2` it is 20/21,
+   the one difference being round 1's intended `Draft Date` title-page line on
+   the only script that has one.
+3. **Inline boneyard and multi-line notes still print.**
+   `/* … */` inside an action line and a `[[ … ]]` note spanning two lines both
+   cross into the FDX as ordinary action text. This is not a defect in the new
+   omission logic: `src/lib/fountain.ts:110` recognises boneyard only at line
+   start, so within this product that text is action and does print. The
+   disclosure is therefore scoped to the constructs the parser implements,
+   which is the honest scope — worth one sentence at the site so the next
+   reader does not re-derive it as a finding, as I did.
+4. **Paragraph grouping is not preserved, for forced and unforced text alike.**
+   Two action lines written without a blank line between them come back as two
+   paragraphs. Inherent to FDX (a paragraph is a paragraph), identical before
+   and after this lane, and invisible to the engine — recorded only because
+   "everything that prints comes back" is now an exact claim and this is the
+   one thing that legitimately changes shape.
+5. Round-1 non-blocking 5 stands: `verify:surfaces` was not re-run by this
+   review, and the lane's §5.5 records that the three new export surfaces still
+   have no browser assertion. Nothing in either round's verdict depends on it.
