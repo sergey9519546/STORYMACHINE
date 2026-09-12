@@ -2568,8 +2568,8 @@ receipt.
   and read its output. I did **not** run `npm run measure-real`, and no AUC-24
   number in this entry is claimed, implied or projected — the private corpus is
   not present in this environment and `REAL_SCRIPT_CORPUS_DIR` is unset, so
-  `tests/core/real-script-corpus.test.ts` skipped every assertion. Nothing here
-  was simulated.
+  `tests/core/real-script-corpus.test.ts` skipped every assertion. Every figure
+  in this entry is the output of a command that ran in this worktree.
 - **Git SHA:** measured at each commit of `scoring/adversarial-2026-09-12` in
   turn, against the baseline `78ec4464` (the rebased
   `scoring/feature-length-defects` tip) and, for the public-benchmark numbers,
@@ -2585,6 +2585,7 @@ the measurement doc it names)*
 |---|---|---|---|
 | 1 | rebase reconciliation + re-lock | `PUBLIC_ORDER_PAIRED_FLOOR` 0.5269 → 0.5738, `PUBLIC_ORDER_FLOOR` 0.4951 → 0.5069, from a rerun forced by main's stronger degradation. Manifest and split re-locked BYTE-IDENTICAL — the instrument moved, the score did not. | `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §13 |
 | 2 | parse and format invariance (dialogue reflow) | Reflow at 30/35/40/60 columns over 32 scripts: **119 of 128 pairs moved, max 8.8 points, one verdict flip → 0 of 128, max 0.0**. Public benchmark byte-identical; all 45 output-identity fixtures byte-identical modulo `provenance.engineCommit`. | `docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md` §1 |
+| 3 | parse and format invariance (title page, typography, non-printing text, the denominator) | Ten more transforms go to **0 of 32**, including the padding attack (**32 of 32 moved, mean +7.206, up to +18.6, four verdicts CONSIDER → RECOMMEND → 0 of 32**). **Four floors re-locked DOWN** — primary shuffle-drop 0.855 → 0.8238 (measured 0.8750 → 0.8438) — attributed by rerun entirely to the denominator change. All 32 scripts fall, mean −1.453, two verdicts CONSIDER → PASS. Calibration byte-identical, 20 of 20. Output identity a deliberate **FAIL**, 25 of 45. | `docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md` §2 · `PUBLIC_BENCHMARK_2026-09-06.md` §14 |
 
 **WHAT THE OWNER'S AUC-24 RUN CAN AND CANNOT SETTLE (commit 2).** The three
 parse fixes are byte-identical on every committed fixture, so AUC-24 **cannot**
@@ -2599,3 +2600,34 @@ document's report changes here and nothing in this repository can tell the owner
 whether it exists. If AUC-24 moves at all on this commit, that is the finding,
 and the answer is to look for that document — not to move the floor in
 `scripts/lib/auc.ts`.
+
+**WHAT THE OWNER'S AUC-24 RUN CAN AND CANNOT SETTLE (commit 3).** This is the
+commit whose AUC-24 is genuinely unknown, and the reason is a property of the
+private corpus that nobody here can inspect: how much of each of those 761
+drafts is text Fountain never prints. The denominator is now the screenplay's
+own printed words. If those drafts carry no boneyards, notes, synopses or
+section headings, AUC-24 does not move. If they carry a title page — the likely
+case — every script loses a few words from the denominator, both halves of each
+matched pair equally, so the LEVEL shifts and the rank statistic largely does
+not; the 72-row real-corpus manifest will still need re-locking. If they carry
+substantial boneyard or note text, the same correction that cost **0.031** of
+the primary public shuffle-drop AUC here will move AUC-24 by an amount
+proportional to how much of each draft was never meant to be printed, and this
+corpus cannot predict the direction.
+
+What the run **cannot** settle is whether the correction is right. That is a
+question about what a screenplay is, and the Fountain specification answers it:
+a boneyard is a comment. If AUC-24 falls, the finding is about what those drafts
+contain, and the response is to read them — not to move `AUC24_FLOOR`.
+
+**ON THE FOUR FLOORS THAT MOVED DOWN.** A downward re-lock is the one direction
+this machinery can be defeated in, so the attribution was measured rather than
+argued: each of the four changes in commit 3 was disabled in turn with the other
+three in place and the benchmark re-run. The typography fold, the title-page
+strip and the non-printing strip move the primary statistic by **0.0000**; the
+denominator change moves all of it. The cause is that every one of the 32
+fixtures opens with its own CC0 licence record — 24 to 151 words — which the
+2026-09-04 corpus-integrity correction moved into a boneyard so it would not be
+DIAGNOSED, while it went on being COUNTED. The benchmark's separation was partly
+a measurement of this repository's filing habits. Full table:
+`PUBLIC_BENCHMARK_2026-09-06.md` §14.3.

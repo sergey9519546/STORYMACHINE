@@ -165,6 +165,52 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  *    on the instrument rather than evidence about the score.
  *
  * WHERE THE NUMBERS STAND, 2026-09-12 (branch scoring/adversarial-2026-09-12,
+ * AFTER the parse-and-format-invariance commits). Shuffle-drop 0.8438
+ * matched-pair [0.7188, 0.9688] / 0.7896 all-pairs; climax-relocate 0.5938
+ * [0.4219, 0.7500] / 0.5234; control 1.0000 / 0.9814.
+ *
+ * FOUR FLOORS MOVED DOWN, AND THE REASON IS A MEASUREMENT ARTIFACT LEAVING,
+ * NOT THE ENGINE GETTING WORSE. This is the single most important sentence in
+ * this header, so it is stated with its mechanism. `wordCount` — the
+ * denominator of the density term, which is most of health — was
+ * `fastWordCount(<the raw submission>)`. Every one of the 20 CC0 screenplays
+ * and all 12 blind-pair fixtures opens with its own CC0 licence and provenance
+ * record, moved into a Fountain boneyard comment by the 2026-09-04 corpus-integrity
+ * correction so that it would not be DIAGNOSED. Its words went on being
+ * COUNTED: 24 to 151 words per file, which on the two shortest scripts is a
+ * fifth of everything the denominator saw. Those words carried no issues, so
+ * they lowered density and raised health for free — which is also the
+ * mechanism of the padding attack this commit closes (an 800-repetition
+ * boneyard moved health on 32 of 32 scripts, mean +7.206, up to +18.6, four
+ * verdicts CONSIDER -> RECOMMEND).
+ *
+ * With the denominator now the screenplay's own printed words, every script
+ * falls: mean -1.453, range -0.1 to -12.3, two verdicts CONSIDER -> PASS
+ * (room-12 63.9 -> 51.6 on 427 -> 338 words, transfer-window 64.1 -> 55.8 on
+ * 454 -> 379). One matched pair flips with them, 28/4/0 -> 27/5/0, and that is
+ * the whole of the shuffle-drop movement:
+ *
+ *   PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR   0.855  -> 0.8238  (measured 0.8750 -> 0.8438)
+ *   PUBLIC_SHUFFLE_DROP_FLOOR          0.8091 -> 0.7696  (measured 0.8291 -> 0.7896)
+ *   PUBLIC_ORDER_FLOOR                 0.5069 -> 0.5034  (measured 0.5269 -> 0.5234)
+ *   PUBLIC_DIALOGUE_FLATTEN_FLOOR      0.98   -> 0.9614  (measured 1.0000 -> 0.9814)
+ *
+ * The two PRIMARY matched-pair floors for the order channel and the control
+ * did not move, and AUC24_FLOOR did not move. The attribution is measured, not
+ * argued: with the denominator change alone reverted and every other change in
+ * place, shuffle-drop reads 0.8750 / 0.8232 — i.e. the three parse fixes
+ * (typography fold, non-printing strip, title-page strip) move it by 0.0000 /
+ * -0.0059 and the denominator moves the rest.
+ *
+ * READ IT AS A CORRECTION TO THE INSTRUMENT'S INPUT. A benchmark whose
+ * separation depends on each fixture counting its own licence text as
+ * screenplay was reporting a number about this repository's filing habits.
+ * 0.8438 is what the same engine scores on the same writing once that stops.
+ * Nothing here licenses a future re-lock downward on a number that fell for a
+ * reason nobody can name.
+ *
+ * THE PREVIOUS ENTRY, kept because the order floors above were set by it
+ * (branch scoring/adversarial-2026-09-12,
  * which is scoring/feature-length-defects REBASED onto main and re-locked from
  * the rerun that rebase forced). Shuffle-drop 0.8750 matched-pair / 0.8291
  * all-pairs; climax-relocate 0.5938 / 0.5269; control 1.0000 / 1.0000.
@@ -229,7 +275,7 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * raising one is a measurement's job, never an edit's.
  *
  * THE PREDICTION THIS REFUTED, kept because it is the useful part. The
- * scene-count-artifact argument (doctor.ts:2380-2381 — scarcity AUC 0.938,
+ * scene-count-artifact argument (doctor.ts:2394-2395 — scarcity AUC 0.938,
  * rule channel 0.076) predicts that dropping every third scene of a 10-scene
  * script adds 140/7 - 140/10 = 6.00 points of scarcity penalty, against 0.58
  * points at the private corpus's median 118 scenes, and therefore that a
@@ -298,12 +344,12 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * matches exactly that shape, and tests/core/public-benchmark.test.ts asserts
  * every one of them is still reachable by it.
  */
-export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.855;
-export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.8091;
+export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.8238;
+export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.7696;
 export const PUBLIC_ORDER_PAIRED_FLOOR = 0.5738;
-export const PUBLIC_ORDER_FLOOR = 0.5069;
+export const PUBLIC_ORDER_FLOOR = 0.5034;
 export const PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR = 0.98;
-export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.98;
+export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.9614;
 
 /**
  * The margin between a fresh public-benchmark measurement and the floor

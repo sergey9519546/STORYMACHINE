@@ -38,7 +38,7 @@ import { analyzeStructure } from '../screenplay/structure.ts';
 import { runRevisionPipeline, type RevisionResult } from '../revision/pipeline.ts';
 import { runDiagnoseOnly } from '../revision/rewrite.ts';
 import { analyzeFountainText } from './fountain-analyzer.ts';
-import { joinWrappedDialogue } from './screenplay-normalizer.ts';
+import { normalizeScreenplay, stripTitlePage } from './screenplay-normalizer.ts';
 import { deepReadRecords } from './deep-read.ts';
 import { computeEmotionalArc, scenesFromFountain } from './emotional-arc.ts';
 import { detectSlop } from './anti-slop.ts';
@@ -2259,6 +2259,19 @@ export function reconcileStrengthsWithCriticalFindings(
 // runScriptDoctorSequentialForTest below. No other caller needs it:
 // runScriptDoctor already wires it into the normal request path.
 export function aggregateReport(result: RevisionResult, analysis: FountainAnalysis, fountain: string): ScriptDoctorReport {
+  // ── ONE TEXT FOR EVERYTHING THAT MEASURES (2026-09-12) ───────────────────
+  // A dozen signals below took the RAW submission while `analysis` came from
+  // `normalizeScreenplay(fountain)`. That is how a boneyard note, a title page
+  // and a curly apostrophe reached the score after the analyzer had already
+  // been taught to ignore them: the analyzer ignored them, and these did not.
+  // `analysisFountain` is the screenplay — typography folded, non-printing
+  // constructs removed, wrapped speeches joined, title page dropped — and it is
+  // what every measurement here reads.
+  //
+  // `contentHash` deliberately does NOT use it: the hash identifies the bytes
+  // the writer submitted, and two different submissions that normalise to the
+  // same screenplay are still two different submissions.
+  const analysisFountain = stripTitlePage(normalizeScreenplay(fountain));
   // #5: assign each issue its stable id HERE, before it fans out into
   // topPriorities/sceneHeatmap below — both are built FROM `passes`, so
   // attaching `id` once at the source means every downstream copy of an
@@ -2396,7 +2409,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
   const ARC_DED_CAP = 15;             // bounded, like the other structural deductions
   let arcIncoherenceDeduction = 0;
   if (analysis.sceneCount >= ARC_DED_MIN_SCENES) {
-    const arcForDeduction = computeEmotionalArc(scenesFromFountain(fountain));
+    const arcForDeduction = computeEmotionalArc(scenesFromFountain(analysisFountain));
     if (arcForDeduction.scored) {
       arcIncoherenceDeduction = Math.min(
         ARC_DED_CAP,
@@ -2604,22 +2617,22 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
     // These summarize the whole narrative. A prefix-only analysis must not
     // present them as if they described the unexamined remainder of a draft.
     metrics: analysisComplete ? metrics : undefined,
-    pageEstimate: estimatePages(fountain) ?? undefined,
+    pageEstimate: estimatePages(analysisFountain) ?? undefined,
     excerptNote: excerptNoteFor(analysis.sceneCount),
-    emotionalArc: computeEmotionalArc(scenesFromFountain(fountain)),
-    antiSlop: detectSlop(fountain),
-    theme: extractTheme(fountain),
-    interiority: analyzeInteriority(fountain),
-    mirrorScenes: detectMirrorScenes(fountain),
-    silence: detectSilence(fountain),
-    bonding: detectBonding(fountain),
-    coldOpenPromise: detectColdOpenPromise(fountain),
-    patternEstablishment: detectPatternEstablishment(fountain),
+    emotionalArc: computeEmotionalArc(scenesFromFountain(analysisFountain)),
+    antiSlop: detectSlop(analysisFountain),
+    theme: extractTheme(analysisFountain),
+    interiority: analyzeInteriority(analysisFountain),
+    mirrorScenes: detectMirrorScenes(analysisFountain),
+    silence: detectSilence(analysisFountain),
+    bonding: detectBonding(analysisFountain),
+    coldOpenPromise: detectColdOpenPromise(analysisFountain),
+    patternEstablishment: detectPatternEstablishment(analysisFountain),
     // Dense, lexicon-free structural readings (2026-09-04). Additive and
     // diagnostic ONLY: no health, verdict, grade, dimension, priority or pass
     // reads this block. Computed unconditionally like the other per-document
     // signal blocks above — its own `scored` flag carries the abstain.
-    structuralSignals: computeStructuralSignals(fountain),
+    structuralSignals: computeStructuralSignals(analysisFountain),
     storyGraph: analysisComplete && analysis.sceneCount > 0 ? storyGraphResult : undefined,
     graphHealth: analysisComplete ? graphHealthContribution : undefined,
     // ── GODMODE integration: 4 new analysis layers ────────────────────────
@@ -2826,7 +2839,7 @@ export async function runScriptDoctor(
     // calibration samples), which is why it is the half that can be shown
     // safe from this tree. The other half is recorded as measured-and-not-taken
     // in docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md.
-    fountain: joinWrappedDialogue(fountain),
+    fountain: stripTitlePage(normalizeScreenplay(fountain)),
     annotations: mergedAnalysis.annotations,
     structureSummary: buildStructureSummaryLine(mergedAnalysis),
     wordCount: mergedAnalysis.wordCount,

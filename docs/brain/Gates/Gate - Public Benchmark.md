@@ -86,7 +86,7 @@ against 5.9–6.5 s for the single-run version measured back to back.
   feature-scale deduction `ARC_DED_MIN_SCENES` (15) never fires at 9–14 scenes,
   so this gate measures a strictly smaller engine. (`CLIMAX_DED_MIN_SCENES` used
   to be named here too. It gates `climaxZoneDecayDeduction`, which is exported
-  and **not wired into health anywhere** — `doctor.ts:2416-2419` records why it
+  and **not wired into health anywhere** — `doctor.ts:2430-2433` records why it
   was reverted — so saying it "never fires at this length" implied it fires at
   some length. It fires at no length. Corrected 2026-09-12,
   [[Audit - 2026-09-12 Adversarial Review]] finding 6.)

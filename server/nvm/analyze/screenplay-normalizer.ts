@@ -22,7 +22,7 @@
 // structural element until the next one. Wrapped fragments inside a block are
 // joined into flowing text.
 
-import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS, parseFountain } from '../../../src/lib/fountain.ts';
+import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS, parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
 
 // Heading detection is kept BYTE-COMPATIBLE with src/lib/fountain.ts's
 // parseFountain (a scene_heading is `/^(INT|EXT|EST|I\/E)[. ]/i` OR any line
@@ -134,6 +134,149 @@ function isDoubleSpaced(lines: string[]): boolean {
   return nonBlank > 0 && followedByBlank / nonBlank >= 0.9;
 }
 
+// ── TYPOGRAPHY IS NOT WRITING (2026-09-12, adversarial review finding 13) ──
+// Every rule lexicon in this engine matches on ASCII. A writer whose editor
+// emits the curly apostrophe — Final Draft, Highland, Word, Google Docs, iOS,
+// every one of them — therefore gets a different score for the same sentence.
+// Measured on the 32 committed benchmark scripts before this fold: replacing
+// `'` with `\u2019` moved health on 21 of 32 (range -0.6 .. +1.6) and replacing
+// `"` with `\u201C`/`\u201D` moved it on 7 of 32, by up to +4.3 points on
+// `the-key-under-the-mat` — more than twice the corpus's whole shuffle-drop
+// mean gap, bought with a keyboard setting.
+//
+// NFKC FIRST, then an explicit quote fold. NFKC alone does not map curly
+// quotes to ASCII (they are not compatibility-equivalent), so the fold is
+// listed out; NFKC is still applied because it handles the rest of the same
+// family — the ligatures a PDF extractor emits, fullwidth punctuation, the
+// non-breaking spaces a word processor leaves behind. Em and en dashes are NOT
+// folded: they are typographic choices the lexicons deliberately read.
+//
+// IT IS SAFE FOR COPY TRUTH. The diagnostic surface quotes no script text back
+// at the writer — an issue carries a rule, a location, a description and a
+// suggested fix, never an excerpt (verified over every pass on
+// data/screenplays/code-blue.fountain) — so folding the analyzer's input
+// cannot put punctuation the writer did not type into anything they read.
+const CURLY_TO_ASCII: Array<[RegExp, string]> = [
+  [/[\u2018\u2019\u201A\u201B\u2032]/g, "'"],
+  [/[\u201C\u201D\u201E\u201F\u2033]/g, '"'],
+];
+
+export function foldTypography(text: string): string {
+  if (!text) return text;
+  let out = text.normalize('NFKC');
+  for (const [re, to] of CURLY_TO_ASCII) out = out.replace(re, to);
+  return out;
+}
+
+// ── NOTHING THE READER NEVER SEES IS SCREENPLAY (2026-09-12, finding 1 of
+// the writer's-loop review) ────────────────────────────────────────────────
+// Fountain defines four constructs that are never printed: the boneyard
+// (`/* ... */`), notes (`[[ ... ]]`), synopses (`= ...`) and section headings
+// (`# ...`). The analyzer already refuses to diagnose them — extractSceneContent
+// skips those block types by name — but several signals still read the RAW
+// submission, so their words reached the analysis anyway. Pasting a production
+// note into a comment therefore changed the score, and before the denominator
+// fix in fountain-analyzer.ts it RAISED it: measured on the 32 committed
+// scripts, an 800-repetition boneyard moved health on 32 of 32, mean +7.206, up
+// to +18.6, flipping FOUR verdicts CONSIDER -> RECOMMEND without one word of
+// screenplay changing.
+//
+// This strips them from the text the analysis reads. It is not censorship of
+// the writer's file: `computeContentHash` still hashes the submitted bytes, and
+// the document the writer sees is untouched. It is the same principle as the
+// denominator fix — the thing being scored is the screenplay, and these four
+// are, by the format's own definition, not the screenplay.
+//
+// The block types come from parseFountain rather than from a regex over the
+// raw text, so a `#` inside a line of dialogue or a `/*` inside an action
+// sentence is never mistaken for one of these.
+const NON_PRINTING_BLOCK_TYPES = new Set(['boneyard', 'note', 'section', 'synopsis']);
+const INLINE_NOTE_RE = /\[\[[^\]]*\]\]/g;
+
+export function stripNonPrinting(text: string): string {
+  if (!text) return text;
+  const typeByLine = new Map<number, string>();
+  for (const b of parseFountain(text)) typeByLine.set(b.lineNumber, b.type);
+  const lines = text.split('\n');
+  const out: string[] = [];
+  let changed = false;
+  for (let i = 0; i < lines.length; i++) {
+    const t = typeByLine.get(i + 1);
+    if (t !== undefined && NON_PRINTING_BLOCK_TYPES.has(t)) { changed = true; continue; }
+    const stripped = lines[i].replace(INLINE_NOTE_RE, ' ');
+    if (stripped !== lines[i]) changed = true;
+    out.push(stripped);
+  }
+  return changed ? out.join('\n') : text;
+}
+
+// ── A TITLE PAGE IS METADATA, NOT PROSE (2026-09-12, finding 5) ────────────
+// Every real draft opens with `Title:` / `Credit:` / `Author:` / `Draft date:`.
+// `segmentScenes` prepends everything before the first heading into scene one's
+// body, so those four lines were diagnosed as screenplay writing: on `main` the
+// review measured 34 rules changing their firing count, health moving on 20 of
+// 32 scripts (worst -5.2) and the PRIMARY order AUC shifting 0.047 — more than
+// twice the 0.02 floor margin — from metadata alone. On this branch the same
+// transform still moved 29 of 32 (range -0.5 .. +1.2).
+//
+// Not one of the 20 `data/screenplays/*.fountain`, the 12 blind-pair fixtures
+// or the 20 calibration samples carries a title page, which is why the defect
+// was invisible: the corpus systematically avoids the document shape writers
+// actually submit.
+//
+// THE SPEC'S RULE, followed exactly. A title page is present only when the
+// document's FIRST non-blank line is a `Key:` line; it then runs to the first
+// blank line, and inside it an indented line is a continuation of the previous
+// key's value. Anything else at the top of the document (a `FADE IN:`, an
+// epigraph, an action paragraph) is not a title page and is left exactly where
+// it was — this must never eat writing.
+//
+// The text is NOT discarded: `analyzeFountainText` still hands the pre-heading
+// blocks to the clue walk as `titlePageText` (see buildProperNounGuard), which
+// is what stops the script's own title being read as a planted clue. What
+// changes is that those lines stop being counted as scene-one prose.
+const TITLE_PAGE_KEY_RE = /^[A-Za-z][A-Za-z0-9 _-]{0,40}:(\s|$)/;
+const TITLE_PAGE_CONTINUATION_RE = /^[ \t]+\S/;
+
+/** How many leading blocks are the Fountain title page — 0 when there is none. */
+export function titlePageBlockCount(blocks: FountainBlock[]): number {
+  // The FIRST block decides. A leading blank line, or any first line that is
+  // not `Key:`, means the document has no title page and nothing is dropped.
+  if (blocks.length === 0) return 0;
+  if (blocks[0].type === 'empty') return 0;
+  if (!TITLE_PAGE_KEY_RE.test(blocks[0].text.trim())) return 0;
+  let i = 1;
+  while (i < blocks.length && blocks[i].type !== 'empty') {
+    const raw = blocks[i].text;
+    // Inside the block, a line is either another key or an indented
+    // continuation of the previous key's value. Anything else ends the title
+    // page at that line rather than swallowing it.
+    if (!TITLE_PAGE_KEY_RE.test(raw.trim()) && !TITLE_PAGE_CONTINUATION_RE.test(raw)) return i;
+    i++;
+  }
+  return i;
+}
+
+/** The Fountain title page, dropped from a text that is about to be ANALYZED
+ *  rather than displayed. `titlePageBlockCount` above is the one
+ *  definition of where a title page starts and stops — see its header for the
+ *  spec rule and for what a title page costs when it is scored as prose.
+ *  Kept here, beside the other analysis-time normalisations, so a caller that
+ *  needs "the screenplay" gets all of them from one place. */
+export function stripTitlePage(text: string): string {
+  if (!text) return text;
+  const blocks = parseFountain(text);
+  const n = titlePageBlockCount(blocks);
+  if (n === 0) return text;
+  const lines = text.split('\n');
+  // titlePageBlockCount counts BLOCKS, and parseFountain emits exactly one
+  // block per line, so the block count is the line count. The blank line that
+  // ends the title page is left in place: it is what separates the (now
+  // absent) metadata from the first element, and removing it too would join
+  // two elements that were never adjacent.
+  return lines.slice(n).join('\n');
+}
+
 // ── ONE SPEECH IS ONE ELEMENT, HOWEVER MANY LINES IT OCCUPIES (2026-09-12) ──
 // A Fountain dialogue element runs from its character cue to the next blank
 // line; whether the writer typed it as one long line or let an editor wrap it
@@ -195,7 +338,7 @@ export function normalizeScreenplay(raw: string): string {
   const allLines = raw.replace(/\r\n?/g, '\n').split('\n').map(l => l.replace(/\s+$/, ''));
   // Preserve a title page verbatim if present (key: value lines before first blank/heading).
   // Clean input still gets the dialogue join: a wrapped speech is one element.
-  if (!isDoubleSpaced(allLines)) return joinWrappedDialogue(raw); // structurally idempotent on clean input
+  if (!isDoubleSpaced(allLines)) return joinWrappedDialogue(stripNonPrinting(foldTypography(raw))); // structurally idempotent on clean input
 
   const lines = allLines.filter(l => l.trim() !== '');
   const out: string[] = [];
@@ -249,5 +392,5 @@ export function normalizeScreenplay(raw: string): string {
     }
   }
   flush();
-  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  return stripNonPrinting(foldTypography(out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n'));
 }

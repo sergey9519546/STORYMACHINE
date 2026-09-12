@@ -131,7 +131,7 @@
 //      - fountain-analyzer.ts (tier 1, always-scoring) imports
 //        src/lib/fountain.ts, which decides what counts as a scene heading —
 //        i.e. it produces `sceneCount`, the single highest-AUC term the
-//        doctor emits (~0.938, doctor.ts:2380-2381). The old prefix filter
+//        doctor emits (~0.938, doctor.ts:2394-2395). The old prefix filter
 //        discarded it unconditionally.
 //      - Proven on commit c9023b8f ("multi-language scene headings"): the old
 //        gate named only screenplay-normalizer.ts in that range while the

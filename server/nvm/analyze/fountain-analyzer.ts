@@ -164,7 +164,7 @@ import {
   CUE_LETTER_CLASS,
   type FountainBlock,
 } from '../../../src/lib/fountain.ts';
-import { normalizeScreenplay } from './screenplay-normalizer.ts';
+import { normalizeScreenplay, titlePageBlockCount } from './screenplay-normalizer.ts';
 import { analyzeStructure } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord, ScenePurpose } from '../screenplay/memory.ts';
 import type { SceneAnnotation } from '../screenplay/compile-types.ts';
@@ -2557,7 +2557,11 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   // engine's own output), so this only changes messy imports — see
   // screenplay-normalizer.ts and docs/scoring/IMPORT_COMPREHENSION_2026-07-11.md.
   const blocks = parseFountain(normalizeScreenplay(fountain));
-  const allRawScenes = segmentScenes(blocks);
+  // The title page is metadata — see titlePageBlockCount above. Its blocks are
+  // dropped from the SCENE content only; `titlePageText` below is still built
+  // from every pre-heading block, so the clue guard reads it exactly as before.
+  const titlePageBlocks = titlePageBlockCount(blocks);
+  const allRawScenes = segmentScenes(titlePageBlocks > 0 ? blocks.slice(titlePageBlocks) : blocks);
   const totalSceneCount = allRawScenes.length;
   const truncatedForAnalysis = totalSceneCount > ANALYZER_SCENE_CEILING;
   const rawScenes = truncatedForAnalysis ? allRawScenes.slice(0, ANALYZER_SCENE_CEILING) : allRawScenes;
@@ -2695,14 +2699,49 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   // full-fountain word count so calibration remains byte-compatible. For
   // truncated scripts, count only the analyzed scene blocks — otherwise
   // post-ceiling padding can inflate the denominator and improve health.
-  const fullWordCount = fastWordCount(fountain);
-  const analyzedWordCount = rawScenes.reduce((n, s) => {
+  // ── THE DENOMINATOR IS THE TEXT THE ANALYZER READ (2026-09-12) ───────────
+  // `wordCount` is the denominator of the density term, which is most of the
+  // health score. It was `fastWordCount(fountain)` over the RAW submission on
+  // every path but the >400-scene one, and this file's own comment two lines
+  // up already named the failure mode: "score denominator must never count
+  // text the analyzer did not diagnose ... otherwise post-ceiling padding can
+  // inflate the denominator and improve health." The guard was applied only
+  // when `truncatedForAnalysis` was true. Every real draft took the unguarded
+  // branch.
+  //
+  // Fountain defines four constructs that are never printed and that
+  // `fountain-analyzer` deliberately does not diagnose: the boneyard
+  // (`/* ... */`), notes (`[[ ... ]]`), synopses (`= ...`) and section
+  // headings (`# ...`). Their words reached the denominator and carried no
+  // issues, so padding one was a free score. MEASURED on the 32 committed
+  // benchmark scripts, prepending a boneyard holding 800 repetitions of a
+  // production note: health moved on 32 of 32, mean +7.206, up to +18.6, and
+  // FOUR verdicts went CONSIDER -> RECOMMEND without one word of the
+  // screenplay changing. The same padding on `dead-frequency` — the product's
+  // own sample — took it 78.3 -> 88.3 and CONSIDER -> RECOMMEND on `main`.
+  //
+  // The title page is excluded by the same principle and by construction: it
+  // is no longer in `rawScenes` at all (see titlePageBlockCount).
+  //
+  // `submittedWordCount` keeps the raw figure for anything that legitimately
+  // wants "how much did the writer send" rather than "how much is screenplay".
+  const PRINTING_BLOCK_TYPES = new Set<FountainBlock['type']>([
+    'scene_heading', 'action', 'character', 'dual_dialogue', 'parenthetical',
+    'dialogue', 'transition', 'centered', 'lyrics', 'shot',
+  ]);
+  /** An inline note span (`[[ ... ]]`) inside an otherwise printing line is
+   *  not printed either, and the analyzer does not diagnose it. */
+  const stripInlineNotes = (t: string): string => t.replace(/\[\[[^\]]*\]\]/g, ' ');
+  const submittedWordCount = fastWordCount(fountain);
+  const wordCount = rawScenes.reduce((n, s) => {
+    let total = fastWordCount(s.slug);
     for (const b of s.blocks) {
-      if (b.text.trim()) n += fastWordCount(b.text);
+      if (!PRINTING_BLOCK_TYPES.has(b.type)) continue;
+      const text = stripInlineNotes(b.text);
+      if (text.trim()) total += fastWordCount(text);
     }
-    return n;
+    return n + total;
   }, 0);
-  const wordCount = truncatedForAnalysis ? analyzedWordCount : fullWordCount;
 
   // Character voice distinctiveness (Burrows's Delta)
   const dialogueByCharacter: Record<string, string[]> = {};

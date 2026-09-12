@@ -141,12 +141,12 @@ as one.
 | recipe | seeded Fisher-Yates shuffle of all scenes, then drop every third of the shuffled order | move the final scene to position 1 | replace every dialogue and parenthetical line with `Hello.` |
 | scene count | **changes** (10 → 7) | **preserved** (measured: mean scarcity delta **0.000** over all 32) | preserved |
 | imported from | `scripts/lib/auc.ts` `shuffleDropDegrade` — the AUC-24 ratchet's own recipe, byte for byte | `scripts/lib/rebuild-experiment-lib.mjs` `degradeClimaxRelocate` | `scripts/lib/rebuild-experiment-lib.mjs` `degradeDialogueFlatten` |
-| lineage number to read it against | AUC-24 (private corpus, feature length) last measured 0.731 | private-corpus act-swap ~0.48 (`doctor.ts:2380-2381`); P1 baseline `CLIMAX_RELOCATE` 0.523 on 153 test scripts | P1 baseline `DIALOGUE_FLATTEN` **0.990** — the one channel that PASSES its ≥0.80 gate |
+| lineage number to read it against | AUC-24 (private corpus, feature length) last measured 0.731 | private-corpus act-swap ~0.48 (`doctor.ts:2394-2395`); P1 baseline `CLIMAX_RELOCATE` 0.523 on 153 test scripts | P1 baseline `DIALOGUE_FLATTEN` **0.990** — the one channel that PASSES its ≥0.80 gate |
 
 **(b) exists because scene count is the doctor's dominant term.**
 `scarcityPenalty(sceneCount) = 140 / max(sceneCount,1)` (`doctor.ts:465-467`,
 summed into `craftPenalty` at `doctor.ts:657`); the file's own comment at
-`doctor.ts:2380-2381` records "scarcity term AUC 0.938; the weightedIssues rule
+`doctor.ts:2394-2395` records "scarcity term AUC 0.938; the weightedIssues rule
 channel AUC is 0.076". A degradation that changes scene count is partly
 measuring that arithmetic. One that preserves it cancels the term exactly and
 leaves order-sensitivity.
@@ -561,15 +561,15 @@ them, and this lane deliberately changed no file on any of those branches.
   that the score is valid — and mistaking one for the other would be the
   worst possible misreading of this document.
 * Transfer to feature-length real writing. N = 32 at 9–14 scenes.
-  `ARC_DED_MIN_SCENES` is 15 (`doctor.ts:2392`), so the one feature-scale
+  `ARC_DED_MIN_SCENES` is 15 (`doctor.ts:2406`), so the one feature-scale
   deduction that is wired into health never fires on this corpus at all — this
   benchmark measures a strictly smaller engine than the AUC-24 ratchet does.
   **Corrected 2026-09-12:** this line also named `CLIMAX_DED_MIN_SCENES`, as a
   second "feature-scale deduction". It gates `climaxZoneDecayDeduction`
-  (`doctor.ts:802`), which is exported and appears in no scoring-path call site
+  (`doctor.ts:803`), which is exported and appears in no scoring-path call site
   at all — `aggregateReport`'s health line subtracts `structuralDeduction`,
   `arcIncoherenceDeduction` and `dialogueDeduction` only, and
-  `doctor.ts:2416-2419` records why the climax term was reverted ("it over-fired
+  `doctor.ts:2430-2433` records why the climax term was reverted ("it over-fired
   on real scripts with naturally flat climaxes"). "Never fires at this length"
   implied it fires at some length. It fires at no length (adversarial finding 6).
 * Say anything about the AUC-24 ≥ 0.622 ratchet. Different corpus, different
@@ -970,3 +970,106 @@ grows it is visible.
 **Everything §8 limits still applies unchanged**, and the holdout is still
 spent: all six floors above were locked from all 32 scripts, the five holdout
 files included.
+
+---
+
+## 14. Re-lock, 2026-09-12 — four floors move DOWN because a measurement artifact left the denominator
+
+This is the second re-lock of the day and the only one in this document's
+history where the PRIMARY shuffle-drop floor falls. It is recorded at length
+because a floor that moves down is the one direction this machinery can be
+defeated in, and the defence is that the cause is named, isolated and
+reproducible.
+
+**Reproduce:** `npm run benchmark:public` on `scoring/adversarial-2026-09-12`
+at the parse-and-format-invariance commits.
+
+| degradation | N | AUC matched-pair (PRIMARY) | 95% CI | floor | AUC all-pairs | 95% CI | floor | ordered/inverted/tied |
+|---|---|---|---|---|---|---|---|---|
+| `SHUFFLE_DROP` | 32 | **0.8438** | [0.7188, 0.9688] | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` = **0.8238** | 0.7896 | [0.6738, 0.8975] | `PUBLIC_SHUFFLE_DROP_FLOOR` = **0.7696** | 27/5/0 |
+| `CLIMAX_RELOCATE` | 32 | **0.5938** | [0.4219, 0.7500] | `PUBLIC_ORDER_PAIRED_FLOOR` = **0.5738** | 0.5234 | [0.4678, 0.5874] | `PUBLIC_ORDER_FLOOR` = **0.5034** | 18/12/2 |
+| `DIALOGUE_FLATTEN` *(control)* | 32 | **1.0000** | [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR` = **0.98** | 0.9814 | [0.9531, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_FLOOR` = **0.9614** | 32/0/0 |
+
+```
+locked scripts/lib/auc.ts — six floor constants:
+  PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR         0.855 ->  0.8238   (measured 0.8438, PRIMARY)
+  PUBLIC_SHUFFLE_DROP_FLOOR               0.8091 ->  0.7696   (measured 0.7896)
+  PUBLIC_ORDER_PAIRED_FLOOR               0.5738 ->  0.5738   (measured 0.5938, PRIMARY, unchanged)
+  PUBLIC_ORDER_FLOOR                      0.5069 ->  0.5034   (measured 0.5234)
+  PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR      0.98 ->    0.98   (measured 1.0000, PRIMARY, unchanged)
+  PUBLIC_DIALOGUE_FLATTEN_FLOOR             0.98 ->  0.9614   (measured 0.9814)
+```
+
+### 14.1 What changed in the engine
+
+`wordCount` is the denominator of the density term, which is most of the health
+score. It was `fastWordCount()` over the **raw submission** on every path but
+the >400-scene one — and `fountain-analyzer.ts`'s own comment at that guard
+already named the failure mode: *"score denominator must never count text the
+analyzer did not diagnose … otherwise post-ceiling padding can inflate the
+denominator and improve health."* Every real draft took the unguarded branch.
+
+It is now the words of the **screenplay the analyzer actually read**: printing
+block types only, inside the analyzed scenes, with the four never-printed
+Fountain constructs (boneyard, notes, synopses, section headings) and the title
+page excluded. `submittedWordCount` keeps the raw figure.
+
+### 14.2 Why that moves THIS corpus, specifically
+
+All 20 CC0 screenplays and all 12 blind-pair fixtures open with their own CC0
+licence and provenance record. The 2026-09-04 corpus-integrity correction (this
+ledger's own entry) moved that text into a Fountain boneyard so it would not be
+**diagnosed**. Its words went on being **counted**: 24 to 151 words per file.
+On the two shortest scripts that is close to a fifth of everything the
+denominator saw, and the words carried no issues, so they lowered density and
+raised health for free.
+
+That is the same mechanism as the padding attack this commit closes. Measured
+on these 32 scripts, prepending a boneyard containing 800 repetitions of a
+production note moved health on **32 of 32**, mean **+7.206**, up to **+18.6**,
+flipping **four** verdicts CONSIDER → RECOMMEND without one word of screenplay
+changing. After the fix that same transform moves **0 of 32**.
+
+Per-script effect of the correction on the intact scripts: **all 32 fall**,
+mean **−1.453**, range **−0.1 to −12.3**, two verdicts CONSIDER → PASS —
+`room-12` 63.9 → 51.6 (427 → 338 words) and `transfer-window` 64.1 → 55.8
+(454 → 379). One matched pair flips with them, 28/4/0 → 27/5/0.
+
+### 14.3 The attribution is measured, not argued
+
+Four changes landed together. Each was disabled in turn, with the other three
+in place, and the benchmark re-run:
+
+| reverted | SHUFFLE_DROP paired | all-pairs |
+|---|---|---|
+| nothing (this tree) | 0.8438 | 0.7896 |
+| the typography fold | 0.8438 | 0.7896 |
+| the title-page strip | 0.8438 | 0.7896 |
+| the non-printing strip | 0.8438 | 0.7920 |
+| **the denominator change** | **0.8750** | **0.8232** |
+
+The three parse fixes move the primary statistic by **0.0000**. The denominator
+change is the whole of it.
+
+### 14.4 How to read the lower floor
+
+A benchmark whose separation depends on each fixture counting its own licence
+text as screenplay was reporting a number about this repository's filing
+habits. **0.8438 is what the same engine scores on the same writing once that
+stops.** The floor follows the measurement, as it always does, and the
+correctness gain it paid for is a class of free-score attack that flipped four
+of these thirty-two verdicts.
+
+Nothing here licenses a future downward re-lock on a number that fell for a
+reason nobody can name. The test of a legitimate downward move is the table in
+§14.3: the cause isolated, the other candidates ruled out by rerun, and the
+mechanism stated in words a reader can check against the code.
+
+### 14.5 What did not move
+
+The 20 calibration samples are **byte-identical** — same health, same word
+count, same verdict, all 20 — because none of them carries a boneyard, a title
+page or a curly quote. `tests/fixtures/public-benchmark-split.json` re-locked
+byte-identical (the split is a hash of the file bytes, and no file changed).
+The blind-pairs craft reading stays **4 of 6 ordered** and its mean gap widens
+from +0.3833 to **+0.7167**. `AUC24_FLOOR` was not touched.

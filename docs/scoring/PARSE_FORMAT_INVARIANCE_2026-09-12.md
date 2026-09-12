@@ -116,3 +116,97 @@ is invisible here. `joinWrappedDialogue` is the half that is provably a no-op
 on every committed fixture. The owner's `npm run measure-real` is what would
 settle the other half, and it should be measured as its own change, not
 smuggled in with this one.
+
+## 2. The other ten transforms (findings 5, 13, and the writer's-loop finding 1)
+
+Same corpus, same method: 32 committed scripts, one transform each, exact
+equality on `health` / `grade` / `verdict` / `sceneCount` / `totalIssues` /
+`bySeverity`. All eleven rows are asserted per script in
+`tests/core/parse-format-invariance.test.ts`.
+
+| transform | branch base | after |
+|---|---|---|
+| dialogue reflow, 30/35/40/60 cols | 119 / 128 pairs, max 8.8, 1 verdict flip | **0 / 128, 0.0** |
+| a standard Fountain title page | 29 / 32, range [-0.5, +1.2] | **0 / 32** |
+| curly apostrophes (U+2019) | 21 / 32, range [-0.6, +1.6] | **0 / 32** |
+| curly double quotes (U+201C/D) | 7 / 32, up to +4.3 | **0 / 32** |
+| a boneyard note before the script | 20 / 32 | **0 / 32** |
+| a boneyard note after the script | 19 / 32 | **0 / 32** |
+| a boneyard padded x800 | **32 / 32, mean +7.206, up to +18.6, 4 verdict flips CONSIDER -> RECOMMEND** | **0 / 32** |
+| an inline `[[note]]` | 22 / 32 | **0 / 32** |
+| a synopsis line | 20 / 32 | **0 / 32** |
+| a section heading | 16 / 32 | **0 / 32** |
+| CRLF line endings | 0 / 32 | 0 / 32 |
+| a byte-order mark | 0 / 32 | 0 / 32 |
+
+### 2.1 The four fixes
+
+1. **`foldTypography`** — NFKC, then an explicit curly-to-ASCII quote fold.
+   NFKC alone does not map curly quotes (they are not compatibility-equivalent),
+   so the fold is written out; NFKC still runs because it handles the rest of
+   the same family, the ligatures a PDF extractor emits and the non-breaking
+   spaces a word processor leaves. Em and en dashes are deliberately NOT folded:
+   the lexicons read them on purpose.
+2. **`stripNonPrinting`** — the four constructs Fountain defines as never
+   printed (boneyard, notes, synopses, sections) leave the text the analysis
+   reads. Block types come from `parseFountain`, not a regex, so a `#` inside a
+   line of dialogue is never mistaken for a section heading.
+3. **`titlePageBlockCount` / `stripTitlePage`** — the spec's rule exactly: a
+   title page exists only when the document's first non-blank line is a `Key:`
+   line, and it runs to the first blank line, with indented continuations. Any
+   other document preamble (a `FADE IN:`, an epigraph) is left where it is.
+   The text is not discarded — `analyzeFountainText` still hands the pre-heading
+   blocks to the clue walk as `titlePageText`, which is what stops a script's
+   own title being read as a planted clue.
+4. **The denominator.** `wordCount` is the printing words of the analyzed
+   scenes, not `fastWordCount(<raw submission>)`. `submittedWordCount` keeps the
+   raw figure.
+
+`aggregateReport` now computes the canonical analysis text once and every signal
+that used to take the raw submission reads it instead — the emotional arc, the
+page estimate, anti-slop, theme, interiority, mirror scenes, silence, bonding,
+the cold-open promise, pattern establishment and the structural signals.
+`computeContentHash` deliberately still hashes the SUBMITTED bytes: two files
+that normalise to the same screenplay are still two different submissions, and
+that is asserted.
+
+### 2.2 What it cost
+
+This is the expensive half of the lane and the cost is a real one.
+`docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §14 carries it in full: four
+floors move DOWN, the primary shuffle-drop AUC from 0.8750 to **0.8438**, and
+the whole of that movement is attributable by rerun to the denominator change
+alone (the three parse fixes move it by 0.0000). The cause is that all 32
+fixtures open with their own CC0 licence record in a boneyard, worth 24-151
+words each, and those words were counted as screenplay. The benchmark's
+separation was partly a measurement of this repository's filing habits.
+
+Per-script: all 32 fall, mean **-1.453**, range -0.1 to -12.3, two verdicts
+CONSIDER -> PASS. The 20 calibration samples are byte-identical. The
+output-identity harness is a deliberate **FAIL** — 25 of 45 fixtures differ
+(20 screenplays, the P0 sample, 4 synthetic scene-count fixtures), on the keys
+`score`, `issueCount`, `minor`, `major`, `percentile`, `percentileDescriptor`,
+`summary` and `freshness`, plus the always-ignored `provenance.engineCommit`.
+The 20 calibration fixtures do not differ.
+
+### 2.3 What the owner's AUC-24 run can and cannot settle
+
+The private corpus is real screenplays. Whether they carry boneyards, notes or
+title pages is not knowable from here, and that is exactly what decides how far
+AUC-24 moves. Three cases, and nothing in this repository can tell them apart:
+
+* **No non-printing text and no title page.** The denominator is unchanged and
+  AUC-24 should not move at all.
+* **A title page on most drafts** (the likely case for real screenplays). Every
+  script loses a few words from the denominator, both halves of each matched
+  pair equally, so the level shifts and the rank statistic largely does not.
+* **Substantial boneyard or note text.** Then the same correction that cost
+  0.031 here will move AUC-24 by an amount proportional to how much of each
+  draft was never meant to be printed, and the direction is not predictable
+  from this corpus.
+
+AUC-24 **cannot** settle whether the correction is right — that is a question
+about what a screenplay is, and it is answered by the format specification, not
+by a statistic. If AUC-24 falls, the finding is about the private corpus's
+document shape, and the response is to look at what those drafts contain, not
+to move `AUC24_FLOOR`.

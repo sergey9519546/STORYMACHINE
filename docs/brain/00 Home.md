@@ -30,7 +30,7 @@ generation. See `NORTH_STAR.md` §0 and [[Glossary]] ("keyless boot").
 The project's central, unresolved wager, per `ROADMAP.md` §3 and
 `CLAUDE.md`'s standing task: **make the score provably discriminate on real
 writing (P1)**, because by the doctor's own measurement
-(`server/nvm/analyze/doctor.ts:2380-2381`) the entire weighted-rule channel
+(`server/nvm/analyze/doctor.ts:2394-2395`) the entire weighted-rule channel
 carries AUC ~0.076 (worse than random) while scene-count scarcity alone
 carries AUC ~0.938 — more generated rules stopped adding signal a long time
 ago. The rule catalog (3,217 pass-scoped constants,

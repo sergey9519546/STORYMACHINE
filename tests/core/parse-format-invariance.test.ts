@@ -197,6 +197,69 @@ describe('the parser reads a wrapped speech as dialogue, not as action prose', (
   });
 });
 
+/** The transforms that change FORMAT and not one printed word. Each is the
+ *  thing a real writer's real tools do to a real file. */
+const FORMAT_TRANSFORMS: Array<[string, (t: string) => string, string]> = [
+  ['a standard Fountain title page',
+    (t) => `Title: The Long Way Down\nAuthor: A. Writer\nDraft date: 12 September 2026\nContact: writer@example.com\n\n${t}`,
+    'finding 5 — the four metadata lines every real draft has. On main this moved health on 20 of 32 '
+    + 'scripts (worst -5.2) and shifted the PRIMARY order AUC by 0.047, 2.3x the floor margin; on this '
+    + "branch's base it still moved 29 of 32."],
+  ['curly apostrophes (U+2019)', (t) => t.replace(/'/g, '\u2019'),
+    'finding 13 — what Final Draft, Highland, Word, Google Docs and iOS all emit. Moved 21 of 32 before '
+    + 'the typography fold, by up to 1.6 points, because every rule lexicon matches on ASCII.'],
+  ['curly double quotes (U+201C/D)', (t) => t.replace(/"([^"\n]*)"/g, '\u201C$1\u201D'),
+    'finding 13 — moved 7 of 32 before the fold, by up to +4.3 on the-key-under-the-mat.'],
+  ['a boneyard note before the script', (t) => `/* production note: budget and scheduling discussion */\n\n${t}`,
+    "finding 13 / writer's-loop finding 1 — a private note to yourself is not screenplay."],
+  ['a boneyard note after the script', (t) => `${t}\n\n/* production note: budget and scheduling discussion */\n`,
+    'same construct at the other end of the document.'],
+  ['a boneyard padded with 800 repetitions',
+    (t) => `/*\n${'scheduling and budget discussion '.repeat(800)}\n*/\n\n${t}`,
+    "writer's-loop finding 1, the attack version. Before the denominator fix this moved health on 32 of "
+    + '32 scripts, mean +7.206, up to +18.6, and flipped FOUR verdicts CONSIDER -> RECOMMEND without one '
+    + 'word of screenplay changing.'],
+  ['an inline note', (t) => `${t}\n\n[[remember to fix act two before the next pass]]\n`, 'the second non-printing construct.'],
+  ['a synopsis line', (t) => `${t}\n\n= a synopsis line the reader never sees\n`, 'the third.'],
+  ['a section heading', (t) => `${t}\n\n# ACT THREE\n`, 'the fourth.'],
+  ['CRLF line endings', (t) => t.replace(/\n/g, '\r\n'), 'already invariant before this work; asserted so it stays that way.'],
+  ['a byte-order mark', (t) => `\uFEFF${t}`, 'already invariant before this work; asserted so it stays that way.'],
+];
+
+describe('format is not writing: eleven transforms, 32 scripts, exact equality (findings 5 and 13)', () => {
+  for (const [label, fn, why] of FORMAT_TRANSFORMS) {
+    it(`${label} does not move any of the 32 scripts`, async () => {
+      const moved: string[] = [];
+      for (const f of FILES) {
+        const got = await runScriptDoctor(fn(read(f)));
+        const base = baseline.get(f)!;
+        try {
+          assert.deepEqual(surface(got), surface(base));
+        } catch {
+          moved.push(`${f} ${base.health} -> ${got.health} (${base.verdict} -> ${got.verdict})`);
+        }
+      }
+      assert.deepEqual(moved, [], `${moved.length} of ${FILES.length} scripts moved under "${label}". ${why}`);
+    });
+  }
+});
+
+/** The submitted bytes are still what identifies a submission. */
+describe('the canonical analysis text does not reach contentHash', () => {
+  it('two submissions that normalise to the same screenplay still hash differently', async () => {
+    const src = read(FILES[0]);
+    const padded = `/* a private note */\n\n${src}`;
+    const a = await runScriptDoctor(src);
+    const b = await runScriptDoctor(padded);
+    assert.equal(a.health, b.health, 'the two must SCORE the same');
+    assert.notEqual(
+      a.contentHash, b.contentHash,
+      'contentHash must identify the bytes the writer submitted, not the screenplay they normalise to — '
+      + 'two different files are two different submissions even when they score identically',
+    );
+  });
+});
+
 describe('the harness still separates writing from formatting (the both-directions check)', () => {
   it('flattening every speech to "Hello." DOES move the score on every script', async () => {
     // The control from the public benchmark, run here so that an invariance

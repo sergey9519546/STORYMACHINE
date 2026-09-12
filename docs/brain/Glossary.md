@@ -18,7 +18,7 @@ more bounded deduction terms on top of that base:
 structural-finding deduction (see the CLAUDE.md gotcha: structural findings
 at feature scale must go through this path, never raw issue-count density);
 `arcIncoherenceDeduction` fires only at feature scale (≥15 scenes,
-`ARC_DED_MIN_SCENES`, `doctor.ts:2392`) off the emotional-arc trajectory;
+`ARC_DED_MIN_SCENES`, `doctor.ts:2406`) off the emotional-arc trajectory;
 `dialogueDeduction` is the 2026-07-29 dialogue-diversity term that took
 DIALOGUE_FLATTEN from AUC 0.54 (chance) to 0.990 — see
 [[Measurement - DISCRIMINATION_BASELINE_2026-07-29]]. Fully LLM-free — see

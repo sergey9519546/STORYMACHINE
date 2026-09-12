@@ -428,7 +428,7 @@ router.get('/api/scriptide/load', gameLimiter, asyncHandler(async (req, res) => 
 // (identical to canonical-fountain.ts's own HEADING_RE) — duplicated rather
 // than imported because both of those modules sit on the scoring path
 // (src/lib/fountain.ts feeds fountain-analyzer.ts's sceneCount, the single
-// highest-AUC term the doctor emits — doctor.ts:2380-2381) and this route is
+// highest-AUC term the doctor emits — doctor.ts:2394-2395) and this route is
 // under a hard no-scoring-path-touch constraint for this change.
 // tests/routes/format-unrecognized.test.ts asserts this mirror agrees with
 // the real parser's scene_heading classification on all 20 calibration
