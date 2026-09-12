@@ -1,7 +1,7 @@
 ---
 type: surface
-updated: 2026-09-11
-sources: [server/lib/reader-tier.ts, server/lib/page-refs.ts, server/lib/reference-bounds.ts, src/lib/priorities-copy.ts, scripts/measure-reader-tier-page.mjs, tests/core/reader-tier.test.ts, tests/core/page-refs.test.ts, tests/core/reference-bounds.test.ts]
+updated: 2026-09-12
+sources: [server/lib/reader-tier.ts, server/lib/artifact-claims.ts, server/lib/page-refs.ts, server/lib/reference-bounds.ts, src/lib/priorities-copy.ts, scripts/measure-reader-tier-page.mjs, tests/core/reader-tier.test.ts, tests/core/page-refs.test.ts, tests/core/reference-bounds.test.ts, tests/core/artifact-claims.test.ts]
 status: active
 ---
 
@@ -71,10 +71,37 @@ absent: with no percentile at all, the labelled line renders.
 `tests/core/reader-tier.test.ts` asserts exactly-once in all three renderings on
 both paths, and never-zero on the third.
 
+**Round 3 (2026-09-12) — every number on this page is now a CHECKABLE claim.**
+The tier's scene count, word count, page/minute estimate, per-finding page
+reference, priorities count, percentile reading, reference bounds and logline
+state were stated on the page a producer is told to trust and checked by nothing
+— a hand edit to any of them printed `VERIFIED` at exit 0 from the verifier the
+report's own footer tells that producer to run
+(`docs/audits/2026-09-12-adversarial/server-data-tests.md` BUG-1; the tier's
+verdict and health readings in `writer-loop.md` finding 2). `buildReaderTier` now
+builds a `server/lib/artifact-claims.ts` `ArtifactClaims` and formats its own
+Length line FROM it, both exporters publish it as their verify block, and both
+verifiers read it back and recompute it from the script text alone — see
+[[Surface - Exports]] for the claim set, the recomputation and what is
+deliberately not checked.
+
+**The logline has three states, not two (2026-09-12).** `logline: null` was
+printing "no single speaker holds enough of this script's dialogue for one"
+(`docs/CLAIMS_REGISTER.md` row 83) for BOTH the dialogue-share gate firing and a
+caller simply not supplying a logline — a claim about the script that the second
+case is no evidence for. Now: a supplied logline is believed; with the script text
+but no logline the engine's own `buildLogline` is derived here, which is also what
+makes the state checkable by a verifier holding only the text; with neither, the
+page says `Unavailable for this report (it was rendered without the script text).`
+and the block publishes no logline claim at all. Both export routes always supply
+one, so the false sentence only ever reached callers inside this repository — it
+was still a sentence the document could not support.
+
 ## Sources
 
 - `server/lib/reader-tier.ts`; `server/lib/page-refs.ts`; `server/lib/reference-bounds.ts`
 - `src/lib/priorities-copy.ts`; `src/lib/percentile-copy.ts`
 - `scripts/measure-reader-tier-page.mjs`
 - `tests/core/reader-tier.test.ts`; `tests/core/page-refs.test.ts`; `tests/core/reference-bounds.test.ts`
-- `docs/CLAIMS_REGISTER.md` rows 82-83, 87-90
+- `server/lib/artifact-claims.ts`; `tests/core/artifact-claims.test.ts`
+- `docs/CLAIMS_REGISTER.md` rows 82-83, 87-90, 94-99

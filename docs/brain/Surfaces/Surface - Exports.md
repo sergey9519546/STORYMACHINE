@@ -1,7 +1,7 @@
 ---
 type: surface
-updated: 2026-09-11
-sources: [server/routes/export.ts, server/routes/coverage-letter.ts, server/lib/verify-compare.ts, server/lib/build-info.ts, scripts/verify-report.mjs, tests/routes/export-verify.test.ts, server/lib/root-cause-pipeline.ts, server/lib/reader-tier.ts]
+updated: 2026-09-12
+sources: [server/routes/export.ts, server/routes/coverage-letter.ts, server/lib/verify-compare.ts, server/lib/artifact-claims.ts, server/lib/build-info.ts, scripts/verify-report.mjs, tests/routes/export-verify.test.ts, tests/core/artifact-claims.test.ts, server/lib/root-cause-pipeline.ts, server/lib/reader-tier.ts]
 status: active
 ---
 
@@ -61,15 +61,63 @@ resolving [[Surface - Producer Tier]]'s page references through the same
 paginator the PDF export uses. Nothing is re-analyzed and no number is derived
 from it there.
 
+**The claim set an artifact carries (2026-09-12, BUG-1).** `verify-compare.ts`
+checked `contentHash`/`health`/`verdict`/`totalIssues`/`healthPercentile`/
+`engineCommit`/`rulebookCount` and nothing else, while
+[[Surface - Producer Tier]] had just put a scene count, a word count, a
+page/minute estimate, a page reference per finding, a priorities count, a
+percentile reading and the reference bounds on the one page a producer is told to
+trust — and `VerifyExpectedSchema` had no FIELD for any of them, so even a caller
+who wanted to check one could not. Measured on
+`data/screenplays/chain-of-custody.fountain` (13 scenes, 824 words, ~4 pages, one
+finding at p. 2): a hand edit to `9,999 scenes · 999,999 words · ~500 pages /
+~500 min (est.)`, a page reference moved to `p. 999` and a heading changed to
+"The 9 things to fix first" printed `VERIFIED — authentic and reproducible under
+this engine.` at exit 0 in the HTML report, the letter and the raw report JSON.
+A letter whose page-one line was edited to
+`**Verdict.** RECOMMEND · Health 94.6 / 100` verified too
+(`docs/audits/2026-09-12-adversarial/writer-loop.md` finding 2: the tier is a
+second verdict/health rendering, and the CLI's scrape looked for `**Verdict:`
+with a colon and `Health 94.6/100` without spaces).
+
+`server/lib/artifact-claims.ts` is now the ONE definition: one label table, one
+encoder, one parser per rendering. `buildReaderTier` builds the claims and
+formats the tier's own Length line out of them, both exporters publish
+`tier.claims` through `claimRowsFor`, and both verifiers read them back through
+`decodeClaimRows` — so a number cannot appear on the page without appearing in
+the block. Three properties are worth knowing:
+
+- **Recomputed, never trusted.** `recomputeArtifactClaims` calls
+  `buildReaderTier` with only the script text, so page references are
+  re-resolved through the paginator and the logline state re-derived; the
+  verifier is deliberately never handed the value it is checking.
+- **A tier with no tier claims is refused.** Deleting a claim row is a missing
+  value, not a wrong one, and "only what was claimed is checked" would let a
+  forger opt a number out of verification. Gated on the tier's PRESENCE, so
+  every artifact exported before 2026-09-11 (no tier) still verifies.
+- **The gap is written down.** `VERIFY_SCOPE_SENTENCE` ships in both exported
+  documents and in `--help`: wording, the logline's text, the title, the author
+  and the caller-supplied draft-rank line are not checked, because re-running the
+  engine cannot attest what a human supplied. A gap that is written down is a
+  scope; BUG-1 was a gap nobody had written down.
+
+Proof: `tests/core/artifact-claims.test.ts` (formatter/parser round trips, the
+zod wall per field, the page-and-block-are-one-statement case),
+`tests/routes/export-verify.test.ts` (the route half: every tier field checked,
+each able to fail, malformed claims 400 before the comparator),
+`tests/scripts/verify-report.test.ts` (eleven claims x three document shapes x
+body-only and every-rendering forgeries, against artifacts a live keyless server
+produced, plus CRLF/BOM variants).
+
 
 ## Sources
 
 - `server/routes/export.ts`
-- `server/lib/verify-compare.ts`
+- `server/lib/verify-compare.ts`; `server/lib/artifact-claims.ts`
 - `server/lib/build-info.ts`
 - `scripts/verify-report.mjs`
 - `tests/routes/export-verify.test.ts`
-- `tests/scripts/verify-report.test.ts`
+- `tests/scripts/verify-report.test.ts`; `tests/core/artifact-claims.test.ts`
 - `tests/core/build-info.test.ts`
 - `server/lib/root-cause-pipeline.ts`; `server/lib/reader-tier.ts`
 - `tests/routes/root-cause-parity.test.ts`
