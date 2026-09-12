@@ -7,7 +7,7 @@ status: active
 
 # Session — 2026-09-12: The Adversarial Review
 
-**Heading:** "2026-09-12 — the adversarial review: eight lanes, twenty-one
+**Heading:** "2026-09-12 — the adversarial review: eight lanes, twenty-three
 review rounds, no lane through on its first pass." The owner asked for a
 principal-level adversarial review of the current features and logic, run as
 an orchestrator over subagents, aimed at the best achievable version of this

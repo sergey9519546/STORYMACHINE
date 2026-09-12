@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-12, main @ 39996b6d (nine session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-12, main @ 3f4a6872 (nine session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -35,7 +35,7 @@ browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
 
-**2026-09-12 — the adversarial review: eight lanes, twenty-one review
+**2026-09-12 — the adversarial review: eight lanes, twenty-three review
 rounds, no lane through on its first pass.** The owner asked for a
 principal-level adversarial review of the current features and logic, run as
 an orchestrator over Sonnet and Opus subagents, with the objective of finding
