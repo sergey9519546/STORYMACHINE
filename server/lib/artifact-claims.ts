@@ -346,6 +346,20 @@ export interface ClaimRowSpec {
   label: string;
   field: keyof ArtifactClaims;
   kind: ClaimFieldKind;
+  /** Set on the claims ONLY a producer-tier artifact states (server/lib/
+   *  reader-tier.ts). `'always'` means every tier artifact publishes it;
+   *  `'ifRendered'` means a tier artifact publishes it exactly when the report has
+   *  the value to state (a page estimate, a percentile, a known logline state) —
+   *  so the verifier requires it when the PAGE renders it, not unconditionally.
+   *
+   *  ROUND 2 (2026-09-12 review finding 1). `TIER_CLAIM_LABELS` was a hand-written
+   *  list of five labels against a comment claiming it was all of them, and the
+   *  four it omitted — `Estimated pages`, `Estimated runtime (minutes)`,
+   *  `Health percentile reading`, `Logline` — were exactly the ones a forger could
+   *  delete to reinstate the brief's own "~500 pages / ~500 min (est.)" forgery at
+   *  exit 0. The set is now DERIVED from this column, so a tenth claim enters the
+   *  gate by being marked here rather than by someone remembering a second list. */
+  tier?: 'always' | 'ifRendered';
 }
 
 export const CLAIM_ROW_SPECS: readonly ClaimRowSpec[] = [
@@ -353,27 +367,48 @@ export const CLAIM_ROW_SPECS: readonly ClaimRowSpec[] = [
   { label: 'Health', field: 'health', kind: 'fixed1' },
   { label: 'Verdict', field: 'verdict', kind: 'verdict' },
   { label: 'Total issues', field: 'totalIssues', kind: 'int' },
-  { label: 'Scenes', field: 'sceneCount', kind: 'int' },
-  { label: 'Words', field: 'wordCount', kind: 'int' },
-  { label: 'Estimated pages', field: 'estimatedPages', kind: 'int' },
-  { label: 'Estimated runtime (minutes)', field: 'estimatedRuntimeMinutes', kind: 'int' },
-  { label: 'Priorities listed', field: 'prioritiesListed', kind: 'int' },
-  { label: 'Health percentile reading', field: 'percentileReading', kind: 'text' },
-  { label: 'Reference bounds', field: 'referenceBounds', kind: 'text' },
-  { label: 'Logline', field: 'loglineState', kind: 'logline' },
-  { label: 'Page references', field: 'pageRefs', kind: 'pageRefs' },
+  { label: 'Scenes', field: 'sceneCount', kind: 'int', tier: 'always' },
+  { label: 'Words', field: 'wordCount', kind: 'int', tier: 'always' },
+  { label: 'Estimated pages', field: 'estimatedPages', kind: 'int', tier: 'ifRendered' },
+  { label: 'Estimated runtime (minutes)', field: 'estimatedRuntimeMinutes', kind: 'int', tier: 'ifRendered' },
+  { label: 'Priorities listed', field: 'prioritiesListed', kind: 'int', tier: 'always' },
+  { label: 'Health percentile reading', field: 'percentileReading', kind: 'text', tier: 'ifRendered' },
+  { label: 'Reference bounds', field: 'referenceBounds', kind: 'text', tier: 'always' },
+  { label: 'Logline', field: 'loglineState', kind: 'logline', tier: 'ifRendered' },
+  { label: 'Page references', field: 'pageRefs', kind: 'pageRefs', tier: 'always' },
   { label: 'Engine commit', field: 'engineCommit', kind: 'text' },
   { label: 'Rulebook count', field: 'rulebookCount', kind: 'int' },
 ];
 
-/** The labels that only a producer-tier artifact publishes. A document that
- *  RENDERS a tier must publish all of these (see `TIER_CLAIM_LABELS`'s use in
- *  scripts/verify-report.mjs): a tier with no tier claims is a report whose
- *  reader-facing numbers cannot be checked, and is refused rather than verified
- *  on the strength of the claims that happen to remain. */
-export const TIER_CLAIM_LABELS: readonly string[] = [
-  'Scenes', 'Words', 'Priorities listed', 'Reference bounds', 'Page references',
-];
+/** Every label only a producer-tier artifact publishes — DERIVED from the table's
+ *  `tier` column, never listed a second time.
+ *
+ *  A document that renders a tier, or that publishes ANY of these rows, must
+ *  publish all of the `'always'` ones plus every `'ifRendered'` one whose value its
+ *  page actually states (scripts/verify-report.mjs's `requiredTierLabels`). A tier
+ *  with some of its claims deleted is a report whose reader-facing numbers cannot
+ *  be checked, and is refused rather than verified on the strength of the claims
+ *  that happen to remain. */
+export const TIER_CLAIM_LABELS: readonly string[] =
+  CLAIM_ROW_SPECS.filter(spec => spec.tier !== undefined).map(spec => spec.label);
+
+/** The subset every tier artifact publishes unconditionally — `buildArtifactClaims`
+ *  always populates these for any report it can build claims from at all. */
+export const TIER_ALWAYS_LABELS: readonly string[] =
+  CLAIM_ROW_SPECS.filter(spec => spec.tier === 'always').map(spec => spec.label);
+
+/** The tier claims a report may legitimately not state: no `pageEstimate`, no
+ *  `healthPercentile`, or a logline state the renderer had no basis for. Required
+ *  when the PAGE renders them — which is what makes deleting the row and forging
+ *  the page a refusal rather than a silent pass. */
+export const TIER_CONDITIONAL_LABELS: readonly string[] =
+  CLAIM_ROW_SPECS.filter(spec => spec.tier === 'ifRendered').map(spec => spec.label);
+
+/** `field -> label`, for a caller that knows which claim it found on the page and
+ *  needs the row label to require. Derived from the same table. */
+export const CLAIM_LABEL_BY_FIELD: Readonly<Record<string, string>> = Object.fromEntries(
+  CLAIM_ROW_SPECS.map(spec => [spec.field, spec.label]),
+);
 
 /** The claims the coverage LETTER states in its own prose footer instead of as a
  *  labelled row — see `claimRowsFor`'s `omit`. Named here rather than spelled at

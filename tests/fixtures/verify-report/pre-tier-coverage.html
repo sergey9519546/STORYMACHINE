@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Warehouse &mdash; Script Coverage</title>
+<style>
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: #f4f2ec;
+      color: #1a1a1a;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .page {
+      max-width: 850px;
+      margin: 0 auto;
+      padding: 40px 48px 56px;
+      background: #fffdf9;
+    }
+    .mono {
+      font-family: 'Courier New', Courier, monospace;
+    }
+    /* ── Header ── */
+    .report-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      border-bottom: 3px double #1a1a1a;
+      padding-bottom: 18px;
+      margin-bottom: 28px;
+    }
+    .masthead {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      color: #52525b;
+      margin-bottom: 6px;
+    }
+    .title {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 26px;
+      font-weight: 700;
+      margin: 0 0 8px;
+      word-break: break-word;
+    }
+    .byline {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12.5px;
+      color: #52525b;
+      margin: 0 0 6px;
+    }
+    .meta-line {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12.5px;
+      color: #3f3f46;
+    }
+    .logline-line {
+      font-size: 14px;
+      font-style: italic;
+      color: #27272a;
+      margin-top: 8px;
+    }
+    .stamp-wrap {
+      flex: 0 0 auto;
+      padding-top: 4px;
+    }
+    .stamp {
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.08em;
+      border: 3px solid;
+      border-radius: 6px;
+      padding: 10px 16px;
+      transform: rotate(-7deg);
+      white-space: nowrap;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.05);
+    }
+    /* ── Sections ── */
+    .section {
+      margin-bottom: 30px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .section h2 {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #1a1a1a;
+      border-bottom: 1px solid #d4d4d8;
+      padding-bottom: 6px;
+      margin: 0 0 14px;
+    }
+    .empty-note {
+      color: #71717a;
+      font-style: italic;
+      margin: 0;
+    }
+    /* ── Health ── */
+    .health-section {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      background: #faf9f5;
+      border: 1px solid #e4e2d8;
+      border-radius: 8px;
+      padding: 20px 24px;
+    }
+    .health-score-block {
+      flex: 0 0 auto;
+      text-align: center;
+      min-width: 120px;
+    }
+    .health-number {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 48px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .health-outof {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      color: #71717a;
+      margin-bottom: 8px;
+    }
+    .health-grade {
+      display: inline-block;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+    .plain-summary {
+      margin: 0;
+      font-size: 15px;
+    }
+    /* ── Dimensions ── */
+    .dim-list { display: flex; flex-direction: column; gap: 14px; }
+    .dim-row {
+      display: grid;
+      grid-template-columns: 150px 1fr 70px;
+      grid-template-areas: "label bar score" "summary summary summary" "basis basis basis";
+      row-gap: 4px;
+      column-gap: 12px;
+      align-items: center;
+    }
+    .dim-label { grid-area: label; font-weight: 700; font-size: 13px; }
+    .dim-bar-track {
+      grid-area: bar;
+      background: #e4e4e7;
+      border-radius: 999px;
+      height: 10px;
+      overflow: hidden;
+    }
+    .dim-bar-fill { height: 100%; border-radius: 999px; }
+    .dim-score {
+      grid-area: score;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      text-align: right;
+      color: #3f3f46;
+    }
+    .dim-summary { grid-area: summary; font-size: 13px; color: #3f3f46; }
+    /* a11y fix (2026-09-05, client-hunter B-15): #a3a3a3 measured 2.25-2.48:1
+       against every background this class actually renders on in this
+       document (page #fffdf9, body #f4f2ec) — the WCAG AA text minimum is
+       4.5:1. This class carries the report's provenance sentences ("Based
+       on N issues across M passes…", "The N findings below…") — the exact
+       lines ROADMAP P3's third-party-verifiability claim rests on, so an
+       unreadable provenance line undercuts the whole point of a shareable
+       report. #6b6b6b clears 4.5:1 on both backgrounds (4.76-5.25:1) while
+       staying visually muted/secondary next to the primary #1a1a1a/#3f3f46
+       ink this document uses for body text. */
+    .dim-basis { grid-area: basis; font-size: 11px; color: #6b6b6b; }
+    /* ── Checklist ── */
+    .checklist { margin: 0; padding-left: 0; list-style: none; }
+    /* a11y fix (2026-09-05): buildGodmodeSection's .issue-minor <li> rows
+       now sit inside a real <ul> (axe's listitem rule); this only resets
+       the default UA list margin/padding to sit flush with the
+       .metric-row divs alongside it, since neither carried any spacing
+       styling before. */
+    .issue-minor-list { margin: 4px 0 8px; padding-left: 20px; }
+    .checklist li {
+      position: relative;
+      padding-left: 26px;
+      margin-bottom: 8px;
+      font-size: 13.5px;
+    }
+    .checklist li::before {
+      content: "\2713";
+      position: absolute;
+      left: 0;
+      color: #1a7f37;
+      font-weight: 700;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    /* ── Heatmap ── */
+    /* a11y/overflow fix (2026-09-05, client-hunter B-15): flex-wrap already
+       keeps individual cells from forcing this row wider than its column —
+       measured with 42 scenes, it never was the export's overflow source
+       (see the .issue-fix fix below for what actually was). overflow-x:auto
+       is added anyway as a defensive floor: if a future change ever grows
+       .heat-cell past its column width, this row scrolls internally
+       instead of taking the whole exported page sideways with it. */
+    .heat-row { display: flex; flex-wrap: wrap; gap: 5px; overflow-x: auto; }
+    .heat-cell {
+      width: 30px;
+      height: 30px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    /* ── Structural-signal strip (unwired diagnostics) ── */
+    /* Same defensive overflow-x:auto floor as .heat-row above, same reason. */
+    .sig-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: flex-end; overflow-x: auto; }
+    .sig-cell {
+      width: 26px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9px;
+      color: #57606a;
+    }
+    .sig-bar { height: 40px; display: flex; flex-direction: column; justify-content: flex-end; border: 1px solid #d0d7de; border-radius: 3px; overflow: hidden; }
+    .sig-talk { background: #6e7781; }
+    .sig-act { background: #d8dee4; flex: 1 1 auto; }
+    .sig-idx { text-align: center; padding-top: 2px; }
+    .sig-note { font-size: 11px; color: #57606a; margin: 8px 0 0; }
+    .sig-legend { font-size: 11px; color: #57606a; margin: 0 0 10px; }
+    /* ── Priorities / appendix ── */
+    .priority-list, .appendix-list {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .priority-item, .appendix-item {
+      margin-bottom: 14px;
+    }
+    .priority-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+    }
+    .issue-location {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11.5px;
+      color: #3f3f46;
+    }
+    .issue-pass {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      color: #71717a;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .issue-description { font-size: 13.5px; }
+    /* overflow fix (2026-09-05, client-hunter B-15): this class also carries
+       the root-cause member-count / member-rules line, where each rule constant
+       (ARC_REVELATION_RELATIONAL_AFTERMATH_VOID and friends) is one
+       unbroken 30-45 character token with no space or hyphen for the
+       browser to wrap on. Measured live on a real "Try sample coverage"
+       report: one of these tokens alone forced this div — and every
+       ancestor up through <body>/<html> — 91px wider than its column,
+       which is the exact mechanism behind the exported report's 375px
+       horizontal overflow (documentElement.scrollWidth 418 vs clientWidth
+       375). overflow-wrap:anywhere lets a token break mid-word ONLY when it
+       has nowhere else to break, so normal prose (the OTHER use of this
+       class, suggested-fix text) is unaffected. */
+    .issue-fix {
+      font-size: 13px;
+      color: #3f3f46;
+      margin-top: 2px;
+      overflow-wrap: anywhere;
+    }
+    .pass-block { margin-bottom: 20px; }
+    .pass-block h3 {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      margin: 0 0 8px;
+    }
+    /* ── Chips ── */
+    .chip {
+      display: inline-block;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .chip-critical { background: #fef2f2; color: #b91c1c; }
+    .chip-major { background: #fffbeb; color: #b45309; }
+    .chip-minor { background: #eff6ff; color: #1d4ed8; }
+    /* ── Footer ── */
+    .report-footer {
+      border-top: 1px solid #d4d4d8;
+      margin-top: 36px;
+      padding-top: 16px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      color: #52525b;
+      text-align: center;
+      line-height: 1.6;
+    }
+    .footer-hash code {
+      background: #f4f4f5;
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+    .footer-caveat {
+      margin: 8px 0;
+      padding: 6px 10px;
+      background: #fef9c3;
+      border: 1px solid #fde68a;
+      border-radius: 3px;
+      color: #713f12;
+    }
+    /* ── Verify block (P3) ── */
+    .verify-block {
+      margin: 14px auto 0;
+      max-width: 640px;
+      padding: 12px 16px;
+      border: 1px solid #d4d4d8;
+      border-radius: 3px;
+      background: #fafaf9;
+      text-align: left;
+    }
+    .verify-heading {
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      color: #1a1a1a;
+    }
+    .verify-body { margin-bottom: 8px; }
+    .verify-steps {
+      margin: 0 0 10px 18px;
+      padding: 0;
+    }
+    .verify-steps li { margin-bottom: 3px; }
+    .verify-claims {
+      margin: 0;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+    .verify-claims dt {
+      display: inline;
+      color: #52525b;
+    }
+    .verify-claims dd {
+      display: inline;
+      margin: 0 0 0 6px;
+    }
+    .verify-claims code, .verify-steps code {
+      background: #f4f4f5;
+      padding: 1px 6px;
+      border-radius: 3px;
+      word-break: break-all;
+    }
+    /* ── Print ── */
+    @page {
+      size: letter portrait;
+      margin: 0.65in;
+    }
+    @media print {
+      body { background: #fff; }
+      .page { max-width: none; padding: 0; background: #fff; }
+      .stamp { box-shadow: none; }
+      .health-section { border: 1px solid #d4d4d8; }
+      .section { page-break-inside: avoid; break-inside: avoid; }
+    }
+
+    .health-text-block {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .health-percentile {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10.5px;
+      color: #52525b;
+      margin-top: 6px;
+    }
+
+</style>
+</head>
+<body>
+  <div class="page">
+
+  <header class="report-header">
+    <div class="header-main">
+      <div class="masthead">SCRIPT COVERAGE &mdash; STORYMACHINE</div>
+      <h1 class="title">The Warehouse</h1>
+
+      <div class="meta-line">
+        September 12, 2026 &middot;
+        4 scenes &middot;
+        152 words &middot;
+        ~2 pages / ~2 min (est.)
+      </div>
+      <div class="meta-line" style="font-style:italic;">This reads like an excerpt (4 scenes analyzed): scores and verdicts are computed the same way as for a full script, but with this little material they should be read as feedback on the pages, not coverage of a feature.</div>
+
+    </div>
+    <div class="stamp-wrap">
+      <div class="stamp" style="background:#fffaf0; border-color:#b45309; color:#78350f;">
+        CONSIDER
+      </div>
+    </div>
+  </header>
+
+  <section class="section health-section">
+    <div class="health-score-block">
+      <div class="health-number" style="color:#b45309;">65.0</div>
+      <div class="health-outof">/ 100</div>
+      <div class="health-grade" style="background:#b45309; color:#fff;">Solid</div>
+    </div>
+    <div class="health-text-block">
+      <p class="plain-summary">CONSIDER — scored in the middle band, above the decline line but short of what the recommend line requires; overall score 65/100. This is the engine&#39;s deterministic, threshold-based verdict, not a human read. Structure &amp; Pacing is the highest-scoring diagnostic dimension, with nothing flagged. Plot Logic &amp; Payoff is the lowest-scoring diagnostic dimension, at 97/100 — most of the trouble is around revelation without reaction. Start with the highest-priority fix: A revelation scene delivers new information but no prior misinformation/deception makes it land as a reversal.</p>
+      <div class="health-percentile" title="Exact rank: 90th of 20 reference samples">Health percentile: top 10% within a 20-sample, hand-authored synthetic reference set</div>
+
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Craft Dimensions</h2>
+    <div class="dim-list">
+
+    <div class="dim-row">
+      <div class="dim-label">Structure &amp; Pacing</div>
+      <div class="dim-bar-track">
+        <div class="dim-bar-fill" style="width:100%; background:#1a7f37;"></div>
+      </div>
+      <div class="dim-score">100/100</div>
+      <div class="dim-summary">Structure &amp; Pacing reads cleanly — no issues found across 4 scene(s).</div>
+      <div class="dim-basis">Based on 0 issues across 3 passes (Structure, Pacing, Rhythm).</div>
+    </div>
+
+    <div class="dim-row">
+      <div class="dim-label">Character</div>
+      <div class="dim-bar-track">
+        <div class="dim-bar-fill" style="width:99.1%; background:#1a7f37;"></div>
+      </div>
+      <div class="dim-score">99/100</div>
+      <div class="dim-summary">Character is in good shape — a handful of minor notes, mostly around intention invisible.</div>
+      <div class="dim-basis">Based on 3 issues across 3 passes (Character Arc, Intention, Relationship Arc).</div>
+    </div>
+
+    <div class="dim-row">
+      <div class="dim-label">Dialogue &amp; Voice</div>
+      <div class="dim-bar-track">
+        <div class="dim-bar-fill" style="width:99.8%; background:#1a7f37;"></div>
+      </div>
+      <div class="dim-score">100/100</div>
+      <div class="dim-summary">Dialogue &amp; Voice is in good shape — a handful of minor notes, mostly around dialogue assertion run.</div>
+      <div class="dim-basis">Based on 1 issue across 2 passes (Dialogue, Voice).</div>
+    </div>
+
+    <div class="dim-row">
+      <div class="dim-label">Plot Logic &amp; Payoff</div>
+      <div class="dim-bar-track">
+        <div class="dim-bar-fill" style="width:96.6%; background:#1a7f37;"></div>
+      </div>
+      <div class="dim-score">97/100</div>
+      <div class="dim-summary">Plot Logic &amp; Payoff is in good shape — a handful of major notes, mostly around revelation without reaction.</div>
+      <div class="dim-basis">Based on 3 issues across 4 passes (Causality, Belief, Payoff, Conflict).</div>
+    </div>
+
+    <div class="dim-row">
+      <div class="dim-label">Theme &amp; Originality</div>
+      <div class="dim-bar-track">
+        <div class="dim-bar-fill" style="width:100%; background:#1a7f37;"></div>
+      </div>
+      <div class="dim-score">100/100</div>
+      <div class="dim-summary">Theme &amp; Originality reads cleanly — no issues found across 4 scene(s).</div>
+      <div class="dim-basis">Based on 0 issues across 2 passes (Theme, Originality).</div>
+    </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>What&rsquo;s Working</h2>
+    <ul class="checklist">
+      <li>Nothing to fix in Structure &amp; Pacing — clean across all 4 scene(s).</li>
+<li>Nothing to fix in Theme &amp; Originality — clean across all 4 scene(s).</li>
+    </ul>
+  </section>
+<section class="section"><h2>Structural Analysis</h2><div class="metrics-grid"><div class="metric-row"><span class="metric-label">Graph Health</span><span class="metric-value">47/100</span></div>
+<div class="metric-row sub"><span class="metric-label">→ Health deduction</span><span class="metric-value">−8</span></div>
+<ul class="issue-minor-list">
+<li class="issue-minor">Promise-payment ratio is 0.50 — 2 unpaid setup(s) may feel like plot holes.</li>
+<li class="issue-minor">Escalation monotonicity is 0.00 — tension does not consistently rise across acts.</li>
+<li class="issue-minor">Arc coherence is low — tension progression may not track with story position.</li>
+</ul>
+<div class="metric-row"><span class="metric-label">Disclosure Violations</span><span class="metric-value">0</span></div>
+<div class="metric-row"><span class="metric-label">Character Functions</span><span class="metric-value">JAX: ally (30%) · MARA: ally (30%) · STRANGER: ally (30%)</span></div>
+<div class="metric-row"><span class="metric-label">Subplots</span><span class="metric-value">2 (2 unresolved, 1 intersections)</span></div>
+<ul class="issue-minor-list">
+<li class="issue-minor">Mystery thread &quot;stranger&quot; unresolved (seeded scene 2)</li>
+<li class="issue-minor">Mystery thread &quot;silver-key&quot; unresolved (seeded scene 3)</li>
+</ul></div></section>
+
+  <section class="section heatmap-section">
+    <h2>Scene Heatmap</h2>
+    <div class="heat-row">
+      <div class="heat-cell" style="background:#1a7f37; color:#fff;" title="INT. WAREHOUSE - NIGHT — 0 issues">1</div>
+<div class="heat-cell" style="background:#1a7f37; color:#fff;" title="EXT. WAREHOUSE - CONTINUOUS — 0 issues">2</div>
+<div class="heat-cell" style="background:#b45309; color:#fff;" title="INT. WAREHOUSE - MOMENTS LATER — 2 issues">3</div>
+<div class="heat-cell" style="background:#1a7f37; color:#fff;" title="EXT. HIGHWAY - DAWN — 0 issues">4</div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Structural Signals (new, unwired diagnostics)</h2>
+    <p class="sig-legend">One bar per scene. The filled lower portion is that scene&rsquo;s share of dialogue words; the pale remainder is action. Hover a bar for that scene&rsquo;s full reading.</p>
+    <div class="sig-row">
+<div class="sig-cell" title="INT. WAREHOUSE - NIGHT — 41 words (z 1.20) · dialogue 59% (Δ +0.00) · 2 speaker(s), 3 turn(s), 8.0 words/turn · lead share 42% · new pairings 1 · open/close shift 0.98"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:59%;"></div></div><div class="sig-idx">1</div></div>
+<div class="sig-cell" title="EXT. WAREHOUSE - CONTINUOUS — 18 words (z -1.56) · dialogue 22% (Δ -0.36) · 1 speaker(s), 1 turn(s), 4.0 words/turn · lead share 100% · new pairings 0 · open/close shift 1.11"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:22%;"></div></div><div class="sig-idx">2</div></div>
+<div class="sig-cell" title="INT. WAREHOUSE - MOMENTS LATER — 34 words (z 0.36) · dialogue 65% (Δ +0.42) · 3 speaker(s), 4 turn(s), 5.5 words/turn · lead share 27% · new pairings 2 · open/close shift 0.88"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:65%;"></div></div><div class="sig-idx">3</div></div>
+<div class="sig-cell" title="EXT. HIGHWAY - DAWN — 31 words (z 0.00) · dialogue 52% (Δ -0.13) · 2 speaker(s), 2 turn(s), 8.0 words/turn · lead share 50% · new pairings 0 · open/close shift 0.68"><div class="sig-bar"><div class="sig-act"></div><div class="sig-talk" style="height:52%;"></div></div><div class="sig-idx">4</div></div>
+    </div>
+    <p class="sig-note">scene-length variation 0.27 &middot; mean talk/action swing 0.31 &middot; talk/action range 0.42 &middot; new-pairing scenes 50% &middot; mean words/turn 6.6 &middot; lead share 55% (trend -0.14) &middot; action-prose variation 0.44</p>
+    <p class="sig-note">These readings are computed from document structure alone &mdash; word, line, sentence, turn and speaker counts &mdash; with no word list involved. They are <strong>diagnostic only and are not part of the score</strong>: no health, grade, verdict, dimension or priority above is derived from any number in this section.</p>
+  </section>
+
+
+  <section class="section">
+    <h2>Top Priorities</h2>
+    <ol class="priority-list">
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-major">MAJOR</span>
+        <span class="issue-location">Scene 3</span>
+        <span class="issue-pass">Belief</span>
+      </div>
+      <div class="issue-description">A revelation scene delivers new information but no prior misinformation/deception makes it land as a reversal</div>
+      <div class="issue-fix"><strong>Suggested fix:</strong> Plant a false belief in an earlier scene that this revelation will overturn</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-major">MAJOR</span>
+        <span class="issue-location">Payoffs: jax, mara</span>
+        <span class="issue-pass">Payoff</span>
+      </div>
+      <div class="issue-description">2 payoffs resolve with no emotional weight — neutral emotion, low suspense, no relationship shift. The loops close mechanically, squandering the anticipation their setups built.</div>
+      <div class="issue-fix"><strong>Suggested fix:</strong> Stage each payoff for impact: the moment a planted thread resolves should land a charge — relief, dread, vindication, or cost. If a resolution carries no feeling, the setup wasn&#39;t worth planting.</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-minor">MINOR</span>
+        <span class="issue-location">Scene 3 → Scene 4</span>
+        <span class="issue-pass">Causality</span>
+      </div>
+      <div class="issue-description">Scene 3 delivers a revelation but the next scene shows no causal ripple — neutral emotion, no relationship shift, no change in suspense. The truth lands and the story carries on as if nothing was learned.</div>
+      <div class="issue-fix"><strong>Suggested fix:</strong> Let the revelation change something immediately: a character recalibrates, a relationship shifts, or the stakes rise. Information that alters nothing wasn&#39;t worth revealing.</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-minor">MINOR</span>
+        <span class="issue-location">Character: JAX</span>
+        <span class="issue-pass">Intention</span>
+      </div>
+      <div class="issue-description">JAX appears in the screenplay but has no tracked beliefs or goals — their intention is opaque</div>
+      <div class="issue-fix"><strong>Suggested fix:</strong> Give JAX a clear want in their first scene (verbal or physical action)</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-minor">MINOR</span>
+        <span class="issue-location">Character: MARA</span>
+        <span class="issue-pass">Intention</span>
+      </div>
+      <div class="issue-description">MARA appears in the screenplay but has no tracked beliefs or goals — their intention is opaque</div>
+      <div class="issue-fix"><strong>Suggested fix:</strong> Give MARA a clear want in their first scene (verbal or physical action)</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-minor">MINOR</span>
+        <span class="issue-location">Character: STRANGER</span>
+        <span class="issue-pass">Intention</span>
+      </div>
+      <div class="issue-description">STRANGER appears in the screenplay but has no tracked beliefs or goals — their intention is opaque</div>
+      <div class="issue-fix"><strong>Suggested fix:</strong> Give STRANGER a clear want in their first scene (verbal or physical action)</div>
+    </li>
+
+    <li class="priority-item">
+      <div class="priority-head">
+        <span class="chip chip-minor">MINOR</span>
+        <span class="issue-location">Dialogue lines 1–7 — assertion run (7 consecutive declarative lines)</span>
+        <span class="issue-pass">Voice</span>
+      </div>
+      <div class="issue-description">7 consecutive dialogue lines each end declaratively — no question, no exclamation — creating a sustained assertion avalanche where nobody probes, nobody challenges, and nobody expresses intensity. While declarative dialogue is the backbone of conversation, a run of 7 statements without any interrogation or charged speech signals that the exchange has collapsed into a single emotional register: all assertion, no inquiry. Real conversation — even in conflict — involves the occasional question (however rhetorical) that breaks the monotony of uninterrupted statement and invites the audience to shift their reading from &quot;listening to claims&quot; to &quot;wondering what comes next.&quot;</div>
+      <div class="issue-fix"><strong>Suggested fix:</strong> Break the declaration run near dialogue line 1 by inserting at least one line that ends in &quot;?&quot; or &quot;!&quot; within the stretch of 7 statements. Even a rhetorical question (&quot;And you think that matters?&quot;) or a charged exclamation changes the register enough to prevent the exchange from feeling like a debate transcript. The variation of end-punctuation creates rhythmic micro-contrast in how the audience reads each line.</div>
+    </li>
+    </ol>
+  </section>
+
+
+  <section class="section">
+    <h2>Full Pass Appendix</h2>
+
+    <div class="pass-block">
+      <h3>Causality &mdash; 1 issue</h3>
+      <ul class="appendix-list">
+
+      <li class="appendix-item">
+        <div class="priority-head">
+          <span class="chip chip-minor">MINOR</span>
+          <span class="issue-location">Scene 3 → Scene 4</span>
+        </div>
+        <div class="issue-description">Scene 3 delivers a revelation but the next scene shows no causal ripple — neutral emotion, no relationship shift, no change in suspense. The truth lands and the story carries on as if nothing was learned.</div>
+        <div class="issue-fix"><strong>Suggested fix:</strong> Let the revelation change something immediately: a character recalibrates, a relationship shifts, or the stakes rise. Information that alters nothing wasn&#39;t worth revealing.</div>
+      </li>
+      </ul>
+    </div>
+
+    <div class="pass-block">
+      <h3>Intention &mdash; 3 issues</h3>
+      <ul class="appendix-list">
+
+      <li class="appendix-item">
+        <div class="priority-head">
+          <span class="chip chip-minor">MINOR</span>
+          <span class="issue-location">Character: JAX</span>
+        </div>
+        <div class="issue-description">JAX appears in the screenplay but has no tracked beliefs or goals — their intention is opaque</div>
+        <div class="issue-fix"><strong>Suggested fix:</strong> Give JAX a clear want in their first scene (verbal or physical action)</div>
+      </li>
+
+      <li class="appendix-item">
+        <div class="priority-head">
+          <span class="chip chip-minor">MINOR</span>
+          <span class="issue-location">Character: MARA</span>
+        </div>
+        <div class="issue-description">MARA appears in the screenplay but has no tracked beliefs or goals — their intention is opaque</div>
+        <div class="issue-fix"><strong>Suggested fix:</strong> Give MARA a clear want in their first scene (verbal or physical action)</div>
+      </li>
+
+      <li class="appendix-item">
+        <div class="priority-head">
+          <span class="chip chip-minor">MINOR</span>
+          <span class="issue-location">Character: STRANGER</span>
+        </div>
+        <div class="issue-description">STRANGER appears in the screenplay but has no tracked beliefs or goals — their intention is opaque</div>
+        <div class="issue-fix"><strong>Suggested fix:</strong> Give STRANGER a clear want in their first scene (verbal or physical action)</div>
+      </li>
+      </ul>
+    </div>
+
+    <div class="pass-block">
+      <h3>Belief &mdash; 1 issue</h3>
+      <ul class="appendix-list">
+
+      <li class="appendix-item">
+        <div class="priority-head">
+          <span class="chip chip-major">MAJOR</span>
+          <span class="issue-location">Scene 3</span>
+        </div>
+        <div class="issue-description">A revelation scene delivers new information but no prior misinformation/deception makes it land as a reversal</div>
+        <div class="issue-fix"><strong>Suggested fix:</strong> Plant a false belief in an earlier scene that this revelation will overturn</div>
+      </li>
+      </ul>
+    </div>
+
+    <div class="pass-block">
+      <h3>Payoff &mdash; 1 issue</h3>
+      <ul class="appendix-list">
+
+      <li class="appendix-item">
+        <div class="priority-head">
+          <span class="chip chip-major">MAJOR</span>
+          <span class="issue-location">Payoffs: jax, mara</span>
+        </div>
+        <div class="issue-description">2 payoffs resolve with no emotional weight — neutral emotion, low suspense, no relationship shift. The loops close mechanically, squandering the anticipation their setups built.</div>
+        <div class="issue-fix"><strong>Suggested fix:</strong> Stage each payoff for impact: the moment a planted thread resolves should land a charge — relief, dread, vindication, or cost. If a resolution carries no feeling, the setup wasn&#39;t worth planting.</div>
+      </li>
+      </ul>
+    </div>
+
+    <div class="pass-block">
+      <h3>Voice &mdash; 1 issue</h3>
+      <ul class="appendix-list">
+
+      <li class="appendix-item">
+        <div class="priority-head">
+          <span class="chip chip-minor">MINOR</span>
+          <span class="issue-location">Dialogue lines 1–7 — assertion run (7 consecutive declarative lines)</span>
+        </div>
+        <div class="issue-description">7 consecutive dialogue lines each end declaratively — no question, no exclamation — creating a sustained assertion avalanche where nobody probes, nobody challenges, and nobody expresses intensity. While declarative dialogue is the backbone of conversation, a run of 7 statements without any interrogation or charged speech signals that the exchange has collapsed into a single emotional register: all assertion, no inquiry. Real conversation — even in conflict — involves the occasional question (however rhetorical) that breaks the monotony of uninterrupted statement and invites the audience to shift their reading from &quot;listening to claims&quot; to &quot;wondering what comes next.&quot;</div>
+        <div class="issue-fix"><strong>Suggested fix:</strong> Break the declaration run near dialogue line 1 by inserting at least one line that ends in &quot;?&quot; or &quot;!&quot; within the stretch of 7 statements. Even a rhetorical question (&quot;And you think that matters?&quot;) or a charged exclamation changes the register enough to prevent the exchange from feeling like a debate transcript. The variation of end-punctuation creates rhythmic micro-contrast in how the audience reads each line.</div>
+      </li>
+      </ul>
+    </div>
+  </section>
+
+  <footer class="report-footer">
+    <div class="footer-disclaimer">
+      Deterministic analysis &mdash; no generative AI read or scored this script.
+      Running this engine again on the same script text reproduces the same score and verdict.
+    </div>
+
+    <div class="footer-hash">Script-text hash (SHA-256, first 12 characters): <code>1872b0810652</code></div>
+    <div class="verify-block">
+      <div class="verify-heading">Verify this report</div>
+      <div class="verify-body">
+        This report is reproducible. Anyone with the original script text can confirm
+        it was produced by the engine &mdash; not hand-edited &mdash; by re-running the
+        deterministic analysis:
+      </div>
+      <ol class="verify-steps">
+        <li><strong>On your own machine</strong> (the script never leaves your computer): <code>npm run verify-report -- report.html script.fountain</code>.</li>
+        <li><strong>Or, hosted:</strong> open any Story Machine instance and go to <code>#verify</code> (the &ldquo;Verify a report&rdquo; link on the start screen), or POST the script text to <code>/api/export/verify</code> &mdash; paste the original script text and the values below.</li>
+        <li>Either way, the tool recomputes the hash and re-runs the analysis; every value must match.</li>
+      </ol>
+      <dl class="verify-claims">
+        <div><dt>Script-text hash (SHA-256, full)</dt><dd><code>1872b0810652baaf2898273315c577183bb7c91dbaa48755829a34f0ae3a39dd</code></dd></div>
+        <div><dt>Health</dt><dd><code>65.0</code></dd></div>
+        <div><dt>Verdict</dt><dd><code>CONSIDER</code></dd></div>
+        <div><dt>Total issues</dt><dd><code>7</code></dd></div>
+        <div><dt>Engine commit</dt><dd><code>dev</code></dd></div>
+        <div><dt>Rulebook count</dt><dd><code>3217</code></dd></div>
+      </dl>
+    </div>
+    <div class="footer-generated">Generated September 12, 2026 at 01:58:57 AM UTC</div>
+  </footer>
+  </div>
+</body>
+</html>

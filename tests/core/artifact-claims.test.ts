@@ -16,8 +16,11 @@ import assert from 'node:assert/strict';
 import {
   formatLengthLine, parseLengthLine, parseCount,
   encodePageRefs, decodePageRefs, resolvedPages, PAGE_REFS_UNAVAILABLE,
-  claimRowsFor, decodeClaimRows, CLAIM_ROW_SPECS, LETTER_PROSE_CLAIMS, TIER_CLAIM_LABELS,
+  claimRowsFor, decodeClaimRows, CLAIM_ROW_SPECS, CLAIM_LABEL_BY_FIELD, LETTER_PROSE_CLAIMS,
+  TIER_ALWAYS_LABELS, TIER_CLAIM_LABELS, TIER_CONDITIONAL_LABELS,
   percentileReadingFromText, referenceBoundsFromText, VERIFY_SCOPE_SENTENCE,
+  formatHealthLine, parseHealthLine, parseLetterTierVerdictLine, verdictFromWord,
+  VERDICT_WORD, UNKNOWN_VERDICT_WORD,
   type ArtifactClaims, type ArtifactPageRef,
 } from '../../server/lib/artifact-claims.ts';
 import {
@@ -177,6 +180,64 @@ describe('the claim rows: one label table, written and read by the same definiti
     }
   });
 
+  // ROUND 2 (2026-09-12 review finding 1). The old assertion was the ⊆ direction
+  // ONLY — every required label is a real row — which is satisfied by a required
+  // set of five, or of one, or of none. The four labels the hand-written list
+  // omitted (Estimated pages, Estimated runtime (minutes), Health percentile
+  // reading, Logline) were exactly the four a forger could delete to reinstate the
+  // brief's own "~500 pages / ~500 min (est.)" forgery at exit 0. The CONVERSE is
+  // what pins it: every tier-only claim buildArtifactClaims populates must be in
+  // the required set.
+  it('every tier claim a tier-rendered report publishes is required of a tier artifact (the converse direction)', () => {
+    const required = new Set(TIER_CLAIM_LABELS);
+    const publishedByATierArtifact = claimRowsFor(BASE_CLAIMS)
+      .map(row => CLAIM_ROW_SPECS.find(spec => spec.label === row.label)!)
+      .filter(spec => spec.tier !== undefined)
+      .map(spec => spec.label);
+    // BASE_CLAIMS is a full tier report: a page estimate, a percentile, a logline
+    // state and page references all present. Every one of those rows must be in the
+    // gate, or deleting it opts that number out of verification.
+    assert.equal(publishedByATierArtifact.length, 9,
+      'a full tier report publishes nine tier-only claims');
+    for (const label of publishedByATierArtifact) {
+      assert.ok(required.has(label), `${label} is published by a tier artifact but is not required of one`);
+    }
+    // And equality: the required set is exactly the tier-only rows, no more.
+    assert.deepEqual([...required].sort(), publishedByATierArtifact.slice().sort());
+  });
+
+  it('the always/ifRendered split matches what buildArtifactClaims actually populates', () => {
+    // ALWAYS: populated for any report at all — proven against a report with no
+    // page estimate, no percentile and no logline state.
+    const thin: ArtifactClaims = {
+      contentHash: 'c'.repeat(64),
+      health: 50,
+      totalIssues: 0,
+      sceneCount: 1,
+      wordCount: 20,
+      prioritiesListed: 0,
+      referenceBounds: referenceBoundsLine(),
+    };
+    const thinTierLabels = claimRowsFor(thin)
+      .map(row => CLAIM_ROW_SPECS.find(spec => spec.label === row.label)!)
+      .filter(spec => spec.tier !== undefined)
+      .map(spec => spec.label);
+    assert.deepEqual(thinTierLabels.slice().sort(), [...TIER_ALWAYS_LABELS].sort(),
+      'a report with no page estimate, percentile or logline state publishes exactly the always-labels');
+    // IF RENDERED: the remaining four, and they are the difference between the two.
+    assert.deepEqual(
+      [...TIER_CONDITIONAL_LABELS].sort(),
+      TIER_CLAIM_LABELS.filter(l => !TIER_ALWAYS_LABELS.includes(l)).slice().sort(),
+    );
+    assert.equal(TIER_ALWAYS_LABELS.length + TIER_CONDITIONAL_LABELS.length, TIER_CLAIM_LABELS.length);
+  });
+
+  it('CLAIM_LABEL_BY_FIELD covers every row, so a requirement can be named from a field', () => {
+    for (const spec of CLAIM_ROW_SPECS) {
+      assert.equal(CLAIM_LABEL_BY_FIELD[spec.field], spec.label);
+    }
+  });
+
   it('the letter omits exactly the three claims it states in its own prose, and no others', () => {
     const rows = claimRowsFor(BASE_CLAIMS, { omit: LETTER_PROSE_CLAIMS }).map(r => r.label);
     assert.ok(!rows.includes('Script-text hash (SHA-256, full)'));
@@ -217,6 +278,96 @@ describe('the claim rows: one label table, written and read by the same definiti
   it('an unreadable page-references row decodes to the raw string, so the schema can refuse it', () => {
     const decoded = decodeClaimRows({ 'Page references': 'p. 999' });
     assert.equal(decoded.pageRefs, 'p. 999');
+  });
+});
+
+// ROUND 2 (2026-09-12 review finding 5). The round-1 report called these pairs
+// "round-trip tested" and they had no test at all: `formatHealthLine`,
+// `parseHealthLine` and `parseLetterTierVerdictLine` appeared in no file under
+// tests/, and `VERDICT_WORD`/`verdictFromWord` were not referenced here either.
+// The functional guarantee did hold — disabling parseHealthLine's pattern failed
+// tests/scripts/verify-report.test.ts with 3 failures — but a claim in a report is
+// not a test, and a pair pinned only by a forgery matrix three files away is one
+// refactor away from silently losing its scrape. Each pair now fails on its own.
+describe('the tier’s health reading: formatter and parser are inverses', () => {
+  it('round-trips every one-decimal health the doctor can produce', () => {
+    for (let tenths = 0; tenths <= 1000; tenths += 1) {
+      const health = tenths / 10;
+      const line = formatHealthLine(health);
+      assert.equal(parseHealthLine(line), health, line);
+    }
+  });
+
+  it('finds the reading inside the real surrounding markup of all three shapes', () => {
+    const line = formatHealthLine(76.3);
+    for (const doc of [
+      `<div><span class="tier-key">Verdict</span> <span class="stamp">CONSIDER</span> &middot; ${line}</div>`,
+      `**Verdict.** CONSIDER · ${line}`,
+      `Verdict: CONSIDER · ${line}`,
+    ]) {
+      assert.equal(parseHealthLine(doc), 76.3, doc);
+    }
+  });
+
+  it('does NOT match the coverage letter’s own headline, which is a different rendering', () => {
+    // `Health 66.7/100 (Fair)` — no spaces around the slash. Getting this
+    // distinction wrong in the other direction is exactly how the tier's reading
+    // went unchecked until 2026-09-12.
+    assert.equal(parseHealthLine('Health 66.7/100 (Fair) · 6 scenes'), null);
+    assert.equal(parseHealthLine('<div class="health-number">66.7</div>'), null);
+    assert.equal(parseHealthLine('Health percentile: top 10%'), null);
+  });
+});
+
+describe('the tier’s verdict line: the letter renderers’ two forms read back', () => {
+  const health = 76.3;
+  for (const [label, line] of [
+    ['markdown', `**Logline.** x\n\n**Verdict.** CONSIDER · ${formatHealthLine(health)}\n`],
+    ['plain text', `Logline: x\nVerdict: CONSIDER · ${formatHealthLine(health)}\n`],
+  ] as Array<[string, string]>) {
+    it(`${label}: the verdict word and the health reading both come back`, () => {
+      const parsed = parseLetterTierVerdictLine(line);
+      assert.ok(parsed, `${label}: the verdict line must parse`);
+      assert.equal(parsed.verdictWord, 'CONSIDER');
+      assert.equal(parsed.health, health);
+      assert.equal(verdictFromWord(parsed.verdictWord), 'CONSIDER');
+    });
+  }
+
+  it('PASS carries its parenthetical through the round trip, and reads back as the enum', () => {
+    const line = `**Verdict.** ${VERDICT_WORD.PASS} · ${formatHealthLine(12.5)}`;
+    const parsed = parseLetterTierVerdictLine(line);
+    assert.ok(parsed);
+    assert.equal(parsed.verdictWord, 'PASS (decline)');
+    assert.equal(verdictFromWord(parsed.verdictWord), 'PASS');
+    assert.equal(parsed.health, 12.5);
+  });
+
+  it('returns null when there is no verdict line, and does not confuse the letter’s own one', () => {
+    assert.equal(parseLetterTierVerdictLine('## Summary\n\nCONSIDER \u2014 a draft.\n'), null);
+    assert.equal(parseLetterTierVerdictLine('**Verdict: CONSIDER**'), null,
+      'the letter’s own bold verdict line is a DIFFERENT rendering with its own scrape');
+  });
+});
+
+describe('the verdict word: one map, and its inverse', () => {
+  it('every verdict round-trips through the word a reader sees', () => {
+    for (const verdict of ['RECOMMEND', 'CONSIDER', 'PASS'] as const) {
+      assert.equal(verdictFromWord(VERDICT_WORD[verdict]), verdict, verdict);
+      // The bare enum name also reads back, because the machine-readable claim row
+      // prints `PASS` while the page prints `PASS (decline)`.
+      assert.equal(verdictFromWord(verdict), verdict);
+    }
+  });
+
+  it('PASS keeps the parenthetical that stops it reading as approval', () => {
+    assert.equal(VERDICT_WORD.PASS, 'PASS (decline)');
+  });
+
+  it('a word that is not a verdict reads back as null, including the no-verdict label', () => {
+    for (const bad of ['', 'MAYBE', 'pass', UNKNOWN_VERDICT_WORD, 'PASS (declined)']) {
+      assert.equal(verdictFromWord(bad), null, JSON.stringify(bad));
+    }
   });
 });
 

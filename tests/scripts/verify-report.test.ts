@@ -29,10 +29,12 @@ import {
   buildReaderTier, NO_LOGLINE_NOTE, NO_LOGLINE_NOTE_HTML, type ReaderTierData,
 } from '../../server/lib/reader-tier.ts';
 import {
-  encodePageRefs, formatLengthLine, type ArtifactClaims,
+  encodePageRefs, formatLengthLine, TIER_CLAIM_LABELS, type ArtifactClaims,
 } from '../../server/lib/artifact-claims.ts';
 import { prioritiesHeadingFor } from '../../src/lib/priorities-copy.ts';
-import { healthPercentileSentence, notComparableSentence } from '../../src/lib/percentile-copy.ts';
+import {
+  healthPercentileSentence, notComparableSentence, referenceBoundsLine,
+} from '../../src/lib/percentile-copy.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CLI = path.join(REPO_ROOT, 'scripts/verify-report.mjs');
@@ -686,7 +688,19 @@ describe('the producer tier\u2019s claims are verifiable in every artifact shape
       // The honest "not comparable" reading replaced by a flattering band — the
       // forgery this gate exists for: 0 of the 20 CC0 shorts are inside the
       // reference set's bounds, so every real draft takes the not-comparable path.
-      page: a => forgeFirst(a, notComparableSentence(), healthPercentileSentence(100)),
+      //
+      // ROUND 2: the replacement ALSO restates the reference bounds. The
+      // not-comparable sentence carries them in its own parenthetical
+      // (reader-tier.ts rule 4), so removing that sentence removes the page's only
+      // bounds text — which the round-2 structural check refuses on its own, before
+      // the reading is ever compared. A forger who wants the reading compared has to
+      // put the bounds back, which is the "two edits rather than one" property this
+      // case now models; the bounds-removed shape is its own test, below.
+      page: a => forgeFirst(
+        a,
+        notComparableSentence(),
+        `${healthPercentileSentence(100)} Reference bounds: ${referenceBoundsLine()}.`,
+      ),
     },
     {
       claim: 'referenceBounds',
@@ -847,19 +861,244 @@ describe('the producer tier\u2019s claims are verifiable in every artifact shape
     assert.doesNotMatch(stdout, /^VERIFIED/m);
   });
 
-  it('a report with NO summary page at all (every artifact exported before 2026-09-11) is unaffected by that rule', () => {
-    // The pre-tier shape, reconstructed by removing the tier section: the claims it
-    // publishes are checked, the ones it does not state are reported as unchecked,
-    // and it verifies. Gating on the tier's PRESENCE rather than on a version stamp
-    // is what makes that true.
+  // ROUND 2 (2026-09-12 review). This case used to reconstruct "a pre-tier report"
+  // by cutting the tier section out of TODAY's HTML — which left the tier's
+  // stylesheet rules and the verify block's scope sentence in place, i.e. a
+  // TAMPERED document, which the round-2 gate correctly refuses. It was therefore
+  // no evidence at all about a real pre-tier artifact. The fixtures below are byte
+  // copies of artifacts rendered by 318493c9, the last commit before
+  // server/lib/reader-tier.ts existed (see tests/fixtures/verify-report/README.md).
+  for (const fixture of ['pre-tier-coverage.html', 'pre-tier-letter.md']) {
+    it(`a GENUINE pre-tier artifact (${fixture}, rendered by 318493c9) still verifies at exit 0`, () => {
+      const p = path.join(REPO_ROOT, 'tests/fixtures/verify-report', fixture);
+      const { status, stdout } = runCli([p, scriptPath]);
+      assert.equal(status, 0, stdout);
+      assert.match(stdout, /^VERIFIED/m);
+      // It publishes no tier claims, and the CLI says so rather than implying they
+      // were checked.
+      assert.match(stdout, /not claimed by this \w+ report, so not checked:.*sceneCount/);
+      assert.doesNotMatch(stdout, /renders a reader summary page whose numbers/);
+    });
+  }
+
+  it('a document with the tier markup cut out but its stylesheet and scope sentence left IS refused — it is tampered, not pre-tier', () => {
     const tierStart = genuine.html.indexOf('<section class="reader-tier">');
     const dividerEnd = genuine.html.indexOf('/>', genuine.html.indexOf('<hr class="tier-divider"')) + 2;
     assert.ok(tierStart > 0 && dividerEnd > tierStart, 'sanity: the genuine report has a tier to remove');
-    const noTier = genuine.html.slice(0, tierStart) + genuine.html.slice(dividerEnd);
-    const p = write('no-tier.html', noTier);
+    const cutOut = genuine.html.slice(0, tierStart) + genuine.html.slice(dividerEnd);
+    const p = write('tier-cut-out.html', cutOut);
     const { status, stdout } = runCli([p, scriptPath]);
-    assert.equal(status, 0, stdout);
-    assert.match(stdout, /^VERIFIED/m);
+    assert.equal(status, 1, stdout);
+    assert.doesNotMatch(stdout, /^VERIFIED/m);
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ROUND 2 (2026-09-12 review findings 1-4). Every case below printed
+  // `VERIFIED — authentic and reproducible under this engine.` at exit 0 on the
+  // reviewed tip `4328a6eb`, with the reviewer's exact edits.
+  // ═══════════════════════════════════════════════════════════════════════
+  describe('round 2 — deleting a claim row must not opt its number out of verification', () => {
+    /** Remove a claim row from a block, in either shape. */
+    function dropRow(artifact: string, shape: Shape, label: string): string {
+      const value = readRow(artifact, shape, label);
+      return shape === 'html'
+        ? forgeFirst(artifact, `        <div><dt>${label}</dt><dd><code>${value}</code></dd></div>\n`, '')
+        : forgeFirst(artifact, `${label}: ${value}\n`, '');
+    }
+
+    // FINDING 1 — the degrading direction, and the brief's own forgery: the
+    // required-row list covered 5 of the 9 tier claims, and `Estimated pages` /
+    // `Estimated runtime (minutes)` were two of the four it missed.
+    for (const shape of SHAPES) {
+      it(`${shape}: the page-estimate rows deleted and the page forged to ~500 pages -> exit 1, both rows named`, () => {
+        let forged = dropRow(genuine[shape], shape, 'Estimated pages');
+        forged = dropRow(forged, shape, 'Estimated runtime (minutes)');
+        forged = forgeEvery(forged, tier.lengthLine, forgedLengthLine({ estimatedPages: 500, estimatedRuntimeMinutes: 500 }));
+        const p = write(`r2-drop-pageest.${EXT[shape]}`, forged);
+        const { status, stdout } = runCli([p, scriptPath]);
+        assert.equal(status, 1, stdout);
+        assert.match(stdout, /missing claim: Estimated pages/);
+        assert.match(stdout, /missing claim: Estimated runtime \(minutes\)/);
+        assert.doesNotMatch(stdout, /^VERIFIED/m);
+      });
+
+      // FINDING 2 — the INFLATING direction, and the one the lane's own gate could
+      // not see: the honest "not comparable" reading replaced by a top-5% ranking
+      // the engine never produced. Deleting the row removes the value comparison;
+      // replacing the sentence removes the page's only reference-bounds text, which
+      // is why that has to be a structural check of its own.
+      it(`${shape}: the percentile row deleted and the page rewritten to a flattering band -> exit 1`, () => {
+        let forged = dropRow(genuine[shape], shape, 'Health percentile reading');
+        forged = forgeFirst(forged, notComparableSentence(), 'Health percentile: top 5%');
+        const p = write(`r2-drop-percentile.${EXT[shape]}`, forged);
+        const { status, stdout } = runCli([p, scriptPath]);
+        assert.equal(status, 1, stdout);
+        assert.match(stdout, /missing claim: Health percentile reading/);
+        assert.doesNotMatch(stdout, /^VERIFIED/m);
+      });
+
+      it(`${shape}: the percentile row AND the page's whole percentile sentence deleted -> exit 1, the missing bounds statement is named`, () => {
+        let forged = dropRow(genuine[shape], shape, 'Health percentile reading');
+        forged = forgeFirst(forged, notComparableSentence(), '');
+        const p = write(`r2-drop-percentile-sentence.${EXT[shape]}`, forged);
+        const { status, stdout } = runCli([p, scriptPath]);
+        assert.equal(status, 1, stdout);
+        assert.match(stdout, /the summary page states no reference bounds/);
+        assert.doesNotMatch(stdout, /^VERIFIED/m);
+      });
+
+      // FINDING 1, generalised: EVERY tier row, one at a time, must be refused when
+      // deleted. A list the gate forgot four labels from is not closed by adding
+      // four labels; it is closed by covering the set.
+      for (const label of TIER_CLAIM_LABELS) {
+        it(`${shape}: deleting the "${label}" row alone -> exit 1, that label named`, () => {
+          const forged = dropRow(genuine[shape], shape, label);
+          const p = write(`r2-drop-${label.replace(/\W+/g, '-')}.${EXT[shape]}`, forged);
+          const { status, stdout } = runCli([p, scriptPath]);
+          assert.equal(status, 1, stdout);
+          assert.match(stdout, new RegExp(`missing claim: ${label.replace(/[()]/g, '\\$&')}`));
+          assert.doesNotMatch(stdout, /^VERIFIED/m);
+        });
+      }
+    }
+  });
+
+  describe('round 2 — the tier gate cannot be turned off by renaming one marker', () => {
+    // FINDING 3. `## Reader summary` -> `## Reader Summary` (renders identically to
+    // any human) and `<section class="reader-tier">` -> `"reader-tier-page"` each
+    // used to turn off the body-versus-block scrape AND the row-deletion refusal at
+    // once, after which all nine rows could be deleted and every original forgery
+    // verified at exit 0.
+    function dropEveryTierRow(artifact: string, shape: Shape): string {
+      let out = artifact;
+      for (const label of TIER_CLAIM_LABELS) {
+        const value = readRow(out, shape, label);
+        out = shape === 'html'
+          ? forgeFirst(out, `        <div><dt>${label}</dt><dd><code>${value}</code></dd></div>\n`, '')
+          : forgeFirst(out, `${label}: ${value}\n`, '');
+      }
+      return out;
+    }
+
+    it('md: the tier heading recapitalised, every tier row deleted, all four page claims forged -> exit 1', () => {
+      let forged = genuine.md.replace('## Reader summary', '## Reader Summary');
+      assert.notEqual(forged, genuine.md, 'sanity: the heading must have been renamed');
+      forged = dropEveryTierRow(forged, 'md');
+      forged = forgeEvery(forged, tier.lengthLine, forgedLengthLine({ sceneCount: 9999, wordCount: 999_999 }));
+      forged = forgeFirst(forged, tier.prioritiesHeading, prioritiesHeadingFor(9));
+      forged = forgeFirst(forged, `${tier.verdictLabel} \u00b7 ${tier.healthLine}`, 'RECOMMEND \u00b7 Health 94.6 / 100');
+      const p = write('r2-rename-heading.md', forged);
+      const { status, stdout } = runCli([p, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.doesNotMatch(stdout, /^VERIFIED/m);
+      assert.match(stdout, /missing claim: Scenes/);
+    });
+
+    it('html: the section class renamed, every tier row deleted, all four page claims forged -> exit 1', () => {
+      let forged = genuine.html.replace('<section class="reader-tier">', '<section class="reader-tier-page">');
+      assert.notEqual(forged, genuine.html, 'sanity: the class must have been renamed');
+      forged = dropEveryTierRow(forged, 'html');
+      forged = forgeEvery(forged, tier.lengthLine, forgedLengthLine({ sceneCount: 9999, wordCount: 999_999 }));
+      forged = forgeFirst(forged, tier.prioritiesHeading, prioritiesHeadingFor(9));
+      forged = forgeFirst(forged, tier.healthLine, 'Health 94.6 / 100');
+      const p = write('r2-rename-class.html', forged);
+      const { status, stdout } = runCli([p, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.doesNotMatch(stdout, /^VERIFIED/m);
+      assert.match(stdout, /missing claim: Scenes/);
+    });
+
+    // A second way to unanchor the scrape, found while building this round: insert a
+    // divider immediately after the tier heading, so the letter's tier REGION shrinks
+    // to the heading and every number below it falls outside what is compared. A
+    // genuine reader summary page always carries a parseable Length line, so a region
+    // without one is not the region — `splitTierRegion` widens to the whole document.
+    it('md: a divider inserted right after the tier heading does not shrink the region past the claims', () => {
+      let forged = genuine.md.replace('## Reader summary\n', '## Reader summary\n\n---\n');
+      assert.notEqual(forged, genuine.md, 'sanity: the fake divider must have been inserted');
+      forged = forgeFirst(forged, `**Length.** ${tier.lengthLine}`, `**Length.** ${forgedLengthLine({ sceneCount: 9999 })}`);
+      const p = write('r2-fake-divider.md', forged);
+      const { status, stdout } = runCli([p, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, /sceneCount = 9999/);
+      assert.doesNotMatch(stdout, /^VERIFIED/m);
+    });
+
+    it('md: renaming the heading alone does NOT silence the body-versus-block scrape', () => {
+      // The narrower half of finding 3: the scrape is anchored by several signals
+      // now, so a renamed heading leaves the page's own numbers checkable.
+      let forged = genuine.md.replace('## Reader summary', '## Reader Summary');
+      forged = forgeFirst(forged, tier.lengthLine, forgedLengthLine({ sceneCount: 9999 }));
+      const p = write('r2-rename-heading-body-only.md', forged);
+      const { status, stdout } = runCli([p, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, /sceneCount/);
+      assert.doesNotMatch(stdout, /^VERIFIED/m);
+    });
+  });
+
+  describe('round 2 — the third logline state is verifiable, not "no claim"', () => {
+    // FINDING 4. `LOGLINE_UNKNOWN_NOTE` came back as null and a null-valued body
+    // claim is skipped, so a page edited to say it was rendered without the script
+    // text, against a block still claiming `Logline: derived`, verified at exit 0.
+    for (const shape of SHAPES) {
+      it(`${shape}: the page says it cannot say while the block claims "derived" -> exit 1`, () => {
+        const forged = forgeFirst(
+          genuine[shape],
+          shape === 'html' ? (tier.logline as string) : (tier.logline as string),
+          'Unavailable for this report (it was rendered without the script text).',
+        );
+        const p = write(`r2-logline-unknown.${EXT[shape]}`, forged);
+        const { status, stdout } = runCli([p, scriptPath]);
+        assert.equal(status, 1, stdout);
+        assert.match(stdout, /the logline line says loglineState = not stated/);
+        assert.doesNotMatch(stdout, /^VERIFIED/m);
+      });
+    }
+
+    it('all three logline states are distinguishable: derived, not derived, and not stated', () => {
+      // The genuine artifact is `derived`; the other two are what the page can say.
+      assert.equal(tier.claims.loglineState, 'derived');
+      const notDerived = forgeFirst(genuine.md, tier.logline as string, NO_LOGLINE_NOTE);
+      const notStated = forgeFirst(genuine.md, tier.logline as string,
+        'Unavailable for this report (it was rendered without the script text).');
+      const a = runCli([write('r2-logline-notderived.md', notDerived), scriptPath]);
+      const b = runCli([write('r2-logline-notstated.md', notStated), scriptPath]);
+      assert.equal(a.status, 1);
+      assert.equal(b.status, 1);
+      assert.match(a.stdout, /the logline line says loglineState = not derived/);
+      assert.match(b.stdout, /the logline line says loglineState = not stated/);
+      assert.notEqual(
+        a.stdout.match(/the logline line says loglineState = [^,]+/)?.[0],
+        b.stdout.match(/the logline line says loglineState = [^,]+/)?.[0],
+        'the two failing states must not report as the same thing',
+      );
+    });
+  });
+
+  describe('round 2 — the letter headline is the third rendering, and it is checked', () => {
+    // FINDING 7. `buildHeadline` formatted the same three numbers by hand and the
+    // CLI reads it back with `parseLengthLine`; nothing asserted that this third
+    // rendering was collected, so a reworded headline would have silently stopped
+    // being checked with every suite green.
+    for (const shape of ['md', 'txt'] as const) {
+      it(`${shape}: forging ONLY the letter headline (tier and block genuine) -> exit 1, the headline named`, () => {
+        const headlineLength = formatLengthLine(tier.claims);
+        // The tier's Length line and the headline's length segment are now the SAME
+        // bytes, so the headline is forged by replacing the SECOND occurrence.
+        const first = genuine[shape].indexOf(headlineLength);
+        const second = genuine[shape].indexOf(headlineLength, first + 1);
+        assert.ok(second > first, 'sanity: the letter states the length twice — the tier and the headline');
+        const forged = genuine[shape].slice(0, second)
+          + forgedLengthLine({ sceneCount: 9999 })
+          + genuine[shape].slice(second + headlineLength.length);
+        const p = write(`r2-headline-only.${EXT[shape]}`, forged);
+        const { status, stdout } = runCli([p, scriptPath]);
+        assert.equal(status, 1, stdout);
+        assert.match(stdout, /the letter headline says sceneCount = 9999/);
+        assert.doesNotMatch(stdout, /^VERIFIED/m);
+      });
+    }
   });
 
   // ── CRLF and BOM ─────────────────────────────────────────────────────────

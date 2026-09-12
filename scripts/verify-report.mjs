@@ -72,12 +72,12 @@ import { commit as localEngineCommit } from '../server/lib/build-info.ts';
 import {
   decodeClaimRows, encodePageRefs, parseLengthLine, parseHealthLine,
   parseLetterTierVerdictLine, percentileReadingFromText, referenceBoundsFromText,
-  verdictFromWord, CLAIM_ROW_SPECS, LETTER_PROSE_CLAIMS, TIER_CLAIM_LABELS,
-  VERIFY_SCOPE_SENTENCE,
+  verdictFromWord, CLAIM_LABEL_BY_FIELD, CLAIM_ROW_SPECS, LETTER_PROSE_CLAIMS,
+  TIER_ALWAYS_LABELS, TIER_CLAIM_LABELS, VERIFY_SCOPE_SENTENCE,
 } from '../server/lib/artifact-claims.ts';
 import { prioritiesCountFromHeading } from '../src/lib/priorities-copy.ts';
 import {
-  NO_LOGLINE_NOTE, NO_LOGLINE_NOTE_HTML, LOGLINE_UNKNOWN_NOTE,
+  NO_LOGLINE_NOTE, NO_LOGLINE_NOTE_HTML, LOGLINE_UNKNOWN_NOTE, TIER_CAPTION,
 } from '../server/lib/reader-tier.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -214,26 +214,112 @@ function collectPlainSummaryClaims(text) {
  *  against a block claiming one. No tier underline is ever 3 or 40 characters. */
 const TIER_DIVIDER_LINE_RE = /^(?:---|-{40})$/m;
 
+// ── Does this document render a producer tier? ──────────────────────────────
+// ROUND 2 (2026-09-12 review finding 3). This used to be ONE marker string per
+// shape — `<section class="reader-tier">` for the HTML, `## Reader summary` /
+// `READER SUMMARY` for the letter — and `rendersProducerTier` was `tier !== ''`.
+// A one-character edit (`## Reader summary` -> `## Reader Summary`, which renders
+// identically to any human; or the section class renamed to `reader-tier-page`)
+// therefore turned OFF both the body-versus-block scrape and the row-deletion
+// refusal at once, after which the nine tier rows could simply be deleted and all
+// four page forgeries verified at exit 0.
+//
+// Two answers, and the FIRST is the one that does not depend on recognising a tier
+// at all:
+//
+//   1. A document that publishes ANY tier claim row must publish all of them
+//      (`missingTierClaims` below). Deleting SOME rows is therefore refused
+//      whatever the markup says — no tier detection involved.
+//   2. For a document with NO tier rows left, the question "was there a tier?" has
+//      to be answered from the page, so it is answered from a SET of independent
+//      structural signals rather than one string. Each is something a genuine
+//      post-2026-09-11 artifact always emits and a pre-tier artifact never did, and
+//      a forger has to remove every one of them — which means removing the page's
+//      own styling, its caption, its labelled lines and the verify block's scope
+//      sentence.
+//
+// HONEST LIMIT, stated because the first version of this gate claimed more than it
+// did: this is N independent edits rather than one, not an unforgeable property. A
+// forger who strips every signal below leaves a document that no longer renders a
+// reader summary page in any recognisable form, and it is then indistinguishable
+// from a pre-tier report — which verifies on the claims it does publish, as it
+// should. README.md, ARCHITECTURE.md, the brain Surface notes and
+// docs/CLAIMS_REGISTER.md row 97 say exactly this.
+
+/** Tier signals present anywhere in the document, by name (for the refusal's own
+ *  message). Deliberately NOT scoped to the tier region: the region is located by
+ *  these same anchors, so scoping would make the detector depend on what it is
+ *  detecting. */
+function tierSignals(text, kind) {
+  const found = [];
+  const add = (name, present) => { if (present) found.push(name); };
+  // Both shapes. The scope sentence is in the verify block the forger is relying
+  // on; the caption is the first line a producer reads.
+  add('the verify block\u2019s scope sentence', text.includes(VERIFY_SCOPE_SENTENCE));
+  add('the reader summary caption', text.includes(TIER_CAPTION));
+  if (kind === 'html') {
+    add('a reader-summary section class', /class="(?:reader-tier|tier-[a-z-]+)"/.test(text));
+    add('the reader-summary stylesheet rules', /\.(?:reader-tier|tier-label|tier-page|tier-divider)\s*\{/.test(text));
+    add('the page-break rule that puts the summary on its own sheet', text.includes('break-after: page'));
+  } else {
+    add('the reader summary heading', text.includes('## Reader summary') || text.includes('READER SUMMARY'));
+    add('a labelled Length line', /^(?:\*\*Length\.\*\* |Length: )/m.test(text));
+    add('a labelled Logline line', /^(?:\*\*Logline\.\*\* |Logline: )/m.test(text));
+    add('a summary-page verdict line', /^(?:\*\*Verdict\.\*\* |Verdict: )/m.test(text));
+    add('a summary-page health reading', /Health \d+(?:\.\d+)? \/ 100/.test(text));
+  }
+  return found;
+}
+
+/** The anchors the tier REGION can be found by — the same signals, as positions.
+ *  Several, so renaming one does not unanchor the scrape (which is how finding 3's
+ *  one-character edit silenced every body claim at once). */
+function tierRegionStart(text, kind) {
+  const anchors = kind === 'html'
+    ? ['<section class="reader-tier', 'class="tier-label"', 'class="tier-caption"', TIER_CAPTION, 'class="tier-facts"']
+    : ['## Reader summary', 'READER SUMMARY', TIER_CAPTION, '**Logline.** ', '**Length.** '];
+  const positions = anchors.map(a => text.indexOf(a)).filter(i => i >= 0);
+  if (positions.length === 0) {
+    // Not anchored at all. If the document still shows tier signals it has been
+    // tampered with (a genuine tier always carries its caption), so the whole
+    // document is scanned rather than nothing: over-reading a tampered file is the
+    // right failure, silently collecting no body claims is not.
+    return tierSignals(text, kind).length > 0 ? 0 : -1;
+  }
+  return Math.min(...positions);
+}
+
 /** `{ tier, rest }` — the reader summary page, and everything after it. Either can
  *  be '' (a report that renders no tier at all: every artifact exported before
  *  2026-09-11). */
 function splitTierRegion(text, kind) {
-  if (kind === 'html') {
-    const start = text.indexOf('<section class="reader-tier">');
-    if (start < 0) return { tier: '', rest: text };
-    const end = text.indexOf('<hr class="tier-divider"', start);
-    return end < 0
-      ? { tier: text.slice(start), rest: '' }
-      : { tier: text.slice(start, end), rest: text.slice(end) };
-  }
-  // The letter, markdown or plain text. Both renderers open the tier with their own
-  // heading and close it with a divider LINE (see TIER_DIVIDER_LINE_RE).
-  const start = Math.max(text.indexOf('## Reader summary'), text.indexOf('READER SUMMARY'));
+  const start = tierRegionStart(text, kind);
   if (start < 0) return { tier: '', rest: text };
-  const after = text.slice(start);
-  const divider = after.match(TIER_DIVIDER_LINE_RE);
-  if (!divider) return { tier: after, rest: '' };
-  return { tier: after.slice(0, divider.index), rest: after.slice(divider.index) };
+  const split = (() => {
+    if (kind === 'html') {
+      const end = text.indexOf('<hr class="tier-divider"', start);
+      return end < 0
+        ? { tier: text.slice(start), rest: '' }
+        : { tier: text.slice(start, end), rest: text.slice(end) };
+    }
+    // The letter, markdown or plain text. Both renderers close the tier with a
+    // divider LINE (see TIER_DIVIDER_LINE_RE).
+    const after = text.slice(start);
+    const divider = after.match(TIER_DIVIDER_LINE_RE);
+    if (!divider) return { tier: after, rest: '' };
+    return { tier: after.slice(0, divider.index), rest: after.slice(divider.index) };
+  })();
+
+  // REGION SANITY. A genuine reader summary page always carries a parseable Length
+  // line, so a region that has none is not the region — which is what an inserted
+  // divider produces: `## Reader summary` followed immediately by `---` shrinks the
+  // letter's region to its heading and would leave every number below it
+  // uncompared. The whole document is scanned instead. (Over-reading a tampered
+  // file is the right failure; collecting no body claims is not. The structural
+  // bounds check refuses this shape too, but a refusal that also NAMES the forged
+  // number is a better diagnosis than one that only says the bounds are missing.)
+  if (parseLengthLine(split.tier) === null) return { tier: text, rest: '' };
+  return split;
 }
 
 /** The page references a reader actually SEES, in document order. Only resolved
@@ -247,10 +333,17 @@ function bodyPageNumbers(tierText, kind) {
   return [...tierText.matchAll(re)].map(m => Number(m[1]));
 }
 
-/** The logline STATE the page states: 'derived', 'not derived', or null when the
- *  page says it has no basis to say (the third state added 2026-09-12 — a report
- *  rendered with neither a logline nor the script text). Compared against the
- *  block's own `loglineState` claim. */
+/** What the page says about the logline, as one of THREE readable states plus
+ *  "there is no logline line at all" (`null`).
+ *
+ *  ROUND 2 (2026-09-12 review finding 4). `LOGLINE_UNKNOWN_NOTE` used to come back
+ *  as `null`, and `findBodyBlockDisagreements` skips a null-valued claim — so a
+ *  page edited to say *"Unavailable for this report (it was rendered without the
+ *  script text)"* while its block still claimed `Logline: derived` verified at
+ *  exit 0. The third state is this lane's own addition; the scrape has to carry it.
+ *  `LOGLINE_NOT_STATED` is the value compared against the block, and the block can
+ *  never claim it (the zod enum is derived/not derived), so a page in that state
+ *  and a block that claims either real state always disagree. */
 function bodyLoglineState(tierText, kind) {
   let stated = null;
   if (kind === 'html') {
@@ -262,10 +355,16 @@ function bodyLoglineState(tierText, kind) {
     if (!m) return null;
     stated = m[1].trim();
   }
-  if (stated === LOGLINE_UNKNOWN_NOTE) return null;
+  if (stated === '') return null;
+  if (stated === LOGLINE_UNKNOWN_NOTE) return LOGLINE_NOT_STATED;
   if (stated === NO_LOGLINE_NOTE || stated === NO_LOGLINE_NOTE_HTML) return 'not derived';
-  return stated === '' ? null : 'derived';
+  return 'derived';
 }
+
+/** The body value for "the page states that it has no basis to say". Not a value
+ *  `VerifyExpectedSchema` accepts, so a block that claims a real state always
+ *  disagrees with a page in this one. */
+const LOGLINE_NOT_STATED = 'not stated (the page says it was rendered without the script text)';
 
 /**
  * Every claim the READER SUMMARY PAGE states, as body claims to be cross-checked
@@ -386,6 +485,7 @@ function collectTierBodyClaims(text, kind) {
     claims.push({ label: 'the logline line', field: 'loglineState', value: logline, kind: 'exact' });
   }
 
+
   claims.push({
     label: 'the page references beside the findings',
     field: 'pageRefs',
@@ -394,15 +494,6 @@ function collectTierBodyClaims(text, kind) {
   });
 
   return claims;
-}
-
-/** Does this document render a producer tier at all? A tier WITH no tier claims in
- *  its block is refused outright (see main()): its reader-facing numbers cannot be
- *  checked, and "verified" over an unverifiable page is the exact sentence BUG-1
- *  was about. Every artifact exported before 2026-09-11 renders no tier and is
- *  unaffected. */
-function rendersProducerTier(text, kind) {
-  return splitTierRegion(text, kind).tier !== '';
 }
 
 /** `<dl class="verify-claims">` — coverage-html.ts's buildFooterSection.
@@ -656,24 +747,84 @@ function findBodyBlockDisagreements(expected, bodyClaims) {
 }
 
 /**
- * A document that RENDERS a reader summary page whose numbers its verify block does
- * not publish cannot be verified — and must not be reported as verified on the
- * strength of the claims that happen to remain.
+ * The tier rows this document is REQUIRED to publish: the unconditional ones, plus
+ * every conditional one whose value its reader summary page actually states.
  *
- * This is the one check that cannot be expressed as a field comparison: deleting a
- * claim row is not a wrong value, it is a missing one, and "only what was claimed
- * is checked" would otherwise hand a forger a way to opt a number out of
- * verification by deleting its row. Returns the missing labels, or [].
+ * ROUND 2 (2026-09-12 review finding 1). The required set was a hand-written list
+ * of five labels, against a comment claiming it was all of them — and the four it
+ * left out were the four a forger could delete. Deleting `Estimated pages` and
+ * `Estimated runtime (minutes)` and then forging the page's Length line to
+ * `~500 pages / ~500 min (est.)` verified at exit 0; so did deleting
+ * `Health percentile reading` and rewriting the page's percentile line to
+ * `Health percentile: top 5%` (finding 2 — the inflating direction).
  *
- * Every coverage artifact exported before 2026-09-11 renders no tier at all, so
- * this never fires for one — which is the point of gating on the tier's PRESENCE
- * rather than on a version stamp the same forger could edit.
+ * The conditional four are conditional for a real reason: a report with no
+ * `pageEstimate`, no `healthPercentile`, or a logline state the renderer had no
+ * basis for legitimately publishes no such row. Requiring them WHEN THE PAGE STATES
+ * THEM is what closes the gap without refusing those artifacts — the page and the
+ * block have to agree about which claims exist, not only about their values.
  */
-function missingTierClaims(text, kind, rows) {
+function requiredTierLabels(tierText, kind) {
+  const required = [...TIER_ALWAYS_LABELS];
+  const length = parseLengthLine(tierText);
+  if (length && length.estimatedPages !== undefined) {
+    required.push(CLAIM_LABEL_BY_FIELD.estimatedPages, CLAIM_LABEL_BY_FIELD.estimatedRuntimeMinutes);
+  }
+  if (percentileReadingFromText(tierText) !== null) {
+    required.push(CLAIM_LABEL_BY_FIELD.percentileReading);
+  }
+  const logline = bodyLoglineState(tierText, kind);
+  if (logline === 'derived' || logline === 'not derived') {
+    required.push(CLAIM_LABEL_BY_FIELD.loglineState);
+  }
+  return required;
+}
+
+/**
+ * Why this document's verify block cannot be trusted to cover its own reader
+ * summary page — a list of human-readable failures, or [].
+ *
+ * Three failures, and the FIRST needs no tier detection at all:
+ *
+ *   1. PARTIAL DELETION. A block that publishes any tier claim must publish every
+ *      required one. This is what makes findings 1 and 2 refusals regardless of
+ *      what the markup says.
+ *   2. TOTAL DELETION. A block with no tier claims left, in a document that still
+ *      shows tier signals (`tierSignals`). One marker string used to be the whole
+ *      test, and renaming it re-enabled every original forgery at once.
+ *   3. THE BOUNDS ARE GONE. A genuine reader summary page states the reference
+ *      bounds exactly once (reader-tier.ts rule 4 — in the not-comparable
+ *      sentence's parenthetical, or on its own labelled line, never neither), so a
+ *      tier page with no bounds text has had that statement removed. This is the
+ *      half of finding 2 that deleting a row does not cover: replacing the
+ *      not-comparable sentence with a flattering band takes the page's only bounds
+ *      text with it.
+ *
+ * A pre-2026-09-11 artifact publishes no tier rows and shows no tier signals, so
+ * none of the three fires and it verifies on the claims it does publish.
+ */
+function tierIntegrityFailures(text, kind, rows) {
   if (kind === 'json') return [];
-  if (!rendersProducerTier(text, kind)) return [];
   const available = rows ?? {};
-  return TIER_CLAIM_LABELS.filter(label => available[label] === undefined);
+  const published = TIER_CLAIM_LABELS.filter(label => available[label] !== undefined);
+  const signals = tierSignals(text, kind);
+  if (published.length === 0 && signals.length === 0) return [];
+
+  const { tier } = splitTierRegion(text, kind);
+  const failures = [];
+  for (const label of requiredTierLabels(tier, kind)) {
+    if (available[label] === undefined) failures.push(`missing claim: ${label}`);
+  }
+  if (tier !== '' && referenceBoundsFromText(tier) === null) {
+    failures.push(
+      'the summary page states no reference bounds \u2014 every genuine reader summary page '
+      + 'states them exactly once, so that statement has been removed',
+    );
+  }
+  if (failures.length > 0 && published.length === 0) {
+    failures.push(`the page still shows: ${signals.join(', ')}`);
+  }
+  return failures;
 }
 
 // ── CRLF diagnosis (round-2 review finding 4) ───────────────────────────────
@@ -777,22 +928,6 @@ async function main(argv) {
   const { expected, bodyClaims } = parsed;
   console.log(`Parsed as: ${parsed.kind}`);
 
-  // BUG-1 (2026-09-12): a report that renders the producer tier must publish the
-  // tier's claims. Checked BEFORE anything else is trusted — a block with the rows
-  // deleted is not "fewer claims to check", it is a document whose reader-facing
-  // numbers are unverifiable, and printing VERIFIED over one is the failure this
-  // whole lane exists to close.
-  const missing = missingTierClaims(reportText, parsed.kind, parsed.rows);
-  if (missing.length > 0) {
-    console.log('');
-    console.log('authentic: no \u2014 this report renders a reader summary page whose numbers its verify block does not publish');
-    for (const label of missing) console.log(`  missing claim: ${label}`);
-    console.log('The summary page states a scene count, a word count, a priorities count and page '
-      + 'references. Without those claims they cannot be checked, so this report cannot be verified.');
-    return verdictFail(`NOT VERIFIED \u2014 the verify block is missing ${missing.length} claim`
-      + `${missing.length === 1 ? '' : 's'} the reader summary page states: ${missing.join(', ')}.`);
-  }
-
   // Round-2 review finding 1: every claim this file parsed by hand must
   // survive the SAME zod schema the route puts in front of its handler
   // before anything downstream trusts it as a number/enum/int at all. A
@@ -815,12 +950,33 @@ async function main(argv) {
   // headline, the verdict stamp, the summary sentence) — with the verify
   // block left untouched — is checkable here and must not pass silently.
   const disagreements = findBodyBlockDisagreements(expected, bodyClaims);
-  if (disagreements.length > 0) {
+  // BUG-1, round 2: a report that renders a reader summary page must also PUBLISH
+  // that page's claims. Reported in the SAME block as the disagreements above, not
+  // before them, because one forgery routinely produces both — replacing the
+  // not-comparable sentence with a flattering band contradicts the percentile claim
+  // AND removes the page's only statement of the reference bounds — and a refusal
+  // that printed whichever check happened to run first would hide half of what is
+  // wrong with the document.
+  const integrity = tierIntegrityFailures(reportText, parsed.kind, parsed.rows);
+  if (disagreements.length > 0 || integrity.length > 0) {
+    const missingLabels = integrity
+      .filter(f => f.startsWith('missing claim: '))
+      .map(f => f.slice('missing claim: '.length));
     console.log('');
-    console.log('authentic: no — the visible report disagrees with its own verify block');
+    console.log(disagreements.length > 0
+      ? 'authentic: no — the visible report disagrees with its own verify block'
+      : 'authentic: no — this report renders a reader summary page whose numbers its verify block does not publish');
     for (const d of disagreements) console.log(`  ${d}`);
-    console.log('A report whose own rendered numbers contradict its verify block cannot be trusted — no further comparison performed.');
-    return verdictFail('NOT VERIFIED — the visible report disagrees with its own verify block.');
+    for (const failure of integrity) console.log(`  ${failure}`);
+    console.log('A report whose own rendered numbers contradict its verify block — or whose summary page '
+      + 'states a number the block does not publish — cannot be trusted; no further comparison performed.');
+    if (disagreements.length > 0) {
+      return verdictFail('NOT VERIFIED — the visible report disagrees with its own verify block.');
+    }
+    return verdictFail(missingLabels.length > 0
+      ? `NOT VERIFIED — the verify block is missing ${missingLabels.length} claim`
+        + `${missingLabels.length === 1 ? '' : 's'} the reader summary page states: ${missingLabels.join(', ')}.`
+      : 'NOT VERIFIED — the reader summary page does not state the reference bounds its verify block claims.');
   }
 
   const actualContentHash = computeContentHash(scriptText);
