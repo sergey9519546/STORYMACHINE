@@ -466,8 +466,10 @@ export default function CoverageSummary({
    *  (server/nvm/analyze/screenplay-normalizer.ts) — the EXISTING normaliser the
    *  engine already uses for scraped-PDF imports, not a second copy of that
    *  logic — and then submits the repaired text through the same `run()`, with
-   *  `onLoadSampleIntoEditor` installing it so the editor and the report never
-   *  describe different bytes.
+   *  `onRepairDraft` installing it so the editor and the report never describe
+   *  different bytes. NOT `onLoadSampleIntoEditor`: that prop's host handler
+   *  carries sample semantics (it retitles the draft to the sample's title),
+   *  which is exactly why this one exists — see its own doc above.
    *
    *  Honest in both outcomes: when the normaliser changes nothing there is
    *  nothing double-spaced to repair and no request is made (`pdfRepairNoop`),
@@ -1005,7 +1007,7 @@ export default function CoverageSummary({
               )}
               {/* Finding #5: the located notes stay reachable, attributed to the
                   finding they belong to rather than relabelled as the priority's
-                  location. Registered as docs/CLAIMS_REGISTER.md row 102. */}
+                  location. Registered as docs/CLAIMS_REGISTER.md row 95. */}
               {rootCauseMemberJump && (onNavigateToFinding || onJumpToLine) && (
                 <div className="mt-3 border-t border-[var(--sm-hair)] pt-3">
                   <p className="text-[11px] font-[family-name:var(--sm-font-mono)] leading-snug text-[var(--sm-ink-mute)]">
