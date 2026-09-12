@@ -139,6 +139,25 @@ describe('isDoubleSpaced is the split variable the receipt is built around', () 
     assert.equal(isDoubleSpacedText(clean), false);
   });
 
+  it('the one-entry memo cannot go stale: alternating inputs each get their own answer', () => {
+    // isDoubleSpacedText is memoised on one (input, output) pair, because two
+    // callers ask about the same bytes inside one report. A memo that kept the
+    // wrong answer for a second document would put a script in the wrong half
+    // of the owner's split, which is worse than the cost it saves. Alternating
+    // two documents with OPPOSITE answers defeats any one-entry cache that is
+    // not keyed correctly.
+    const clean = read(FILES[0]);
+    const messy = doubleSpace(clean);
+    for (let i = 0; i < 5; i++) {
+      assert.equal(isDoubleSpacedText(messy), true, `round ${i}: the double-spaced text must stay true`);
+      assert.equal(isDoubleSpacedText(clean), false, `round ${i}: the clean text must stay false`);
+      assert.equal(isDoubleSpacedText(messy), true, `round ${i}: a repeat of the same bytes must agree with itself`);
+    }
+    // And the analyzer's reported field agrees after all that interleaving.
+    assert.equal(analyzeFountainText(messy).isDoubleSpaced, true);
+    assert.equal(analyzeFountainText(clean).isDoubleSpaced, false);
+  });
+
   it('does not fire on an empty or whitespace-only submission', () => {
     for (const t of ['', '   ', '\n\n\n']) {
       assert.equal(isDoubleSpacedText(t), false, `isDoubleSpacedText(${JSON.stringify(t)}) must be false`);

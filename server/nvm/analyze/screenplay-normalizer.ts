@@ -120,9 +120,27 @@ function looksLikeContinuation(prev: string, next: string): boolean {
  *  any rank statistic, and until round 3 nothing outside this module could
  *  answer the question. `server/lib/validation.ts`'s shape guard mirrors the
  *  same decision on the raw text and must keep agreeing with it. */
+let dsMemoInput: string | null = null;
+let dsMemoOutput = false;
+
 export function isDoubleSpacedText(raw: string): boolean {
   if (!raw || typeof raw !== 'string') return false;
-  return isDoubleSpaced(rawLines(raw));
+  // ── ONE-ENTRY MEMO, for the same reason normalizeScreenplay has one ───────
+  // Two callers ask this question about the SAME bytes inside one report:
+  // normalizeScreenplayUncached, to choose its branch, and analyzeFountainText,
+  // to report it as a diagnostic. Without the memo that is two full
+  // split-and-scans of the document per report, the second of them purely for
+  // a field nothing scores from — a cost the product pays for the owner's
+  // corpus run (round-3 review, non-blocking item 4). ONE entry, not an LRU:
+  // the repeats are always the same string back-to-back, and a multi-entry
+  // cache would hold several megabytes of screenplay alive for no extra hit
+  // rate. Pure function of its input, so the memo cannot be stale — a
+  // different string recomputes.
+  if (raw === dsMemoInput) return dsMemoOutput;
+  const out = isDoubleSpaced(rawLines(raw));
+  dsMemoInput = raw;
+  dsMemoOutput = out;
+  return out;
 }
 
 /** The line prep the double-spaced decision is taken on: CRLF folded, trailing
