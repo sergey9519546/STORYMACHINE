@@ -297,3 +297,110 @@ export function slatePercentileCaption(): string {
   return `Percentile ranks each script's health against ${referenceSetDescription()} — not the other scripts in this slate.`;
 }
 // probe
+
+// ── DIMENSION percentile badges ───────────────────────────────────────────────
+//
+// 2026-09-12, adversarial findings #4 and #14. Two defects in one badge:
+//
+//   #4 — THE GATE WAS NEVER APPLIED HERE. `percentileIsComparable` was written
+//   2026-09-11 to stop the product ranking real drafts against a 20-sample,
+//   9–10-scene, 256–337-word synthetic corpus. Its own doc comment says "One
+//   function, both dimensions, every caller." It reached the HEADLINE health
+//   percentile and not the five DIMENSION badges, so one scrolling document said
+//   "Health percentile: not comparable — this draft is outside the bounds of the
+//   hand-authored synthetic reference set" on line 140 and "STRUCTURE & PACING
+//   TOP 10% · CHARACTER TOP 10% · DIALOGUE & VOICE TOP 10% · PLOT LOGIC & PAYOFF
+//   TOP 10% · THEME & ORIGINALITY TOP 10%" on lines 367–399.
+//
+//   #14 — THE WORDING READS BACKWARDS. `percentileBand(20)` returns "top 80%",
+//   which is literally true and reads as praise to every reader who is not
+//   thinking about it: on `runoff` the badge beside Dialogue & Voice (percentile
+//   20) read "TOP 80%" next to the score 98. `percentileDescriptor`
+//   (server/nvm/analyze/calibration/percentile.ts) deliberately uses "stronger
+//   than N%" for that band and reserves superlatives for the tails; the badge
+//   undid it.
+//
+// AND THE BADGE IS RANKED ON A DIFFERENT STATISTIC FROM THE NUMBER BESIDE IT.
+// `doctor.ts:2257` ranks `build.rawScore` — the UNCLAMPED craft statistic, with
+// the scene-count scarcity term in it — while the badge sits next to the CLAMPED
+// display score. That is why the badge is anti-correlated with it: on a coherent
+// 5-scene short every dimension scores 96.5–100 and every badge read "bottom
+// 10%", Theme & Originality included at 100/100 with zero issues; on the
+// deliberately incoherent 231-scene concatenation Character scores 81.5 and read
+// "top 10%". Higher craft score, lower percentile — the badge was a scene-count
+// readout. Re-ranking is a scoring change and is NOT done here. What IS done is
+// that no badge is shown for a draft the gate excludes (which is every draft
+// outside 9–10 scenes / 256–337 words, i.e. every real draft), and that where one
+// IS shown its tooltip states which statistic it ranked.
+//
+// ONE FUNCTION, BOTH SURFACES. The in-app panel
+// (src/components/scriptide/ScriptDoctorPanel.tsx) and the exported coverage HTML
+// (server/lib/coverage-html.ts, which already imports from this module) call
+// `dimensionPercentileBadgeFor` and `dimensionPercentileTooltipFor` — so the two
+// can never word the same badge two ways, which is exactly how this module came
+// to exist in the first place (see its header).
+
+/** The badge text for ONE dimension's percentile: a direction-safe band, or
+ *  "not comparable" when the draft is outside the reference set's bounds.
+ *
+ *  The band vocabulary is `percentileDescriptor`'s, not `percentileBand`'s: the
+ *  middle of the distribution says "stronger than N%" rather than "top (100-N)%",
+ *  so no badge can be read backwards. Clamped to 0–100 first, so a statistic that
+ *  arrives outside the range cannot produce a nonsense band. */
+export function dimensionPercentileBand(pct: number): string {
+  const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+  if (clamped >= 90) return 'top 10%';
+  if (clamped < 10) return 'bottom 10%';
+  if (clamped < 25) return 'bottom quartile';
+  return `stronger than ${clamped}%`;
+}
+
+/** The gated badge — what every surface should render. `'not comparable'` is the
+ *  same string `percentileCellFor` uses for the same decision, so the dimension
+ *  badges and the Slate table's cells cannot disagree about a draft. */
+export function dimensionPercentileBadgeFor(
+  pct: number,
+  sceneCount: number | null | undefined,
+  wordCount: number | null | undefined,
+): string {
+  return percentileIsComparable(sceneCount, wordCount) ? dimensionPercentileBand(pct) : 'not comparable';
+}
+
+/** The badge's tooltip. Two different sentences, because the badge has two
+ *  different meanings:
+ *
+ *  OUT OF BOUNDS — why there is no reading, in the same terms
+ *  `notComparableSentence` uses for the headline, so the two halves of one report
+ *  agree. No exact rank: an ordinal against a set the draft cannot be compared to
+ *  is false precision twice over (`exactRankTooltipFor`'s rule).
+ *
+ *  IN BOUNDS — the exact rank, plus the fact that it ranks the unclamped craft
+ *  statistic rather than the 0–100 score printed beside it (`doctor.ts:2257`).
+ *  Without that clause the two numbers on one row look like two readings of the
+ *  same thing, which is what made a 100/100 beside "bottom 10%" unreadable
+ *  instead of merely surprising. */
+export function dimensionPercentileTooltipFor(
+  pct: number,
+  label: string,
+  sceneCount: number | null | undefined,
+  wordCount: number | null | undefined,
+): string {
+  if (!percentileIsComparable(sceneCount, wordCount)) {
+    return `${label}: no percentile — this draft is outside the bounds of the ${REFERENCE_SET_LABEL} `
+      + `(${referenceBoundsLine()}), so a rank against it would measure this draft's length, not its craft.`;
+  }
+  return `${label}: ${dimensionPercentileBand(pct)} of ${referenceSetDescription()}. `
+    + `${exactRankTooltip(pct)}. Ranked on the unclamped craft statistic, not the 0-100 score shown beside it.`;
+}
+
+/** The visible caption for the whole Craft Dimensions block, gated the same way —
+ *  so the section does not promise a comparison it is about to withhold. */
+export function dimensionPercentileCaptionFor(
+  sceneCount: number | null | undefined,
+  wordCount: number | null | undefined,
+): string {
+  return percentileIsComparable(sceneCount, wordCount)
+    ? `Percentile badges compare against ${referenceSetDescription()}.`
+    : `No percentile badges: this draft is outside the bounds of the ${REFERENCE_SET_LABEL} `
+      + `(${referenceBoundsLine()}), the only set any percentile here is ranked against.`;
+}

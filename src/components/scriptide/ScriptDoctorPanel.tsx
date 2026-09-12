@@ -53,10 +53,16 @@ import { computeDraftRank, type DraftRank } from "../../lib/snapshot-trend.ts";
 import {
   // 2026-09-11: the GATED helpers (…For) for the headline percentile — the
   // comparability decision lives in one place (see percentile-copy.ts's header).
-  // `percentileBand` stays for the per-DIMENSION percentiles, which are ranked
-  // against the same reference set's per-dimension distributions and are not part
-  // of this change's scope.
-  ordinal, percentileBand, percentileSentenceFor, exactRankTooltipFor,
+  // (The note that used to stand here said `percentileBand` "stays for the
+  // per-DIMENSION percentiles … not part of this change's scope". That scope gap
+  // IS findings #4 and #14: the gate never reached the dimension badges, and
+  // percentileBand's "top 80%" wording read as praise on a bottom-quintile
+  // dimension. Closed below.)
+  percentileSentenceFor, exactRankTooltipFor,
+  // Findings #4 and #14 (2026-09-12): the dimension badges' own gated copy. ONE
+  // function, shared with the exported coverage HTML — see percentile-copy.ts's
+  // "DIMENSION percentile badges" section for both defects.
+  dimensionPercentileBadgeFor, dimensionPercentileTooltipFor, dimensionPercentileCaptionFor,
 } from "../../lib/percentile-copy.ts";
 // Finding #9 (2026-09-12): ONE label for the diagnostic scores these panels
 // render, so the report presents exactly one number as the health of the
@@ -5356,8 +5362,13 @@ export default function ScriptDoctorPanel({
                 <h3 className="text-[10px] font-bold uppercase tracking-widest mb-2 text-[var(--sm-ink-mute)]">
                   Craft Dimensions
                 </h3>
-                <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] mb-2">
-                  Percentile badges compare against the same 20-sample, hand-authored synthetic reference set.
+                {/* Findings #4/#14: the caption is gated by the SAME decision the
+                    badges are, so the section cannot promise a comparison it is
+                    about to withhold. Before this it asserted the comparison
+                    unconditionally, 227 lines under the headline's own
+                    "not comparable" sentence. */}
+                <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] mb-2" data-dimension-percentile-caption>
+                  {dimensionPercentileCaptionFor(report.sceneCount, report.wordCount)}
                 </p>
                 <div className="space-y-3">
                   {report.dimensions.map((dim) => {
@@ -5373,9 +5384,19 @@ export default function ScriptDoctorPanel({
                             {typeof dim.percentile === "number" && (
                               <span
                                 className={PERCENTILE_BADGE_CLASS}
-                                title={`${dim.percentileDescriptor ?? `${ordinal(dim.percentile)} percentile`} (exact rank: ${ordinal(dim.percentile)} of 20 reference samples)`}
+                                title={dimensionPercentileTooltipFor(
+                                  dim.percentile,
+                                  dim.label,
+                                  report.sceneCount,
+                                  report.wordCount,
+                                )}
+                                data-dimension-percentile-badge
                               >
-                                {percentileBand(dim.percentile)}
+                                {dimensionPercentileBadgeFor(
+                                  dim.percentile,
+                                  report.sceneCount,
+                                  report.wordCount,
+                                )}
                               </span>
                             )}
                             <span className={`text-xs font-bold ${band.text}`}>{pct}</span>

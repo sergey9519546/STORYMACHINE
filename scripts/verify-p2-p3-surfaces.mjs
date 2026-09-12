@@ -495,81 +495,6 @@ async function main() {
   const advancedSimCountOff = await advancedSimBtnOff.count();
   record('P2', 'StartScreen "Advanced: Simulation" (Labs-gated) is ABSENT with Labs OFF', advancedSimCountOff === 0, `found ${advancedSimCountOff} matching button(s)`);
 
-  // ── Finding #10 (2026-09-12): NO DEAD CONTROLS on the default start screen.
-  //
-  // "Open simulation" and "Simulate" called `onOpenStoryMachine?.()`. With Labs
-  // off App.tsx passes that prop as undefined, so the optional call is a no-op:
-  // two normal, enabled, focusable buttons that produced no navigation and no
-  // state change, beside a full-width OASIS hero and a numbered workflow
-  // describing a Labs-only feature as part of the core loop. NORTH_STAR §1 —
-  // hide, don't disable.
-  //
-  // This walks EVERY visible, enabled button on the fresh default screen and
-  // requires each to either navigate, change the page, or be honestly disabled
-  // with a reason. Each click is taken on a RELOADED page so one button's
-  // navigation cannot hide the next one's inertness.
-  const startScreenButtonNames = await pageA.evaluate(() =>
-    [...document.querySelectorAll('button')]
-      .filter((b) => !b.disabled && b.offsetParent !== null)
-      .map((b) => (b.getAttribute('aria-label') || b.innerText || '').replace(/\s+/g, ' ').trim())
-      .filter((n) => n.length > 0),
-  );
-  record(
-    'P2-deadcontrols',
-    'the default start screen really does render buttons to audit',
-    startScreenButtonNames.length >= 3,
-    `buttons=${JSON.stringify(startScreenButtonNames)}`,
-  );
-  const inertStartScreenButtons = [];
-  for (const name of startScreenButtonNames) {
-    await pageA.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
-    await pageA.getByRole('button', { name: /try sample coverage/i }).first()
-      .waitFor({ timeout: timing.ms(15000) });
-    const before = await pageA.evaluate(() => ({
-      url: location.href,
-      text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 4000),
-    }));
-    const target = pageA.getByRole('button', { name, exact: true }).first();
-    const clickable = await target.isVisible().catch(() => false);
-    if (!clickable) continue;
-    await target.click({ timeout: timing.ms(10000) }).catch(() => {});
-    await pageA.waitForTimeout(timing.ms(900));
-    const after = await pageA.evaluate(() => ({
-      url: location.href,
-      text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 4000),
-    }));
-    if (after.url === before.url && after.text === before.text) inertStartScreenButtons.push(name);
-  }
-  record(
-    'P2-deadcontrols',
-    'every visible, enabled button on the keyless default start screen produces a navigation or a state change',
-    inertStartScreenButtons.length === 0,
-    `inert=${JSON.stringify(inertStartScreenButtons)} audited=${startScreenButtonNames.length}`,
-  );
-  const oasisSectionOff = await pageA.locator('[aria-labelledby="oasis-heading"]').count();
-  const simulateJargonOff = await pageA.evaluate(() => {
-    const t = document.body.innerText;
-    return {
-      storyMachineSimulate: /Story Machine Simulate/i.test(t),
-      simulateIfNeeded: /Simulate if needed/i.test(t),
-      railStep: /Export · simulate/i.test(t),
-    };
-  });
-  record(
-    'P2-deadcontrols',
-    'the Labs-only OASIS section does not render at all with Labs OFF (hide, don\'t disable)',
-    oasisSectionOff === 0
-      && !simulateJargonOff.storyMachineSimulate
-      && !simulateJargonOff.simulateIfNeeded
-      && !simulateJargonOff.railStep,
-    `oasisSections=${oasisSectionOff} jargon=${JSON.stringify(simulateJargonOff)}`,
-  );
-
-  // Back to a clean default screen for the assertions that follow.
-  await pageA.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
-  await pageA.getByRole('button', { name: /try sample coverage/i }).first()
-    .waitFor({ timeout: timing.ms(15000) });
-
   // ── Toolbar / overflow gating + the Ship-task bypass check, using a
   // blank draft so no doctor call is needed yet. ──────────────────────────
   const startFreshBtn = pageA.getByRole('button', { name: /start fresh/i }).first();
@@ -1114,6 +1039,57 @@ async function main() {
     'the Story Structure diagnostic is named "Graph health score", not "Health score" (the words the header uses for the one real number)',
     healthWordings.bareHealthScoreLine === 0 && healthWordings.graphHealthScoreLine >= 1,
     JSON.stringify(healthWordings),
+  );
+
+  // ── Findings #4 and #14 (2026-09-12): the Craft Dimensions badges. The panel
+  // rendered the UNGATED band for each dimension while the headline percentile
+  // 227 lines above went through the gate, so the same scrolling document said
+  // "not comparable" and "TOP 10%" about the same reference set — and
+  // percentileBand(20) says "top 80%", which reads as praise on a bottom-quartile
+  // dimension. The sample is 12 scenes / ~1,830 words, outside the reference set's
+  // 9–10 scene / 256–337 word bounds, so every badge here must withhold.
+  const dimensionBadges = await pageA
+    .locator('[data-dimension-percentile-badge]')
+    .evaluateAll((els) => els.map((el) => el.textContent.replace(/\s+/g, ' ').trim()));
+  const dimensionCaption = await pageA
+    .locator('[data-dimension-percentile-caption]')
+    .first()
+    .textContent()
+    .then((t) => (t ?? '').replace(/\s+/g, ' ').trim())
+    .catch(() => '');
+  record(
+    'P3-dimbadge',
+    'the Craft Dimensions section renders its five badges through the shared gated copy',
+    dimensionBadges.length === 5,
+    `badges=${JSON.stringify(dimensionBadges)}`,
+  );
+  record(
+    'P3-dimbadge',
+    'every dimension badge agrees with the headline: "not comparable" on a draft outside the reference set\'s bounds',
+    dimensionBadges.length > 0 && dimensionBadges.every((t) => /not comparable/i.test(t)),
+    `badges=${JSON.stringify(dimensionBadges)}`,
+  );
+  record(
+    'P3-dimbadge',
+    'no badge reads as praise ("top N%") on a draft the gate excludes',
+    dimensionBadges.every((t) => !/top \d+%/i.test(t)),
+    `badges=${JSON.stringify(dimensionBadges)}`,
+  );
+  record(
+    'P3-dimbadge',
+    'the section caption does not promise a comparison the badges withhold',
+    /^No percentile badges/i.test(dimensionCaption),
+    `caption=${JSON.stringify(dimensionCaption.slice(0, 200))}`,
+  );
+  const dimensionBadgeTooltips = await pageA
+    .locator('[data-dimension-percentile-badge]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('title') ?? ''));
+  record(
+    'P3-dimbadge',
+    'each withheld badge explains WHY in its tooltip, and states no exact rank',
+    dimensionBadgeTooltips.length > 0
+      && dimensionBadgeTooltips.every((t) => /no percentile/i.test(t) && !/Exact rank/i.test(t)),
+    `tooltip[0]=${JSON.stringify((dimensionBadgeTooltips[0] ?? '').slice(0, 220))}`,
   );
 
   // ── Shape & Rhythm (2026-09-04) — server/nvm/analyze/structural-signals.ts
@@ -2490,32 +2466,20 @@ async function main() {
     );
   }
 
-  // NOTE ON WHAT THIS AFFORDANCE CAN AND CANNOT DO, asserted rather than
-  // assumed: `hasSceneHeading` (server/routes/scriptide.ts) tests each line
-  // TRIMMED, and `normalizeScreenplay` re-spaces blocks without ever inventing a
-  // slugline — so from THIS state the repair can honestly only report that it did
-  // not help, and the actionable sentence ("Add one, such as INT. KITCHEN - DAY")
-  // is the outcome that matters. A double-spaced paste that does carry sluglines
-  // never reaches this card at all: the route recognises it and the doctor
-  // analyses it, which is what the assertion below pins.
-  const doubleSpacedWithHeadings = [
-    'INT. KITCHEN - DAY', '', '', 'Maya stands at the counter.', '', '',
-    'MAYA', '', 'You kept the tape.', '', '',
-    'EXT. PORCH - NIGHT', '', '', 'Rain on the boards.', '',
-  ].join('\n');
-  const doubleSpacedRes = await fetch(`${BASE}/api/scriptide/doctor`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fountain: doubleSpacedWithHeadings, title: 'PASTED' }),
-  });
-  const doubleSpacedAnswer = await doubleSpacedRes.json();
-  record(
-    'P2-format',
-    'a double-spaced paste that DOES carry sluglines is analysed, not refused — so the refusal card is only ever shown for text with no headings at all',
-    doubleSpacedAnswer.formatUnrecognized !== true && typeof doubleSpacedAnswer.sceneCount === 'number' && doubleSpacedAnswer.sceneCount >= 2,
-    `formatUnrecognized=${doubleSpacedAnswer.formatUnrecognized} sceneCount=${doubleSpacedAnswer.sceneCount}`,
-  );
-
+  // NOTE ON WHAT THIS AFFORDANCE CAN AND CANNOT DO, written here because it is
+  // the thing a future reader of this phase will want: `hasSceneHeading`
+  // (server/routes/scriptide.ts) tests each line TRIMMED, and
+  // `normalizeScreenplay` re-spaces blocks without ever inventing a slugline — so
+  // from THIS state the repair can honestly only report that it did not help, and
+  // the actionable sentence ("Add one, such as INT. KITCHEN - DAY") is the outcome
+  // that matters. A double-spaced paste that DOES carry sluglines never reaches
+  // this card at all: the route recognises it and the doctor analyses it. That
+  // complementary claim is asserted in
+  // tests/core/coverage-format-unrecognized-card.test.ts — against
+  // `normalizeScreenplay` and the route's own exported `hasSceneHeading`, not
+  // over HTTP, because a fourth doctor POST from this phase trips the route's
+  // gameLimiter (measured: status 429, "Too many requests, please slow down",
+  // twice in a row) and a rate-limited request proves nothing about the card.
   await contextF.close();
 
   // ══════════════════════════════════════════════════════════════════════
@@ -2923,6 +2887,99 @@ async function main() {
   }
 
   await contextD.close();
+
+  // ══════════════════════════════════════════════════════════════════════
+  // CONTEXT G — NO DEAD CONTROLS on the keyless default start screen
+  // (2026-09-12, finding #10).
+  //
+  // Its own context, and LAST in the suite, for a measured reason: the audit
+  // below reloads `/` once per button, and each load makes several API calls.
+  // Run inside context A it put ~50 requests into the same 60-second window as
+  // the feature-length doctor run, and the route's gameLimiter (120/min/IP,
+  // server/lib/session-store.ts) answered 429 — a rate-limited request proves
+  // nothing about a button. A fresh context also gives exactly what this gate
+  // needs: no `sm_labs_enabled`, so Labs is OFF by default.
+  // ══════════════════════════════════════════════════════════════════════
+  console.log('\n=== P2-deadcontrols — every button on the default start screen does something ===');
+  const contextG = await browser.newContext();
+  const pageG = await contextG.newPage();
+  wireConsoleCapture(pageG, genuineConsoleErrors);
+  await pageG.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await pageG.getByRole('button', { name: /try sample coverage/i }).first()
+    .waitFor({ timeout: timing.ms(15000) });
+
+  // ── Finding #10 (2026-09-12): NO DEAD CONTROLS on the default start screen.
+  //
+  // "Open simulation" and "Simulate" called `onOpenStoryMachine?.()`. With Labs
+  // off App.tsx passes that prop as undefined, so the optional call is a no-op:
+  // two normal, enabled, focusable buttons that produced no navigation and no
+  // state change, beside a full-width OASIS hero and a numbered workflow
+  // describing a Labs-only feature as part of the core loop. NORTH_STAR §1 —
+  // hide, don't disable.
+  //
+  // This walks EVERY visible, enabled button on the fresh default screen and
+  // requires each to either navigate, change the page, or be honestly disabled
+  // with a reason. Each click is taken on a RELOADED page so one button's
+  // navigation cannot hide the next one's inertness.
+  const startScreenButtonNames = await pageG.evaluate(() =>
+    [...document.querySelectorAll('button')]
+      .filter((b) => !b.disabled && b.offsetParent !== null)
+      .map((b) => (b.getAttribute('aria-label') || b.innerText || '').replace(/\s+/g, ' ').trim())
+      .filter((n) => n.length > 0),
+  );
+  record(
+    'P2-deadcontrols',
+    'the default start screen really does render buttons to audit',
+    startScreenButtonNames.length >= 3,
+    `buttons=${JSON.stringify(startScreenButtonNames)}`,
+  );
+  const inertStartScreenButtons = [];
+  for (const name of startScreenButtonNames) {
+    await pageG.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+    await pageG.getByRole('button', { name: /try sample coverage/i }).first()
+      .waitFor({ timeout: timing.ms(15000) });
+    const before = await pageG.evaluate(() => ({
+      url: location.href,
+      text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 4000),
+    }));
+    const target = pageG.getByRole('button', { name, exact: true }).first();
+    const clickable = await target.isVisible().catch(() => false);
+    if (!clickable) continue;
+    await target.click({ timeout: timing.ms(10000) }).catch(() => {});
+    await pageG.waitForTimeout(timing.ms(900));
+    const after = await pageG.evaluate(() => ({
+      url: location.href,
+      text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 4000),
+    }));
+    if (after.url === before.url && after.text === before.text) inertStartScreenButtons.push(name);
+  }
+  record(
+    'P2-deadcontrols',
+    'every visible, enabled button on the keyless default start screen produces a navigation or a state change',
+    inertStartScreenButtons.length === 0,
+    `inert=${JSON.stringify(inertStartScreenButtons)} audited=${startScreenButtonNames.length}`,
+  );
+  const oasisSectionOff = await pageG.locator('[aria-labelledby="oasis-heading"]').count();
+  const simulateJargonOff = await pageG.evaluate(() => {
+    const t = document.body.innerText;
+    return {
+      storyMachineSimulate: /Story Machine Simulate/i.test(t),
+      simulateIfNeeded: /Simulate if needed/i.test(t),
+      railStep: /Export · simulate/i.test(t),
+    };
+  });
+  record(
+    'P2-deadcontrols',
+    'the Labs-only OASIS section does not render at all with Labs OFF (hide, don\'t disable)',
+    oasisSectionOff === 0
+      && !simulateJargonOff.storyMachineSimulate
+      && !simulateJargonOff.simulateIfNeeded
+      && !simulateJargonOff.railStep,
+    `oasisSections=${oasisSectionOff} jargon=${JSON.stringify(simulateJargonOff)}`,
+  );
+
+
+  await contextG.close();
 
   if (genuineConsoleErrors.length > 0) {
     record('(global)', 'ZERO genuine browser console errors', false, `${genuineConsoleErrors.length} found: ${genuineConsoleErrors.slice(0, 5).join(' | ')}`);
