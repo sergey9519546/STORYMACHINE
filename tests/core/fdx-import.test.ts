@@ -10,6 +10,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { fountainToFdx } from '../../src/lib/fdx.ts';
 import { fdxToFountain } from '../../server/lib/fdx-import.ts';
+import { parseFountain } from '../../src/lib/fountain.ts';
 
 describe('fdxToFountain — round trip through the Fountain→FDX exporter', () => {
   const SAMPLE_FOUNTAIN = [
@@ -64,6 +65,37 @@ describe('fdxToFountain — round trip through the Fountain→FDX exporter', () 
     // An auto-detected transition ("CUT TO:") round-trips without the
     // forced "> " prefix.
     assert.match(fountain, /^CUT TO:$/m);
+  });
+
+  it('a Character name that is not a Fountain cue comes back as a cue, not as action', () => {
+    // The importer knows the ELEMENT TYPE (Final Draft stores it) where
+    // Fountain only infers it from the line's shape. A caseless name, or one
+    // carrying punctuation the cue alphabet excludes, is not cue-shaped — so
+    // before round 3 it came back as an ACTION line and took its whole speech
+    // with it as action prose, silently, on exactly the real files this
+    // importer exists to accept. `@` is the spec's answer and formatCharacter
+    // asks CHARACTER_CUE_RE rather than restating the grammar.
+    const fdxXml = [
+      '<?xml version="1.0" encoding="UTF-8"?><FinalDraft><Content>',
+      '<Paragraph Type="Scene Heading"><Text>INT. TEA HOUSE - DAY</Text></Paragraph>',
+      '<Paragraph Type="Character"><Text>田中</Text></Paragraph>',
+      '<Paragraph Type="Dialogue"><Text>I already told you what I saw.</Text></Paragraph>',
+      '<Paragraph Type="Character"><Text>MARY</Text></Paragraph>',
+      '<Paragraph Type="Dialogue"><Text>You told me what you wanted to have seen.</Text></Paragraph>',
+      '</Content></FinalDraft>',
+    ].join('');
+    const { fountain } = fdxToFountain(fdxXml);
+
+    // The name that IS cue-shaped is untouched — the marker is added only
+    // where it is needed, so every existing import is byte-identical.
+    assert.match(fountain, /^MARY$/m);
+    assert.match(fountain, /^@田中$/m);
+
+    // And the point of the marker: re-parsing the imported Fountain gives a
+    // cue with a speech under it, for BOTH names.
+    const types = parseFountain(fountain).filter((b) => b.type !== 'empty').map((b) => b.type);
+    assert.deepEqual(types, ['scene_heading', 'character', 'dialogue', 'character', 'dialogue'],
+      'an imported Character paragraph must read back as a character cue whatever its name looks like');
   });
 
   it('is deterministic: converting the same FDX twice yields identical output', () => {

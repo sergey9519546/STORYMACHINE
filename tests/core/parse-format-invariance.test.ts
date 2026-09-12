@@ -261,6 +261,13 @@ const FORMAT_TRANSFORMS: Array<[string, (t: string) => string, string]> = [
   ['a redundant forced-transition `>` on every transition line', redundantMarker('transition', '>'),
     'the parser has no forced-transition branch at all, so `>CUT TO:` was scored as an ACTION LINE, `>` and '
     + 'all. 5 of the 6 applicable scripts moved at 85273742, mean -4.080, largest -15.7 on room-12.'],
+  ['a redundant forced-cue `@` on every character cue', redundantMarker('character', '@'),
+    'the fourth marker and the LARGEST format sensitivity ever measured on this branch. Round 2 pinned it '
+    + 'as a known gap rather than closing it, because the parser did not implement `@` at all — `@MARY` was '
+    + 'action prose and so was every line of her speech — and honouring it in the normaliser alone would '
+    + 'have made the analysis strip a marker all four renderers still printed. Round 3 closed BOTH halves '
+    + '(src/lib/fountain.ts parseFountain + renderableText), so this moved 32 of 32 scripts at 3124a94e, '
+    + 'mean -1.172, largest -26.8 on room-12, and moves 0 of 32 here.'],
 
   // ── Cue extension spelling (round 2) ────────────────────────────────────
   // CHARACTER_CUE_RE admits only the canonical spellings, so a cue carrying
@@ -278,7 +285,7 @@ const FORMAT_TRANSFORMS: Array<[string, (t: string) => string, string]> = [
     'the typographic fold reaches inside the extension too — every word processor emits this one.'],
 ];
 
-describe('format is not writing: eighteen transforms, 32 scripts, exact equality (findings 5 and 13, and round 2)', () => {
+describe('format is not writing: nineteen transforms, 32 scripts, exact equality (findings 5 and 13, rounds 2 and 3)', () => {
   for (const [label, fn, why] of FORMAT_TRANSFORMS) {
     it(`${label} does not move any of the 32 scripts`, async () => {
       const moved: string[] = [];
@@ -329,42 +336,6 @@ describe('the harness still separates writing from formatting (the both-directio
     }
     assert.equal(moved, FILES.length, `only ${moved} of ${FILES.length} scripts moved under dialogue flattening — `
       + 'the invariance assertions above are worthless if the analyzer cannot tell writing apart at all');
-  });
-});
-
-// ── THE MARKER THIS BRANCH DOES NOT CLOSE, PINNED WITH ITS SIZE ────────────
-// `@` is Fountain's forced character cue. src/lib/fountain.ts has never
-// implemented it, so `@MARY` is action prose and so is every line of the
-// speech beneath her. Honouring it is a PARSER FEATURE, not a normalisation:
-// unlike `!`, `.` and `>`, stripping `@` changes the type of every line BELOW
-// the cue, and the editor, PDF, FDX and DOCX renderers would all still print
-// the marker the analysis had decided was invisible.
-//
-// It is asserted here with its measured size so it cannot be rediscovered as
-// news, and so that the day someone DOES implement it this test goes red and
-// says where the row belongs.
-describe('the forced cue `@` is a known, quantified gap (round 2)', () => {
-  it('still moves every one of the 32 scripts, because the parser does not implement it', async () => {
-    const apply = redundantMarker('character', '@');
-    let moved = 0;
-    let applicable = 0;
-    for (const f of FILES) {
-      const src = read(f);
-      const marked = apply(src);
-      if (marked === src) continue;
-      applicable++;
-      const got = await runScriptDoctor(marked);
-      if (JSON.stringify(surface(got)) !== JSON.stringify(surface(baseline.get(f)!))) moved++;
-    }
-    assert.equal(applicable, FILES.length, 'every script must carry at least one character cue');
-    assert.equal(
-      moved, FILES.length,
-      `${moved} of ${FILES.length} scripts moved under a redundant forced cue "@". This is a PINNED KNOWN GAP, `
-      + 'not a tolerance: at 85273742 it was 32 of 32, mean -1.172, largest -26.8 on room-12 — the largest '
-      + 'format sensitivity this branch has measured. If this number has FALLEN, the parser has learned `@` '
-      + '(or something has changed the corpus): move this row into FORMAT_TRANSFORMS as an invariance '
-      + 'assertion, check that every renderer strips the marker too, and delete this test. Do not relax it.',
-    );
   });
 });
 
@@ -443,5 +414,98 @@ I counted your footsteps.
         + 'CUE_EXTENSIONS (src/lib/fountain.ts).',
       );
     }
+  });
+});
+
+// ── THE MARKER ROUND 2 PINNED, CLOSED ON BOTH SIDES (round 3) ──────────────
+// The row above asserts that a REDUNDANT `@` does not move the score. That is
+// necessary and not sufficient: an analyzer that simply deleted `@` would pass
+// it while every exporter still printed the marker, which is the split the
+// round-2 review named as its reason for pinning rather than fixing. So the
+// same marker is checked at the other end too — what the parser makes of it,
+// and what each of the four renderers prints — and in the direction that
+// cannot be faked by deletion: a cue only `@` can express.
+describe('a forced cue `@` is a character cue everywhere (round 3)', () => {
+  const CASELESS = 'INT. TEA HOUSE - DAY\n\nA kettle ticks as it cools.\n\n@田中\n(quietly)\nそこにいるのは知っている。\n\nEXT. STREET - LATER\n\nRain.\n';
+
+  it('the parser types the cue, its parenthetical and its speech exactly as an unforced cue', () => {
+    const types = parseFountain(CASELESS).filter((b) => b.type !== 'empty').map((b) => b.type);
+    assert.deepEqual(
+      types,
+      ['scene_heading', 'action', 'character', 'parenthetical', 'dialogue', 'scene_heading', 'action'],
+      'a forced cue must produce the SAME element sequence an unforced one does — the whole point of `@` is '
+      + 'that the lines below it are dialogue, not action prose',
+    );
+    // The other direction, and it is the decision this fixture exists for:
+    // WITHOUT the marker the same caseless line is still action, because "all
+    // caps" is meaningless in a caseless script (src/lib/fountain.ts).
+    const unforced = parseFountain(CASELESS.replace('@', '')).filter((b) => b.type !== 'empty').map((b) => b.type);
+    assert.deepEqual(
+      unforced, ['scene_heading', 'action', 'action', 'action', 'action', 'scene_heading', 'action'],
+      'admitting a caseless line as a cue WITHOUT the marker would make every short line of Japanese action '
+      + 'a character cue — `@` is the escape hatch precisely because the bare line must not be one',
+    );
+  });
+
+  it('a `^` forced cue is dual dialogue and retags the left column, as an unforced `^` does', () => {
+    const dual = 'INT. HALL - NIGHT\n\n@田中\nYes.\n\n@McCLANE^\nNo.\n\nEXT. STREET - DAY\n\nRain.\n';
+    const types = parseFountain(dual).filter((b) => b.type !== 'empty').map((b) => b.type);
+    assert.deepEqual(
+      types,
+      ['scene_heading', 'dual_dialogue', 'dialogue', 'dual_dialogue', 'dialogue', 'scene_heading', 'action'],
+      'the caret tail must be read past the marker, and the preceding cue retagged as the left column',
+    );
+  });
+
+  it('the analyzer counts the speaker and the speech, under the bare name', () => {
+    const a = analyzeFountainText(CASELESS);
+    assert.deepEqual(a.characters, ['田中'], 'the marker is a decoration, never part of the name');
+    assert.equal(a.dialogueLineCount, 1, 'the speech under a forced cue is DIALOGUE, not action prose');
+  });
+
+  it('not one of the four renderers prints the marker', async () => {
+    const { layoutScreenplay } = await import('../../src/lib/screenplay-layout.ts');
+    const { fountainToFdx } = await import('../../src/lib/fdx.ts');
+    const { fountainToDocx } = await import('../../src/lib/docx.ts');
+    const { fountainToPdf } = await import('../../src/lib/pdf.ts');
+    const latin1 = (b: Uint8Array) => { let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return s; };
+
+    const layoutLines = layoutScreenplay(CASELESS).flatMap((p) => p.lines.map((l) => l.text));
+    assert.deepEqual(
+      layoutLines.filter((t) => t.includes('@')), [],
+      'screenplay-layout.ts feeds the PDF writer; a marker reaching it is a marker on the page',
+    );
+    assert.ok(layoutLines.includes('田中'), 'the bare name must still be laid out');
+
+    const fdx = fountainToFdx(CASELESS, 'Forced Cue');
+    assert.equal(fdx.includes('@'), false, 'the FDX export still carries the marker');
+    assert.ok(
+      /<Paragraph Type="Character">\s*<Text>田中<\/Text>/.test(fdx),
+      'the forced cue must leave as a Final Draft Character paragraph, not an Action one',
+    );
+
+    const docx = latin1(fountainToDocx(CASELESS, 'Forced Cue'));
+    assert.equal(
+      [...docx.matchAll(/<w:t xml:space="preserve">([\s\S]*?)<\/w:t>/g)].filter((m) => m[1].includes('@')).length,
+      0, 'the DOCX export still carries the marker in a text run',
+    );
+    assert.ok(docx.includes('w:val="Character"'), 'the forced cue must take the Character style');
+
+    assert.equal(latin1(fountainToPdf(CASELESS, 'Forced Cue')).includes('@'), false, 'the PDF still carries the marker');
+  });
+
+  it('`@` inside a speech is NOT a cue, and `@` on an action line is left alone', () => {
+    // The deliberate non-escape. A Character element needs a preceding blank
+    // line in the spec, and `@` is a character writers really do type inside
+    // dialogue — reading `@everyone` as a cue would be worse than the bug.
+    const speech = 'INT. OFFICE - DAY\n\nMARY\nTell them all.\n@everyone, the meeting moved.\n\nEXT. LOT - DAY\n\nRain.\n';
+    const types = parseFountain(speech).filter((b) => b.type !== 'empty').map((b) => b.type);
+    assert.deepEqual(types, ['scene_heading', 'character', 'dialogue', 'dialogue', 'scene_heading', 'action']);
+
+    // And the normaliser's strip is gated on the PARSER having typed the line
+    // from the marker, so an action line that merely starts with `@` keeps it.
+    const action = 'INT. OFFICE - DAY\n\n@home he would have said nothing at all.\n\nEXT. LOT - DAY\n\nRain.\n';
+    assert.equal(normalizeScreenplay(action).includes('@home'), true,
+      'stripForcedMarkers must not touch a `@` the parser did not type a cue from');
   });
 });

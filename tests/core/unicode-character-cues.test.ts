@@ -281,10 +281,32 @@ describe('character cues: caseless scripts are action, on purpose', () => {
     assert.deepEqual(a.characters, []);
     assert.equal(a.dialogueLineCount, 0);
     // …and the scenes themselves still parse, so the document is not lost —
-    // only its speaker attribution is, which is what the `@` forced-cue
-    // prefix would fix. That prefix is NOT implemented (see fountain.ts).
+    // only its speaker attribution is.
     assert.ok(a.sceneCount >= 2, `sceneCount ${a.sceneCount}`);
-    assert.equal(blockTypeInContext('@たなか'), 'action', 'forced-cue support arrived without a test');
+  });
+
+  // ── AND THE ESCAPE HATCH THE DECISION ALWAYS NAMED (round 3) ────────────
+  // Excluding caseless scripts from the cue ALPHABET is only defensible while
+  // a caseless writer has some way to mark a cue. Fountain's is `@`, and until
+  // 2026-09-12 this parser did not implement it — so the paragraph above was
+  // not a trade-off, it was a dead end, and the line below was pinned as
+  // `action` with the message "forced-cue support arrived without a test".
+  // It has. Both directions are asserted on the SAME fixture text so the pair
+  // cannot drift: the bare caseless line is still action, the marked one is a
+  // cue, and the only difference between the two files is the marker.
+  it('the SAME fixture with `@` on every cue yields its speakers and its dialogue', () => {
+    const bare = readFixture('caseless-cues.fountain');
+    const forced = readFixture('forced-caseless-cues.fountain');
+    assert.equal(
+      forced.replace(/^@/gm, '').replace(/^Title:.*$/m, ''),
+      bare.replace(/^Title:.*$/m, ''),
+      'the two fixtures must differ only in the marker (and the title), or this pair proves nothing',
+    );
+    const a = analyzeFountainText(forced);
+    assert.deepEqual(a.characters, ['たなか', 'מרים', 'مريم'], 'each forced cue is a speaker, under its BARE name');
+    assert.equal(a.dialogueLineCount, 3, 'each speech under a forced cue is dialogue, not action prose');
+    assert.equal(blockTypeInContext('@たなか'), 'character', 'the forced cue must type as a character cue');
+    assert.equal(blockTypeInContext('たなか'), 'action', 'and the unmarked line must NOT — that is the decision');
   });
 });
 

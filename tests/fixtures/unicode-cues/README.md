@@ -29,8 +29,15 @@ adjacency that promotes an ASCII all-caps line to a cue. Those scripts have no
 case, so `\p{Lu}` does not match them and they stay `action`. That is a
 deliberate choice, not an omission: admitting `\p{Lo}` would make every short
 line of Japanese or Hebrew *action* a character cue. See the block comment at
-the top of `src/lib/fountain.ts` for the full reasoning and for the
-forced-cue (`@`) escape hatch this parser does not yet implement.
+the top of `src/lib/fountain.ts` for the full reasoning.
+
+`forced-caseless-cues.fountain` is the same document with Fountain's forced-cue
+`@` on each of those three lines, and it is the positive direction the decision
+above depends on: excluding caseless scripts from the cue alphabet is only a
+trade-off while a caseless writer has some way to mark a cue. `@` is that way,
+and as of 2026-09-12 this parser implements it — so the pair asserts that the
+marker, and nothing else, is the difference between three action lines and
+three speakers with three lines of dialogue.
 
 These files live in a SUBDIRECTORY on purpose.
 `scripts/check-doctor-output-identity.mjs` scans `tests/fixtures/*.fountain`
