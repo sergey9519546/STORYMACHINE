@@ -381,3 +381,139 @@ background task, per this round's explicit instruction.
 `origin/lane/writer-followups` == `da4a6539a1ef0a0e997793dfa1e5da3b866f5ede`
 — confirmed via `git ls-remote` against the local `git rev-parse HEAD`, both
 equal, run after every commit this round.
+
+## Round 3
+
+**Reviewed object:** `da4a6539` (round-2 tip). **Round-3 tip:** `5a95623c`,
+two commits on top, pushed after each (the first was corrected once — see the
+note at the end of this section). Source:
+`docs/audits/2026-09-12-adversarial/writer-review.md` "## Round 4
+(follow-ups lane) — re-check of `da4a6539`", verdict REVISE: one blocking
+item (the 503 misattribution) plus one non-blocking item the orchestrator
+directed be built this round (the runtime assertion strengthening).
+
+```
+8b9e5451 docs(fuzz-routes): attribute the concurrency case's 503s to the doctor budget
+5a95623c fix(fuzz-routes): require a 429 before the overflow case passes
+```
+
+### Item 1 (blocking) — the 503 is misattributed, corrected at all three sites
+
+**What was wrong.** Three places said the concurrency case's 503s could be
+`SessionCapacityError` (`MAX_SESSIONS`, `server/lib/session-store.ts`) as well
+as, or instead of, the doctor analysis pool's own queue budget:
+`scripts/fuzz-routes.mjs:548-558` (the comment justifying the crash-detector's
+`!== 503` exclusion), `:588` (the printed note, labelling every 503 "refused
+on session capacity"), and this report's own Round-2 Item-1 paragraph ("also
+trips `MAX_SESSIONS=100` … a SECOND, orthogonal way this server sheds an
+overflow it cannot serve"). The round-4 review captured all 30 503 bodies on
+its own boot of the same production-ceiling server and found zero
+`SessionCapacityError` — all 30 were `DoctorAnalysisBudgetExceededError`
+(`state: 'queued'`) — and showed `MAX_SESSIONS` cannot fire in this case
+because `gameLimiter` admits only ~90 of the 200 requests, well under the cap
+of 100.
+
+**Reproduced independently this round**, before touching any file
+(`<session scratch>/probe503.mjs`: `keylessBrowserServerEnv(process.env,
+port, { productionRateLimit: true })`, `SESSION_DB_DIR=':memory:'`, the
+worktree's own `server.ts`, 200 concurrent `POST /api/scriptide/doctor` with
+distinct `X-Session-Id` headers, response bodies parsed and classified by
+error shape):
+
+```
+breakdown {"200":90,"429":80,"503":30}
+503 body class tally: { "DoctorAnalysisBudgetExceededError (queued)": 30 }
+sample 503 body: {"error":"This server is busy: your draft waited longer
+  than the 60s it allows for a free analysis slot, so the run never started
+  and nothing was scored. Nothing is wrong with the draft — try again in
+  about 92 seconds."}
+```
+
+30 of 30, zero `SessionCapacityError`, matching the reviewer's own numbers
+exactly.
+
+**The fix.** All three sites corrected in place to name
+`DoctorAnalysisBudgetExceededError` / `server/lib/doctor-budget.ts` (the
+doctor analysis pool's own queue budget, pool admission control) as the
+source, and to explain plainly why `SessionCapacityError`/`MAX_SESSIONS`
+cannot fire in this specific case (`gameLimiter` spends the window at ~90
+requests, well under the 100-session cap). The crash-detector's exclusion
+itself — `o.status === null || (o.status >= 500 && o.status !== 503)` — is
+untouched: still exactly as narrow as it was, excluding 503 alone and no
+other status. The third site (this report's Round-2 paragraph) is left as
+originally written above, per this repository's established correction
+convention (see Round 1's own "CORRECTED in round 2" annotation on Item 1) —
+the wrong attribution there is superseded by this section, not rewritten
+in place.
+
+### Item 2 (non-blocking, built) — the runtime assertion now requires a 429
+
+**What was wrong.** `concurrencyAttack`'s own assertion accepted either
+`limited > 0` (a 429 appeared) OR `capacityRefused > 0` (a 503 appeared) as
+proof the overflow was shed, so a fully-disengaged `gameLimiter` — 0 429s —
+still passed as long as the doctor budget's 503s showed up instead. This
+does not prove what the case's own header claims it proves ("to 429 the
+overflow").
+
+**The fix.** The condition is now `succeeded > 0 && limited > 0` — a 429
+must actually appear, in addition to legitimate traffic getting through.
+`capacityRefused` (the doctor budget's 503 count) is still reported in the
+printed note as extra information, never as a substitute for `limited > 0`.
+
+**Fail-first, on a scratch mutation of this same worktree** (the dedicated
+overflow server's `{ productionRateLimit: true }` opt-out removed —
+`bootServer(overflowPort, { productionRateLimit: true })` →
+`bootServer(overflowPort)` — applied with `sed`, the fuzzer run, then
+reverted with `git checkout --` before the next run; `git status --short`
+confirmed clean before and after):
+
+| run | breakdown | record | exit |
+|---|---|---|---|
+| mutated (opt-out removed) | `{"200":90,"503":110}` — **0 429s** | `[UNEXPECTED-STATUS] 200-concurrent-doctor-requests status=no-overflow-signal` | **1 — FAIL** |
+| restored | `{"200":90,"429":81,"503":29}` | `[ok] 200-concurrent-doctor-requests status=overflow-shed` | **0 — PASS** |
+
+Both runs' full breakdowns and status lines are captured in
+`<session scratch>/fuzz-failfirst.log` and `<session scratch>/fuzz-restored.log`.
+The mutated run reproduces the exact numbers the round-4 review predicted
+(`{"200":90,"503":110}`, 0 429s, `[ok]` under the OLD condition) — under the
+NEW condition it now correctly flags and exits 1 instead.
+
+### A note on how this round's two commits were produced
+
+The first attempt at Item 1 accidentally included Item 2's code change in
+the same commit (both edits were made to the same file before the first
+commit was cut). This was caught before reporting: the combined commit
+(`bead83cc`, already pushed) was split via `git reset --soft da4a6539` (no
+working-tree or index change — nothing lost) followed by two commits, each
+containing exactly one item's diff (verified by diffing the intermediate
+and final file states against the originally-intended per-item edits before
+committing), then `git push --force-with-lease` to replace the single pushed
+commit with the two-commit history described above. No other session had
+based work on `bead83cc` at the time (it was pushed and corrected within the
+same round, before the report was written or reviewed). The final tree is
+byte-identical to what the single combined commit produced — this changed
+the history's shape, not the code.
+
+### Gates, this round (final tip `5a95623c`)
+
+| gate | command | result |
+|---|---|---|
+| lint | `npx tsc --noEmit` | **0** |
+| no-console | `node scripts/check-no-console.mjs` | **0** — 305 files, 24 quarantine entries, all unreachable |
+| honesty-audit | `node scripts/honesty-audit.mjs` | **0** — 461 files + 473 tracked markdown + 106 claims rows, clean |
+| touched: rate-limit-verification-override | `node --experimental-strip-types tests/core/rate-limit-verification-override.test.ts` | **14/14 pass, 0 fail** |
+| fuzzer, run 1 (foreground) | `node scripts/fuzz-routes.mjs` (full mode) | **PASS, exit 0, 0 flagged**, `{"200":90,"429":81,"503":29}` |
+| fuzzer, run 2 (foreground) | `node scripts/fuzz-routes.mjs` (full mode) | **PASS, exit 0, 0 flagged**, `{"200":90,"429":81,"503":29}` |
+
+No `npm test` this round, per instruction — the orchestrator runs the merge
+gates. `ps -eo args | grep -c '[n]ode --test'` was checked and read `0`
+immediately before every gate and every fuzzer run this round, so no wait
+was needed.
+
+## Tip and origin (Round 3)
+
+`origin/lane/writer-followups` == `5a95623c910dda40c14178822a5147f43ae53d86`
+— confirmed via `git ls-remote origin lane/writer-followups` against the
+local `git rev-parse HEAD` in `/home/user/wt-followups`, both equal, run
+after the force-push that corrected the commit split and again after the
+final gate run.
