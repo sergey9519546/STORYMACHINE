@@ -2,7 +2,7 @@
  * Coverage summary — primary Coverage-mode surface (paper·ink·stamp).
  * Progressive depth: summary first; full Script Doctor is one click deeper.
  */
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Loader2, RefreshCw, Stethoscope, X, ArrowRight } from "lucide-react";
 import type { ScriptDoctorReport } from "../../../server/nvm/analyze/types.ts";
 import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
@@ -297,6 +297,27 @@ export default function CoverageSummary({
   // worker immediately (server/nvm/analyze/doctor-pool.ts) rather than
   // leaving it to run to completion for a result nobody will see.
   const abortRef = useRef<AbortController | null>(null);
+  /** ROUND-2 REVIEW ITEM 7 — the gap the supersede-abort did not close.
+   *
+   *  `aliveRef` above already stopped a late RESPONSE from touching a torn-down
+   *  editor, but the REQUEST kept running: closing Coverage mid-run left a full
+   *  14-pass analysis occupying a doctor-pool worker for a result nobody would
+   *  ever read. On a 231-scene draft that is seconds of a worker the next writer
+   *  is queued behind. Aborting closes the connection, which frees the worker
+   *  immediately (server/nvm/analyze/doctor-pool.ts) — the same mechanism
+   *  `cancelRun` relies on and the same one `run` now uses to stop a superseded
+   *  request.
+   *
+   *  Its own effect, declared AFTER `abortRef`, rather than a second statement
+   *  in the `aliveRef` cleanup above: this repository has already paid for one
+   *  temporal-dead-zone bug that a fallback swallowed (CLAUDE.md's doctor.ts
+   *  note), and a cleanup that reads a `const` declared 30 lines below it is the
+   *  same shape even where it happens to work.
+   *
+   *  Safe: the catch checks `gen`, then returns for an AbortError with
+   *  `userCancelledRef` false, so nothing calls setState on an unmounted
+   *  component. */
+  useEffect(() => () => { abortRef.current?.abort(); }, []);
   // Set only by the Cancel button's own handler, so the catch block can tell
   // a real Cancel apart from the 120s watchdog or a teardown/superseded
   // abort — all three share the same DOMException("AbortError") shape.
@@ -455,6 +476,25 @@ export default function CoverageSummary({
     abortRef.current?.abort();
   }, []);
 
+  /** The text "Paste from PDF?" would actually submit, or null when the
+   *  normaliser would change nothing.
+   *
+   *  ROUND-2 REVIEW ITEM 5 (2026-09-12). The button used to render in both
+   *  cases, and its no-op branch existed only to explain a control that could
+   *  not act. Computing the candidate here instead means the control is offered
+   *  only where it does something — the same hide-don't-disable rule finding #10
+   *  applied to the start screen — and the same value is what the click submits,
+   *  so what the card offers and what it does cannot drift apart.
+   *
+   *  Guarded on `formatHint` so `normalizeScreenplay` (a full reflow of the
+   *  draft) runs only in the refusal state this affordance belongs to, never on
+   *  every render of a healthy report. */
+  const pdfRepairCandidate = useMemo(() => {
+    if (!formatHint) return null;
+    const repaired = normalizeScreenplay(fountain);
+    return repaired.trim() === fountain.trim() ? null : repaired;
+  }, [formatHint, fountain]);
+
   /** "Paste from PDF?" — finding #15's third affordance.
    *
    *  The server refuses text with no scene heading, and offers RETRY (the same
@@ -471,13 +511,14 @@ export default function CoverageSummary({
    *  carries sample semantics (it retitles the draft to the sample's title),
    *  which is exactly why this one exists — see its own doc above.
    *
-   *  Honest in both outcomes: when the normaliser changes nothing there is
-   *  nothing double-spaced to repair and no request is made (`pdfRepairNoop`),
-   *  and when the repaired text is still refused the card says that normalisation
-   *  found no sluglines either rather than re-offering the button
+   *  When the repaired text is still refused the card says that normalisation
+   *  found no sluglines either, rather than re-offering the button
    *  (`pdfRepairTried`). Whether the repair WORKED is decided by the server's own
    *  answer to the repaired bytes, not by a second copy of its scene-heading
-   *  test living in the client.
+   *  test living in the client. The no-op case (`pdfRepairNoop`) is now a
+   *  defensive path rather than a normal one: since round-2 review item 5 the
+   *  button is offered only when `pdfRepairCandidate` is non-null, so a control
+   *  that could not act is not rendered at all.
    *
    *  WHAT IT CANNOT DO, written down rather than discovered later. The route's
    *  `hasSceneHeading` tests each line TRIMMED, and `normalizeScreenplay`
@@ -485,8 +526,21 @@ export default function CoverageSummary({
    *  this card has no INT./EXT. line anywhere, and re-spacing cannot produce one.
    *  From this state the repair therefore lands on the second message above, whose
    *  value is the one instruction it carries ("Add one, such as INT. KITCHEN -
-   *  DAY"), plus the re-spaced draft now in the editor for the writer to keep
-   *  working in. A double-spaced paste that DOES carry sluglines never reaches
+   *  DAY").
+   *
+   *  AND IT REWRITES THE DRAFT TO GET THERE — corrected in round 2 after the
+   *  reviewer drove it. `normalizeScreenplay` collapses blank-line runs and joins
+   *  wrapped lines, so on the reviewer's own double-spaced paste four separate
+   *  action beats came back as ONE run-on paragraph. An earlier version of this
+   *  comment, and claims row 100, called that "the re-spaced draft now in the
+   *  editor for the writer to keep working in"; in the only state where this
+   *  control acts, the draft it leaves behind is materially WORSE than the one
+   *  the writer pasted. That is not a reason to withhold the control — the
+   *  instruction it lands is the thing the writer needs, and the edit is
+   *  reversible — but it is a reason to say so, which the card now does twice:
+   *  in the button's `title` before the click, and in the outcome sentence
+   *  after it, naming Ctrl+Z. A double-spaced paste that DOES carry sluglines
+   *  never reaches
    *  this card: the route recognises it and the doctor analyses it (asserted in
    *  scripts/verify-p2-p3-surfaces.mjs's P2-format phase). Making the repair able
    *  to RECOVER a heading — stripping the page-header and scene-number artifacts a
@@ -495,9 +549,12 @@ export default function CoverageSummary({
    *  docs/audits/2026-09-12-adversarial/writer-lane-report.md as out of scope for
    *  this lane, not forgotten. */
   const tryPdfRepair = useCallback(() => {
-    const current = fountain;
-    const repaired = normalizeScreenplay(current);
-    if (repaired.trim() === current.trim()) {
+    const repaired = pdfRepairCandidate;
+    if (repaired === null) {
+      // Defensive, not a normal path: the button is rendered from the same
+      // `pdfRepairCandidate` this reads, in the same render, so the two cannot
+      // disagree. Kept — and kept honest — so a future caller that reaches this
+      // function another way still gets told what happened instead of nothing.
       setPdfRepairTried(true);
       setPdfRepairNoop(true);
       return;
@@ -509,7 +566,7 @@ export default function CoverageSummary({
     void run({ fountain: repaired, title: title ?? "Untitled" });
     setPdfRepairTried(true);
     setPdfRepairNoop(false);
-  }, [fountain, title, onRepairDraft, run]);
+  }, [pdfRepairCandidate, title, onRepairDraft, run]);
 
   // Finding #3 (2026-09-12): publish `run` to the host so ScriptIDE's
   // "Coverage outdated -> Re-run coverage" banner issues the SAME request this
@@ -781,7 +838,15 @@ export default function CoverageSummary({
                 )}
                 {/* Finding #15: the honest outcome of a repair attempt. Neither
                     branch claims the repair worked — that is the server's answer
-                    to the repaired bytes, which arrives as a fresh run. */}
+                    to the repaired bytes, which arrives as a fresh run.
+
+                    ROUND-2 REVIEW ITEM 5: the second sentence now NAMES THE EDIT
+                    AND THE UNDO. The repair rewrites the writer's own draft —
+                    measured on the exact paste the reviewer used, four action
+                    beats separated by blank lines become one run-on paragraph —
+                    and the card previously said nothing about that at all. The
+                    undo works (Ctrl+Z restores the paste, verified), so the only
+                    thing missing was saying so. */}
                 {formatHint && pdfRepairNoop && (
                   <p className="mt-2 font-[family-name:var(--sm-font-mono)] text-[11px] leading-snug text-[var(--sm-ink-mute)]">
                     Nothing to re-space — this text is not double-spaced, so a PDF
@@ -790,21 +855,40 @@ export default function CoverageSummary({
                   </p>
                 )}
                 {formatHint && pdfRepairTried && !pdfRepairNoop && (
-                  <p className="mt-2 font-[family-name:var(--sm-font-mono)] text-[11px] leading-snug text-[var(--sm-ink-mute)]">
+                  <p
+                    className="mt-2 font-[family-name:var(--sm-font-mono)] text-[11px] leading-snug text-[var(--sm-ink-mute)]"
+                    data-pdf-repair-outcome
+                  >
                     Re-spaced the paste and ran it again — still no scene headings.
-                    Add one, such as INT. KITCHEN - DAY, and run coverage.
+                    Your draft was rewritten to do it: blank lines collapsed and
+                    wrapped lines joined. Press Ctrl+Z (⌘Z on a Mac) to put it
+                    back. To get coverage, add a scene heading such as
+                    INT. KITCHEN - DAY.
                   </p>
                 )}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button type="button" onClick={() => void run()} className="sm-btn sm-btn--ink">
                     Retry
                   </button>
-                  {/* Finding #15's third affordance. Offered only for a
-                      format refusal (where it is the relevant action) and only
-                      until it has been tried once — after that the card states
-                      what it found instead of re-offering the same button. */}
-                  {formatHint && !pdfRepairTried && (
-                    <button type="button" onClick={tryPdfRepair} className="sm-btn">
+                  {/* Finding #15's third affordance. Offered only for a format
+                      refusal (where it is the relevant action), only until it
+                      has been tried once — after that the card states what it
+                      found instead of re-offering the same button — and, since
+                      round-2 review item 5, only when the normaliser would
+                      actually change something (`pdfRepairCandidate`), so the
+                      control is never a button that cannot act.
+
+                      The `title` discloses the edit BEFORE the click, which is
+                      the half the outcome sentence cannot cover: a writer should
+                      not have to press a button to find out that it rewrites
+                      their draft. */}
+                  {formatHint && !pdfRepairTried && pdfRepairCandidate !== null && (
+                    <button
+                      type="button"
+                      onClick={tryPdfRepair}
+                      title="Rewrites your draft with the screenplay normaliser — blank lines collapsed, wrapped lines joined — and runs coverage on the result. Ctrl+Z undoes it."
+                      className="sm-btn"
+                    >
                       Paste from PDF?
                     </button>
                   )}

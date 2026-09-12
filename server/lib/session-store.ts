@@ -134,9 +134,64 @@ export function safeJsonParse<T>(text: string, fallback: T): T {
 // reverse proxy in front of this server MUST also set TRUST_PROXY (README's
 // Deployment section) or these limiters silently rate-limit the whole
 // deployment as a single client.
+/**
+ * VERIFICATION-ONLY budget headroom. Default 1 — i.e. off, and the production
+ * numbers below are the production numbers.
+ *
+ * ── WHY THIS EXISTS (2026-09-12, writer-loop review round 1, item 1) ────────
+ *
+ * The limiters key on `req.ip`, which is the right identity for a WRITER and
+ * the wrong one for a BROWSER GATE: `scripts/verify-*.mjs` drives the whole
+ * product loop — every phase, every browser context, plus its own direct
+ * `fetch` probes — through one server process from 127.0.0.1, so the suite as a
+ * whole spends one client's minute. Measured: `npm run verify:surfaces` reached
+ * its feature-length phase with the 120/60 s window already spent by earlier
+ * phases, `POST /api/scriptide/doctor` came back 429, the report never rendered,
+ * and 24 assertions never ran while the suite printed "218/218 passed" — three
+ * consecutive runs, one of them on an idle machine.
+ *
+ * ── WHY IT IS AN ENV VAR AND NOT A CODE CHANGE ─────────────────────────────
+ *
+ * Two alternatives were considered and rejected:
+ *   - a per-phase identity. `express-rate-limit` keys on `req.ip`, and every
+ *     Playwright context connects from the same address, so distinguishing them
+ *     needs `X-Forwarded-For` — which means running the gate with `TRUST_PROXY`
+ *     set, i.e. testing a NON-DEFAULT deployment configuration for every other
+ *     assertion in the suite. Trading a limiter artifact for a proxy-trust
+ *     artifact is not an improvement.
+ *   - waiting out the window before the phase. Papers over the count instead of
+ *     giving the suite a budget, and breaks again the moment a phase is added.
+ *
+ * ── WHY IT CANNOT LOOSEN PRODUCTION ────────────────────────────────────────
+ *
+ * It is read ONCE at module load from an environment variable that only
+ * `scripts/lib/keyless-browser-certification.mjs` sets, on the isolated
+ * short-lived server a gate boots for itself. Nothing else in the repository
+ * sets it: not the Dockerfile, not docker-compose.yml, not package.json's
+ * start/dev scripts, not `.github/**`, not `server/**` or `src/**`.
+ * `tests/core/rate-limit-verification-override.test.ts` asserts all of that AND
+ * that the default is the production number — so a deployment that never sets
+ * the variable is byte-for-byte the deployment that existed before this comment.
+ * A value outside 1-50, or one that is not a finite number, is ignored rather
+ * than trusted.
+ */
+const VERIFICATION_LIMIT_MULTIPLIER: number = (() => {
+  const raw = process.env.VERIFY_RATE_LIMIT_MULTIPLIER;
+  if (raw === undefined || raw === '') return 1;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 50) return 1;
+  return Math.floor(parsed);
+})();
+
+/** The production ceiling, times the verification multiplier (1 in every
+ *  deployment). Exported for the guard test, which asserts the defaults. */
+export function rateLimitMax(productionMax: number): number {
+  return productionMax * VERIFICATION_LIMIT_MULTIPLIER;
+}
+
 export const gameLimiter = rateLimit({
   windowMs: 60_000,
-  max: 120,
+  max: rateLimitMax(120),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please slow down.' },
@@ -144,7 +199,7 @@ export const gameLimiter = rateLimit({
 
 export const aiLimiter = rateLimit({
   windowMs: 60_000,
-  max: 20,
+  max: rateLimitMax(20),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many AI requests, please slow down.' },
@@ -170,7 +225,7 @@ export const aiLimiter = rateLimit({
 // gameLimiter on that route rather than stacking on top of it.
 export const heavyBodyLimiter = rateLimit({
   windowMs: 60_000,
-  max: 10,
+  max: rateLimitMax(10),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Large-upload rate limit reached — try again in a minute.' },

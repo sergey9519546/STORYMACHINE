@@ -202,6 +202,40 @@ const BASE = `http://127.0.0.1:${ISOLATED_PORT}`;
 
 let serverProc = null;
 let browser = null;
+// ── API-REQUEST BUDGET METER (2026-09-12, round-2 review item 1) ────────────
+//
+// The server's limiters key on `req.ip`, so this suite — every phase, every
+// browser context, plus its own `fetch` probes — spends ONE client's minute.
+// That is what starved the feature-length phase's doctor POST (429) and deleted
+// 24 assertions. The fix is the verification-only headroom the gate's server
+// boot sets (scripts/lib/keyless-browser-certification.mjs); this meter is how
+// that number stays honest. It records the timestamp of every /api/ request the
+// suite causes, from either side, and prints the busiest 60-second window at the
+// end — so a future phase that pushes the real peak toward the ceiling shows up
+// as a number in the log instead of as a mystery 429.
+const apiRequestTimes = [];
+const noteApiRequest = () => apiRequestTimes.push(Date.now());
+
+/** Count every /api/ request a page makes. Paired with wireConsoleCapture at
+ *  each context, so a new context cannot be added without being metered. */
+function meterApiRequests(metered) {
+  metered.on('request', (r) => { if (r.url().includes('/api/')) noteApiRequest(); });
+  return metered;
+}
+
+/** The largest number of /api/ requests inside any 60-second window. */
+function peakApiRequestsPerMinute() {
+  if (apiRequestTimes.length === 0) return 0;
+  const t = [...apiRequestTimes].sort((a, b) => a - b);
+  let peak = 0;
+  let lo = 0;
+  for (let hi = 0; hi < t.length; hi++) {
+    while (t[hi] - t[lo] >= 60_000) lo++;
+    peak = Math.max(peak, hi - lo + 1);
+  }
+  return peak;
+}
+
 let timing = null; // set at the top of main() — see scripts/lib/browser-verify.mjs
 // NOTE (2026-09-12): `page.waitForFunction(fn, arg, options)` takes its options
 // THIRD. Every call in this file passed `{ timeout }` in the ARG position, so
@@ -409,6 +443,16 @@ async function main() {
   // without paying for either. See scripts/lib/browser-verify.mjs.
   timing = getTiming();
 
+  // The suite's own probes count against the same budget as the browser's.
+  // Wrapped once here rather than at ~10 call sites, so a probe added later is
+  // metered without anyone remembering to.
+  const untrackedFetch = globalThis.fetch;
+  globalThis.fetch = (...args) => {
+    const url = String(args[0] instanceof Request ? args[0].url : args[0]);
+    if (url.includes('/api/')) noteApiRequest();
+    return untrackedFetch(...args);
+  };
+
   const { fountain: sampleFountain, title: sampleTitle } = loadSampleScript();
   console.log(`[verify] loaded sample script "${sampleTitle}" (${sampleFountain.length} chars) for the verify loop.`);
 
@@ -437,6 +481,7 @@ async function main() {
   const contextA = await browser.newContext({ acceptDownloads: true });
   const pageA = await contextA.newPage();
   wireConsoleCapture(pageA, genuineConsoleErrors);
+  meterApiRequests(pageA);
 
   console.log('\n=== P2 — DEFAULT SURFACE (Labs OFF, fresh profile) ===');
   await pageA.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
@@ -821,6 +866,7 @@ async function main() {
   const context375 = await browser.newContext({ viewport: { width: 375, height: 720 } });
   const page375 = await context375.newPage();
   wireConsoleCapture(page375, genuineConsoleErrors);
+  meterApiRequests(page375);
   await page375.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   await page375.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
   const summaryPanel375 = page375.locator('aside[role="region"]');
@@ -1729,6 +1775,7 @@ async function main() {
   await contextB.addInitScript(() => { try { localStorage.setItem('sm_labs_enabled', 'true'); } catch {} });
   const pageB = await contextB.newPage();
   wireConsoleCapture(pageB, genuineConsoleErrors);
+  meterApiRequests(pageB);
 
   await pageB.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
 
@@ -2268,6 +2315,7 @@ async function main() {
   const contextE = await browser.newContext();
   const pageE = await contextE.newPage();
   wireConsoleCapture(pageE, genuineConsoleErrors);
+  meterApiRequests(pageE);
 
   const doctorStreamPosts = [];
   pageE.on('request', (r) => {
@@ -2291,7 +2339,12 @@ async function main() {
   if (await runBtnE.isVisible().catch(() => false)) {
     await runBtnE.click({ timeout: timing.ms(20000) }).catch(() => {});
   }
-  await pageE.waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(120000) });
+  // Same recorded-failure shape as the feature-length phases below: the
+  // assertion immediately after this already reports whether the first run
+  // landed, so a stall should reach that line rather than end the suite.
+  await pageE
+    .waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(120000) })
+    .catch(() => {});
   await pageE.waitForTimeout(timing.ms(800));
   const healthBefore = await pageE.evaluate(() => {
     const m = document.body.innerText.match(/Health\s+([\d.]+)/i);
@@ -2395,6 +2448,7 @@ async function main() {
   const contextF = await browser.newContext();
   const pageF = await contextF.newPage();
   wireConsoleCapture(pageF, genuineConsoleErrors);
+  meterApiRequests(pageF);
   await pageF.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   await pageF.getByRole('button', { name: /start fresh/i }).first().click({ timeout: timing.ms(15000) });
   await pageF.locator('.cm-content').first().waitFor({ timeout: timing.ms(20000) });
@@ -2453,29 +2507,84 @@ async function main() {
     hintOnCard >= 1 && cardText !== null && cardText.includes(formatAnswer.hint.replace(/\s+/g, ' ')),
     `hintNodes=${hintOnCard} card=${JSON.stringify((cardText ?? '').slice(0, 260))}`,
   );
-  const pdfBtn = pageF.getByRole('button', { name: 'Paste from PDF?', exact: true }).first();
-  const pdfBtnVisible = await pdfBtn.isVisible().catch(() => false);
+  // ROUND-2 REVIEW ITEM 5. The affordance is now driven in BOTH of its states,
+  // because they are different claims:
+  //
+  //   (a) a paste the normaliser cannot change (this title-page-only one) —
+  //       the button must NOT render at all, since it could only report that it
+  //       did nothing;
+  //   (b) a double-spaced paste it CAN change — the button renders, discloses
+  //       the edit in its `title` before the click, rewrites the draft, and the
+  //       outcome names the edit and the undo.
+  const pdfBtnOnNoop = await pageF
+    .getByRole('button', { name: 'Paste from PDF?', exact: true })
+    .count();
   record(
     'P2-format',
-    'it offers the relevant third affordance, "Paste from PDF?", beside Retry and Use sample',
+    'a paste the normaliser cannot change is offered no "Paste from PDF?" button at all (hide, don\'t disable)',
+    pdfBtnOnNoop === 0,
+    `buttons rendered=${pdfBtnOnNoop}`,
+  );
+
+  // (b) — the same card, on a paste the repair really acts on.
+  const doubleSpacedProse = 'The room was cold.\n\n\n\n\nMaya opened the door.\n'
+    + '\n\n\n\nShe said nothing.\n\n\n\n\nThe tape was still running.\n';
+  await pageF.locator('.cm-content').first().focus();
+  await pageF.keyboard.press('Control+A');
+  await pageF.keyboard.press('Delete');
+  await typeWithoutDrainGaps(pageF, doubleSpacedProse);
+  await pageF.waitForTimeout(timing.ms(800));
+  const rerunAfterProse = pageF.locator('button', { hasText: /^Re-run coverage$/ }).first();
+  if (await rerunAfterProse.isVisible().catch(() => false)) {
+    await rerunAfterProse.click({ timeout: timing.ms(15000) });
+  }
+  const pdfBtn = pageF.getByRole('button', { name: 'Paste from PDF?', exact: true }).first();
+  const pdfBtnVisible = await pdfBtn
+    .waitFor({ state: 'visible', timeout: timing.ms(60000) })
+    .then(() => true)
+    .catch(() => false);
+  record(
+    'P2-format',
+    'a double-spaced paste the repair CAN act on is offered the third affordance, beside Retry and Use sample',
     pdfBtnVisible,
-    pdfBtnVisible ? '' : '"Paste from PDF?" not offered',
+    pdfBtnVisible ? '' : '"Paste from PDF?" not offered on a paste the normaliser changes',
   );
   if (pdfBtnVisible) {
+    const disclosure = await pdfBtn.getAttribute('title');
+    record(
+      'P2-format',
+      'the button discloses that it REWRITES the draft, before the click, and names the undo',
+      typeof disclosure === 'string'
+        && /Rewrites your draft/i.test(disclosure)
+        && /Ctrl\+Z undoes it/i.test(disclosure),
+      `title=${JSON.stringify(disclosure)}`,
+    );
+    const draftBefore = await pageF.evaluate(() => document.querySelector('.cm-content')?.innerText ?? '');
     await pdfBtn.click({ timeout: timing.ms(10000) });
-    await pageF.waitForTimeout(timing.ms(1200));
-    const honestOutcome = await pageF.evaluate(() => {
-      const t = document.body.innerText;
-      return /Nothing to re-space/i.test(t) || /still no scene headings/i.test(t);
+    await pageF.waitForTimeout(timing.ms(2500));
+    const draftAfter = await pageF.evaluate(() => document.querySelector('.cm-content')?.innerText ?? '');
+    const outcome = await pageF.evaluate(() => {
+      const el = document.querySelector('[data-pdf-repair-outcome]');
+      return el ? el.textContent.replace(/\s+/g, ' ').trim() : null;
     });
     const stillOffered = await pageF
       .getByRole('button', { name: 'Paste from PDF?', exact: true })
       .count();
     record(
       'P2-format',
-      'clicking it produces an honest outcome and is not re-offered as a button that changes nothing',
-      honestOutcome && stillOffered === 0,
-      `honestOutcome=${honestOutcome} buttonStillOffered=${stillOffered}`,
+      'the repair really does rewrite the writer\'s draft (the thing the card must not hide)',
+      draftBefore !== draftAfter && draftAfter.length > 0,
+      `beforeLen=${draftBefore.length} afterLen=${draftAfter.length} changed=${draftBefore !== draftAfter}`,
+    );
+    record(
+      'P2-format',
+      'the outcome names the edit AND the undo, and the button is not re-offered',
+      outcome !== null
+        && /still no scene headings/i.test(outcome)
+        && /Your draft was rewritten/i.test(outcome)
+        && /Ctrl\+Z/i.test(outcome)
+        && stillOffered === 0,
+      `outcome=${JSON.stringify((outcome ?? '').slice(0, 240))} buttonStillOffered=${stillOffered}`,
     );
   }
 
@@ -2544,6 +2653,7 @@ async function main() {
   const featurePageErrors = [];
   pageC.on('pageerror', (e) => featurePageErrors.push(String(e && e.message ? e.message : e).slice(0, 300)));
   wireConsoleCapture(pageC, genuineConsoleErrors);
+  meterApiRequests(pageC);
   // A second, phase-local console sink: wireConsoleCapture's list is asserted
   // globally at the end of this suite, but this phase needs to attribute an
   // error to THIS interaction (the loop surfaced as a console error thrown
@@ -2571,7 +2681,24 @@ async function main() {
   if (await runBtnC.isVisible().catch(() => false)) {
     await runBtnC.click({ timeout: timing.ms(20000) }).catch(() => {});
   }
-  await pageC.waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(180000) });
+  // ROUND-2 REVIEW ITEM 1: a lost request must not delete the phases behind it.
+  // This wait used to throw, and an unhandled throw here ends `main()` — so when
+  // the doctor POST came back 429 the suite stopped with "218/218 passed" and
+  // 24 later assertions simply never ran. It is now a RECORDED failure: the run
+  // continues, the number that comes back is the number of assertions the suite
+  // actually has, and a red line names what did not render.
+  const healthRendered_pageC = await pageC
+    .waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(180000) })
+    .then(() => true)
+    .catch(() => false);
+  if (!healthRendered_pageC) {
+    record(
+      'P2-featurelen',
+      `the feature-length coverage run rendered a report on pageC (a 429 or a stall here used to end the whole suite)`,
+      false,
+      'HEALTH never appeared — check the server log for a 429 from gameLimiter',
+    );
+  }
   await pageC.waitForTimeout(timing.ms(1500));
   record(
     'P2-featurelen',
@@ -2672,6 +2799,7 @@ async function main() {
   const contextD = await browser.newContext();
   const pageD = await contextD.newPage();
   wireConsoleCapture(pageD, genuineConsoleErrors);
+  meterApiRequests(pageD);
   await pageD.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   const [featureChooserD] = await Promise.all([
     pageD.waitForEvent('filechooser', { timeout: timing.ms(20000) }),
@@ -2686,7 +2814,19 @@ async function main() {
   if (await runBtnD.isVisible().catch(() => false)) {
     await runBtnD.click({ timeout: timing.ms(20000) }).catch(() => {});
   }
-  await pageD.waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(180000) });
+  // Same recorded-failure shape as pageC above.
+  const healthRendered_pageD = await pageD
+    .waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(180000) })
+    .then(() => true)
+    .catch(() => false);
+  if (!healthRendered_pageD) {
+    record(
+      'P2-featurelen',
+      `the feature-length coverage run rendered a report on pageD (a 429 or a stall here used to end the whole suite)`,
+      false,
+      'HEALTH never appeared — check the server log for a 429 from gameLimiter',
+    );
+  }
   await pageD.waitForTimeout(timing.ms(1500));
 
   // ── Finding #5 (2026-09-12): the COMPACT card's "next fix" must not invent
@@ -2930,6 +3070,7 @@ async function main() {
   const contextG = await browser.newContext();
   const pageG = await contextG.newPage();
   wireConsoleCapture(pageG, genuineConsoleErrors);
+  meterApiRequests(pageG);
   await pageG.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
   await pageG.getByRole('button', { name: /try sample coverage/i }).first()
     .waitFor({ timeout: timing.ms(15000) });
@@ -3012,6 +3153,21 @@ async function main() {
   } else {
     record('(global)', 'ZERO genuine browser console errors', true, '');
   }
+
+  const peakPerMinute = peakApiRequestsPerMinute();
+  console.log(
+    `\n[verify] API-request budget: ${apiRequestTimes.length} /api/ requests total, `
+    + `peak ${peakPerMinute} in any 60 s window `
+    + `(gameLimiter production ceiling 120/min; the gate's server runs with `
+    + `VERIFY_RATE_LIMIT_MULTIPLIER=10, i.e. 1200 — see `
+    + `scripts/lib/keyless-browser-certification.mjs).`,
+  );
+  record(
+    '(global)',
+    'the suite stays inside the rate-limit budget its server is given',
+    peakPerMinute < 1200,
+    `peak=${peakPerMinute}/60s ceiling=1200`,
+  );
 
   return staticResult;
 }

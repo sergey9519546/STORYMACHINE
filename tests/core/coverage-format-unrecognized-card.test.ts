@@ -70,6 +70,21 @@ describe('the compact card shows the hint, not just the reason', () => {
     assert.match(runPrefix, /abortRef\.current\?\.abort\(\);\s*\n\s*const controller = new AbortController\(\);/);
   });
 
+  it('unmounting Coverage mid-run aborts the request, not just its result', () => {
+    // ROUND-2 REVIEW ITEM 7. The supersede-abort stopped a run that a NEW run
+    // replaced; it did not stop the run nobody replaced. `aliveRef` made a late
+    // response harmless, but closing Coverage mid-analysis left a full 14-pass
+    // run occupying a doctor-pool worker for a result nobody would read.
+    assert.match(coverageSummary, /useEffect\(\(\) => \(\) => \{ abortRef\.current\?\.abort\(\); \}, \[\]\);/);
+    // Declared AFTER abortRef, so the cleanup does not close over a const
+    // declared below it — the shape CLAUDE.md's doctor.ts note warns about.
+    const abortRefDecl = coverageSummary.indexOf('const abortRef = useRef<AbortController | null>(null);');
+    const unmountAbort = coverageSummary.indexOf('useEffect(() => () => { abortRef.current?.abort(); }, []);');
+    assert.ok(abortRefDecl > -1 && unmountAbort > abortRefDecl, 'the unmount abort must follow abortRef\'s declaration');
+    // The aliveRef cleanup keeps its single job.
+    assert.match(coverageSummary, /return \(\) => \{\s*\n\s*aliveRef\.current = false;\s*\n\s*\};/);
+  });
+
   it('clears the hint when a new run starts, so it cannot describe text that is gone', () => {
     const runPrefix = coverageSummary.slice(
       coverageSummary.indexOf('setStatus("loading");'),
@@ -111,16 +126,81 @@ describe('"Paste from PDF?" routes through the existing normaliser', () => {
     assert.match(scriptIde, /onRepairDraft=\{\(text\) => installDraft\(text\)\}/);
   });
 
-  it('is offered only for a format refusal, and only once', () => {
+  it('is offered only for a format refusal, only once, and only when it would ACT', () => {
+    // Round-2 review item 5: the third condition is new. A button that cannot
+    // change anything is not rendered — the same hide-don't-disable rule
+    // finding #10 applied to the start screen.
     assert.match(
       coverageSummary,
-      /\{formatHint && !pdfRepairTried && \(\s*\n\s*<button type="button" onClick=\{tryPdfRepair\} className="sm-btn">\s*\n\s*Paste from PDF\?/,
+      /\{formatHint && !pdfRepairTried && pdfRepairCandidate !== null && \(/,
+    );
+    assert.match(coverageSummary, /const pdfRepairCandidate = useMemo\(\(\) => \{/);
+    // The candidate and the click read the SAME value, so what the card offers
+    // and what it does cannot drift apart.
+    assert.match(coverageSummary, /const repaired = pdfRepairCandidate;/);
+  });
+
+  it('discloses the edit BEFORE the click, in the button itself', () => {
+    // The outcome sentence cannot cover this half: a writer should not have to
+    // press a button to learn that it rewrites their draft.
+    assert.match(
+      coverageSummary,
+      /title="Rewrites your draft with the screenplay normaliser — blank lines collapsed, wrapped lines joined — and runs coverage on the result\. Ctrl\+Z undoes it\."/,
     );
   });
 
-  it('says honestly what the repair found, in both directions', () => {
+  it('names the edit and the undo in the outcome sentence', () => {
+    const outcome = coverageSummary.slice(
+      coverageSummary.indexOf('data-pdf-repair-outcome'),
+      coverageSummary.indexOf('data-pdf-repair-outcome') + 700,
+    );
+    assert.ok(outcome.length > 0, 'the outcome paragraph was not found');
+    assert.match(outcome, /Re-spaced the paste and ran it again — still no scene headings\./);
+    assert.match(outcome, /Your draft was rewritten to do it: blank lines collapsed and/);
+    assert.match(outcome, /wrapped lines joined\./);
+    assert.match(outcome, /Press Ctrl\+Z \(⌘Z on a Mac\) to put it/);
+    assert.match(outcome, /add a scene heading such as\s*\n\s*INT\. KITCHEN - DAY\./);
+  });
+
+  it('keeps the no-op message as a defensive path, not a normal one', () => {
     assert.match(coverageSummary, /Nothing to re-space — this text is not double-spaced/);
-    assert.match(coverageSummary, /Re-spaced the paste and ran it again — still no scene headings\./);
+    assert.match(coverageSummary, /Defensive, not a normal path/);
+  });
+});
+
+describe('what the repair actually does to the draft (round-2 review item 5)', () => {
+  // The reviewer's own paste. This is the measurement the card's new sentence
+  // is written from: the control's one acting state REWRITES the writer's text.
+  const doubleSpacedProse = 'The room was cold.\n\n\n\n\nMaya opened the door.\n'
+    + '\n\n\n\nShe said nothing.\n\n\n\n\nThe tape was still running.\n';
+
+  it('joins separate action beats into one paragraph — the edit the card now names', () => {
+    const repaired = normalizeScreenplay(doubleSpacedProse);
+    assert.notEqual(repaired.trim(), doubleSpacedProse.trim(), 'this paste must be one the repair acts on');
+    assert.equal(
+      repaired.trim(),
+      'The room was cold. Maya opened the door. She said nothing. The tape was still running.',
+    );
+    const beatsBefore = doubleSpacedProse.trim().split(/\n\s*\n/).length;
+    const beatsAfter = repaired.trim().split(/\n\s*\n/).length;
+    assert.equal(beatsBefore, 4);
+    assert.equal(beatsAfter, 1, 'four beats become one run-on paragraph');
+    // …and it is still not a screenplay, so this is the state the outcome
+    // sentence describes.
+    assert.equal(hasSceneHeading(repaired), false);
+  });
+
+  it('the states where the button is now withheld are exactly the ones where it could not act', () => {
+    for (const [label, text] of [
+      ['title-page only', 'Title: The Second Key\nAuthor: A. Writer\nDraft date: 2026-09-12\n'],
+      ['single-spaced prose', 'A memo about the third quarter.\nIt mentions a kitchen.\n'],
+    ] as const) {
+      assert.equal(
+        normalizeScreenplay(text).trim(),
+        text.trim(),
+        `${label}: the normaliser changes nothing, so no control should be offered`,
+      );
+    }
   });
 });
 
