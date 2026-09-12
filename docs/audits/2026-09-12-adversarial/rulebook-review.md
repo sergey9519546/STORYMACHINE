@@ -365,3 +365,235 @@ literally true. Pre-existing pattern in this file; noted, not required.
   than by assertion (R7), and 45/45 reports are byte-identical (R11).
 * The 20/30/40-cast ACCEPT proof is real and fail-first (R8). The problem is
   not that those casts are accepted; it is what else the chosen value accepts.
+
+---
+
+## Round 2
+
+Reviewed object: `d43022fe10c5950b4fea205219be82fa38042e59` — one commit on
+`8cdec674` (the round-1 object `08a67802` rebased onto `main @ 9cd1805c`), on
+`origin/lane/rulebook-and-guard-bound`. Same reviewer. Worked from
+`git archive d43022fe` beside the round-1 export;
+`/home/user/wt-rulebook` read-only, nothing in `/home/user/STORYMACHINE`
+modified except this file. Budget: the touched suites, identity, the receipt
+gate, my own probes.
+
+### Round-1 items, re-checked against the round-2 diff
+
+| Item | Round-1 verdict | Round 2 | Evidence |
+|---|---|---|---|
+| 1 | **BLOCKER** — 1,500,000 admits a 27.3 s analysis | **fixed** | bound is 675,000 (`server/lib/validation.ts:668`), derived from cost on the worst-admitted shape; reproduced below |
+| 2 | rate-based derivation deleted, not re-applied | **fixed** | `validation.ts:630-636` re-applies the file's own worst historical rate (0.022 ms/unit × 675,000 = 14,850 ms) as a cross-check on the direct measurement |
+| 3 | comment contradicts the value ("dozens, not hundreds" vs 223) | **fixed**, with one wording slip (item 12) | `validation.ts:638-641` states the true admitted maximum (150) |
+| 4 | six-timing table unreproducible | **superseded** | the round-2 generator `buildUniformMin` is committed at `tests/security/fountain-shape-guard-cue-parity.test.ts:3030`, and I reproduced its numbers |
+| 5 | `generateRulebook` partial write on throw | **not addressed** | acceptable — out of the round's named scope, and non-blocking |
+| 6 | identity gate weaker than it needed to be | **fixed** | reproduced below, 45/45 with `GIT_SHA` pinned and no `--ignore-keys` |
+| 7 | nearest-neighbour margin was 1.067×, not 1.28× | **superseded** | margin to bypass B is now 2.844×; the 1,600,000 unpinned neighbour is 2.37× clear |
+| 8 | one more copy of `dsWrapped` | **declined, reasonably** | pre-existing pattern, flagged as not required |
+
+### Reproductions
+
+`<r2>` = `<session scratch>/rulebook-review/r2` (export of `d43022fe`),
+`<base2>` = export of `main @ 9cd1805c`.
+
+**R12 — the worst admitted shape, measured, on my box.** `buildUniformMin(N)`
+as committed (N speakers × exactly 5 double-spaced 6-word paragraphs = 30 real
+words), `runScriptDoctor` in-process, fresh payload per run (the doctor caches
+on `contentHash`, so a repeated identical text reads 0 ms — I hit that trap
+too):
+
+| shape | distinct | weight | guard | wall | CPU |
+|---|---|---|---|---|---|
+| uniform-min N=150 (**at the bound**) | 150 | 675,000 | **ACCEPTED** | 13,418 / 13,894 / 14,023 / 13,709 / 13,804 / 15,093 / 15,241 ms | 12,405 / 12,898 / 13,170 ms |
+| uniform-min N=151 (one speaker over) | 151 | 684,030 | **REJECTED** | — | — |
+
+Median wall ≈ **14.0 s**, median CPU ≈ **12.9 s**. The lane reports 12.1 s
+median on its box; my seven runs straddle the 15 s design target (two of seven
+exceeded it on wall clock) while every CPU sample sits under it. The target is
+met, with a thinner margin than the report's "~24%" — on CPU, the quantity the
+headroom claim is about, the margin is **12–17%**.
+
+**R13 — the bound holds ACROSS shapes, which is what round 1 was about.**
+Three different shapes at or just under 675,000:
+
+| shape | distinct | pooled words | weight | guard | wall | CPU |
+|---|---|---|---|---|---|---|
+| few-big: probe-cast 44 (largest admitted) | 44 | 15,282 | 672,408 | ACCEPTED | 7,497 / 6,915 ms | 6,747 / 6,667 ms |
+| mid: 100 speakers × 66 words | 100 | 6,600 | 660,000 | ACCEPTED | 9,882 / 8,972 ms | 8,774 / 8,815 ms |
+| **uniform-min: 150 × 30** | 150 | 4,500 | 675,000 | ACCEPTED | 13,418–15,241 ms | 12,405–13,170 ms |
+
+Cost rises monotonically with distinct count at fixed weight, and the
+uniform-min shape is the maximum — exactly what the round-2 derivation
+assumes. **Nothing admitted by 675,000 costs more than ~14 s on my box.** The
+bound now brackets cost, not fixture weights. Round-1 BLOCKER discharged.
+
+**R14 — the new boundary tests fail on the unfixed tree (§3).** Against
+`8cdec674`'s `validation.ts` (bound 1,500,000):
+```
+round-1 bound 1500000
+N=151 on round-1 tree:    ACCEPTED  (=> the new "N=151 REJECTED" test fails)
+60-cast on round-1 tree:  ACCEPTED  (=> the new "60-cast REJECTED" test fails)
+```
+
+**R15 — no pinned rejection flipped.** Production
+`realVoiceEligibleWeightRejectionReason` instrumented in a scratch copy to
+record every rejecting weight; whole suite run:
+```
+# tests 657  # pass 657  # fail 0
+REJECTIONS-VIA-BOUND count=62 distinct weights:
+684,030 | 916,200 | 1,600,000 | 1,920,000 | 2,400,000 | 4,788,000 | 18,720,000 | 19,656,000
+```
+Every weight present at round 1 is still present; the two new entries are the
+lane's own N=151 and 60-cast cases. Lightest **pinned** DoS/bypass fixture is
+still bypass B at 1,920,000 → margin `1,920,000 / 675,000 = 2.844×`, matching
+the claimed 2.84×. The unpinned 1,600,000 "realistic-feature fixture"
+(`test:2737`) that I flagged at round 1 is now 2.37× clear.
+
+**R16 — the rejection copy a 60-cast writer now sees.**
+```
+"has too large a cast where every named character speaks enough to be individually
+ voice-scored (more than 675000 in distinct speaking characters × their total pooled
+ dialogue words) — this is a cast-size and analysis-cost limit, not a formatting
+ error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT"
+```
+True (the constant is interpolated, so the number cannot drift), and it names
+two things the writer can do. "Too large a cast" is a partial description —
+the binding quantity is cast × pooled words, which is why a 150-speaker sketch
+document passes and a 45-speaker feature does not — but the sentence states
+that product explicitly in its own next clause, so it corrects itself. Claims
+register row 69 carries the new number and the full round-1 → round-2 history;
+`honesty-audit` clean.
+
+**R17 — gates re-run by the reviewer on the round-2 export.**
+| Gate | Result |
+|---|---|
+| `tests/security/fountain-shape-guard-cue-parity.test.ts` | **657/657, exit 0** (duration 19.9 s, up from 4.2 s — see item 11) |
+| `tests/routes/fountain-shape-guard-cue-bypass.test.ts` | 57/57, exit 0 |
+| `tests/core/analyzer-dos.test.ts` | 12/12, exit 0 |
+| `tests/core/rulebook.test.ts` | 6/6, exit 0 |
+| `tests/core/brain-coverage.test.ts` | 7/7, exit 0 |
+| `npx tsc --noEmit` | 0 errors, exit 0 |
+| `check-brain` | "OK. 104 notes, 383 links, graph is fresh." exit 0 |
+| `honesty-audit` | "scanned 459 files … clean." exit 0 |
+| `check-docs` | "No AI writing patterns detected." exit 0 |
+| `check-no-console` | "305 file(s) … OK." exit 0 |
+| `check-scoring-receipt 8cdec674..d43022fe` | "no scoring-path files changed. OK." exit 0 |
+| output identity vs `main @ 9cd1805c`, `GIT_SHA` pinned, **no `--ignore-keys`** | "PASS — all 45 reports are byte-identical (analyzedAt excluded)." exit 0 |
+
+Both trailers present on `d43022fe`; no model identifier anywhere in the
+diff's content.
+
+**One correction to my own round 1.** I scaled my 27.3 s N=223 measurement to
+"≈36 s on the lane's box" using a 1.31× factor taken from the probe-cast
+fixture. The lane's round-2 sweep measures 27,361 ms for the same shape on its
+own box — within 1% of mine. The 1.31× was shape-specific and my scaled figure
+was wrong; the BLOCKER stood on the unscaled number alone (91% of the budget
+on either box), but the extrapolation should not have been stated as it was.
+
+---
+
+### Verdict: **REVISE** — one item
+
+The engineering is right and I want to be explicit about that: the bound is now
+derived from measured cost on the shape that actually maximizes cost, I
+verified it holds across three different shapes at the same weight (R13), the
+boundary tests fail on the unfixed tree (R14), nothing pinned flipped (R15),
+the narrowing to 60-cast ensembles is disclosed in the comment, in a test, and
+in the brain note rather than hidden, and every gate passes including the
+stronger identity form. One item stands between this and MERGE, and it is a
+single-line change with the pattern already in this repository.
+
+#### 9. The `ms < 20_000` wall-clock assertion is the exact form this repository already retired for flaking, and it is looser than the target it claims to guard
+
+`tests/security/fountain-shape-guard-cue-parity.test.ts:3055-3061`:
+```ts
+const start = Date.now();
+await runScriptDoctor(text);
+const ms = Date.now() - start;
+assert.ok(ms < 20_000, `…`);
+```
+Three problems, and `tests/core/doctor-analysis-budget.test.ts:620-655` already
+solved all three for the same measurement:
+
+* **Wall clock is the quantity that has already flaked here.** That file's own
+  header records it: "the wall-clock version of this assertion tripped twice on
+  trees that did not touch it (18,512 ms and 21,624 ms under load; 8.5 s alone)"
+  — a **2.5× load inflation on a fixture costing 8.5 s standalone**. This
+  lane's fixture costs **13.4–15.2 s standalone on my box** (R12) inside a
+  suite that `npm test` runs in parallel with everything else. The same
+  inflation puts it past 20,000 ms comfortably. The comment's claim that 20 s
+  is chosen so it will not "flake on ordinary shared-box noise" is not
+  supported by the noise this repository has actually recorded.
+* **It is looser than the target.** The derivation's target is 15 s (half the
+  budget); the assertion admits 20 s. The comment says so ("looser than the 15s
+  design target deliberately"), which makes it disclosed, not correct: a
+  regression from 12.1 s to 19.9 s would leave the derivation false and the
+  test green.
+* **`20_000` is a bare literal.** `doctor-analysis-budget.test.ts:642-643`
+  derives both of its ceilings from `DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS`, so a
+  budget change moves them together. This one decouples.
+
+**The fix, which passes today.** Use the two-part assertion from
+`doctor-analysis-budget.test.ts:646-655` verbatim — CPU time against half the
+budget, wall clock against the full budget:
+```ts
+const cpuStart = process.cpuUsage();
+const start = Date.now();
+await runScriptDoctor(text);
+const wallMs = Date.now() - start;
+const c = process.cpuUsage(cpuStart);
+const cpuMs = (c.user + c.system) / 1000;
+assert.ok(cpuMs < DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS / 2, …);
+assert.ok(wallMs < DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS, …);
+```
+I measured this shape at **12,405 / 12,898 / 13,170 ms of CPU** (R12) — inside
+the 15,000 ms half-budget on every sample, with 12–17% margin — so the strict
+form passes now and would have caught round 1's 223-speaker document (27 s CPU)
+outright. No change to the bound is implied.
+
+---
+
+### Non-blocking, for the same edit or the merge note
+
+#### 10. Header item (b)'s cross-shape comparison does not reproduce, and its conclusion is right for the wrong reason
+
+`server/lib/validation.ts:613-622` cites "probe-cast cast=45, weight 681,750 …
+about the same, ~12.6s" and concludes the two shapes "are not the 1.7x-apart
+pair the reviewer measured at 1.5M". Two corrections: cast 45 measures **686,340**
+on the committed generator and is **REJECTED** by this very bound, so the cited
+comparator is not a document the guard admits (the largest admitted few-big cast
+is 44, at 672,408); and measured (R13) the spread at this weight is **1.9×**
+(6.9–7.5 s few-big vs 13.4–15.2 s uniform-min), i.e. wider than the 1.7× at
+1.5M, not narrower. The bound is safe anyway — not because the shapes converged,
+but because the derivation is anchored on the worst one, which is the correct
+method. Delete the convergence claim rather than defend it; it is the weakest
+sentence in an otherwise well-evidenced comment.
+
+#### 11. The suite got 4.8× slower, in the file that is not the one that budgeted for it
+
+`tests/security/…` went from 4.2 s to 19.9 s on my box because the N=150 case
+runs a real `runScriptDoctor`. `doctor-analysis-budget.test.ts:9-12` explicitly
+avoided this shape of cost ("a genuinely slow fixture would add ~14 s to every
+CI run to prove the same branch"). Here the slow run IS the proof, so it is not
+the same trade — but it is worth one line in the file header saying the suite
+now carries a ~14 s cost and why, so the next person to find it does not
+"optimize" it away.
+
+#### 12. Two small wording slips in header item (d)
+
+`validation.ts:638-641` says `MAX_FOUNTAIN_FREQUENT_CUE_LINES`'s "dozens … not
+HUNDREDS" framing "below is corrected to say so". That comment is **above**
+(`validation.ts:541-552`), and it was **not edited** — the contradiction was
+removed by lowering the value, not by correcting the neighbour. Say that
+instead.
+
+---
+
+### Verdict line
+
+**REVISE** — item 9 only. Items 10–12 are non-blocking and can ride along.
+Everything else in round 2 is MERGE-ready and reproduces: the bound is
+cost-derived and shape-robust (R12, R13), the new tests fail on the unfixed
+tree (R14), no pinned rejection flipped and bypass B's margin is 2.844× (R15),
+the rejection copy is true and actionable (R16), and all twelve gates pass
+including 657/657 and 45/45 unqualified identity (R17).
