@@ -263,3 +263,139 @@ strengthening that still passes on real text.
    correctly left undone and correctly recorded — this lane removed the 504
    class from `verify:p0-flow` only, and the hazard is now measured evidence
    for whoever takes that lane.
+
+---
+
+## Round 2 — re-check of **96ab1ac1**
+
+**Reviewed object:** `lane/smoke-gate-boot` tip `96ab1ac1`, five commits over
+`f0b5d787` — `3f504d99` (public/), `a586884e` (call-boundary taint),
+`142c4e47` (attribute quoting), `93513cf9` (non-2xx status), `96ab1ac1`
+(one freshness walk per run). `git diff --stat f0b5d787 96ab1ac1` → **3 files,
++362 / −11**; no `src/`, no `server/`. Same reviewer, warm context: I re-checked
+my own items and nothing else. Worktree clean after every run; every plant
+under `<session scratch>`.
+
+### Blocking item 1 — `public/` — **closed, and I repeated my own experiment**
+
+`DIST_BUILD_INPUTS` is now `['src', 'public', 'index.html', 'vite.config.ts',
+'package.json', 'package-lock.json']`, plus root files matched by shape
+(`DIST_BUILD_CONFIG_RE`: `tsconfig*.json`, `postcss|tailwind|vite.config.*`) so
+a config added later is covered the day it appears. The same favicon experiment
+on a `git archive 96ab1ac1` export, built once, then
+`public/favicon.svg` edited:
+
+```
+staleness after public/ edit: "dist/index.html is older than public/favicon.svg (… < …)"
+[rev] dist/ is stale — …; running `npm run build`...
+[rev] dist/ rebuilt (2026-09-12T23:21:36.589Z).
+served favicon carries the tree edit: true        ← was FALSE at f0b5d787
+```
+
+**Fail-first, driven:** with `'public'` removed again from the list in a scratch
+copy, `smoke-gate-serve-mode.test.ts` goes **9 pass / 1 fail**, the failure
+being `distStaleness fires on public/ — the input that was missing (review round
+1, blocking)`. A second new test (`this repository really does ship a public/
+directory into dist/`) keeps that fixture from going vacuous if `public/` is
+ever emptied. That is the shape a staleness rule has to be proven in, and it now
+is.
+
+The in/out audit reads as an audit rather than a list, and the one exclusion I
+could have argued with checks out: `git grep -n "import.meta.env" -- src
+index.html` at the tip is **empty**, so no env value is inlined into the bundle
+and `.env*` is correctly out. `ensureBuiltDist`'s doc comment no longer states
+the guarantee as an absolute.
+
+### Non-blocking 1 — call-boundary taint — **closed, and it holds against a
+harder plant**
+
+Plant D rebuilt verbatim, plus one of my own (F) designed to beat a naive
+pre-pass — a `function` declaration rather than an arrow, the tainted value in
+the **second** argument position behind a decoy literal:
+
+| plant | result |
+|---|---|
+| D — `const check = (s) => /…/.test(s); return check(t);` | **caught** — `verify-plant-d.mjs:6 … [\`t\` derives from an innerText read at line 4, tested by \`check()\`]` |
+| F — `function hasVerdict(prefix, s) {…} return hasVerdict('x', body);` | **caught** — `verify-plant-f.mjs:6 … [\`body\` derives from an innerText read at line 4, tested by \`hasVerdict()\`]` |
+| C — a plain `textContent` poll (the two deliberate `verify-a11y.mjs` sites) | **still not flagged** — 13 pass / 0 fail with it present, so the fix bought no churn |
+
+The message now names the predicate as well as the origin line. Imported
+predicates are declared out of scope for a single-file textual scan and the test
+says so rather than leaving it implied — the right call for a scanner that must
+not become a type checker.
+
+### Non-blocking 2 and 3 — `serveModeOf` — **closed**
+
+Re-probed with a stub `fetchImpl`:
+
+| markup / response | classified |
+|---|---|
+| `src='/assets/index-abc.js'` (single quotes) | **built-dist** (was `unknown`) |
+| `src=/assets/index-abc.js` (unquoted) | **built-dist** |
+| `href = "/assets/index-Xy12.css"` (spaced `=`) | **built-dist** |
+| `src="/assets/index-MmPcFF4j.js"` (baseline) | built-dist |
+| stray `/@vite/client` in a comment | vite-dev (fail-closed, unchanged and correct) |
+| everything inlined | `unknown` (fail-closed, correct) |
+| HTTP 500 / 404 / 302 | **throws, naming the status** — e.g. "GET / answered HTTP 500 Internal Server Error, so there is no served front end to classify" |
+
+The fail-open direction is still unreachable (the `/@vite/client` test runs
+first), and the two ways a green gate could have gone red for a non-defect are
+gone.
+
+### Non-blocking 4 — one walk per run — **closed**
+
+`verifiedDists` memoizes a VERIFIED-CURRENT result per repo per process, and
+only ever after re-checking. Visible in both of my gate runs:
+
+```
+[smoke]        dist/ is current (built …, newest build input vite.config.ts) — not rebuilding.
+[smoke-budget] dist/ already verified current in this run — not re-checking.
+```
+
+Also exercised directly: two `bootKeylessServer({ serve: SERVE_BUILT_DIST })`
+calls in one process print the build line once and the cached line second.
+
+### Gates I re-ran
+
+| gate | command | exit |
+|---|---|---|
+| touched tests | `node --experimental-strip-types --test tests/scripts/wait-for-function-options-position.test.ts tests/scripts/smoke-gate-serve-mode.test.ts` | **0** — 23 pass, 0 fail, 4 suites (was 17) |
+| p0-flow ×2 (tip) | `npm run verify:p0-flow` | **0**, **0** — 16.6 s at load 4.52, 16.1 s at load 6.20 (round 1 measured 12.9–13.9 s at load 0.17–1.75; these ran under 3–4× the load) |
+| scoring receipt | `node scripts/check-scoring-receipt.mjs main..HEAD` | **0** — "no scoring-path files changed" |
+| claims register | `node scripts/honesty-audit.mjs` | **0** — 465 files, 489 tracked md, 115 rows, clean |
+| env exclusion | `git grep -n "import.meta.env" -- src index.html` | **empty** |
+
+I did not re-run `verify:surfaces`, `verify:ui-polish` or `npm test`: round 2
+touches `DIST_BUILD_INPUTS`, `serveModeOf`, the memo and the scanner, and the
+two dev suites' behaviour depends on none of them (both were green on
+`f0b5d787` in round 1, driven).
+
+---
+
+## VERDICT: **MERGE**
+
+The one blocking item is fixed at the cause and, more to the point, shown to
+fail first: `public/` is in the list, the served favicon now carries the tree's
+edit where it did not before, and removing the entry again turns the new fixture
+red by name. All four non-blocking items were taken as well, each with the
+narrower failure mode closed rather than documented — including the harder
+call-boundary plant I wrote specifically to beat the new taint pre-pass, which
+it caught with the predicate named.
+
+### Non-blocking
+
+1. **The memo is keyed on the repo path for the life of the process**, and
+   deliberately caches only "verified current". Within one gate run nothing
+   edits `src/`, so this is right today; if a future gate ever rebuilds or
+   mutates the tree between its own boots, the second boot would trust the first
+   boot's verdict. One line in the comment would fix the trap for whoever writes
+   that gate.
+2. **`DIST_BUILD_CONFIG_RE` matches root files only** (`readdirSync(cwd)`), so a
+   config moved into a subdirectory — `config/vite.config.ts`, say — would stop
+   being seen without anything failing. The shape-matching idea is the right
+   one; its blind spot is depth, not name.
+3. **Round-1 non-blocking item about a `.fulfill(` mention inside a hand-rolled
+   hold is already closed upstream** — `e41e55ca` carries the test ("a hold whose
+   handler only MENTIONS route.fulfill( in a comment or string is still a hold"),
+   so it arrived with the p0-flow lane's merge, not this one. Noting it so the
+   item is not chased twice.
