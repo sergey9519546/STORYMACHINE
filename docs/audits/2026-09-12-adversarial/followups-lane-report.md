@@ -63,29 +63,38 @@ This matches the brief's target exactly ("the production verifier's first
 | base (`6dbabc9c`) | `{"200":200}` — **0 429s** | 0 |
 | fixed | `{"429":200}` — **200/200 429s** | 2 (see below) |
 
-The fuzzer's 429 count returns to non-zero, as asked. **One side effect
-found and reported, not engineered around:** running the FULL fuzz suite
-(not just the concurrency case) against the real 120/min ceiling means the
-~195 sequential attack probes earlier in the same run already spend most of
-the budget before the concurrency case even starts, so two unrelated
-probes late in the sequence also see 429 instead of their expected
-status —
+The fuzzer's 429 count returns to non-zero, as asked. **CORRECTED in round 2
+(round-3 review item 1): this was undercounted by 9x, and a second cost went
+unmentioned entirely.** Running the FULL fuzz suite against the real
+120/min ceiling means the ~195 sequential attack probes earlier in the same
+run already spend most of the budget before the concurrency case even
+starts. The real count is **18** `status=429` lines, not two — only two of
+those eighteen are *flagged* (`[UNEXPECTED-STATUS]` / `[5XX]`, shown below);
+the other sixteen are silently absorbed as `[ok]` because 429 is in the
+harness's accepted-status set, for probes written to prove a validation
+rejection (`empty-body /api/analyze-script`, `array-body
+/api/simulate-to-fountain`, `no-content-type /api/nvm/selfplay`,
+`commitId-path-traversal`, `numeric-1e308`, and eleven more). **Separately,
+and not mentioned in the original round-1 report at all: both
+`ws-oversized-frame (10MB)` and `ws-10000-message-burst` stop running
+entirely** — the room-mint POST both depend on returns 429 once the window
+is spent, and the harness prints a skip line and returns rather than
+attempting either attack. On the unfixed baseline both execute and pass.
 
 ```
 [UNEXPECTED-STATUS] A3-bound legitimate-small-boneyard (raw) /api/scriptide/doctor   status=429
 [5XX] fdx-conversion-bypass /api/scriptide/doctor/stream (SSE)                       status=500 (synthetic marker for "no doctor_error frame" — the SSE body was a 429, not a crash)
 ```
 
-Both are reproducible, and both are a direct, foreseeable consequence of
-measuring the real ceiling across a fuzz run that fires far more than
-120 requests/minute — not a defect in the routes under test, and not
-something this narrowly-scoped item asked to be redesigned (pacing or
-budget-awareness inside `fuzz-routes.mjs` itself). Flagged here rather than
-silently left for someone to rediscover; `npm run fuzz-routes` now exits 1
-where it used to exit 0, for this reason alone. `verify-production-build.mjs`
-and `load-test-doctor.mjs` do not have this issue — the former's own
-71-assertion run stays under 120 requests, the latter is deliberately paced
-under the ceiling by design.
+All of this is reproducible, and all of it is a direct, foreseeable
+consequence of measuring the real ceiling across a fuzz run that fires far
+more than 120 requests/minute — not a defect in the routes under test, but
+a real, disclosed-too-narrowly cost of the round-1 fix, closed properly in
+Round 2 below (the reviewer's preferred two-server design) rather than left
+as a documented trade-off. `verify-production-build.mjs` and
+`load-test-doctor.mjs` never had this issue — the former's own 71-assertion
+run stays under 120 requests, the latter is deliberately paced under the
+ceiling by design.
 
 **`npm run verify:production` (real end-to-end run, with `PW_CHROMIUM_PATH`
 pointed at the installed full-Chromium build since the bundled
@@ -237,3 +246,138 @@ lane's diff.
 not touched. `lane/writer-loop-client`'s tip `6dbabc9c` will shortly be what
 `main` fast-forwards to, per the task's own note — this lane's base is that
 tip, not `main` itself.
+
+## Round 2
+
+**Reviewed object:** `55660c9f` (round-1 tip). **Round-2 tip:** `da4a6539`,
+two commits on top, pushed after each. Source:
+`docs/audits/2026-09-12-adversarial/writer-review.md` "## Round 3
+(follow-ups lane)" (committed on `origin/main`, `11f76f8f`).
+
+```
+da4a6539 test(coverage): close the abort-count guard's semicolon escape
+3a40bfd3 fix(fuzz-routes): give the overflow case its own server on a fresh window
+```
+
+### Item 1 — the fuzzer, closed at the reviewer's preferred fix
+
+**What was wrong, corrected to the real numbers.** The round-2 report said
+"two unrelated probes" and did not mention the WebSocket attacks at all. The
+reviewer measured, and I confirmed reproducing the round-1 build:
+**18** `status=429` lines (not two), **sixteen** validation probes scored
+`[ok]` by the rate limiter instead of their own route (`empty-body
+/api/analyze-script`, `commitId-path-traversal`, `numeric-1e308`, and
+thirteen more), **both** `ws-oversized-frame` and `ws-10000-message-burst`
+skipped ("room mint returned 429"), and the headline
+200-concurrent-doctor-requests case read `{"429":200}` with **zero**
+successes — a window already spent 195 requests earlier, unable to
+distinguish "sheds the overflow while legitimate traffic gets through" from
+"refuses everything." Both corrections (18, and the two named WS cases) are
+now in the item-1 write-up below and in the commit message.
+
+**The fix — the reviewer's preferred close, built.** `bootServer` takes an
+options argument (`{ productionRateLimit }`, default `false`). `main()` now
+boots TWO servers:
+
+1. The default (multiplied) server — same as every other keyless gate —
+   carries the ~195 sequential validation probes and the collab WebSocket
+   attacks. None of them are about the rate limiter, and none of them are
+   about to answer 429 for a route's own rejection ever again.
+2. A second, freshly-booted server with `{ productionRateLimit: true }`,
+   booted immediately before `concurrencyAttack` and used for nothing else,
+   so the 200-request burst hits a genuinely untouched 60s window.
+
+`concurrencyAttack`'s own assertion now checks BOTH halves of the property
+the case exists to prove: `succeeded > 0` (legitimate traffic gets through)
+AND an overflow signal is present (`rate-limited > 0` OR
+`session-capacity-refused > 0`). Either extreme — 200/200 succeeding (the
+limiter never engaged) or 0/200 succeeding (a spent window refusing
+everything) — is flagged as `no-overflow-signal` rather than printed `[ok]`.
+
+**One thing found while building this that the reviewer's design did not
+anticipate, and is disclosed rather than routed around.** A genuinely fresh
+120/min-ceiling server admitting 200 truly concurrent requests, each with a
+distinct fabricated session id, also trips `MAX_SESSIONS=100`
+(`server/lib/session-store.ts`) once enough sessions are simultaneously
+busy — a SECOND, orthogonal way this server sheds an overflow it cannot
+serve, answered with a deliberate, caught 503
+(`SessionCapacityError`/doctor-pool admission control — both have their own
+test coverage under `tests/core/doctor-analysis-budget.test.ts`), never an
+uncaught exception. The fuzzer's crash detector now excludes 503
+specifically (`status === null || (status >= 500 && status !== 503)`) so
+this legitimate capacity signal is reported, not flagged as a crash. A
+second, related fix: the aggregate wall-clock for draining up to ~90 real
+doctor analyses through a bounded worker pool is no longer compared against
+the single-request `SLOW_THRESHOLD_MS` (5s) — that threshold exists to catch
+ONE request hanging, and this case now does real work for the first time
+(previously ~0, since the window was always already spent), so its total
+time necessarily grew; the genuine "stayed responsive under load" signal
+remains the separate `/health` p95 check, unchanged and still applied
+correctly.
+
+**Measured, three consecutive foreground runs, same machine, no edits
+between them:**
+
+| metric | before (`55660c9f`) | after |
+|---|---|---|
+| `status=429` lines | **18** | **0** (confined to one aggregate note) |
+| `ws-oversized-frame` / `ws-10000-message-burst` | **SKIPPED** | both run, `[ok]` |
+| 200-concurrent breakdown | `{"429":200}` — **0 succeeded** | `{"200":90,"429":81,"503":29}` — stable across all 3 runs |
+| total requests / `[ok]` lines | 195 / 193 | **197 / 197** |
+| flagged findings | 2 | **0** |
+| exit | **1 — FAIL** | **0 — PASS** |
+
+`node scripts/fuzz-routes.mjs` run a fourth time as the gate evidence for
+this round (below): same shape, exit 0.
+
+### Item 2 — the abort-count guard's semicolon escape, closed
+
+`abortCallSites`' pattern required a trailing `;` immediately after
+`abort()`, so `useEffect(() => () => abortRef.current?.abort(), []);` — an
+arrow-expression-body cleanup whose only `;` lands after `useEffect(...)`'s
+closing paren, not after the call itself — survived at 21/0. Fixed by
+stripping block and line comments first (`stripComments`, shared by the
+primary guard and the self-check block rather than duplicated) and dropping
+the `;` requirement from the regex.
+
+**Fail-first, reproduced against `55660c9f` with route (C) planted into a
+fresh `git archive` export of that tip's `CoverageSummary.tsx`:**
+
+| | old test (pre-round-2) | new test (this round) |
+|---|---|---|
+| route (C) planted | **21 pass / 0 fail — missed** | **17 pass / 5 fail — caught** |
+| untouched tree | 21 pass / 0 fail | **22 pass / 0 fail** |
+
+Added route (C) as a third self-check entry alongside (A) and (B) (same
+plant-and-restore discipline), so a future edit to the counting rule has to
+keep catching all three; renamed the describe block from "both … routes" to
+"every known reintroduction route."
+
+### Gates, this round (final tip `da4a6539`)
+
+| gate | command | result |
+|---|---|---|
+| lint | `npx tsc --noEmit` | **0** |
+| no-console | `node scripts/check-no-console.mjs` | **0** — 305 files, 24 quarantine entries, all unreachable |
+| check-docs | `node --experimental-strip-types scripts/check-docs-quality.ts --all` | **0** — no AI-writing patterns |
+| honesty-audit | `node scripts/honesty-audit.mjs` | **0** — 461 files + 473 tracked markdown + 106 claims rows, clean |
+| check-brain | `node scripts/brain-graph.mjs --check` | **0** — 105 notes, 386 links, fresh |
+| scoring receipt | `node scripts/check-scoring-receipt.mjs 6dbabc9c..HEAD` | **0** — "no scoring-path files changed" |
+| output identity | `check-doctor-output-identity.mjs --compare` vs `git archive 6dbabc9c`, `GIT_SHA` pinned equal | **PASS — 45/45 byte-identical** |
+| touched: rate-limit-verification-override | run individually | **14/14** |
+| touched: keyless-browser-certification | run individually | **2/2** |
+| touched: coverage-format-unrecognized-card | run individually | **22/22** |
+| fuzzer (foreground, required this round) | `node scripts/fuzz-routes.mjs` (full mode) | **PASS, exit 0, 0 flagged**, `{"200":90,"429":81,"503":29}` |
+
+No `npm test` this round, per instruction — the orchestrator runs the merge
+gates.
+
+All commands above were run in the foreground on this session's own shell,
+polling completion directly rather than through a monitor or a detached
+background task, per this round's explicit instruction.
+
+## Tip and origin (Round 2)
+
+`origin/lane/writer-followups` == `da4a6539a1ef0a0e997793dfa1e5da3b866f5ede`
+— confirmed via `git ls-remote` against the local `git rev-parse HEAD`, both
+equal, run after every commit this round.
