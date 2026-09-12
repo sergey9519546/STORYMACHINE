@@ -476,3 +476,83 @@ four sentences; item 2 is two numbers. Re-check will be a handful of greps.
 first measured 152/1 for me. The failure was my own contamination — two
 scratch `.mjs` helpers I had copied into the export tree — and the suite is
 153/0 on a clean archive, as the lane reports.)*
+
+## Round 3
+
+Reviewed object: `c9c50296` — one copy-only commit on the rebased lane line
+(`c9c50296` *docs: the known limit, measured — with the counterexample
+committed as a fixture*), branch `lane/verify-covers-tier`, on origin. Same
+reviewer, confirmation pass. Worked from `git archive c9c50296 | tar -x` under
+`<session scratch>/verify-review/r3` (and `r3m` for the flip checks).
+`/home/user/wt-verify` untouched; nothing pushed.
+
+**No executable behaviour changed.** `git diff --stat 511688b8..c9c50296 -- .
+':(exclude)docs/**' ':(exclude)tests/**' ':(exclude)*.md'` is **empty**; the
+whole commit is four doc files, two fixtures, the fixtures README and a
+44-line test block.
+
+### R2 finding 1 — closed, and closed better than I asked for
+
+| check | result |
+|---|---|
+| the wording carries in all four places | `README.md`, `ARCHITECTURE.md` §4, `docs/brain/Surfaces/Surface - Exports.md`, `docs/CLAIMS_REGISTER.md` row 97 each carry "machine-readable label" and "14 mechanical edits"/"17"; **`recognisable form` now appears in none of them** (grep count 0/0/0/0) — the false half is gone, not merely softened |
+| the wording is TRUE | Verified against the code, not the prose: every member of `tierSignals` (`scripts/verify-report.mjs`) is a class name, a stylesheet selector, a heading's wording, the tier caption or the scope sentence. The sentence now describes the mechanism the gate actually implements |
+| fixtures byte-identical to mine | `cmp` on both: **RAW BYTE-IDENTICAL, timestamp included**. `known-limit-relabelled-coverage.html` sha256 `758ad6156c8b3ff1…` = my `MIN-html-14edits.html`; `known-limit-relabelled-letter.md` `3c404d8852379080…` = my `MIN-letter-final.md`. Not re-derived, not "equivalent" — the same bytes |
+| they still verify at exit 0 on this tree | both, freshly, against `data/screenplays/chain-of-custody.fountain` |
+| the four forged strings are really on the page | `9,999 scenes`, `999,999 words`, `~500 pages`, `p. 999`, `The 9 things to fix first`, `top 5%` — one occurrence of each, in **both** fixtures |
+| the fixtures README tabulates the edits | It does, and the description matches what I actually did edit-for-edit, including the load-bearing detail (markup classes **and** stylesheet selectors renamed together, so nothing is left unstyled) and the letter's different route (`**Logline.**`→`**Premise.**`, `**Length.**`→`**Size.**`, `**Verdict.**`→`**Rating.**`, health reading unspaced, `Verdict:` row also deleted) |
+| the block cannot become a tautology | **Flip check (b)**: de-forging the HTML fixture (`9,999 scenes`→`13 scenes`, `top 5%`→`not comparable`) makes two of the four `assert.match` guards fail. A fixture that quietly lost its forgery is caught |
+| the test fails correctly if the limit is CLOSED | **Flip check (a)**: forcing `tierSignals` to always return a signal makes both fixtures exit 1 (`missing claim: …` ×9 / ×8) and the suite goes **151 pass / 4 fail**, with both KNOWN LIMIT cases failing on exactly the intended message — *"if this now exits 1 the limit has been CLOSED — flip this assertion, move the fixture out of the known-limit block, and delete the known-limit section of the fixtures README and the four shipped sentences that cite it."* The instruction a future lane needs is inside the failure it will see |
+| clean suite | `tests/scripts/verify-report.test.ts` → **155 pass / 0 fail**, with `ok 78` / `ok 79` the two KNOWN LIMIT cases |
+| hygiene gates on a clean archive of `c9c50296` | `check-no-console`, `check-docs`, `honesty-audit`, `check-brain` — all exit 0 |
+
+The framing is the right one: the block says in its own comment that it "is not
+a guard; it is a fail-first target for the lane that closes the limit", and the
+README section ends "do not 'fix' the fixtures by regenerating them." A known
+gap, written down, measured, and committed as the next lane's failing test is a
+better outcome than the sentence I asked for.
+
+### R2 finding 2 — NOT fixed in this object
+
+The two figures are unchanged at `c9c50296`. The Round 2 gate table in
+`docs/audits/2026-09-12-adversarial/verifytier-lane-report.md` still reads:
+
+```
+line 358 | `node scripts/check-no-console.mjs` | 305 files, 24 quarantine entries, … | 0 |
+line 360 | `npm run honesty-audit` | 459 files + 461 tracked markdown + 99 register rows — clean | 0 |
+```
+
+Re-measured on a clean `git archive` of `c9c50296` just now:
+
+```
+check-no-console: 305 file(s) … 23 tsconfig quarantine entr(ies) applied … OK.
+honesty-audit:    scanned 459 files, plus 454 tracked markdown files … clean.
+```
+
+23, not 24. And the markdown count is 454 on this tree, 450 on `4328a6eb`,
+461 in the lane's worktree — which is the whole reason it should not be quoted
+as a gate result at all, as that table's own closing paragraph says one
+screen below it. (That paragraph is still there and still correct; the cell
+above it was not brought into line.)
+
+This is not a product defect: both gates exit 0, nothing user-facing carries
+either number, and it is two cells in the lane's own retrospective.
+
+### VERDICT: MERGE
+
+R2 finding 1 — the only substantive item left after round 2 — is closed, with
+my own counterexample committed byte-identical as a fail-first target, a test
+block that is honest in both directions, and a limit sentence that is now true
+in all four shipped places. R1's findings 1-3 remain closed under replay,
+and no executable code changed in this round.
+
+One correction to make with the merge, not a reason to hold it:
+
+1. `docs/audits/2026-09-12-adversarial/verifytier-lane-report.md` lines 358 and
+   360 — set the quarantine count to **23**, and drop the "461 tracked
+   markdown" figure (leave `459 files + 99 register rows`, or say
+   "tracked markdown: worktree-dependent"), so the cell agrees with the
+   paragraph 20 lines below it that explains why that number must not be
+   quoted. Measured values above; a two-line edit.
+
+Nothing else is outstanding from any round.
