@@ -110,7 +110,7 @@ INVERSE_CHEKHOV_GUN in `33a2ee48`; `docs/rulebook/README.md` is the
 machine-counted authority — the earlier "~8,917 rules, ~5,701
 from a bulk Wave 1191" story was shown to be inaccurate by the 2026-07-14
 audit — `docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md`
-R2-C01), and by the doctor's own measurement (`doctor.ts:2092-2093`) the
+R2-C01), and by the doctor's own measurement (`doctor.ts:2380-2381`) the
 entire weighted-rule channel contributes AUC ~0.076 to discrimination while
 scene-count scarcity carries AUC ~0.938. More rules stopped adding signal a
 long time ago; they add maintenance cost and undercut the trust story. Do not
@@ -247,11 +247,11 @@ before the score.
 
 None of these six is comparable to AUC-24 or to the P1 baseline — 32 short
 scripts vs feature-length, and the one feature-scale deduction that is WIRED
-INTO HEALTH (`ARC_DED_MIN_SCENES` = 15, `doctor.ts:2104`) never fires at this
+INTO HEALTH (`ARC_DED_MIN_SCENES` = 15, `doctor.ts:2392`) never fires at this
 length, so the public benchmark measures a strictly smaller engine. *(This
 sentence also named `CLIMAX_DED_MIN_SCENES` until 2026-09-12. That constant
 gates `climaxZoneDecayDeduction`, which is exported and wired into NOTHING —
-`doctor.ts:2127-2131` records the revert, "it over-fired on real scripts with
+`doctor.ts:2416-2419` records the revert, "it over-fired on real scripts with
 naturally flat climaxes" — so "never fires at this length" implied it fires at
 some length. It fires at no length. Adversarial finding 6.)* What
 distinguishes the two measurement channels from each other is scene count:

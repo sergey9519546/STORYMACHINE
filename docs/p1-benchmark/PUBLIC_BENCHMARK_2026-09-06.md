@@ -141,12 +141,12 @@ as one.
 | recipe | seeded Fisher-Yates shuffle of all scenes, then drop every third of the shuffled order | move the final scene to position 1 | replace every dialogue and parenthetical line with `Hello.` |
 | scene count | **changes** (10 → 7) | **preserved** (measured: mean scarcity delta **0.000** over all 32) | preserved |
 | imported from | `scripts/lib/auc.ts` `shuffleDropDegrade` — the AUC-24 ratchet's own recipe, byte for byte | `scripts/lib/rebuild-experiment-lib.mjs` `degradeClimaxRelocate` | `scripts/lib/rebuild-experiment-lib.mjs` `degradeDialogueFlatten` |
-| lineage number to read it against | AUC-24 (private corpus, feature length) last measured 0.731 | private-corpus act-swap ~0.48 (`doctor.ts:2092-2093`); P1 baseline `CLIMAX_RELOCATE` 0.523 on 153 test scripts | P1 baseline `DIALOGUE_FLATTEN` **0.990** — the one channel that PASSES its ≥0.80 gate |
+| lineage number to read it against | AUC-24 (private corpus, feature length) last measured 0.731 | private-corpus act-swap ~0.48 (`doctor.ts:2380-2381`); P1 baseline `CLIMAX_RELOCATE` 0.523 on 153 test scripts | P1 baseline `DIALOGUE_FLATTEN` **0.990** — the one channel that PASSES its ≥0.80 gate |
 
 **(b) exists because scene count is the doctor's dominant term.**
 `scarcityPenalty(sceneCount) = 140 / max(sceneCount,1)` (`doctor.ts:465-467`,
 summed into `craftPenalty` at `doctor.ts:657`); the file's own comment at
-`doctor.ts:2092-2093` records "scarcity term AUC 0.938; the weightedIssues rule
+`doctor.ts:2380-2381` records "scarcity term AUC 0.938; the weightedIssues rule
 channel AUC is 0.076". A degradation that changes scene count is partly
 measuring that arithmetic. One that preserves it cancels the term exactly and
 leaves order-sensitivity.
@@ -561,15 +561,15 @@ them, and this lane deliberately changed no file on any of those branches.
   that the score is valid — and mistaking one for the other would be the
   worst possible misreading of this document.
 * Transfer to feature-length real writing. N = 32 at 9–14 scenes.
-  `ARC_DED_MIN_SCENES` is 15 (`doctor.ts:2104`), so the one feature-scale
+  `ARC_DED_MIN_SCENES` is 15 (`doctor.ts:2392`), so the one feature-scale
   deduction that is wired into health never fires on this corpus at all — this
   benchmark measures a strictly smaller engine than the AUC-24 ratchet does.
   **Corrected 2026-09-12:** this line also named `CLIMAX_DED_MIN_SCENES`, as a
   second "feature-scale deduction". It gates `climaxZoneDecayDeduction`
-  (`doctor.ts:617`), which is exported and appears in no scoring-path call site
+  (`doctor.ts:802`), which is exported and appears in no scoring-path call site
   at all — `aggregateReport`'s health line subtracts `structuralDeduction`,
   `arcIncoherenceDeduction` and `dialogueDeduction` only, and
-  `doctor.ts:2127-2131` records why the climax term was reverted ("it over-fired
+  `doctor.ts:2416-2419` records why the climax term was reverted ("it over-fired
   on real scripts with naturally flat climaxes"). "Never fires at this length"
   implied it fires at some length. It fires at no length (adversarial finding 6).
 * Say anything about the AUC-24 ≥ 0.622 ratchet. Different corpus, different
@@ -910,3 +910,63 @@ matched pairs go from 1 of 6 ordered (mean gap −0.02) to **4 of 6 (mean gap
 +0.3833)**, with no script left pinned at a shared health value. On six pairs
 that is inside what chance produces, and it is recorded as a number to
 re-measure on more pairs, not as a result.
+
+---
+
+## 13. Re-lock, 2026-09-12 — a REBASE, and what a stronger degradation does to a floor
+
+`scoring/feature-length-defects` (§12) was built before main's instrument fix
+landed. `scoring/adversarial-2026-09-12` is that branch rebased onto
+`main @ 8aa1f696`, which brings in `63d7ede1`: `CLIMAX_RELOCATE` now moves the
+final scene to position **ONE** (it spliced at index 1 — position two — before,
+leaving the script's opening in place), and one shared scene segmenter
+(`scripts/lib/scene-segments.ts`) replaces the `INT./EXT.`-only split. The
+scoring change from §12 is unchanged; the instrument around it is not, so every
+number had to be re-measured before anything new was built on top.
+
+**Reproduce:** `npm run benchmark:public` on `scoring/adversarial-2026-09-12`
+at its first commit. The floors were written by
+`npm run benchmark:public -- --lock` and its before → after print is quoted
+below verbatim.
+
+| degradation | N | AUC matched-pair (PRIMARY) | 95% CI | floor | AUC all-pairs | 95% CI | floor | ordered/inverted/tied |
+|---|---|---|---|---|---|---|---|---|
+| `SHUFFLE_DROP` | 32 | **0.8750** | [0.7500, 0.9688] | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` = **0.855** | 0.8291 | [0.7222, 0.9268] | `PUBLIC_SHUFFLE_DROP_FLOOR` = **0.8091** | 28/4/0 |
+| `CLIMAX_RELOCATE` | 32 | **0.5938** | [0.4219, 0.7500] | `PUBLIC_ORDER_PAIRED_FLOOR` = **0.5738** | 0.5269 | [0.4639, 0.5986] | `PUBLIC_ORDER_FLOOR` = **0.5069** | 18/12/2 |
+| `DIALOGUE_FLATTEN` *(control)* | 32 | **1.0000** | [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR` = **0.98** | 1.0000 | [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_FLOOR` = **0.98** | 32/0/0 |
+
+```
+locked scripts/lib/auc.ts — six floor constants:
+  PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR         0.855 ->   0.855   (measured 0.8750, PRIMARY, unchanged)
+  PUBLIC_SHUFFLE_DROP_FLOOR               0.8091 ->  0.8091   (measured 0.8291, unchanged)
+  PUBLIC_ORDER_PAIRED_FLOOR               0.5269 ->  0.5738   (measured 0.5938, PRIMARY)
+  PUBLIC_ORDER_FLOOR                      0.4951 ->  0.5069   (measured 0.5269)
+  PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR      0.98 ->    0.98   (measured 1.0000, PRIMARY, unchanged)
+  PUBLIC_DIALOGUE_FLATTEN_FLOOR             0.98 ->    0.98   (measured 1.0000, unchanged)
+```
+
+**The two ORDER floors moved and the score did not.** A relocation that
+replaces the opening is a harder test than one that leaves it alone, so the
+same scorer separates more of the pairs: 17/14/1 under position two, 18/12/2
+under position one, matched-pair 0.5469 → **0.5938**. The proof that the engine
+sat still is in what did **not** move: `tests/fixtures/public-corpus-manifest.json`
+(32 rows of intact `sceneCount`/`words`/`health`/`verdict`) and
+`tests/fixtures/public-benchmark-split.json` both re-locked to byte-identical
+content, and all four non-order floors are unchanged.
+
+**Do not read the higher floor as a better score.** The matched-pair interval
+[0.4219, 0.7500] still contains 0.5, and so does the all-pairs interval
+[0.4639, 0.5986]. With scene count held exactly constant the doctor still does
+not reliably prefer an intact script to a reordered copy of itself. What the
+re-lock buys is that the same engine is now ratcheted against a *harder*
+degradation than before.
+
+**The tie count rose from 1 to 2, not fell.** §12 reported the density pin gone
+and 1 exact tie of 32; under position-one relocation there are 2. Two pairs
+where a stronger manipulation produces an identical health are two pairs the
+score cannot see at all, and the number is recorded here so a later change that
+grows it is visible.
+
+**Everything §8 limits still applies unchanged**, and the holdout is still
+spent: all six floors above were locked from all 32 scripts, the five holdout
+files included.

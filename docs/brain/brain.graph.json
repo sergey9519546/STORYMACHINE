@@ -55,6 +55,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-12 Adversarial Review",
+      "path": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
       "type": "branch",
       "title": "Branch — Advice-Rule-Fixes",
@@ -541,6 +547,12 @@
       "path": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md"
     },
     {
+      "id": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "type": "session",
+      "title": "Session — 2026-09-07: The Innovation Batch, and the Rebuild",
+      "path": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md"
+    },
+    {
       "id": "docs/brain/Surfaces/Surface - Collab Room.md",
       "type": "surface",
       "title": "Surface — Collab Room",
@@ -569,6 +581,18 @@
       "type": "surface",
       "title": "Surface — Fix and Verify",
       "path": "docs/brain/Surfaces/Surface - Fix and Verify.md"
+    },
+    {
+      "id": "docs/brain/Surfaces/Surface - Producer Tier.md",
+      "type": "surface",
+      "title": "Surface — Producer Tier",
+      "path": "docs/brain/Surfaces/Surface - Producer Tier.md"
+    },
+    {
+      "id": "docs/brain/Surfaces/Surface - Root Cause Pipeline.md",
+      "type": "surface",
+      "title": "Surface — Root Cause Pipeline",
+      "path": "docs/brain/Surfaces/Surface - Root Cause Pipeline.md"
     },
     {
       "id": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
@@ -635,6 +659,14 @@
     {
       "from": "docs/brain/00 Home.md",
       "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Surfaces/Surface - Root Cause Pipeline.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Surfaces/Surface - Producer Tier.md"
     },
     {
       "from": "docs/brain/00 Home.md",
@@ -794,6 +826,50 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
       "to": "docs/brain/Patterns.md"
     },
     {
@@ -962,6 +1038,14 @@
     },
     {
       "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
@@ -973,8 +1057,20 @@
       "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
     },
     {
+      "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
       "from": "docs/brain/Gates/Gate - Browser Battery Suites.md",
       "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Claims Register Lane.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Claims Register Lane.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md"
     },
     {
       "from": "docs/brain/Gates/Gate - Corpus Layout Verification.md",
@@ -998,11 +1094,31 @@
     },
     {
       "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
       "to": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md"
     },
     {
       "from": "docs/brain/Gates/Gate - Public Benchmark.md",
       "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
     },
     {
       "from": "docs/brain/Gates/Gate - Public Benchmark.md",
@@ -1123,6 +1239,14 @@
     {
       "from": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md",
       "to": "docs/brain/Glossary.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - DISCRIMINATION_BASELINE_2026-07-29.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
     },
     {
       "from": "docs/brain/Measurements/Measurement - EMOTIONAL_ARC_ANTISLOP_EXPERIMENT_2026-07-11.md",
@@ -1833,6 +1957,38 @@
       "to": "docs/brain/Owner/Owner - Make Repo Private.md"
     },
     {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Sessions/Session - 2026-09-06 Current Synced Upgraded.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-07 Innovation Batch.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
       "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
       "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
     },
@@ -1849,12 +2005,44 @@
       "to": "docs/brain/Surfaces/Surface - Exports.md"
     },
     {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Producer Tier.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Root Cause Pipeline.md"
+    },
+    {
       "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
       "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
       "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
+      "to": "docs/brain/Surfaces/Surface - Producer Tier.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
+      "to": "docs/brain/Surfaces/Surface - Root Cause Pipeline.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Exports.md",
@@ -1877,8 +2065,32 @@
       "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
     },
     {
+      "from": "docs/brain/Surfaces/Surface - Exports.md",
+      "to": "docs/brain/Surfaces/Surface - Root Cause Pipeline.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Exports.md",
+      "to": "docs/brain/Surfaces/Surface - Producer Tier.md"
+    },
+    {
       "from": "docs/brain/Surfaces/Surface - Fix and Verify.md",
       "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Producer Tier.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Producer Tier.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Producer Tier.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Producer Tier.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
@@ -1905,6 +2117,10 @@
       "to": "docs/brain/Patterns.md"
     },
     {
+      "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
+      "to": "docs/brain/Surfaces/Surface - Root Cause Pipeline.md"
+    },
+    {
       "from": "docs/brain/Surfaces/Surface - Slate.md",
       "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
     },
@@ -1917,8 +2133,16 @@
       "to": "docs/brain/Surfaces/Surface - Coverage Letter.md"
     },
     {
+      "from": "docs/brain/Surfaces/Surface - Versions and Snapshots.md",
+      "to": "docs/brain/Surfaces/Surface - What-If Lab.md"
+    },
+    {
       "from": "docs/brain/Surfaces/Surface - What-If Lab.md",
       "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - What-If Lab.md",
+      "to": "docs/brain/Surfaces/Surface - Versions and Snapshots.md"
     }
   ]
 }

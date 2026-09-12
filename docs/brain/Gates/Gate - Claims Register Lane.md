@@ -32,7 +32,7 @@ path is checked" — so a line number pointing at the wrong code passed. Three
 files cited `server/nvm/analyze/doctor.ts:1892-1898` for this project's central
 negative finding about its own score (rule channel AUC ~0.076 against
 scene-count scarcity ~0.938) while that comment had moved to
-`doctor.ts:2092-2093`; lines 1892-1898 held unrelated scene-index parsing. A
+`doctor.ts:2380-2381`; lines 1892-1898 held unrelated scene-index parsing. A
 prior audit ([[Audit - 2026-09-06 Mistake Search]]) had recorded the same anchor
 "FIXED in both places", and it was — in the two places it looked at. Adding the
 anchors to the eleven rows that cite a line turned up **two more** stale line

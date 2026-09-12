@@ -116,18 +116,26 @@ async function main(): Promise<void> {
   const asJson = argv.includes('--json');
   const quiet = argv.includes('--quiet') || asJson;
 
-  // --limits prints the caveats WITHOUT the 128 doctor runs. Two reasons it
-  // exists (2026-09-12): a reader who wants to know what this benchmark cannot
-  // show should not have to wait 6 s for a table to find out, and
-  // tests/core/public-benchmark-limits.test.ts greps this command's real stdout
-  // for the constant names in it. That grep is why finding 6's corrected
-  // sentence cannot drift back: the claim is printed on every run, so the test
-  // checks the printed bytes rather than a copy of them.
+  // --limits prints the caveats and NOTHING ELSE — no table, no per-script
+  // rows, no floor lines. tests/core/public-benchmark-limits.test.ts greps this
+  // command's real stdout for the claims in it, which is why finding 6's
+  // corrected sentence cannot drift back: the claim is printed on every run, so
+  // the test checks the printed bytes rather than a copy of them.
+  //
+  // IT RUNS THE MEASUREMENT (changed 2026-09-12). It did not, when the caveats
+  // were a frozen string constant and printing them cost nothing. They are now
+  // rendered FROM the run (`publicBenchmarkLimits`) precisely so they cannot
+  // drift from the numbers they qualify — see that function's header — and a
+  // caveat block rendered from no measurement would be either a lie or a set of
+  // holes. So this flag costs the same ~6 s a full run does; what it buys is
+  // that the caveats arrive without the table a reader would have to scroll
+  // past, and that the test asserting them is asserting printed bytes.
   if (argv.includes('--limits')) {
+    const limitsResult = await measurePublicBenchmark();
     out('-'.repeat(78));
     out(PUBLIC_CONTROL_RATIONALE);
     out('-'.repeat(78));
-    out(PUBLIC_BENCHMARK_LIMITS);
+    out(publicBenchmarkLimits(limitsResult));
     out('-'.repeat(78));
     return;
   }

@@ -164,11 +164,30 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  *    for exactly this manipulation, which is what makes it a liveness check
  *    on the instrument rather than evidence about the score.
  *
- * WHERE THE NUMBERS STAND, 2026-09-11 (branch scoring/feature-length-defects,
- * round 2; re-locked by `npm run benchmark:public -- --lock` in the same commit
- * as the scoring change). Shuffle-drop 0.8750 matched-pair / 0.8291 all-pairs;
- * climax-relocate 0.5469 / 0.5151; control 1.0000 / 1.0000. Read each of
- * those against what it was and against what it means:
+ * WHERE THE NUMBERS STAND, 2026-09-12 (branch scoring/adversarial-2026-09-12,
+ * which is scoring/feature-length-defects REBASED onto main and re-locked from
+ * the rerun that rebase forced). Shuffle-drop 0.8750 matched-pair / 0.8291
+ * all-pairs; climax-relocate 0.5938 / 0.5269; control 1.0000 / 1.0000.
+ *
+ * THE TWO ORDER FLOORS MOVED AND THE SCORE DID NOT. The rebase brought in
+ * main's instrument fix (63d7ede1): CLIMAX_RELOCATE now moves the final scene
+ * to position ONE rather than TWO, and one shared segmenter replaces the
+ * INT./EXT.-only split. That is a STRONGER manipulation applied to an
+ * unchanged scorer, so the channel reads higher: matched-pair 0.5469 -> 0.5938
+ * and all-pairs 0.5151 -> 0.5269, with PUBLIC_ORDER_PAIRED_FLOOR 0.5269 ->
+ * 0.5738 and PUBLIC_ORDER_FLOOR 0.4951 -> 0.5069. The evidence that the engine
+ * did not move with them: `tests/fixtures/public-corpus-manifest.json` (32 rows
+ * of intact sceneCount/words/health/verdict) and
+ * `tests/fixtures/public-benchmark-split.json` both re-locked to BYTE-IDENTICAL
+ * content, and the shuffle-drop and control floors did not move at all. A
+ * higher floor from a stronger degradation is not a better score; it is the
+ * same score measured with a sharper instrument, and it must not be read as
+ * progress on the order question — the matched-pair interval [0.4219, 0.7500]
+ * still contains 0.5.
+ *
+ * Read the 2026-09-11 branch figures below against what they were and what
+ * they mean; the two climax-relocate values in them are the position-TWO
+ * measurement, superseded by the paragraph above:
  *
  *  - SHUFFLE-DROP moved 0.5313 -> 0.8750 matched-pair, and the sign counts
  *    moved with it: 17 ordered / 15 inverted / 0 tied -> 28 / 4 / 0, with the
@@ -191,13 +210,14 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  *    constraint's population (the 16 scripts sub-1 at both ends) rather than
  *    implying all 32. See also the DELETION REWARD block above doctor.ts's
  *    densityPenalty.
- *  - CLIMAX-RELOCATE moved 0.4219 -> 0.5469 matched-pair and its exact ties
- *    collapsed from 11 of 32 to 1. That second number matters more than the
- *    first: the channel's N is no longer a third frozen, so the estimate now
- *    rests on 31 movable scripts rather than 21. Its interval [0.3750,
- *    0.7188] still contains 0.5 — the doctor still does not reliably detect
- *    reordering with scene count held constant. It reads chance HONESTLY now
- *    instead of reading chance through a saturated formula.
+ *  - CLIMAX-RELOCATE moved 0.4219 -> 0.5469 matched-pair under the OLD
+ *    position-two relocation, and its exact ties collapsed from 11 of 32 to 1.
+ *    That second number matters more than the first: the channel's N is no
+ *    longer a third frozen. Under main's corrected position-ONE relocation the
+ *    same scorer reads 0.5938 with 2 ties of 32 — 30 movable scripts — and its
+ *    interval [0.4219, 0.7500] still contains 0.5. The doctor still does not
+ *    reliably detect reordering with scene count held constant. It reads
+ *    chance HONESTLY now instead of reading chance through a saturated formula.
  *  - The CONTROL is unchanged in kind and cleaner in degree (0.9473 -> 1.0000
  *    all-pairs). It is still a liveness check on the instrument, never
  *    evidence about the score.
@@ -209,7 +229,7 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * raising one is a measurement's job, never an edit's.
  *
  * THE PREDICTION THIS REFUTED, kept because it is the useful part. The
- * scene-count-artifact argument (doctor.ts:2092-2093 — scarcity AUC 0.938,
+ * scene-count-artifact argument (doctor.ts:2380-2381 — scarcity AUC 0.938,
  * rule channel 0.076) predicts that dropping every third scene of a 10-scene
  * script adds 140/7 - 140/10 = 6.00 points of scarcity penalty, against 0.58
  * points at the private corpus's median 118 scenes, and therefore that a
@@ -256,6 +276,12 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * before -> after. Do that ONLY after a scoring change you intended, and read
  * the resulting diff: a re-lock following an unintended regression silently
  * lowers the ratchet, which is the one way this machinery can be defeated.
+ * TWO floors have ever moved UP for a reason that is not a scoring change:
+ * the 2026-09-12 rebase re-lock moved both ORDER floors because the
+ * DEGRADATION got stronger (position two -> position one), with the manifest
+ * re-locking byte-identical to prove the scorer sat still. A floor raised by a
+ * sharper instrument ratchets the same engine against a harder test; it is not
+ * a claim that the engine improved.
  * ONE floor has ever moved DOWN here: round 2's re-lock took
  * PUBLIC_SHUFFLE_DROP_FLOOR from 0.8106 to 0.8091 (measured 0.8306 ->
  * 0.8291), because the saturation point moved from 15 scenes to 12 and one of
@@ -274,8 +300,8 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  */
 export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.855;
 export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.8091;
-export const PUBLIC_ORDER_PAIRED_FLOOR = 0.5269;
-export const PUBLIC_ORDER_FLOOR = 0.4951;
+export const PUBLIC_ORDER_PAIRED_FLOOR = 0.5738;
+export const PUBLIC_ORDER_FLOOR = 0.5069;
 export const PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR = 0.98;
 export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.98;
 

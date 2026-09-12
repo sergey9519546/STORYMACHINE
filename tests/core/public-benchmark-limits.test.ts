@@ -2,7 +2,7 @@
 // the bytes it actually writes to stdout.
 //
 // ── Why this file exists (2026-09-12, adversarial review finding 6) ────────
-// `scripts/lib/public-benchmark.ts`'s `PUBLIC_BENCHMARK_LIMITS` block is printed
+// `scripts/lib/public-benchmark.ts`'s `publicBenchmarkLimits(result)` block is printed
 // on every `npm run benchmark:public` run, quoted by the measurement doc, and
 // echoed in `CLAUDE.md` and the brain gate note. One of its lines said:
 //
@@ -10,10 +10,10 @@
 //    feature-scale deductions never fire on this corpus at all"
 //
 // `CLIMAX_DED_MIN_SCENES` gates `climaxZoneDecayDeduction`
-// (`server/nvm/analyze/doctor.ts:617`), which is EXPORTED and has no scoring-path
+// (`server/nvm/analyze/doctor.ts:802`), which is EXPORTED and has no scoring-path
 // call site: `aggregateReport`'s health line subtracts `structuralDeduction`,
 // `arcIncoherenceDeduction` and `dialogueDeduction` only, and
-// `doctor.ts:2127-2131` records the revert ("it over-fired on real scripts with
+// `doctor.ts:2416-2419` records the revert ("it over-fired on real scripts with
 // naturally flat climaxes"). So "never fires at this length" implied that it
 // fires at SOME length. It fires at no length. The honest sentence names
 // `ARC_DED_MIN_SCENES` alone.
@@ -23,9 +23,11 @@
 // the person misled by it. A test that imported the constant would pass while
 // the CLI printed something else (a second copy, a truncation, a reordering), so
 // this spawns `npm run benchmark:public -- --limits` and reads its real bytes.
-// That flag exists so the check costs ~0.3 s instead of the 6 s a full
-// measurement takes: it prints the control rationale and the caveats and exits
-// without scoring anything.
+// That flag prints the control rationale and the caveats and no table. It is
+// NOT free: since the caveats became a render of the measurement rather than a
+// frozen string, `--limits` has to run the 128 doctor calls like any other
+// invocation, so this file costs two measurements (~12 s) and buys the
+// assertion that the PRINTED bytes are the module's own render.
 //
 // Both directions are asserted, because a test that only checked the new wording
 // would pass on a file that printed nothing at all.
@@ -37,17 +39,26 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import {
-  PUBLIC_BENCHMARK_LIMITS,
+  measurePublicBenchmark,
+  publicBenchmarkLimits,
   PUBLIC_CONTROL_RATIONALE,
   REPO_ROOT,
 } from '../../scripts/lib/public-benchmark.ts';
 
-/** The CLI's real stdout, produced once. `--limits` runs no measurement. */
+/** The CLI's real stdout, produced once. `--limits` DOES run the measurement
+ *  (2026-09-12): the caveats are rendered from the `BenchmarkResult` so they
+ *  cannot drift from the numbers they qualify, so there is nothing to render
+ *  without one. It prints the caveats and no table. */
 const LIMITS_STDOUT = execFileSync(
   'node',
   ['--experimental-strip-types', path.join(REPO_ROOT, 'scripts/benchmark-public.ts'), '--limits'],
-  { cwd: REPO_ROOT, encoding: 'utf8' },
+  { cwd: REPO_ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 },
 );
+
+/** The same caveats, rendered in-process from this tree's own measurement. Two
+ *  independent renders of one deterministic function: if the CLI ever grows a
+ *  second copy of the wording, these stop matching. */
+const EXPECTED_LIMITS = publicBenchmarkLimits(await measurePublicBenchmark());
 
 describe('benchmark:public --limits prints the caveats, and they are the module\'s own', () => {
   it('prints PUBLIC_BENCHMARK_LIMITS and PUBLIC_CONTROL_RATIONALE verbatim, not a copy', () => {
@@ -55,13 +66,13 @@ describe('benchmark:public --limits prints the caveats, and they are the module\
     // being about what a full run prints. This is the assertion that keeps the
     // cheap flag honest as a proxy for the expensive command.
     assert.ok(
-      LIMITS_STDOUT.includes(PUBLIC_BENCHMARK_LIMITS),
-      '`--limits` did not print PUBLIC_BENCHMARK_LIMITS verbatim — it has drifted into a second copy',
+      LIMITS_STDOUT.includes(EXPECTED_LIMITS),
+      '`--limits` did not print publicBenchmarkLimits(result) verbatim — it has drifted into a second copy',
     );
     assert.ok(LIMITS_STDOUT.includes(PUBLIC_CONTROL_RATIONALE));
   });
 
-  it('runs no measurement — it must not print a single AUC table row', () => {
+  it('prints the caveats and no table — not a single AUC table row', () => {
     assert.doesNotMatch(LIMITS_STDOUT, /AUC \(matched pair/);
     assert.doesNotMatch(LIMITS_STDOUT, /bootstrap: 2000 resamples/);
   });
@@ -82,7 +93,7 @@ describe('the printed feature-scale claim names ARC_DED_MIN_SCENES alone (findin
       LIMITS_STDOUT,
       /ARC_DED_MIN_SCENES and CLIMAX_DED_MIN_SCENES are both 15/,
       'the benchmark is printing CLIMAX_DED_MIN_SCENES as a live feature-scale gate again. '
-      + 'climaxZoneDecayDeduction is exported and wired into nothing (doctor.ts:2127-2131 records '
+      + 'climaxZoneDecayDeduction is exported and wired into nothing (doctor.ts:2416-2419 records '
       + 'the revert), so it fires at NO length — see docs/audits/2026-09-12-adversarial/'
       + 'engine-logic.md finding 6.',
     );
@@ -92,7 +103,7 @@ describe('the printed feature-scale claim names ARC_DED_MIN_SCENES alone (findin
   it('says the climax term is exported but unwired, and cites where the revert is recorded', () => {
     assert.match(LIMITS_STDOUT, /climaxZoneDecayDeduction, which is EXPORTED and/);
     assert.match(LIMITS_STDOUT, /wired into nothing/);
-    assert.match(LIMITS_STDOUT, /doctor\.ts:2127-2131 records the revert/);
+    assert.match(LIMITS_STDOUT, /doctor\.ts:2416-2419 records the revert/);
     assert.match(LIMITS_STDOUT, /It fires at no length\./);
   });
 });

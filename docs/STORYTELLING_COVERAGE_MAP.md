@@ -11,7 +11,7 @@ completing every row is not a goal. This project's documented central failure
 mode is inflating counts of things it covers: it shipped 3,217 generated rule
 constants whose entire weighted-issue channel measures AUC ≈ 0.076 on the
 real-corpus shuffle-drop harness, while scene-count scarcity alone carries AUC
-≈ 0.938 (`doctor.ts:2092-2093`, `docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`).
+≈ 0.938 (`doctor.ts:2380-2381`, `docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`).
 A coverage map that becomes a checklist to complete recreates that exact
 failure one layer up — more rows marked "done" would feel like progress while
 adding nothing to what the score can actually tell a writer. So the standing

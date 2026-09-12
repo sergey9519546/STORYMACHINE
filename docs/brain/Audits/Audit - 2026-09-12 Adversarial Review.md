@@ -53,12 +53,12 @@ files changed".
   means for the owner's lock.
 * **Finding 6 — `CLIMAX_DED_MIN_SCENES` was presented as a live feature-scale
   gate in four places.** `climaxZoneDecayDeduction` is exported and wired into
-  nothing (`doctor.ts:2127-2131` records the revert), so "never fires at this
+  nothing (`doctor.ts:2416-2419` records the revert), so "never fires at this
   length" implied it fires at some length. All four now name
   `ARC_DED_MIN_SCENES` alone.
 * **Finding 11 — the claims register checked that an evidence `path` exists,
   never that a `path:line` points at the right code.** Three files cited
-  `doctor.ts:1892-1898` for a comment that has been at `doctor.ts:2092-2093`
+  `doctor.ts:1892-1898` for a comment that has been at `doctor.ts:2380-2381`
   since before a prior audit recorded the same anchor FIXED elsewhere. The
   anchors are corrected and [[Gate - Claims Register Lane]] now requires every
   `path:line` pointer to carry a quoted anchor string found within ±3 lines.

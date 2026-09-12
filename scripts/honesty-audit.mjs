@@ -705,7 +705,7 @@ function scanFile(filePath) {
 // wrong code passed. That is not hypothetical: three files cited
 // `server/nvm/analyze/doctor.ts:1892-1898` for the project's central negative
 // finding about its own score (rule channel AUC ~0.076 vs scene-count scarcity
-// ~0.938) while that comment had moved to `doctor.ts:2092-2093`, and lines
+// ~0.938) while that comment had moved to `doctor.ts:2380-2381`, and lines
 // 1892-1898 held unrelated scene-index parsing. A prior audit
 // (docs/audits/2026-09-06-mistake-search/brain-review.md:398) recorded the same
 // anchor "FIXED in both places" — and it was, in the two places that audit
@@ -931,7 +931,7 @@ function checkSupportedEvidenceExists(rows) {
  * register. Anchors are `anchor:"…"`, one or more, anywhere in the same
  * ';'-separated pointer:
  *
- *     server/nvm/analyze/doctor.ts:2092-2093 anchor:"scene-COUNT artifact"
+ *     server/nvm/analyze/doctor.ts:2380-2381 anchor:"scene-COUNT artifact"
  *     tests/core/script-doctor.test.ts:1133,1528 anchor:"same hash" anchor:"plainSummary"
  *
  * The sigil is deliberate. Several existing pointers already carry parenthetical
