@@ -230,3 +230,134 @@ final tree).
   entry — the brief asked for brain Gate/Surface notes, not a Decision Log
   entry, and neither change is a strategic/phase-defining decision in that
   log's sense.
+
+## Round 2
+
+**Verdict addressed: REVISE.** Review:
+`docs/audits/2026-09-12-adversarial/rulebook-review.md`. Finding 14 was
+confirmed clean and left untouched. Finding 10's BLOCKER (item 1: the
+1,500,000 bound admitted a 27.3s analysis) is fixed; items 2 and 3
+(the deleted rate-derivation sentence, the "dozens ... not HUNDREDS"
+self-contradiction) are fixed as part of the same rewrite; item 4
+(unreproducible six-timing table) is superseded — round 2's own timings
+are reproduced against a generator now committed in the test file itself
+(`buildUniformMin`), not an uncommitted probe script. Items 5-8
+(non-blocking) are addressed below. Rebased tip before round 2:
+`8cdec674` (on `main @ 9cd1805c`). Round-2 tip: `d43022fe`.
+
+**The bug the reviewer found.** Round 1 derived
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` by bracketing FIXTURE WEIGHTS
+(a 40-cast normal feature below, the lightest pinned DoS fixture above).
+That bracket is on the wrong axis. Because the guard also requires every
+eligible character to individually clear `VOICE_ELIGIBLE_MIN_WORDS = 30`,
+a weight ceiling `W` admits at most `sqrt(W / 30)` distinct characters —
+and the WORST-CASE shape at any `W` is not a realistic few-big-speakers
+script, it is the thinnest possible one: every character sitting exactly
+at the 30-word floor, maximizing distinct count (and therefore
+`analyzeVoices`'s O(distinct²) pair count) for that weight. At round 1's
+1,500,000 that shape is 223 speakers × 30 words — a 50 KB document,
+ACCEPTED, measured by the reviewer at 27.3-27.6s in `runScriptDoctor` (91%
+of the 30s analysis budget), and reproduced on this lane's own box almost
+exactly (27,361ms — the two boxes measure within 1% of each other on this
+particular shape, unlike the ~1.31x gap measured on the padded, few-big
+probe-cast shape). That is a real DoS regression: `main`'s old 300,000
+bound rejected the identical document; the new one let a 50 KB payload buy
+27s of worker CPU.
+
+**Re-derivation, this time from cost, not weight.**
+
+1. Swept the "uniform-min" shape (N distinct speakers, each exactly 5
+   double-spaced 6-word paragraphs = exactly 30 real words) at N =
+   100/140/150/160/180/200/223 on this lane's box, using fresh distinct
+   payloads per run (the doctor caches by `contentHash`, so repeated
+   identical text reads 0ms — a real trap on the first pass). Median of 3
+   fresh runs at the two load-bearing points: **N=150 → 12.1s** (12,071 /
+   11,506 / 12,685ms), **N=160 → 14.3s** (13,544 / 14,332 / 14,420ms). Full
+   sweep and rate table (0.0173-0.0187 ms/unit, inside this file's own
+   historical 0.01-0.022 ms/unit fit from the round-2/3 review) is in
+   `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`'s own header comment.
+2. Target: HALF the 30s `DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS` (15s),
+   mirroring Decision #7's own 2x-headroom derivation, so that a box up to
+   ~2x slower than this one still lands at or under the 30s hard stop
+   rather than burning a full worker slot before the writer gets the
+   budget's timeout sentence instead of the guard's honest "trim the
+   cast". N=150 (12.1s, ~24% margin under 15s) clears it; N=160 (14.3s,
+   ~5% margin, and this shared box's own noise moved N=165 by ~900ms
+   between two fresh runs) does not. **New bound: 675,000** (= 150² × 30).
+   Cross-check: this file's own historical WORST rate (0.022ms/unit)
+   applied to 675,000 predicts 14,850ms — under the 15s target and close
+   to, not contradicting, the direct 12.1s measurement.
+3. Restored and re-applied the file's own rate-based derivation sentence
+   (deleted in round 1, flagged as item 2) — see the header comment's
+   point (1) and its cross-check in point (2) above.
+4. Fixed the "dozens ... not HUNDREDS" self-contradiction (item 3): the
+   header now states the true admitted maximum (150, not 223) and the
+   neighbouring `MAX_FOUNTAIN_FREQUENT_CUE_LINES` comment's framing is no
+   longer contradicted by the value eight lines below it.
+5. **What this does and does not admit, stated with the number (brief
+   item 2).** The brief's explicit 20/30/40-cast targets stay ACCEPTED
+   (weights 303,000 / 454,500 / 606,000, measured 8.4-10.7s on the cheap
+   few-big shape — unaffected by the tightened bound, since they were
+   already far below it). A 60-cast fully-eligible ensemble (909,000) now
+   EXCEEDS 675,000 and is correctly REJECTED — a real narrowing from round
+   1's 1,500,000, disclosed with its own test and comment rather than left
+   to a silent regression. The budget was not traded for the cast:
+   unlocking ensembles beyond ~150 (uniform-min) / larger few-big casts
+   safely is `analyzeVoices`'s O(distinct²) pair count needing a cap
+   (scoring-path, the scoring lane's item per the original brief) — not a
+   further raise of this bound.
+6. New tests in `tests/security/fountain-shape-guard-cue-parity.test.ts`'s
+   "finding 10" block: the N=150/N=151 uniform-min boundary directly (150
+   ACCEPTED, with its measured `runScriptDoctor` wall time asserted under
+   a 20,000ms CI-noise-tolerant ceiling — looser than the 15s design
+   target deliberately, to guard against a real regression toward the 30s
+   budget without flaking on ordinary shared-box noise — measured
+   13,560ms on the committed re-run); N=151 REJECTED (fast, guard-only);
+   a 60-cast feature now asserted REJECTED with the reason named. Bypass
+   B (the lightest pinned DoS fixture) re-asserted REJECTED, margin now
+   2.84x (was 1.28x at round 1). Full security suite: **657/657 pass**
+   (654 + 3 new), none of ROUNDS 2-7's pre-existing pinned decisions
+   flipped.
+7. Output identity re-verified per item 5/non-blocking-item-6: `GIT_SHA`
+   pinned to the same 40-zero value on BOTH the `main @ 9cd1805c` archive
+   and the working tree, no `--ignore-keys` — **"OUTPUT IDENTITY: PASS —
+   all 45 reports are byte-identical (analyzedAt excluded)."** the
+   stronger, unqualified form the reviewer used, not round 1's
+   `--ignore-keys provenance.engineCommit` workaround.
+
+**Non-blocking items 5, 7, 8** from the review: item 5 (the six-timing
+table wasn't reproducible from anything committed) is closed by
+construction — round 2's `buildUniformMin` generator lives in the test
+file itself, and its N=223 weight/chars are asserted to match the
+reviewer's own reported 1,491,870 / 50,172 in the header comment's prose
+(spot-checked directly against the reviewer's R9 table, not just cited).
+Item 7 (bypass B's true nearest-neighbour margin) is superseded — at
+675,000 the margin to bypass B widens to 2.84x, well clear of the 1.6M
+"realistic-feature fixture" the review flagged as a closer, unpinned
+neighbour at round 1's value. Item 8 (one more copy of `dsWrapped`) was
+not additionally addressed — pre-existing pattern in the file, noted by
+the reviewer as not required, and out of round 2's scope (BLOCKER + the
+three items the coordinator named).
+
+**Gates, round 2 (foreground, exit codes):**
+
+| Gate | Result |
+|---|---|
+| `tests/security/fountain-shape-guard-cue-parity.test.ts` | 657/657 pass, exit 0 |
+| `tests/routes/fountain-shape-guard-cue-bypass.test.ts` | 57/57 pass, exit 0 |
+| `tests/core/analyzer-dos.test.ts` | 12/12 pass, exit 0 |
+| `tests/core/rulebook.test.ts` | 6/6 pass, exit 0 |
+| `tests/core/brain-coverage.test.ts` | 7/7 pass, exit 0 |
+| `node scripts/check-scoring-receipt.mjs 9cd1805c..HEAD` | "no scoring-path files changed. OK." exit 0 |
+| Output identity, `GIT_SHA` pinned equal, no `--ignore-keys` | "OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded)." exit 0 |
+| `npx tsc --noEmit` (lint) | 0 errors, exit 0 |
+| `npm run check-no-console` | "305 file(s) ... OK." exit 0 |
+| `npm run check-docs` | "No AI writing patterns detected." exit 0 |
+| `npm run honesty-audit` | "scanned 459 files ... clean." exit 0 |
+| `npm run check-brain` | "OK. 104 notes, 383 links, graph is fresh." exit 0 |
+| `npm test` (full, once, final tree) | **13,548 tests, 2,349 suites — 13,456 pass, 0 fail, 91 skipped (env-gated), 1 todo — exit 0**, duration 392.1s |
+
+No browser battery (no browser-facing surface touched this round either).
+Final round-2 tip: `d43022fe10c5950b4fea205219be82fa38042e59`, confirmed
+identical on `origin/lane/rulebook-and-guard-bound`
+(`git ls-remote origin lane/rulebook-and-guard-bound`), worktree clean.
