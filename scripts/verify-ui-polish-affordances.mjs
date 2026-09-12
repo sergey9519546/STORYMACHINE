@@ -120,7 +120,7 @@ try {
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
 
   await page.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
-  await page.waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), { timeout: timing.ms(40000) });
+  await page.waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), undefined, { timeout: timing.ms(40000) });
   await page.screenshot({ path: join(SHOTS, 'A1-coverage-summary.png'), fullPage: false });
 
   const jumpBtn = page.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).first();

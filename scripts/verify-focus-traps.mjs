@@ -172,7 +172,7 @@ async function verifyDialog(page, { name, accessibleName, restoreTriggerHandle, 
   await closeDialog();
   // ScriptDoctorPanel's framer-motion exit spring needs real time to finish
   // before React actually unmounts it and the hook's cleanup runs.
-  await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), { timeout: timing.ms(3000) }).catch(() => {});
+  await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), undefined, { timeout: timing.ms(3000) }).catch(() => {});
   await page.waitForTimeout(timing.ms(150));
   let restoreOk = false;
   let restoreDetail = '';
@@ -362,7 +362,7 @@ async function main() {
     await saveBtn.click({ timeout: timing.ms(15000) });
     // The Save modal unmounts once the snapshot is recorded; give its exit
     // animation + the list re-render real time before looking for the row.
-    await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), { timeout: timing.ms(3000) }).catch(() => {});
+    await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), undefined, { timeout: timing.ms(3000) }).catch(() => {});
     await page.waitForTimeout(timing.ms(400));
 
     const restoreBtn = page.getByRole('button', { name: /^Restore snapshot: /i }).first();

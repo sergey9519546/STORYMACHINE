@@ -382,10 +382,12 @@ async function scrollShapeRhythmIntoView(page) {
 async function auditLandingAtRest(page) {
   await page.waitForFunction(
     () => document.querySelector('[data-slug-done="true"]') !== null,
+    undefined,
     { timeout: timing.ms(5000) },
   ).catch(() => {});
   await page.waitForFunction(
     () => document.querySelector('main[data-reveal-done="true"]') !== null,
+    undefined,
     { timeout: timing.ms(5000) },
   ).catch(() => {});
   await waitForDomQuiet(page, { quietMs: 250, timeoutMs: 3000 });
@@ -814,7 +816,7 @@ async function main() {
     await runDiagnosisBtn.waitFor({ state: 'visible', timeout: timing.ms(10000) }).catch(() => {});
     await runDiagnosisBtn.click().catch(() => {});
   }
-  await page5.waitForFunction(() => /CONSIDER|RECOMMEND|PASS/.test(document.body.textContent || ''), { timeout: timing.ms(45000) }).catch(() => {});
+  await page5.waitForFunction(() => /CONSIDER|RECOMMEND|PASS/.test(document.body.textContent || ''), undefined, { timeout: timing.ms(45000) }).catch(() => {});
   await page5.waitForTimeout(timing.ms(400));
   await auditSurface(page5, 'dark-doctor-report');
 
@@ -992,7 +994,7 @@ async function main() {
         await beatInput.fill('A quiet moment before the storm.');
         const generateBtn = page7.getByRole('button', { name: /generate scene/i }).first();
         await generateBtn.click();
-        await page7.waitForFunction(() => /result/i.test(document.body.textContent || ''), { timeout: timing.ms(20000) }).catch(() => {});
+        await page7.waitForFunction(() => /result/i.test(document.body.textContent || ''), undefined, { timeout: timing.ms(20000) }).catch(() => {});
         await page7.waitForTimeout(timing.ms(300));
         await auditSurface(page7, 'labs-story-engine-result');
       }
@@ -1742,6 +1744,7 @@ async function main() {
   }
   const reportRendered11 = await page11.waitForFunction(
     () => /CONSIDER|RECOMMEND|PASS/.test(document.body.textContent || ''),
+    undefined,
     { timeout: timing.ms(45000) },
   ).then(() => true).catch(() => false);
   record('doctor-full-report-gate', 'a real (non-sample) multi-scene draft produces a report via Run Diagnosis', reportRendered11);
