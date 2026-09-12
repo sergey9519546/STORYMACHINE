@@ -8,7 +8,7 @@ status: ready-for-owner
 # Branch — Forced Cue
 
 **Branch:** `scoring/forced-cue`, stacked on [[Branch - Adversarial 2026-09-12]]
-at `4cf5b2f3`. **Tip `f258c405`, READY-FOR-OWNER** after one review round
+at `4cf5b2f3`. **Tip `089bec91`, READY-FOR-OWNER** after one review round, its four non-blocking items built in round 2
 (`docs/audits/2026-09-12-adversarial/forcedcue-review.md`). Receipt: rows 11
 and 12 in the branch's single PENDING entry; no AUC-24 number stated,
 implied or projected.
