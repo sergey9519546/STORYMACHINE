@@ -437,6 +437,60 @@ async function main() {
   await sampleCta.waitFor({ timeout: timing.ms(15000) });
   record('P2', 'StartScreen offers the sample-coverage CTA', true, '"Try sample coverage" button found');
 
+  // ── Finding #6 (2026-09-12): the start screen's Coverage card showed
+  // hardcoded literals (HEALTH 76, COUNTS 3 · 38 · 159) beside "See it on the
+  // sample", and the sample returns 78 and 2 · 32 · 139. The card now renders
+  // from src/lib/sample-coverage-facts.ts, a build-time artifact. The floor for
+  // this assertion is the SERVER's own answer for the sample's exact bytes — not
+  // the artifact, which would only prove the card agrees with its own input.
+  const sampleDoctorRes = await fetch(`${BASE}/api/scriptide/doctor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fountain: sampleFountain, title: sampleTitle }),
+  });
+  const sampleReport = await sampleDoctorRes.json();
+  const startCardText = await pageA.evaluate(() => {
+    const heading = [...document.querySelectorAll('h2')].find((h) => h.id === 'coverage-heading');
+    const section = heading?.closest('section');
+    return section ? section.innerText.replace(/\s+/g, ' ') : null;
+  });
+  const expectedHealth = String(Math.round(sampleReport.health));
+  const expectedCounts = `${sampleReport.bySeverity.critical} · ${sampleReport.bySeverity.major} · ${sampleReport.bySeverity.minor}`;
+  const expectedNext = sampleReport.topPriorities?.[0]?.location ?? '';
+  record(
+    'P2-startcard',
+    'the start screen\'s Coverage card states the health the sample actually returns',
+    startCardText !== null && startCardText.includes(expectedHealth),
+    `serverHealth=${expectedHealth} card=${JSON.stringify((startCardText ?? '').slice(0, 220))}`,
+  );
+  record(
+    'P2-startcard',
+    'its critical · major · minor counts are the sample\'s own',
+    startCardText !== null && startCardText.includes(expectedCounts),
+    `serverCounts=${JSON.stringify(expectedCounts)}`,
+  );
+  record(
+    'P2-startcard',
+    'its "Next" cell names the sample\'s real top priority, not a hand-written phrase',
+    startCardText !== null && expectedNext.length > 0 && startCardText.includes(expectedNext),
+    `serverTopPriorityLocation=${JSON.stringify(expectedNext)}`,
+  );
+  record(
+    'P2-startcard',
+    'the card is labelled as the sample\'s own reading, so a visitor knows what they are looking at',
+    startCardText !== null && /The sample's own numbers/i.test(startCardText),
+    startCardText === null ? 'coverage section not found' : '',
+  );
+  const staleStartCardLiterals = ['3 · 38 · 159', 'Climax engagement'].filter(
+    (lit) => startCardText !== null && startCardText.includes(lit),
+  );
+  record(
+    'P2-startcard',
+    'none of the superseded hardcoded values survives on the front door',
+    staleStartCardLiterals.length === 0,
+    `stillPresent=${JSON.stringify(staleStartCardLiterals)}`,
+  );
+
   const advancedSimBtnOff = pageA.getByRole('button', { name: /advanced: simulation/i });
   const advancedSimCountOff = await advancedSimBtnOff.count();
   record('P2', 'StartScreen "Advanced: Simulation" (Labs-gated) is ABSENT with Labs OFF', advancedSimCountOff === 0, `found ${advancedSimCountOff} matching button(s)`);

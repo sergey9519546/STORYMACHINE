@@ -17,6 +17,15 @@ import {
   loadScriptIDEDraft,
   writeScriptIDEDraft,
 } from "../lib/scriptide-draft-store";
+// Finding #6 (2026-09-12, adversarial audit): the Coverage card below used to
+// hold hardcoded literals — VERDICT Consider / HEALTH 76 / NEXT Climax
+// engagement / COUNTS 3 · 38 · 159 — beside a button reading "See it on the
+// sample", and the sample returned 78 / 2 · 32 · 139. The card now renders from
+// a build-time artifact produced by running the doctor on
+// src/lib/sample-script.ts (`npm run generate-p0-sample`), and
+// tests/core/sample-coverage-facts.test.ts fails when those numbers drift from a
+// fresh run.
+import { SAMPLE_COVERAGE_FACTS } from "../lib/sample-coverage-facts";
 
 interface StartScreenProps {
   onStart: (config: StoryConfig) => void;
@@ -55,6 +64,14 @@ const MAX_OPEN_FILE_SIZE = 5 * 1024 * 1024; // 5 MB — generous for a feature-l
 const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
 const DUR_MICRO = 0.2; // var(--dur-micro), seconds
 const DUR_REVEAL = 0.7; // var(--dur-reveal), seconds
+
+/** The doctor's verdict is an uppercase token ("CONSIDER"); the card's stamp
+ *  styling already uppercases visually, so the text itself reads as a word —
+ *  the same `verdictLabel` shape CoverageSummary.tsx uses for the same token. */
+function verdictTitleCase(verdict: string): string {
+  if (!verdict) return "—";
+  return verdict.charAt(0) + verdict.slice(1).toLowerCase();
+}
 
 const MICRO_TRANSITION = "duration-[var(--dur-micro)] ease-[var(--ease-out-expo)]";
 const FOCUS_RING =
@@ -657,31 +674,56 @@ export default function StartScreen({
                       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--sm-hair)] pb-4">
                         <div>
                           <p className="sm-h">Verdict</p>
-                          <p className="sm-stamp mt-2 text-[13px]">Consider</p>
+                          <p className="sm-stamp mt-2 text-[13px]">{verdictTitleCase(SAMPLE_COVERAGE_FACTS.verdict)}</p>
                         </div>
                         <div className="text-right">
                           <p className="sm-h">Health</p>
                           <p className="font-[family-name:var(--sm-font-display)] text-5xl leading-none text-[var(--sm-ink)]">
-                            76
+                            {SAMPLE_COVERAGE_FACTS.health}
                           </p>
                         </div>
                       </div>
                       <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="sm-card py-3 text-center">
                           <dt className="sm-h">Next</dt>
-                          <dd className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-stamp-on-light)]">
-                            Climax engagement
+                          <dd
+                            className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold text-[var(--sm-stamp-on-light)]"
+                            title={SAMPLE_COVERAGE_FACTS.nextFixRule}
+                          >
+                            {SAMPLE_COVERAGE_FACTS.nextFixLocation}
                           </dd>
                         </div>
                         <div className="sm-card py-3 text-center">
                           <dt className="sm-h">Counts</dt>
-                          <dd className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold">3 · 38 · 159</dd>
+                          <dd className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold">
+                            {SAMPLE_COVERAGE_FACTS.critical} · {SAMPLE_COVERAGE_FACTS.major} · {SAMPLE_COVERAGE_FACTS.minor}
+                          </dd>
                         </div>
                         <div className="sm-card py-3 text-center">
                           <dt className="sm-h">LLM judge</dt>
-                          <dd className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold">None</dd>
+                          <dd className="mt-1 font-[family-name:var(--sm-font-mono)] text-sm font-bold">
+                            {SAMPLE_COVERAGE_FACTS.llmJudge}
+                          </dd>
                         </div>
                       </dl>
+                      {/* Finding #6: the card is LABELLED as the sample's own
+                          reading, so a visitor knows what they are looking at
+                          before they click the button beside it — and the
+                          numbers are now the ones that button produces.
+                          Registered as docs/CLAIMS_REGISTER.md row 103. */}
+                      {/* NOT `.sm-slug`: that class uppercases via
+                          text-transform, which turns this sentence into a
+                          shout and makes the shipped bytes differ from the
+                          sentence the claims register quotes. --sm-ink-mute is
+                          the design system's "secondary text" token, measured
+                          5.34:1 on paper in the 2026-09-04 a11y pass. */}
+                      <p
+                        className="mt-4 font-mono text-[11px] leading-snug text-[var(--sm-ink-mute)]"
+                        data-sample-card-provenance
+                      >
+                        {`The sample's own numbers — ${SAMPLE_COVERAGE_FACTS.title}, `
+                          + `${SAMPLE_COVERAGE_FACTS.sceneCount} scenes, run keyless by this build.`}
+                      </p>
                     </div>
                   </div>
                 </section>
