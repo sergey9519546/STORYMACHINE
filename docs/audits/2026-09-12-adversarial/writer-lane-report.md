@@ -539,8 +539,18 @@ of byte-identical text) then correctly refuse to start another:
 
 That is the golden path. It is reverted (`d0d1b759`). What ships is the finding,
 written above `abortRef` where the next person to reach for that cleanup reads it
-first, plus a test asserting the naive fix is **not** in the tree and the note
-**is**. Closing it properly means distinguishing a real unmount from StrictMode's
+first, plus a test asserting the note **is** in the tree and pinning the count of
+`abortRef.current?.abort()` call sites at exactly 2 — the two the golden path
+actually has (`run`'s supersede prefix and `cancelRun`), so a third site fails
+the count regardless of whether it is folded into the existing `aliveRef`
+cleanup or added as its own `useEffect`.
+(Round-2 follow-ups lane, 2026-09-12: the original single-line `doesNotMatch`
+this sentence described was caught only by the neighbouring `aliveRef`
+cleanup-shape assertion, not by itself — a separate, normally-formatted
+`useEffect` doing the same thing passed 18/0. The count assertion above
+replaces it and is proven, by planting both routes, to fail on each; see
+`docs/audits/2026-09-12-adversarial/followups-lane-report.md`.)
+Closing it properly means distinguishing a real unmount from StrictMode's
 simulated one, or making the run-once guards survivable across an aborted run —
 a change to the golden path's concurrency contract, and the right size for its
 own brief.

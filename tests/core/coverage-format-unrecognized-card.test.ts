@@ -80,11 +80,22 @@ describe('the compact card shows the hint, not just the reason', () => {
     //
     // What this asserts is that the finding is written down where the next
     // person to reach for the cleanup will read it first, and that the naive
-    // fix is NOT in the tree.
-    assert.doesNotMatch(
-      coverageSummary,
-      /useEffect\(\(\) => \(\) => \{ abortRef\.current\?\.abort\(\); \}, \[\]\);/,
-      'the unmount abort breaks the golden path under StrictMode — see the note above abortRef',
+    // fix is not in the tree — as a COUNT of real call sites, not a single
+    // unrealistic spelling. Round-2 review's own follow-up #3: the original
+    // `doesNotMatch` here named one single-line form nobody would write, and
+    // was caught only by the neighbouring aliveRef cleanup-shape assertion
+    // below — which catches (A) appending the abort to that cleanup, but not
+    // (B) a separate, normally-formatted `useEffect` doing the same thing
+    // (planted and measured pass 18/fail 0 against the old regex — see the
+    // self-check below, which proves this count assertion catches both).
+    // Real call sites end in `;` (`abortRef.current?.abort();`); the doc
+    // comment above `abortRef` also names the pattern, in backticks with no
+    // trailing semicolon, so it does not add to this count.
+    assert.equal(
+      (coverageSummary.match(/abortRef\.current\?\.abort\(\);/g) ?? []).length,
+      2,
+      'exactly two abort() call sites should exist — run()\'s supersede prefix and cancelRun — '
+        + 'a third means the unmount-abort gap (see the note above abortRef) was reintroduced',
     );
     assert.match(coverageSummary, /IT WAS BUILT AND REVERTED, because the gate caught what it does\./);
     assert.match(coverageSummary, /Sample coverage\s*\n\s*\*\s*produces a rendered verdict/);
@@ -103,6 +114,49 @@ describe('the compact card shows the hint, not just the reason', () => {
     assert.match(runPrefix, /setFormatHint\(null\);/);
     assert.match(runPrefix, /setPdfRepairTried\(false\);/);
     assert.match(runPrefix, /setPdfRepairNoop\(false\);/);
+  });
+});
+
+// A scanner nothing plants against proves nothing (same discipline as
+// tests/scripts/wait-for-function-options-position.test.ts's six hand-written
+// shapes). This runs the SAME counting rule the guard above uses against the
+// real source, plus two synthetic reintroductions of the unmount-abort gap —
+// the two routes the round-2 review measured by hand — so a future edit to
+// the counting rule itself has to keep catching both.
+describe('the abort-count guard catches both known reintroduction routes', () => {
+  const abortCallSites = (src: string) => (src.match(/abortRef\.current\?\.abort\(\);/g) ?? []).length;
+
+  it('the real source has exactly two — the guard is not vacuous on the untouched tree', () => {
+    assert.equal(abortCallSites(coverageSummary), 2);
+  });
+
+  it('route (A): appending the abort to the existing aliveRef unmount cleanup', () => {
+    // This is the shape a reader reaching for "just clean up the abort" would
+    // write first — folding it into the cleanup that is already there.
+    const planted = coverageSummary.replace(
+      'return () => {\n      aliveRef.current = false;\n    };',
+      'return () => {\n      aliveRef.current = false;\n      abortRef.current?.abort();\n    };',
+    );
+    assert.notEqual(planted, coverageSummary, 'the aliveRef cleanup text to replace was not found');
+    assert.equal(abortCallSites(planted), 3, 'route (A) must move the count off 2');
+  });
+
+  it('route (B): a separate, normally-formatted useEffect doing the same thing', () => {
+    // The exact defect the lane describes building, formatted the way a
+    // person actually formats a useEffect — not the single-line spelling the
+    // old `doesNotMatch` regex named, which the round-2 review measured this
+    // route surviving (18 pass / 0 fail) against.
+    const planted = coverageSummary.replace(
+      'const userCancelledRef = useRef(false);',
+      'const userCancelledRef = useRef(false);\n\n'
+        + '  useEffect(() => {\n'
+        + '    return () => {\n'
+        + '      abortRef.current?.abort();\n'
+        + '    };\n'
+        + '  }, []);',
+    );
+    assert.notEqual(planted, coverageSummary, 'the useRef(false) anchor line was not found');
+    assert.equal(abortCallSites(planted), 3, 'route (B) must move the count off 2');
   });
 });
 
