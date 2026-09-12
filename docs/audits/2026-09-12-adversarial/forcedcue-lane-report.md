@@ -2,7 +2,7 @@
 
 **Worktree:** `/home/user/wt-forcedcue`
 **Branch:** `scoring/forced-cue`, pushed to origin after every commit.
-**Tip:** `703903d9`
+**Tip:** `6eeef062`, plus the commit carrying this report (see §Tip and origin)
 **Base:** `3124a94e` — `origin/scoring/adversarial-2026-09-12` at the moment
 this lane was cut.
 **Answers:** the scoring lane's round-2 residual (`scoring-lane-report.md`
@@ -18,6 +18,8 @@ This is scoring-path work. It is **not merged here** and waits for the owner's
 anywhere in this report, in the receipt, or in any file on this branch.
 
 ```
+6eeef062 docs(audit): drop a generic intensifier the pre-commit hook flagged
+cb4cc957 docs(audit): the lane report's final numbers — the full suite, the tip, and my own miniature of the round-9 mistake
 703903d9 fix(test): the ROUND 9 oracle names the bound it actually trips
 4abd675f docs(audit): the forced-cue lane report, and receipt row 12 for what the full suite found
 b3b37277 fix(guard): the shape guard learns the forced cue too — ROUND 9 of a pattern with eight prior rounds
@@ -434,14 +436,19 @@ SUBDIRECTORY precisely so the harness's fixed set of 45 does not become 46.
 $ git ls-remote origin scoring/forced-cue scoring/adversarial-2026-09-12 main
 3f4a68725edae64861ac5fececd97c86798e1b42	refs/heads/main
 4cf5b2f3c3bb61dafdb5afc2ac59a2c0ad674db0	refs/heads/scoring/adversarial-2026-09-12
-703903d9af070c11d6d3745963f4793cb4f41ff5	refs/heads/scoring/forced-cue
+6eeef0620779b5f1c3d5267bd948a9c911a1cca6	refs/heads/scoring/forced-cue
 ```
 
-`refs/heads/scoring/forced-cue` is at this lane's tip, `703903d9`. Two notes
-for the orchestrator: `origin/scoring/adversarial-2026-09-12` has moved since
-this lane was cut (`3124a94e` → `4cf5b2f3`), and `main` has moved twice during
-this lane (`251e0840` → `0ecc8aea` → `3f4a6872`), so this branch needs a
-rebase and a re-run of the
-identity harness and the benchmark against whichever tree it is merged into —
-the harness's own header says the baseline must be the branch being merged
-INTO, not the commit branched FROM.
+That is verbatim, taken at `6eeef062`. The commit carrying this section is the
+one after it, so the tip named at the top of this report is one ahead of the
+line above — the usual and unavoidable off-by-one of a report that records its
+own branch. Everything measured in this report was measured at or before
+`703903d9`; the two commits after it are this report and a one-word wording
+fix, and neither touches code.
+
+Two notes for the orchestrator: `origin/scoring/adversarial-2026-09-12` has
+moved since this lane was cut (`3124a94e` → `4cf5b2f3`), and `main` moved
+twice during it (`251e0840` → `0ecc8aea` → `3f4a6872`), so this branch needs a
+rebase and a re-run of the identity harness and the benchmark against
+whichever tree it is merged into — the harness's own header says the baseline
+must be the branch being merged INTO, not the commit branched FROM.
