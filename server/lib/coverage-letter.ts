@@ -95,7 +95,9 @@ import {
 // ONE definition of the claims an exported artifact carries (2026-09-12, BUG-1) —
 // the same label table the exported coverage HTML's verify block publishes and both
 // verifiers read back. See server/lib/artifact-claims.ts.
-import { claimRowsFor, LETTER_PROSE_CLAIMS, VERIFY_SCOPE_SENTENCE } from './artifact-claims.ts';
+import {
+  claimRowsFor, LETTER_PROSE_CLAIMS, VERDICT_WORD, VERIFY_SCOPE_SENTENCE,
+} from './artifact-claims.ts';
 // ONE priorities heading across the panel, the exported HTML, this letter and the
 // tier — see src/lib/priorities-copy.ts.
 import { prioritiesHeadingFor, prioritiesHeadingUpper } from '../../src/lib/priorities-copy.ts';
@@ -165,11 +167,11 @@ function titleCase(word: string): string {
 // Same vocabulary as coverage-html.ts's VERDICT_STYLE labels — in particular
 // the PASS "(decline)" parenthetical, which that module's own tests require
 // on every producer-facing export so PASS is never misread as affirmative.
-const VERDICT_LABEL: Record<CoverageVerdict, string> = {
-  RECOMMEND: 'RECOMMEND',
-  CONSIDER: 'CONSIDER',
-  PASS: 'PASS (decline)',
-};
+// The verdict WORD is server/lib/artifact-claims.ts's VERDICT_WORD — one map, not
+// the fourth hand-copy of it (2026-09-12: there were three renderers with their own
+// copy and a fourth inverse in the verify CLI, and the copy that mattered was the
+// one the CLI could not read back).
+const VERDICT_LABEL: Record<CoverageVerdict, string> = VERDICT_WORD;
 
 // A finding/priority is "scene- or lines-anchored" when its location string
 // names a specific scene or line range rather than reading as a whole-draft

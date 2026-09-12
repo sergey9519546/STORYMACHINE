@@ -184,6 +184,79 @@ export function parseLengthLine(text: string): ParsedLengthLine | null {
   return parsed;
 }
 
+// ── The verdict word, and the health line ────────────────────────────────────
+// ONE map, and ONE formatter/parser pair, because the producer tier is a SECOND
+// rendering of the verdict and health the report already states — and on 2026-09-12
+// investigator A proved that second rendering was not checked by anything: a letter
+// whose page-one line was edited to `**Verdict.** RECOMMEND · Health 94.6 / 100`
+// printed VERIFIED at exit 0 (docs/audits/2026-09-12-adversarial/writer-loop.md
+// finding 2). The CLI's letter parser read `**Verdict:`(colon) and
+// `Health 74.6/100`(no spaces); the tier writes `**Verdict.**` and
+// `Health 74.6 / 100`. Neither matched, and the forgery guard covered the header's
+// health-number, the stamp and the plainSummary sentence — not the tier.
+//
+// The word map had THREE hand-copies at that point (coverage-html.ts's
+// VERDICT_STYLE.label, coverage-letter.ts's VERDICT_LABEL, reader-tier.ts's
+// VERDICT_WORD) and the CLI carried a fourth as an inverse. All four now come from
+// here, so a rendering cannot be added or reworded without the scraper's own
+// round-trip test (tests/core/artifact-claims.test.ts) following it.
+
+/** The verdict word a reader sees. PASS carries its parenthetical because "PASS"
+ *  reads as approval to anyone outside coverage culture — the single most commonly
+ *  misread word in a coverage document, so the parenthetical is load-bearing, not
+ *  decor. */
+export const VERDICT_WORD: Record<CoverageVerdict, string> = {
+  RECOMMEND: 'RECOMMEND',
+  CONSIDER: 'CONSIDER',
+  PASS: 'PASS (decline)',
+};
+
+/** What every surface prints for a report with no verdict at all. */
+export const UNKNOWN_VERDICT_WORD = 'N/A';
+
+/** The inverse of `VERDICT_WORD`: the enum a printed word means, or `null` for a
+ *  word that is not one of the three (including 'N/A'). Accepts the bare enum name
+ *  as well as the reader-facing word, because the machine-readable claim row prints
+ *  `CONSIDER` while the page prints `PASS (decline)`. */
+export function verdictFromWord(word: string): CoverageVerdict | null {
+  const trimmed = word.trim();
+  for (const [verdict, label] of Object.entries(VERDICT_WORD)) {
+    if (trimmed === label || trimmed === verdict) return verdict as CoverageVerdict;
+  }
+  return null;
+}
+
+/** "Health 76.3 / 100" — the tier's headline reading, stated once. */
+export function formatHealthLine(health: number): string {
+  return `Health ${health.toFixed(1)} / 100`;
+}
+
+/** The inverse: the health figure the TIER's reading states, or `null`.
+ *
+ *  The spaces around the slash are what distinguish this rendering from the
+ *  coverage letter's headline (`Health 66.7/100 (Fair) · …`), which is a different
+ *  rendering with its own scrape — and getting that distinction wrong in the
+ *  other direction is exactly how the tier's reading went unchecked. */
+export function parseHealthLine(text: string): number | null {
+  const m = text.match(/Health (\d+(?:\.\d+)?) \/ 100/);
+  return m ? Number(m[1]) : null;
+}
+
+/** The verdict word and the health figure the TIER states, read back out of either
+ *  letter renderer's combined line (`**Verdict.** CONSIDER · Health 76.3 / 100` in
+ *  markdown, `Verdict: …` in plain text). `null` when the line is absent.
+ *
+ *  The HTML tier states the same two facts as a stamp plus the same health reading,
+ *  so the CLI reads its verdict from the stamp it already scrapes and its health
+ *  through `parseHealthLine` — see scripts/verify-report.mjs. */
+export function parseLetterTierVerdictLine(
+  tierText: string,
+): { verdictWord: string; health: number | null } | null {
+  const m = tierText.match(/^(?:\*\*Verdict\.\*\* |Verdict: )(.+?) \u00b7 (Health .+)$/m);
+  if (!m) return null;
+  return { verdictWord: m[1].trim(), health: parseHealthLine(m[2]) };
+}
+
 /** The percentile READING stated in a body of text: "not comparable", or the band
  *  out of `healthPercentileSentence`. `null` when the text states neither.
  *

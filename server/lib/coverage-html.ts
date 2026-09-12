@@ -32,7 +32,10 @@ import { rootCauseStatements } from './root-cause-pipeline.ts';
 import { buildReaderTier, renderReaderTierHtml } from './reader-tier.ts';
 // ONE definition of the claims an exported artifact carries, shared with the
 // coverage letter and with both verifiers — see server/lib/artifact-claims.ts.
-import { claimRowsFor, VERIFY_SCOPE_SENTENCE, type ArtifactClaims } from './artifact-claims.ts';
+import {
+  claimRowsFor, UNKNOWN_VERDICT_WORD, VERDICT_WORD, VERIFY_SCOPE_SENTENCE,
+  type ArtifactClaims,
+} from './artifact-claims.ts';
 // ONE priorities heading across the panel, this export, the letter and the tier.
 import { prioritiesHeadingFor } from '../../src/lib/priorities-copy.ts';
 // ONE title and caption for the checks-that-found-nothing section, shared with
@@ -116,15 +119,20 @@ function healthBandColor(score: number): { fg: string; bg: string } {
   return { fg: '#7f1d1d', bg: '#b91c1c' };
 }
 
+// The COLOURS are this document's own; the LABEL is artifact-claims.ts's
+// VERDICT_WORD (2026-09-12). It used to be a fourth hand-copy of the same three
+// strings — including the load-bearing "PASS (decline)" parenthetical, without
+// which "PASS" reads as approval to anyone outside coverage culture — and the
+// verify CLI carried a fifth as an inverse. One map now, so a reworded verdict
+// cannot leave the scraper reading a word no renderer emits.
 const VERDICT_STYLE: Record<CoverageVerdict, { bg: string; border: string; text: string; label: string }> = {
-  RECOMMEND: { bg: '#eafaf1', border: '#1a7f37', text: '#14532d', label: 'RECOMMEND' },
-  CONSIDER:  { bg: '#fffaf0', border: '#b45309', text: '#78350f', label: 'CONSIDER' },
-  // Coverage vocabulary: "PASS" means the reader declines the project — the
-  // single most commonly misread word in this whole document to a
-  // non-industry audience, so the parenthetical is load-bearing, not decor.
-  PASS:      { bg: '#fef2f2', border: '#b91c1c', text: '#7f1d1d', label: 'PASS (decline)' },
+  RECOMMEND: { bg: '#eafaf1', border: '#1a7f37', text: '#14532d', label: VERDICT_WORD.RECOMMEND },
+  CONSIDER:  { bg: '#fffaf0', border: '#b45309', text: '#78350f', label: VERDICT_WORD.CONSIDER },
+  PASS:      { bg: '#fef2f2', border: '#b91c1c', text: '#7f1d1d', label: VERDICT_WORD.PASS },
 };
-const UNKNOWN_VERDICT_STYLE = { bg: '#f1f5f9', border: '#64748b', text: '#334155', label: 'N/A' };
+const UNKNOWN_VERDICT_STYLE = {
+  bg: '#f1f5f9', border: '#64748b', text: '#334155', label: UNKNOWN_VERDICT_WORD,
+};
 
 function severityChip(sev: RevisionIssue['severity']): string {
   const label = sev.toUpperCase();

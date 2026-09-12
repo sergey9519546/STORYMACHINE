@@ -96,14 +96,47 @@ the IndexedDB draft mirror, and calls `POST /api/session/delete`.
 | `POST /api/session/delete` | Destroy the caller's own session — evict its `Stage` and unlink its SQLite files. Unrecoverable; backs the "delete everything" control in Settings → Session |
 | `GET /api/ledger/fountain` | Export action log as annotated Fountain screenplay |
 
+## The producer tier and the root-cause pipeline
+
+Every exported coverage report and coverage letter opens with **one printed
+page for a reader deciding whether to read the script** — a logline, the
+length, the verdict and health, the percentile reading (or why a percentile is
+not comparable, with the reference set's bounds), and the leading findings,
+each with a **page number** resolved through the same paginator that lays out
+the exported PDF. Then a divider, then the complete report unchanged: the tier
+is a front page, not a replacement, and nothing was removed to make room for
+it (`server/lib/reader-tier.ts`, `server/lib/page-refs.ts`).
+
+The root causes and priorities it leads with come from **one pipeline**
+(`server/lib/root-cause-pipeline.ts`) that the in-app Script Doctor panel and
+both exports all call. Before it existed, each of those surfaces assembled its
+own `locateIssues`/`clusterIssues` pair, and one of them did it with an
+argument missing — so a producer's export named different scenes, counted a
+different number of findings, and ordered them differently from the writer's
+screen for the same script.
+
 ## Verifying a report
 
 Every exported Script Doctor coverage report (the HTML export, the coverage
 letter, or a raw report JSON) carries a full SHA-256 hash of the script text
-plus the numbers it claims (health, verdict, total issues and, when present,
-health percentile and engine identity). Anyone holding the original script
-text can independently re-run the deterministic engine and confirm those
-numbers weren't hand-edited — two ways:
+plus **every value it states as a number or as a discrete reading**: health,
+verdict, total issues, the scene and word counts, the estimated page/minute
+figures, the count its priorities heading states, the percentile reading, the
+reference bounds the percentile is measured against, whether a logline was
+derived, each finding's page reference, and the engine identity. One module
+defines that set (`server/lib/artifact-claims.ts`); the exporters render the
+page from it and publish it as the report's verify block, and both verifiers
+read it back through the same definition — so a number cannot appear on the
+page without appearing in the block.
+
+What is **not** checked is stated on the artifact itself and in
+`npm run verify-report --help`: wording. The report's prose, the finding
+descriptions, the logline's own text (only whether one was derived), the title,
+the author and the draft-rank line are supplied by whoever exported the report
+rather than derived by the engine, so re-running the engine cannot attest them.
+
+Anyone holding the original script text can independently re-run the
+deterministic engine and confirm the rest weren't hand-edited — two ways:
 
 **On your own machine (recommended for an unpublished script):**
 
@@ -124,8 +157,8 @@ npm run verify-report -- report.json script.fountain
 It prints three verdicts and exits `0` only when the first two are both
 "yes":
 
-- `authentic: yes/no` — does the script's own hash match what the report claims?
-- `reproducible under this engine: yes/no` (per field) — does a fresh analysis of that exact text reproduce the report's numbers, within the same tolerance `/api/export/verify` uses?
+- `authentic: yes/no` — does the script's own hash match what the report claims? This step also checks the document against **itself**: the summary page's own Length line, priorities heading, percentile reading, reference bounds, logline state, verdict, health reading and page references must agree with the verify block, so an edit to what a human reads is caught even when the block is genuine. A report that renders a summary page whose numbers its block does not publish is refused rather than verified on what remains.
+- `reproducible under this engine: yes/no` (per field) — does a fresh analysis of that exact text reproduce the report's numbers, within the same tolerance `/api/export/verify` uses? Page references are re-resolved through the paginator, not merely checked for being present. Fields this artifact's shape does not state are named as unchecked rather than left out.
 - `engine: report <sha> vs local <sha>` — an advisory comparison of which build of the engine produced each side (a mismatch here does not fail the run: reproducing a report's numbers is not the same claim as attesting which build produced the original — see the CLI's own header).
 
 **Hosted, via a running instance:** open `#verify` (the "Verify a report"

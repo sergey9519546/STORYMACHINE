@@ -15,6 +15,8 @@ import { startTestServer, type TestServer } from './helpers.ts';
 import { fountainToFdx } from '../../src/lib/fdx.ts';
 import { fdxToFountain } from '../../server/lib/fdx-import.ts';
 import { runScriptDoctor, clearDoctorCache } from '../../server/nvm/analyze/doctor.ts';
+import { buildReaderTier } from '../../server/lib/reader-tier.ts';
+import type { ArtifactClaims } from '../../server/lib/artifact-claims.ts';
 
 // Same fixture as tests/routes/export-coverage.test.ts: enough scenes/
 // dialogue/characters for the 14 revision passes to have real material, so
@@ -497,5 +499,173 @@ describe('routes/export — a shared report verifies from its own published clai
 
     assert.equal(body.verified, false);
     assert.ok(body.mismatches.some((m: { field: string }) => m.field === 'contentHash'));
+  });
+});
+
+// ── The producer tier's claims, through the ROUTE (2026-09-12, BUG-1) ────────
+// docs/audits/2026-09-12-adversarial/server-data-tests.md: the tier states a
+// scene count, a word count, a page/minute estimate, a priorities count, a
+// percentile reading, the reference bounds, a logline state and a page reference
+// per finding — and `VerifyExpectedSchema` had no FIELD for any of them, so this
+// route could not check them even if a caller asked. These cases are the route
+// half of that fix: the claims an exported report publishes all reach the
+// comparator, every one of them can fail, and the page references are re-resolved
+// through the paginator rather than taken on trust.
+describe('routes/export — POST /api/export/verify checks every claim the producer tier publishes', async () => {
+  let server: TestServer;
+  let report: Awaited<ReturnType<typeof runScriptDoctor>>;
+  let contentHash: string;
+  let claims: ArtifactClaims;
+
+  before(async () => {
+    server = await startTestServer();
+    clearDoctorCache();
+    report = await runScriptDoctor(MULTI_SCENE_FOUNTAIN);
+    contentHash = sha256(MULTI_SCENE_FOUNTAIN);
+    // The exact claim set a genuine export of this script publishes.
+    claims = buildReaderTier(report, { fountain: MULTI_SCENE_FOUNTAIN }).claims;
+  });
+  after(async () => { await server.close(); });
+
+  function post(body: unknown) {
+    return fetch(`${server.baseUrl}/api/export/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  /** Every tier claim, as a route caller would send them. */
+  function tierExpected(over: Record<string, unknown> = {}) {
+    return {
+      contentHash,
+      sceneCount: claims.sceneCount,
+      wordCount: claims.wordCount,
+      estimatedPages: claims.estimatedPages,
+      estimatedRuntimeMinutes: claims.estimatedRuntimeMinutes,
+      prioritiesListed: claims.prioritiesListed,
+      percentileReading: claims.percentileReading,
+      referenceBounds: claims.referenceBounds,
+      loglineState: claims.loglineState,
+      pageRefs: claims.pageRefs,
+      ...over,
+    };
+  }
+
+  it('a genuine claim set verifies, and every tier field is named in `checked`', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, expected: tierExpected() });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.verified, true, `mismatches: ${JSON.stringify(body.mismatches)}`);
+    for (const field of [
+      'sceneCount', 'wordCount', 'estimatedPages', 'estimatedRuntimeMinutes',
+      'prioritiesListed', 'percentileReading', 'referenceBounds', 'loglineState', 'pageRefs',
+    ]) {
+      assert.ok(body.checked.includes(field), `${field} must be a checked field`);
+    }
+  });
+
+  it('`recomputed` reports the engine’s own reading of every tier claim, whether or not the caller claimed it', async () => {
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, expected: { contentHash } });
+    const body = await res.json();
+    assert.equal(body.verified, true);
+    assert.equal(body.recomputed.sceneCount, claims.sceneCount);
+    assert.equal(body.recomputed.wordCount, claims.wordCount);
+    assert.equal(body.recomputed.prioritiesListed, claims.prioritiesListed);
+    assert.equal(body.recomputed.referenceBounds, claims.referenceBounds);
+    assert.equal(body.recomputed.loglineState, claims.loglineState);
+    assert.deepEqual(body.recomputed.pageRefs, claims.pageRefs);
+    // Reported but NOT checked, because the caller named none of them.
+    assert.ok(!body.checked.includes('sceneCount'));
+  });
+
+  for (const [field, forged] of [
+    ['sceneCount', 9999],
+    ['wordCount', 999_999],
+    ['estimatedPages', 500],
+    ['estimatedRuntimeMinutes', 500],
+    ['prioritiesListed', 9],
+    ['percentileReading', 'top 10%'],
+    ['referenceBounds', '200 samples / 9–10 scenes / 256–337 words'],
+    ['loglineState', 'not derived'],
+  ] as Array<[string, unknown]>) {
+    it(`a forged ${field} is a hard mismatch naming ${field}, never an engine advisory`, async () => {
+      const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, expected: tierExpected({ [field]: forged }) });
+      const body = await res.json();
+      assert.equal(body.verified, false, `${field} must be able to fail verification`);
+      assert.equal(body.mismatchKind, 'score_mismatch',
+        'a tier claim is a content claim, not an engine-identity one');
+      assert.ok(body.mismatches.some((m: { field: string }) => m.field === field),
+        `mismatches must name ${field}: ${JSON.stringify(body.mismatches)}`);
+    });
+  }
+
+  it('a forged page reference fails and names WHICH finding points at the wrong page', async () => {
+    const forgedRefs = (claims.pageRefs ?? []).map((r, i) => (i === 0 ? { ...r, page: 999 } : r));
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, expected: tierExpected({ pageRefs: forgedRefs }) });
+    const body = await res.json();
+    assert.equal(body.verified, false);
+    const mismatch = body.mismatches.find((m: { field: string }) => m.field === 'pageRefs');
+    assert.ok(mismatch, `mismatches must name pageRefs: ${JSON.stringify(body.mismatches)}`);
+    assert.match(mismatch.detail, /reference 1 \(.+\) points at p\. 999 in this report and/);
+  });
+
+  it('a page-reference list with a finding deleted fails on its length, not silently on the entries that remain', async () => {
+    const res = await post({
+      fountain: MULTI_SCENE_FOUNTAIN,
+      expected: tierExpected({ pageRefs: (claims.pageRefs ?? []).slice(0, 1) }),
+    });
+    const body = await res.json();
+    assert.equal(body.verified, false);
+    const mismatch = body.mismatches.find((m: { field: string }) => m.field === 'pageRefs');
+    assert.match(mismatch.detail, /claims 1 page reference, the engine resolves 3/);
+  });
+
+  it('a page reference attributed to the wrong rule fails even when the page number is right', async () => {
+    const swapped = (claims.pageRefs ?? []).map((r, i) => (i === 0 ? { ...r, rule: 'SOME_OTHER_RULE' } : r));
+    const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, expected: tierExpected({ pageRefs: swapped }) });
+    const body = await res.json();
+    assert.equal(body.verified, false);
+    const mismatch = body.mismatches.find((m: { field: string }) => m.field === 'pageRefs');
+    assert.match(mismatch.detail, /names rule SOME_OTHER_RULE in this report/);
+  });
+
+  // The zod wall in front of the comparator — the 2026-09-06 NaN finding, re-run
+  // for every field added on 2026-09-12. A claim that cannot be compared must be a
+  // 400, never a silent pass: `Math.abs(NaN - x) > tolerance` is false.
+  for (const field of ['sceneCount', 'wordCount', 'estimatedPages', 'estimatedRuntimeMinutes', 'prioritiesListed']) {
+    for (const [label, value] of [
+      ['a non-numeric string', 'OUTSTANDING'],
+      ['null (JSON has no NaN)', null],
+      ['a negative', -1],
+      ['a float', 6.5],
+      ['an empty string', ''],
+    ] as Array<[string, unknown]>) {
+      it(`${field} = ${label} is rejected with 400 before the comparator runs`, async () => {
+        const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, expected: { contentHash, [field]: value } });
+        assert.equal(res.status, 400, `${field} = ${String(value)} must not reach the comparator`);
+      });
+    }
+  }
+
+  it('a percentileReading that is not a band or "not comparable" is rejected with 400', async () => {
+    for (const bad of ['', 'middle 50%', 'not-comparable', 'EXCELLENT']) {
+      const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, expected: { contentHash, percentileReading: bad } });
+      assert.equal(res.status, 400, JSON.stringify(bad));
+    }
+  });
+
+  it('a malformed pageRefs entry is rejected with 400 rather than partially checked', async () => {
+    const bads: unknown[] = [
+      'p. 999',
+      [{ ordinal: 1, rule: 'X' }],
+      [{ ordinal: 0, rule: 'X', page: 1 }],
+      [{ ordinal: 1, rule: 'X', page: 0 }],
+      [{ ordinal: 1, rule: 'X', page: 1, extra: 'x' }],
+    ];
+    for (const bad of bads) {
+      const res = await post({ fountain: MULTI_SCENE_FOUNTAIN, expected: { contentHash, pageRefs: bad } });
+      assert.equal(res.status, 400, JSON.stringify(bad));
+    }
   });
 });

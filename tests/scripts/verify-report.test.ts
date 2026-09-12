@@ -24,6 +24,15 @@ import { fileURLToPath } from 'node:url';
 import { runScriptDoctor, clearDoctorCache } from '../../server/nvm/analyze/doctor.ts';
 import { renderCoverageHtml } from '../../server/lib/coverage-html.ts';
 import { renderCoverageLetter } from '../../server/lib/coverage-letter.ts';
+import { startTestServer, freshSessionId, type TestServer } from '../routes/helpers.ts';
+import {
+  buildReaderTier, NO_LOGLINE_NOTE, NO_LOGLINE_NOTE_HTML, type ReaderTierData,
+} from '../../server/lib/reader-tier.ts';
+import {
+  encodePageRefs, formatLengthLine, type ArtifactClaims,
+} from '../../server/lib/artifact-claims.ts';
+import { prioritiesHeadingFor } from '../../src/lib/priorities-copy.ts';
+import { healthPercentileSentence, notComparableSentence } from '../../src/lib/percentile-copy.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CLI = path.join(REPO_ROOT, 'scripts/verify-report.mjs');
@@ -177,6 +186,12 @@ describe('scripts/verify-report.mjs — offline CLI', async () => {
     let tampered = original
       .replace(`<dt>Health</dt><dd><code>${realHealth}</code></dd>`, `<dt>Health</dt><dd><code>${inflated}</code></dd>`)
       .replace(`>${realHealth}</div>`, `>${inflated}</div>`) // the health-number headline
+      // The producer tier's own reading — a FOURTH rendering, added 2026-09-11 and
+      // unchecked until 2026-09-12 (writer-loop.md finding 2). It has to move with
+      // the others or this case no longer tests what it says it does: it would be
+      // caught by the document disagreeing with itself, one step before the
+      // recomputation this case exists to exercise.
+      .replace(`Health ${realHealth} / 100`, `Health ${inflated} / 100`)
       .replace(`overall score ${realRounded}/100`, `overall score ${inflatedRounded}/100`); // plainSummary
     assert.notEqual(tampered, original, 'sanity: at least one replace must have matched');
     assert.ok(!tampered.includes(`>${realHealth}</div>`) && !tampered.includes(`<code>${realHealth}</code>`),
@@ -452,4 +467,433 @@ describe('scripts/verify-report.mjs — offline CLI', async () => {
       assert.doesNotMatch(stdout, /line endings/i);
     });
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BUG-1 (2026-09-12) — the producer tier's claims, in every artifact shape.
+//
+// docs/audits/2026-09-12-adversarial/server-data-tests.md BUG-1: the tier put a
+// scene count, a word count, an estimated page/minute figure, a per-finding page
+// reference, a priorities count, a percentile reading and the reference bounds on
+// the one page a producer is told to trust, and the verifier checked none of them
+// — `9,999 scenes · 999,999 words · p. 999` printed VERIFIED at exit 0. And
+// docs/audits/2026-09-12-adversarial/writer-loop.md finding 2: the tier is also a
+// SECOND rendering of the verdict and health, which the CLI's scrape did not read
+// either, so `**Verdict.** RECOMMEND · Health 94.6 / 100` verified too.
+//
+// EVERY CASE BELOW WAS RUN AGAINST 3bb623cc FIRST and printed
+// `VERIFIED — authentic and reproducible under this engine.` at exit 0. Two
+// directions per claim, because they fail differently:
+//
+//   BODY ONLY  — the reader-facing rendering is edited, the verify block is left
+//                genuine. Caught by the document disagreeing with itself, before
+//                the engine is re-run at all.
+//   CONSISTENT — the rendering AND the block are edited together, so the document
+//                agrees with itself. Only recomputation from the script text
+//                catches it, and it must name the field.
+//
+// The genuine artifacts come from a LIVE KEYLESS SERVER (the real export routes,
+// not renderCoverageHtml/renderCoverageLetter called directly), because a
+// recipient only ever holds what a route produced.
+describe('the producer tier\u2019s claims are verifiable in every artifact shape (BUG-1)', () => {
+  let server: TestServer;
+  let dir: string;
+  let scriptPath: string;
+  /** kind -> the genuine artifact a live route produced. */
+  const genuine: Record<string, string> = {};
+  let tier: ReaderTierData;
+
+  const SHAPES = ['html', 'md', 'txt'] as const;
+  type Shape = typeof SHAPES[number];
+  const EXT: Record<Shape, string> = { html: 'html', md: 'md', txt: 'txt' };
+
+  before(async () => {
+    clearDoctorCache();
+    server = await startTestServer();
+    dir = mkdtempSync(path.join(tmpdir(), 'verify-tier-claims-'));
+    scriptPath = path.join(dir, 'script.fountain');
+    writeFileSync(scriptPath, MULTI_SCENE_FOUNTAIN);
+
+    const htmlRes = await fetch(`${server.baseUrl}/api/export/coverage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Warehouse' }),
+    });
+    assert.equal(htmlRes.status, 200);
+    genuine.html = await htmlRes.text();
+
+    const letterRes = await fetch(`${server.baseUrl}/api/export/coverage-letter`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fountain: MULTI_SCENE_FOUNTAIN, title: 'The Warehouse' }),
+    });
+    assert.equal(letterRes.status, 200);
+    const letter = await letterRes.json() as { markdown: string; text: string };
+    genuine.md = letter.markdown;
+    genuine.txt = letter.text;
+
+    const doctorRes = await fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: freshSessionId(), fountain: MULTI_SCENE_FOUNTAIN }),
+    });
+    assert.equal(doctorRes.status, 200);
+    genuine.json = JSON.stringify(await doctorRes.json(), null, 2);
+
+    // The strings the tier actually rendered, taken from the tier itself rather
+    // than re-typed here — a forgery test that hand-types the genuine value can
+    // pass while testing nothing.
+    const report = await runScriptDoctor(MULTI_SCENE_FOUNTAIN);
+    tier = buildReaderTier(report, { fountain: MULTI_SCENE_FOUNTAIN });
+  });
+  after(async () => {
+    await server.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  function write(name: string, contents: string): string {
+    const p = path.join(dir, name);
+    writeFileSync(p, contents);
+    return p;
+  }
+
+  /** A replacement that FAILS LOUDLY when its target is absent — a forgery test
+   *  whose edit silently did not apply proves nothing. */
+  function forgeFirst(text: string, find: string, replacement: string): string {
+    assert.ok(text.includes(find), `sanity: the genuine artifact must contain ${JSON.stringify(find)}`);
+    return text.replace(find, replacement);
+  }
+  function forgeEvery(text: string, find: string, replacement: string): string {
+    assert.ok(text.includes(find), `sanity: the genuine artifact must contain ${JSON.stringify(find)}`);
+    return text.split(find).join(replacement);
+  }
+
+  // ── The verify block, by label ─────────────────────────────────────────────
+  // The letter's rows are scoped to its FOOTER: its plain-text tier prints
+  // `Logline: …` and `Verdict: …` lines of its own, so an unscoped `^Label:` edit
+  // would forge the page instead of the block — the opposite of what these cases
+  // are isolating.
+  const FOOTER_ANCHOR = 'Script-text hash (SHA-256):';
+
+  function readRow(artifact: string, shape: Shape, label: string): string {
+    if (shape === 'html') {
+      const m = artifact.match(new RegExp(`<dt>${label.replace(/[().]/g, '\\$&')}</dt><dd><code>([^<]*)</code></dd>`));
+      assert.ok(m, `sanity: the genuine ${shape} artifact must publish a ${label} row`);
+      return m[1];
+    }
+    const footerStart = artifact.indexOf(FOOTER_ANCHOR);
+    assert.ok(footerStart > 0, 'sanity: the letter must carry its verify footer');
+    const m = artifact.slice(footerStart).match(new RegExp(`^${label.replace(/[().]/g, '\\$&')}: (.*)$`, 'm'));
+    assert.ok(m, `sanity: the genuine ${shape} artifact must publish a ${label} row`);
+    return m[1];
+  }
+
+  function forgeRow(artifact: string, shape: Shape, label: string, value: string): string {
+    const old = readRow(artifact, shape, label);
+    if (shape === 'html') {
+      return forgeFirst(artifact, `<dt>${label}</dt><dd><code>${old}</code></dd>`,
+        `<dt>${label}</dt><dd><code>${value}</code></dd>`);
+    }
+    const footerStart = artifact.indexOf(FOOTER_ANCHOR);
+    return artifact.slice(0, footerStart)
+      + forgeFirst(artifact.slice(footerStart), `${label}: ${old}`, `${label}: ${value}`);
+  }
+
+  // ── The forgery matrix ────────────────────────────────────────────────────
+  // One entry per CLAIM. `page` edits only what a reader sees; `row` is the label
+  // whose claim has to move with it for the consistent forgery. `named` is what the
+  // failure must name, in both directions.
+  interface Forgery {
+    claim: string;
+    row: string;
+    /** A THUNK, not a value: this table is built when the describe body runs, which
+     *  is before before() has produced the artifacts — an eager value here reads
+     *  `tier` unassigned. */
+    rowValue: () => string;
+    named: RegExp;
+    page: (artifact: string, shape: Shape) => string;
+    /** The OTHER renderings of this claim, for the consistent direction only.
+     *
+     *  health and verdict are each rendered three or four times in one document (the
+     *  summary page, the health headline or the letter's own verdict line, the
+     *  doctor's plainSummary sentence), and the body-versus-block check fires on any
+     *  one of them disagreeing — which is correct, and which means a forgery that
+     *  edits only the summary page and the block never reaches the recomputation at
+     *  all. To prove recomputation ALSO names these two, every rendering has to move
+     *  together. The tier's own claims (scene count, page references, …) are rendered
+     *  once, so they need no such hook. */
+    alsoForge?: (artifact: string, shape: Shape) => string;
+  }
+
+  /** The doctor's own summary sentence — `CONSIDER — <descriptor>; overall score
+   *  65/100.` — present verbatim in all three shapes. Rewritten through its own
+   *  structure rather than by a literal replace, so neither capture can be confused
+   *  with the same words elsewhere in the document. */
+  function forgePlainSummary(text: string, over: { verdict?: string; health?: number }): string {
+    const re = /(RECOMMEND|CONSIDER|PASS)( \u2014 [^;]+; overall score )(\d+)(\/100\.)/;
+    assert.match(text, re, 'sanity: the artifact must carry the doctor\u2019s summary sentence');
+    return text.replace(re, (_m, verdict, middle, health, tail) =>
+      `${over.verdict ?? verdict}${middle}${over.health !== undefined ? Math.round(over.health) : health}${tail}`);
+  }
+
+  function forgedLengthLine(over: Partial<Pick<ArtifactClaims, 'sceneCount' | 'wordCount' | 'estimatedPages' | 'estimatedRuntimeMinutes'>>): string {
+    return formatLengthLine({ ...tier.claims, ...over });
+  }
+
+  const FORGERIES: Forgery[] = [
+    {
+      claim: 'sceneCount',
+      row: 'Scenes',
+      rowValue: () => '9999',
+      named: /sceneCount/,
+      page: a => forgeEvery(a, tier.lengthLine, forgedLengthLine({ sceneCount: 9999 })),
+    },
+    {
+      claim: 'wordCount',
+      row: 'Words',
+      rowValue: () => '999999',
+      named: /wordCount/,
+      page: a => forgeEvery(a, tier.lengthLine, forgedLengthLine({ wordCount: 999_999 })),
+    },
+    {
+      claim: 'estimatedPages',
+      row: 'Estimated pages',
+      rowValue: () => '500',
+      named: /estimatedPages/,
+      page: a => forgeEvery(a, tier.lengthLine, forgedLengthLine({ estimatedPages: 500 })),
+    },
+    {
+      claim: 'estimatedRuntimeMinutes',
+      row: 'Estimated runtime (minutes)',
+      rowValue: () => '500',
+      named: /estimatedRuntimeMinutes/,
+      page: a => forgeEvery(a, tier.lengthLine, forgedLengthLine({ estimatedRuntimeMinutes: 500 })),
+    },
+    {
+      claim: 'prioritiesListed',
+      row: 'Priorities listed',
+      rowValue: () => '9',
+      named: /prioritiesListed/,
+      page: (a, shape) => (shape === 'txt'
+        ? forgeFirst(a, tier.prioritiesHeading.toUpperCase(), prioritiesHeadingFor(9).toUpperCase())
+        : forgeFirst(a, tier.prioritiesHeading, prioritiesHeadingFor(9))),
+    },
+    {
+      claim: 'percentileReading',
+      row: 'Health percentile reading',
+      rowValue: () => 'top 10%',
+      named: /percentileReading/,
+      // The honest "not comparable" reading replaced by a flattering band — the
+      // forgery this gate exists for: 0 of the 20 CC0 shorts are inside the
+      // reference set's bounds, so every real draft takes the not-comparable path.
+      page: a => forgeFirst(a, notComparableSentence(), healthPercentileSentence(100)),
+    },
+    {
+      claim: 'referenceBounds',
+      row: 'Reference bounds',
+      rowValue: () => '200 samples / 9\u201310 scenes / 256\u2013337 words',
+      named: /referenceBounds/,
+      // A wider reference set makes the percentile look like a reading about real
+      // writing rather than about twenty synthetic 9-10-scene samples.
+      page: a => forgeFirst(a, tier.claims.referenceBounds, '200 samples / 9\u201310 scenes / 256\u2013337 words'),
+    },
+    {
+      claim: 'loglineState',
+      row: 'Logline',
+      rowValue: () => 'not derived',
+      named: /loglineState/,
+      page: (a, shape) => forgeFirst(a, tier.logline as string,
+        shape === 'html' ? NO_LOGLINE_NOTE_HTML : NO_LOGLINE_NOTE),
+    },
+    {
+      claim: 'pageRefs',
+      row: 'Page references',
+      rowValue: () => encodePageRefs((tier.claims.pageRefs ?? []).map((r, i) => (i === 0 ? { ...r, page: 999 } : r))),
+      named: /page reference|pageRefs/,
+      page: (a, shape) => (shape === 'html'
+        ? forgeFirst(a, '<span class="tier-page">p. 1</span>', '<span class="tier-page">p. 999</span>')
+        : forgeFirst(a, '\u2014 p. 1', '\u2014 p. 999')),
+    },
+    // writer-loop.md finding 2, verbatim: the tier's own verdict/health line.
+    {
+      claim: 'verdict',
+      row: 'Verdict',
+      rowValue: () => 'RECOMMEND',
+      named: /verdict/,
+      page: (a, shape) => (shape === 'html'
+        // The HTML tier states the verdict as the stamp the tier owns.
+        ? forgeFirst(a, `>${tier.verdictLabel}</span>`, '>RECOMMEND</span>')
+        : forgeFirst(a, `${tier.verdictLabel} \u00b7 ${tier.healthLine}`, `RECOMMEND \u00b7 ${tier.healthLine}`)),
+      alsoForge: (a, shape) => {
+        const withSummary = forgePlainSummary(a, { verdict: 'RECOMMEND' });
+        if (shape === 'html') return withSummary;
+        // The letter states the verdict a third time, below the divider.
+        return shape === 'md'
+          ? forgeFirst(withSummary, `**Verdict: ${tier.verdictLabel}**`, '**Verdict: RECOMMEND**')
+          : forgeFirst(withSummary, `VERDICT: ${tier.verdictLabel}`, 'VERDICT: RECOMMEND');
+      },
+    },
+    {
+      claim: 'health',
+      row: 'Health',
+      rowValue: () => '94.6',
+      named: /health/,
+      page: a => forgeFirst(a, tier.healthLine, 'Health 94.6 / 100'),
+      alsoForge: (a, shape) => {
+        const withSummary = forgePlainSummary(a, { health: 94.6 });
+        const genuineHealth = tier.claims.health.toFixed(1);
+        return shape === 'html'
+          // The health headline below the divider.
+          ? forgeFirst(withSummary, `>${genuineHealth}</div>`, '>94.6</div>')
+          // The letter's headline: `Health 65.0/100 (Fair) · …` — no spaces around
+          // the slash, which is what distinguishes it from the tier's reading.
+          : forgeFirst(withSummary, `Health ${genuineHealth}/100`, 'Health 94.6/100');
+      },
+    },
+  ];
+
+  for (const shape of SHAPES) {
+    for (const forgery of FORGERIES) {
+      it(`${shape}: ${forgery.claim} forged on the page only -> exit 1, the document disagrees with its own verify block`, () => {
+        const forged = forgery.page(genuine[shape], shape);
+        assert.notEqual(forged, genuine[shape], 'sanity: the forgery must have applied');
+        const p = write(`body-${forgery.claim}.${EXT[shape]}`, forged);
+        const { status, stdout } = runCli([p, scriptPath]);
+        assert.equal(status, 1, stdout);
+        assert.match(stdout, /authentic: no — the visible report disagrees with its own verify block/);
+        assert.match(stdout, forgery.named);
+        assert.doesNotMatch(stdout, /^VERIFIED/m);
+      });
+
+      it(`${shape}: ${forgery.claim} forged in every rendering AND in the verify block -> exit 1, reproduction names ${forgery.claim}`, () => {
+        const onPage = forgery.page(genuine[shape], shape);
+        const everywhere = forgery.alsoForge ? forgery.alsoForge(onPage, shape) : onPage;
+        const forged = forgeRow(everywhere, shape, forgery.row, forgery.rowValue());
+        const p = write(`consistent-${forgery.claim}.${EXT[shape]}`, forged);
+        const { status, stdout } = runCli([p, scriptPath]);
+        assert.equal(status, 1, stdout);
+        assert.match(stdout, /authentic: yes/, 'the script text is untouched — only the claims were forged');
+        assert.doesNotMatch(stdout, /disagrees with its own verify block/,
+          'a document that agrees with itself must reach the recomputation, not be caught before it');
+        assert.match(stdout, new RegExp(`NOT VERIFIED — reproduction disagrees on:.*${forgery.claim}`));
+        assert.doesNotMatch(stdout, /^VERIFIED/m);
+      });
+    }
+
+    it(`${shape}: the genuine artifact a live keyless server produced verifies at exit 0`, () => {
+      const p = write(`genuine.${EXT[shape]}`, genuine[shape]);
+      const { status, stdout } = runCli([p, scriptPath]);
+      assert.equal(status, 0, stdout);
+      assert.match(stdout, /^VERIFIED/m);
+      // and every tier claim was actually CHECKED, not quietly absent
+      for (const field of [
+        'sceneCount', 'wordCount', 'estimatedPages', 'estimatedRuntimeMinutes',
+        'prioritiesListed', 'percentileReading', 'referenceBounds', 'loglineState', 'pageRefs',
+      ]) {
+        assert.match(stdout, new RegExp(`^  ${field}: yes`, 'm'), `${field} must be reported as checked`);
+      }
+    });
+  }
+
+  // ── The raw report JSON ───────────────────────────────────────────────────
+  // No reader summary page exists in this shape, so there is no body/block split:
+  // the fields ARE the claims, and recomputation is the only check. The four the
+  // tier renders from are the four this shape states.
+  for (const [field, forge] of [
+    ['sceneCount', (r: Record<string, unknown>) => ({ ...r, sceneCount: 9999 })],
+    ['wordCount', (r: Record<string, unknown>) => ({ ...r, wordCount: 999_999 })],
+    ['estimatedPages', (r: Record<string, unknown>) => ({
+      ...r, pageEstimate: { ...(r.pageEstimate as object), pages: 500 },
+    })],
+    ['estimatedRuntimeMinutes', (r: Record<string, unknown>) => ({
+      ...r, pageEstimate: { ...(r.pageEstimate as object), runtimeMinutes: 500 },
+    })],
+  ] as Array<[string, (r: Record<string, unknown>) => Record<string, unknown>]>) {
+    it(`json: a forged ${field} -> exit 1, reproduction names ${field}`, () => {
+      const forged = forge(JSON.parse(genuine.json) as Record<string, unknown>);
+      const p = write(`json-${field}.json`, JSON.stringify(forged, null, 2));
+      const { status, stdout } = runCli([p, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, new RegExp(`NOT VERIFIED — reproduction disagrees on:.*${field}`));
+    });
+  }
+
+  it('json: the genuine report a live keyless server returned verifies at exit 0, and says which claims its shape cannot carry', () => {
+    const p = write('genuine.json', genuine.json);
+    const { status, stdout } = runCli([p, scriptPath]);
+    assert.equal(status, 0, stdout);
+    assert.match(stdout, /^VERIFIED/m);
+    assert.match(stdout, /^  sceneCount: yes/m);
+    assert.match(stdout, /^  wordCount: yes/m);
+    // No silent gaps: the page-only claims are NAMED as unchecked for this shape.
+    assert.match(stdout, /not claimed by this json report, so not checked:.*prioritiesListed/);
+    assert.match(stdout, /not claimed by this json report, so not checked:.*pageRefs/);
+  });
+
+  // ── A block with the tier's rows deleted ─────────────────────────────────
+  it('html: a report that renders the summary page but publishes none of its claims is refused, not verified on what remains', () => {
+    const stripped = genuine.html.replace(
+      /\s*<div><dt>(Scenes|Words|Priorities listed|Reference bounds|Page references)<\/dt><dd><code>[^<]*<\/code><\/dd><\/div>/g,
+      '',
+    );
+    assert.notEqual(stripped, genuine.html, 'sanity: rows must have been removed');
+    const p = write('stripped-rows.html', stripped);
+    const { status, stdout } = runCli([p, scriptPath]);
+    assert.equal(status, 1, stdout);
+    assert.match(stdout, /renders a reader summary page whose numbers its verify block does not publish/);
+    for (const label of ['Scenes', 'Words', 'Priorities listed', 'Reference bounds', 'Page references']) {
+      assert.match(stdout, new RegExp(`missing claim: ${label}`));
+    }
+    assert.doesNotMatch(stdout, /^VERIFIED/m);
+  });
+
+  it('a report with NO summary page at all (every artifact exported before 2026-09-11) is unaffected by that rule', () => {
+    // The pre-tier shape, reconstructed by removing the tier section: the claims it
+    // publishes are checked, the ones it does not state are reported as unchecked,
+    // and it verifies. Gating on the tier's PRESENCE rather than on a version stamp
+    // is what makes that true.
+    const tierStart = genuine.html.indexOf('<section class="reader-tier">');
+    const dividerEnd = genuine.html.indexOf('/>', genuine.html.indexOf('<hr class="tier-divider"')) + 2;
+    assert.ok(tierStart > 0 && dividerEnd > tierStart, 'sanity: the genuine report has a tier to remove');
+    const noTier = genuine.html.slice(0, tierStart) + genuine.html.slice(dividerEnd);
+    const p = write('no-tier.html', noTier);
+    const { status, stdout } = runCli([p, scriptPath]);
+    assert.equal(status, 0, stdout);
+    assert.match(stdout, /^VERIFIED/m);
+  });
+
+  // ── CRLF and BOM ─────────────────────────────────────────────────────────
+  // CLAUDE.md's own OneDrive/`core.autocrlf` hazard, applied to the artifact rather
+  // than to the script: a Windows checkout or an editor that rewrote line endings
+  // must not turn a genuine report into a failure, and must not turn a forged one
+  // into a pass.
+  const BOM = '\uFEFF';
+  for (const [name, transform] of [
+    ['CRLF', (t: string) => t.replace(/\n/g, '\r\n')],
+    ['a BOM', (t: string) => BOM + t],
+    ['CRLF and a BOM', (t: string) => BOM + t.replace(/\n/g, '\r\n')],
+  ] as Array<[string, (t: string) => string]>) {
+    it(`${name} in the genuine letter still verifies at exit 0`, () => {
+      const p = write(`genuine-${name.replace(/\W+/g, '-')}.md`, transform(genuine.md));
+      const { status, stdout } = runCli([p, scriptPath]);
+      assert.equal(status, 0, stdout);
+      assert.match(stdout, /^VERIFIED/m);
+    });
+
+    it(`${name} in the genuine HTML report still verifies at exit 0`, () => {
+      const p = write(`genuine-${name.replace(/\W+/g, '-')}.html`, transform(genuine.html));
+      const { status, stdout } = runCli([p, scriptPath]);
+      assert.equal(status, 0, stdout);
+      assert.match(stdout, /^VERIFIED/m);
+    });
+
+    it(`${name} does not let a forged scene count through`, () => {
+      const forged = forgeEvery(genuine.md, tier.lengthLine, forgedLengthLine({ sceneCount: 9999 }));
+      const p = write(`forged-${name.replace(/\W+/g, '-')}.md`, transform(forged));
+      const { status, stdout } = runCli([p, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, /sceneCount/);
+      assert.doesNotMatch(stdout, /^VERIFIED/m);
+    });
+  }
 });

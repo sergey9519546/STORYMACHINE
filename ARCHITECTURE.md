@@ -150,6 +150,62 @@ dialogue → rhythm → pacing → originality → payoff → voice → theme �
 relationship-arc
 ```
 
+### The producer tier, and the one root-cause pipeline
+
+Both coverage exports open with a one-page reader summary — the **producer
+tier** (`server/lib/reader-tier.ts`): logline, length, verdict, health, the
+percentile reading with the bounds it is measured against, and the leading
+findings, each carrying a page number. `buildReaderTier` builds one
+`ReaderTierData` and three renderers (HTML, markdown, plain text) format it, so
+the HTML report and the letter cannot state a different number for one script.
+Page numbers come from `server/lib/page-refs.ts`, which calls the SAME
+`layoutScreenplay` that `src/lib/pdf.ts` lays the exported PDF out with — never
+a second paginator.
+
+The root causes and priorities that tier leads with come from ONE pipeline,
+`server/lib/root-cause-pipeline.ts`, called by the in-app panel's route, the
+coverage HTML route and the coverage letter route. It replaced eight
+hand-assembled `clusterIssues(locateIssues(...))` call sites, one of which was
+missing the scene-spans argument — so the producer's export named different
+scenes, counted a different number of findings and ordered them differently
+from the writer's screen, from one `contentHash`.
+
+### The claim set an exported artifact carries
+
+`server/lib/artifact-claims.ts` is the single definition of "the claims an
+artifact carries": one label table, one encoder, one parser per rendering.
+
+```
+buildReaderTier ──> ArtifactClaims ──> the tier's own Length line (formatLengthLine)
+                          │
+                          ├─> coverage-html.ts  verify block  (claimRowsFor, <dt>/<dd>)
+                          ├─> coverage-letter.ts verify footer (claimRowsFor, Label: value)
+                          │
+                          └─< decodeClaimRows <── scripts/verify-report.mjs (offline CLI)
+                              VerifyExpectedSchema (zod) ──> compareVerifyClaims
+                                                             POST /api/export/verify
+```
+
+The page is rendered FROM the claim object, so a number cannot reach a
+producer's first page without reaching the claim set a verifier checks —
+which is what went wrong on 2026-09-11: the tier added a scene count, a word
+count, a page estimate, per-finding page references, a priorities count, a
+percentile reading and the reference bounds, and the verify block was assembled
+separately from `report`, so a hand edit to any of them printed
+`VERIFIED`, exit 0 (`docs/audits/2026-09-12-adversarial/server-data-tests.md`
+BUG-1; `writer-loop.md` finding 2 for the tier's verdict/health line).
+
+Two rules hold the offline verifier honest. Every claim is **recomputed**, not
+read off the report — page references are re-resolved through the paginator and
+the logline state re-derived from the text, with the verifier deliberately never
+handed the value it is checking. And a document that renders a summary page
+whose numbers its verify block does not publish is **refused**, because
+"only what was claimed is checked" would otherwise let a forger opt a number
+out of verification by deleting its row. What the verifier does NOT check —
+wording, the logline's text, the title, the author, the caller-supplied draft
+rank — is stated on the artifact itself, in `--help`, and in the register
+(`docs/CLAIMS_REGISTER.md`).
+
 ### Execution off the main thread
 
 `runScriptDoctor` is pure, deterministic CPU work with no I/O to yield on, so

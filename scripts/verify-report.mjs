@@ -70,8 +70,9 @@ import { commit as localEngineCommit } from '../server/lib/build-info.ts';
 // re-typed — a second regex for a claim is how the verdict-stamp scrape silently
 // stopped firing on 2026-09-11 when the stamp's tag changed.
 import {
-  decodeClaimRows, encodePageRefs, parseLengthLine, percentileReadingFromText,
-  referenceBoundsFromText, TIER_CLAIM_LABELS, VERIFY_SCOPE_SENTENCE,
+  decodeClaimRows, encodePageRefs, parseLengthLine, parseHealthLine,
+  parseLetterTierVerdictLine, percentileReadingFromText, referenceBoundsFromText,
+  verdictFromWord, TIER_CLAIM_LABELS, VERIFY_SCOPE_SENTENCE,
 } from '../server/lib/artifact-claims.ts';
 import { prioritiesCountFromHeading } from '../src/lib/priorities-copy.ts';
 import {
@@ -201,8 +202,16 @@ function collectPlainSummaryClaims(text) {
 // the same three length figures. Slicing the region first is what keeps one scrape
 // from reading the other section's number and calling it a disagreement.
 
-const TIER_DIVIDER_MD = '\n---';
-const TIER_DIVIDER_TXT = '\n----------------------------------------';
+/** The divider both letter renderers put after the tier, as a WHOLE LINE: exactly
+ *  three dashes (markdown's `---`) or exactly forty (the plain-text renderer's rule).
+ *
+ *  Whole-line and exact-length, both load-bearing. The plain-text tier underlines its
+ *  own headings with dashes — 14 under "READER SUMMARY", 25 under "The 3 things to fix
+ *  first" — so a substring search for '\n---' finds the tier's FIRST underline and
+ *  truncates the region to its heading, which is exactly the bug this pattern replaced:
+ *  the genuine plain-text letter then reported "the summary prints 0 page references"
+ *  against a block claiming one. No tier underline is ever 3 or 40 characters. */
+const TIER_DIVIDER_LINE_RE = /^(?:---|-{40})$/m;
 
 /** `{ tier, rest }` — the reader summary page, and everything after it. Either can
  *  be '' (a report that renders no tier at all: every artifact exported before
@@ -216,18 +225,14 @@ function splitTierRegion(text, kind) {
       ? { tier: text.slice(start), rest: '' }
       : { tier: text.slice(start, end), rest: text.slice(end) };
   }
-  // The letter, markdown or plain text. Both renderers open the tier with their
-  // own heading and close it with a divider line; the tier's own underlines are
-  // never 40 dashes and never a bare '---', so the first divider after the heading
-  // is the real one.
+  // The letter, markdown or plain text. Both renderers open the tier with their own
+  // heading and close it with a divider LINE (see TIER_DIVIDER_LINE_RE).
   const start = Math.max(text.indexOf('## Reader summary'), text.indexOf('READER SUMMARY'));
   if (start < 0) return { tier: '', rest: text };
-  const mdEnd = text.indexOf(TIER_DIVIDER_MD, start);
-  const txtEnd = text.indexOf(TIER_DIVIDER_TXT, start);
-  const ends = [mdEnd, txtEnd].filter(i => i >= 0);
-  if (ends.length === 0) return { tier: text.slice(start), rest: '' };
-  const end = Math.min(...ends);
-  return { tier: text.slice(start, end), rest: text.slice(end) };
+  const after = text.slice(start);
+  const divider = after.match(TIER_DIVIDER_LINE_RE);
+  if (!divider) return { tier: after, rest: '' };
+  return { tier: after.slice(0, divider.index), rest: after.slice(divider.index) };
 }
 
 /** The page references a reader actually SEES, in document order. Only resolved
@@ -281,6 +286,39 @@ function collectTierBodyClaims(text, kind) {
   const claims = [];
   if (tier === '') return claims;
 
+  // THE TIER'S VERDICT AND HEALTH READING (2026-09-12, investigator A finding 2 in
+  // docs/audits/2026-09-12-adversarial/writer-loop.md). The producer tier is a
+  // SECOND rendering of both, and nothing read it: a letter whose page-one line was
+  // edited to `**Verdict.** RECOMMEND · Health 94.6 / 100` printed VERIFIED at
+  // exit 0, because this file's letter scrape looked for `**Verdict:` (colon) and
+  // `Health 94.6/100` (no spaces) while the tier writes `**Verdict.**` and
+  // `Health 94.6 / 100`. Read through artifact-claims.ts's own inverses of the
+  // formatters that print them, so a reworded rendering fails the round-trip test
+  // rather than silently turning this scrape off.
+  if (kind === 'html') {
+    // The HTML tier's verdict is its `class="stamp"` span, already collected by
+    // parseHtmlReport (since 2026-09-11 the tier's stamp is the FIRST one in the
+    // document). Its health reading is this line, which nothing read before.
+    const tierHealth = parseHealthLine(tier);
+    if (tierHealth !== null) {
+      claims.push({ label: 'the summary page’s health reading', field: 'health', value: tierHealth, kind: 'exact' });
+    }
+  } else {
+    const verdictLine = parseLetterTierVerdictLine(tier);
+    if (verdictLine) {
+      const verdict = verdictFromWord(verdictLine.verdictWord);
+      claims.push({
+        label: 'the summary page’s verdict line',
+        field: 'verdict',
+        value: verdict ?? verdictLine.verdictWord,
+        kind: 'exact',
+      });
+      if (verdictLine.health !== null) {
+        claims.push({ label: 'the summary page’s health reading', field: 'health', value: verdictLine.health, kind: 'exact' });
+      }
+    }
+  }
+
   const length = parseLengthLine(tier);
   if (length) {
     claims.push({ label: 'the summary page’s Length line', field: 'sceneCount', value: length.sceneCount, kind: 'exact' });
@@ -311,13 +349,24 @@ function collectTierBodyClaims(text, kind) {
     }
   }
 
-  const heading = kind === 'html'
-    ? tier.match(/<h2 class="tier-heading">([^<]*)<\/h2>/)?.[1]
-    : (tier.match(/^### (.+)$/m)?.[1] ?? tier.match(/^([A-Z][A-Z0-9 ,'’-]+)$\n^-+$/m)?.[1]);
-  if (heading !== undefined) {
-    const count = prioritiesCountFromHeading(unescapeHtml(heading));
+  // The priorities heading. In the plain-text letter the tier's headings are bare
+  // underlined lines — "READER SUMMARY" is one of them, and taking the FIRST such
+  // line read the wrong heading entirely (prioritiesCountFromHeading returned null,
+  // so the claim was silently never checked and a forged count passed). Every
+  // candidate is offered to the shared inverse and the first one it RECOGNISES
+  // wins, which makes this a property of the heading's wording rather than of its
+  // position in the tier.
+  const headingCandidates = kind === 'html'
+    ? [...tier.matchAll(/<h2 class="tier-heading">([^<]*)<\/h2>/g)].map(m => m[1])
+    : [
+      ...[...tier.matchAll(/^### (.+)$/gm)].map(m => m[1]),
+      ...[...tier.matchAll(/^(.+)\n-+$/gm)].map(m => m[1]),
+    ];
+  for (const candidate of headingCandidates) {
+    const count = prioritiesCountFromHeading(unescapeHtml(candidate));
     if (count !== null) {
       claims.push({ label: 'the priorities heading', field: 'prioritiesListed', value: count, kind: 'exact' });
+      break;
     }
   }
 
@@ -400,22 +449,24 @@ function parseHtmlReport(text) {
   const stampMatch = text.match(/<(div|span) class="stamp"[^>]*>([\s\S]*?)<\/\1>/);
   if (stampMatch) {
     const label = unescapeHtml(stampMatch[2].trim());
-    bodyClaims.push({ label: 'the verdict stamp', field: 'verdict', value: VERDICT_LABEL_TO_ENUM[label] ?? label, kind: 'exact' });
+    bodyClaims.push({ label: 'the verdict stamp', field: 'verdict', value: verdictFromWord(label) ?? label, kind: 'exact' });
   }
   bodyClaims.push(...collectTierBodyClaims(text, 'html'));
 
   return { expected, bodyClaims, rows };
 }
 
-/** coverage-letter.ts's verify footer — server/lib/coverage-letter.ts's
- *  buildLetterData. hashLine, the claim lines and provenanceLine are
- *  byte-identical strings in BOTH the markdown and plain-text renderers
- *  (renderMarkdown/renderText each just `lines.push(...)` them); only the
- *  verdict line's wrapping differs (`**Verdict: X**` vs `VERDICT: X`), and
- *  the headline (`Health X.X/100 (Grade) · ...`) is pushed as the same
- *  literal string either way — so one set of patterns covers a `.md` or a
- *  `.txt` export of the same letter. */
-const VERDICT_LABEL_TO_ENUM = { RECOMMEND: 'RECOMMEND', CONSIDER: 'CONSIDER', 'PASS (decline)': 'PASS' };
+// coverage-letter.ts's verify footer — server/lib/coverage-letter.ts's
+// buildLetterData. hashLine, the claim lines and provenanceLine are byte-identical
+// strings in BOTH the markdown and plain-text renderers (renderMarkdown/renderText
+// each just `lines.push(...)` them); only the verdict line's wrapping differs
+// (`**Verdict: X**` vs `VERDICT: X`), and the headline (`Health X.X/100 (Grade) ·
+// ...`) is pushed as the same literal string either way — so one set of patterns
+// covers a `.md` or a `.txt` export of the same letter.
+//
+// The verdict WORD map that used to live here is gone: it is
+// server/lib/artifact-claims.ts's VERDICT_WORD/verdictFromWord, the same map the
+// three renderers emit through (2026-09-12).
 
 /** The letter's footer claim rows — `Label: value` lines, the same label table the
  *  HTML report publishes as `<dt>/<dd>` pairs (claimRowsFor, omitting the three the
@@ -459,7 +510,7 @@ function parseLetterReport(text) {
   // fallback rather than the primary read.
   const verdictMatch = text.match(/\*\*Verdict:\s*(.+?)\*\*/) ?? text.match(/^VERDICT:\s*(.+)$/m);
   const verdictFromBody = verdictMatch
-    ? (VERDICT_LABEL_TO_ENUM[verdictMatch[1].trim()] ?? verdictMatch[1].trim())
+    ? (verdictFromWord(verdictMatch[1]) ?? verdictMatch[1].trim())
     : undefined;
   const healthMatch = text.match(/Health\s+([\d.]+)\/100/);
   const healthFromBody = healthMatch ? Number(healthMatch[1]) : undefined;
@@ -685,7 +736,16 @@ async function main(argv) {
   console.log(`Script: ${scriptPath}`);
   console.log('');
 
-  const reportText = readFileSync(reportPath, 'utf8');
+  // THE ARTIFACT IS NORMALISED; THE SCRIPT IS NOT. A report travels by email, by a
+  // Windows checkout, by a copy-paste into an editor — so a leading BOM and CRLF
+  // line endings are transport artifacts of the DOCUMENT, not claims it makes, and
+  // every `^…$` scrape below would otherwise fail on a `\r` it cannot see: a genuine
+  // CRLF letter reported "the summary prints 0 page references" against a block
+  // claiming one, because the tier-region divider `---\r` does not match /^---$/m.
+  // The SCRIPT text is deliberately left byte-exact — its bytes are what the hash is
+  // of, and a CRLF copy of the script is DIAGNOSED as such rather than normalised
+  // into a pass (see hashDiffersOnlyByLineEndings above).
+  const reportText = readFileSync(reportPath, 'utf8').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
   const scriptText = readFileSync(scriptPath, 'utf8');
 
   let parsed;

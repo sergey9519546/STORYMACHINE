@@ -56,8 +56,8 @@ import { derivedReferenceBoundsLine } from './reference-bounds.ts';
 import { analyzeFountainText } from '../nvm/analyze/fountain-analyzer.ts';
 import { buildLogline } from './logline.ts';
 import {
-  buildArtifactClaims, formatLengthLine, type ArtifactClaims, type ArtifactPageRef,
-  type LoglineState,
+  buildArtifactClaims, formatLengthLine, formatHealthLine, VERDICT_WORD, UNKNOWN_VERDICT_WORD,
+  type ArtifactClaims, type ArtifactPageRef, type LoglineState,
 } from './artifact-claims.ts';
 import { percentileSentenceFor } from '../../src/lib/percentile-copy.ts';
 import { prioritiesHeadingFor } from '../../src/lib/priorities-copy.ts';
@@ -130,17 +130,6 @@ export interface ReaderTierData {
    *  being in the block" a property of the code rather than a convention. */
   claims: ArtifactClaims;
 }
-
-/** The verdict word a reader sees. PASS carries its parenthetical because
- *  "PASS" reads as approval to anyone outside coverage culture — the same
- *  decision coverage-html.ts's VERDICT_STYLE and coverage-letter.ts's
- *  VERDICT_LABEL already made, restated here rather than imported because
- *  neither module exports it. */
-const VERDICT_WORD: Record<CoverageVerdict, string> = {
-  RECOMMEND: 'RECOMMEND',
-  CONSIDER: 'CONSIDER',
-  PASS: 'PASS (decline)',
-};
 
 /** Which scene contains a 1-based line number, or -1. The spans are sorted and
  *  non-overlapping (locate.ts's computeSceneSpans), so a linear walk is exact. */
@@ -269,8 +258,11 @@ export function buildReaderTier(
     // one alone.
     lengthLine: formatLengthLine(claims),
     verdict: report.verdict ?? null,
-    verdictLabel: report.verdict ? VERDICT_WORD[report.verdict] : 'N/A',
-    healthLine: `Health ${report.health.toFixed(1)} / 100`,
+    verdictLabel: report.verdict ? VERDICT_WORD[report.verdict] : UNKNOWN_VERDICT_WORD,
+    // Formatted by artifact-claims.ts, whose parseHealthLine is its inverse — the
+    // tier's reading is a SECOND rendering of the report's health, and on
+    // 2026-09-12 it was the one nothing checked (investigator A, finding 2).
+    healthLine: formatHealthLine(report.health),
     percentileLine,
     boundsLine: boundsAlreadyStated ? null : boundsLine,
     prioritiesHeading: prioritiesHeadingFor(priorities.length),
