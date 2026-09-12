@@ -321,3 +321,165 @@ change that would make the first of them true.
    driven number, not the battery. The helper is additive (a new export; no
    existing export changed), so the blast radius on those suites is nil by
    inspection.
+
+---
+
+## Round 2 — re-check of **632592ec**
+
+**Reviewed object:** `lane/p0-flow-race` tip `632592ec`
+(`632592ecec7a8afe8057bbf34a9a3a7f5d43cab6`, `git ls-remote` matches the local
+tip), three commits over `42f510ee` — `457469f8` (pin MOUNT by holding the
+lazy chunk), `d7a82a3e` (qualify the invariant), `632592ec` (scanner
+deny-by-default). `git diff --stat 42f510ee 632592ec` → **3 files, +283 /
+−109**; still no `src/`, no `server/`. Same reviewer, warm context: I re-checked
+only my own three items plus the gates the brief named, and the worktree was
+again driven read-only (every regressed tree and plant under
+`<session scratch>`). Machine checked clear before every browser run.
+
+### Item 1 — the determinism claim — **corrected**
+
+The lane report's Round 2 §"Item 1" states plainly that §4's "caught on every
+run" and §7's "fails deterministically" were wrong, names my measurement (4 of
+6, runs 2 and 6 passing, every catch at MOUNT), and states what the round-1
+evidence actually supported ("caught twice out of two"). It also gets the cause
+right — the hold pinned IN FLIGHT, never the sub-frame mount gap. The record is
+corrected rather than softened. **Closed.**
+
+### Item 2 — MOUNT pinned — **closed, and it is now the fail-first I asked for**
+
+`holdCoverageSummaryChunk` (`browser-verify.mjs`, over a shared internal
+`holdRoute`; `COVERAGE_SUMMARY_CHUNK_ROUTE = '**/CoverageSummary*'`) holds the
+lazy chunk, and step 3b walks MOUNT → click → IN FLIGHT → click. Re-measured
+myself on a `git archive 632592ec` export with **only** the `doctorAutoSample`
+clause removed (`<session scratch>/p0rev/nomount2`,
+`node scripts/smoke-p0-live-flow.mjs`, foreground, one at a time):
+
+| run | load | exit | wall | caught by |
+|---|---|---|---|---|
+| 1 | 0.84 | **1** | 7 s | MOUNT |
+| 2 | 1.01 | **1** | 7 s | MOUNT |
+| 3 | 1.65 | **1** | 7 s | MOUNT |
+| 4 | 2.32 | **1** | 7 s | MOUNT |
+
+**4 of 4**, all "NOT disabled at the earliest instant", all failing in 7 s
+(it no longer has to wait out a run to find out). Against 4 of 6 at `42f510ee`.
+
+The cold-open branch, checked independently: I removed **only** the MOUNT
+`isDisabled()` throw from a copy of that same tree so the forced click is
+actually reached (`<session scratch>/p0rev/nomount3`) — exit **1**:
+
+```
+[reviewer-plant] MOUNT throw removed; disabled=false
+FAIL — golden-path cold-panel regression: … opened a dialog … (text starts:
+"SCRIPT DOCTOR\nUPLOAD SCRIPT\n\nWRITE SOME SCRIPT CONTENT, OR UPLOAD A SCRIPT …")
+[window: MOUNT]
+```
+
+That is the **genuinely cold** panel — the original golden-path defect — not
+round 1's accidental warm one (health 78), and the new `[window: …]` tail names
+which window fired. The lane's claim reproduces exactly.
+
+**The click assertion is still byte-unchanged.** Extracting the round-1 block
+and the round-2 `assertEarliestClickIsInert` body and comparing code lines only
+(comments and indentation stripped): the sole difference is the added
+`[window: <name>]` clause in the failure message. `force: true`, the
+`.catch()`, the 300 ms settle, the `[role="dialog"]` count, the throw and its
+sentence are identical — and it now runs **twice**, once per pinned window.
+
+Tip, `npm run verify:p0-flow`, foreground, one at a time, in
+`/home/user/wt-p0flow`:
+
+| run | load | exit | wall |
+|---|---|---|---|
+| 1 | 2.34 | **0** | 24 s |
+| 2 | 4.23 | **0** | 20 s |
+| 3 | 4.65 | **0** | 21 s |
+
+**3/3 green**, each logging `earliest-instant "Full report" click did not
+cold-open the full report (MOUNT and IN FLIGHT windows both held)`. Wall is
+unchanged against round 1 at comparable load, so pinning two windows costs
+nothing measurable.
+
+### Item 3 — the invariant — **closed**
+
+`holdDoctorRunInFlight`'s comment now separates what the product guarantees
+(first run, before any report exists — with my 4/4 and CDP-latency numbers)
+from what it does not (re-run: `if (coverageReport) return { disabled: false }`
+short-circuits, 5/5 in-flight commits enabled, a real click opens the hydrated
+report and abandons the run; benign, and the toggle does not exist at all once
+the draft has moved — 20/20). It ends with the line that matters for the next
+lane: *"this helper pins a window. It does not certify an invariant."* No
+product change, as I asked. Non-blocking 1 is closed in the same commit: the
+comment now says `page.route` intercepts **before dispatch**, that nothing has
+reached the server while a hold is on, and warns any gate asserting on
+server-side state.
+
+### Non-blocking 3 and 4 — the scanner
+
+Re-run with my own round-1 plant rebuilt verbatim
+(`<session scratch>/p0rev/scan2`, a `git archive 632592ec` export):
+
+| tree | `node --experimental-strip-types tests/scripts/wait-for-function-options-position.test.ts` |
+|---|---|
+| tip untouched | **exit 0** — # tests 8, # pass 8, # fail 0 |
+| tip + my hoisted-`const` plant (live 4 s hand-rolled hold) | **exit 1** — # pass 7, # fail 1, named `scripts/verify-escape-a.mjs:7` (8/8 green at `42f510ee`) |
+
+The escape is closed, and by the right mechanism: deny-by-default (allowed only
+if the route `.fulfill(`s) rather than another list of spellings to enumerate.
+`maskCommentsAndStrings` closes the comment misattribution, with three
+self-tests including the URL `//` case.
+
+### Gates I re-ran
+
+| gate | command | exit |
+|---|---|---|
+| touched test (tip) | `node --experimental-strip-types tests/scripts/wait-for-function-options-position.test.ts` | **0** — 8 pass, 0 fail |
+| lint | `npx tsc --noEmit` | **0** |
+| scoring receipt | `node scripts/check-scoring-receipt.mjs main..HEAD` | **0** — "no scoring-path files changed" |
+| claims register | `node scripts/honesty-audit.mjs` | **0** — 461 files, 481 tracked md, 106 rows, clean |
+| worktree | `git status --short` | clean; `origin/lane/p0-flow-race` == `632592ec` |
+
+`verify:ui-polish` / `verify:surfaces` were not re-run, and after checking I
+agree they need not be: `grep -rn "holdDoctorRunInFlight\|holdCoverageSummaryChunk\|holdRoute" scripts/ --include=*.mjs`
+outside `browser-verify.mjs` returns **only** `smoke-p0-live-flow.mjs` (lines
+40, 41, 181, 182, 281, 288), so round 2 adds an export and changes no existing
+caller.
+
+---
+
+## VERDICT: **MERGE**
+
+All three blocking items are closed, and closed at the cause rather than in
+prose: the detector I measured at 4 of 6 is 4 of 4 for me at the new tip (6 of
+6 for the lane), it now fires the genuinely cold panel on purpose in both
+directions, the click assertion survived byte-identical and runs twice, the
+invariant says what is true and marks where it stops, and the scanner escape I
+planted is caught. The report corrects its own false claim in the record
+instead of quietly restating it.
+
+### Non-blocking
+
+1. **The deny-by-default test's ALLOW side still reads unmasked text.**
+   `handRolledStreamHolds` masks comments and strings for the brace-walk, but
+   `call` is sliced from the ORIGINAL source and the exemption is
+   `/route\.fulfill\(|\.fulfill\(/.test(call)` — so a genuine hand-rolled hold
+   that merely *mentions* the phrase in a comment inside its handler is
+   exempted. Planted
+   (`<session scratch>/p0rev/scan2/scripts/verify-escape-c.mjs`: a live 4 s
+   `setTimeout` + `route.continue()` hold whose body contains
+   `// we do not route.fulfill( here`) → suite stays **8 pass, 0 fail**. One
+   line: test the exemption against `masked.slice(at, i + 1)` and keep the
+   `doctor/stream` URL check on `source`, since the mask blanks string bodies.
+   Deliberate evasion rather than an accident, so not blocking — but it is the
+   same shape as the escape this commit just closed.
+2. **Round-1 non-blocking 2 stays open by choice** (the gate never asserts the
+   released run completes). The lane's reasoning — a broken `release()` would
+   surface as a `waitUntilHeld` timeout in 3b/3c, and step 2/3 drives a full
+   unintercepted run to a rendered verdict — is sound. Leave it.
+3. **`COVERAGE_SUMMARY_CHUNK_ROUTE` is a name-shaped dependency.** `
+   **/CoverageSummary*` matches the dev module URL and today's built chunk
+   name; a future build config that names chunks by hash alone would make the
+   hold match nothing. It fails loudly rather than silently
+   (`earlyChunk.waitUntilHeld()` throws), which is the right failure mode, but
+   a one-line comment pointing at the Vite `chunkFileNames` setting would save
+   the next reader the hunt.
