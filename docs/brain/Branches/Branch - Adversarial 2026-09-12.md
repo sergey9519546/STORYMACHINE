@@ -2,15 +2,35 @@
 type: branch
 updated: 2026-09-12
 sources: [docs/audits/2026-09-12-adversarial/engine-logic.md, docs/audits/2026-09-12-adversarial/writer-loop.md]
-status: in-progress
+status: ready-for-owner
 ---
 
 # Branch — Adversarial 2026-09-12
 
 **Branch:** `scoring/adversarial-2026-09-12`, created from
-[[Branch - Feature-Length Defects]] (rebased onto main first), building as
-this note is written; its tip and receipt are recorded when the lane
-reports.
+[[Branch - Feature-Length Defects]] (rebased onto main first). **Tip
+`4cf5b2f3`, READY-FOR-OWNER** after four independent review rounds
+(`docs/audits/2026-09-12-adversarial/scoring-review.md`; the lane's own
+record is `scoring-lane-report.md`, rounds 1–4). Receipt: exactly one PENDING
+entry over `78ec4464..HEAD`; no AUC-24 number stated, implied or projected.
+
+**What the reviews settled:** the four public-benchmark floors that moved
+DOWN are isolated to the denominator fix (the fixtures had counted their CC0
+licence record as prose; reverting that change alone reproduces the
+isolation table's cell exactly), so the re-lock stands. The one blocking item
+was truth: the pipeline seam takes the whole normaliser
+(`stripTitlePage(normalizeScreenplay(fountain))`) while three places said it
+took half — kept as the stronger version and disclosed as its own cost,
+because the private corpus IS the double-spaced scraped-PDF shape it reaches.
+Round 2 folded Fountain's forced-element markers (`!` 32/32 → 0/32, `.`
+32/32 → 0/32, `>` 5/6 → 0/6) and cue-extension spelling (12/14 → 0/14) at
+the parser seam; `@` is pinned two-sided and unfixed (32/32, up to −26.8),
+the subject of `scoring/forced-cue`. Rounds 3–4 made the owner's first
+instruction one command, `npm run probe-corpus-shape` (corpus-gated, computes
+no AUC, writes nothing, prints no screenplay text; its output is a local
+artifact because the paths are the corpus's index). Output identity vs
+`85273742`: 45/45 byte-identical from round 2 onward; vs main: 45 differ, by
+design.
 
 **What it is:** the scoring-path answer to the 2026-09-12 adversarial
 review's engine findings ([[Audit - 2026-09-12 Adversarial Review]]):

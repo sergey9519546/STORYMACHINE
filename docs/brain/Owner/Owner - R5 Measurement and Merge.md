@@ -132,6 +132,7 @@ only a heading — that is the one route the entry text itself forbids.
 | branch | tip | what it is |
 | --- | --- | --- |
 | `scoring/feature-length-defects` | `bcc96f85` | **measure this one FIRST** — [[Branch - Feature-Length Defects]] |
+| `scoring/adversarial-2026-09-12` | `4cf5b2f3` | **stacks on the first; measure it right after, if the first is accepted** — [[Branch - Adversarial 2026-09-12]], READY-FOR-OWNER after four review rounds. Run `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run --silent probe-corpus-shape -- --csv` on this tree and on a pre-branch checkout (copy the script across) BEFORE reading AUC-24: it splits the corpus by document shape and prints word counts, health, verdict and severity mix per script — the corpus-visible change with the largest expected effect is the pipeline seam, which reaches exactly the double-spaced scraped-PDF shape. Its output is a local artifact (the paths are the corpus's index): never paste it. Known: it carries the first branch's 1,500,000 voice bound, which must not land before main's 675,000 re-derivation is applied on the merged tree with the analyzer cap in place. |
 | `scoring/feature-length-saturation-only` | `efd1a463` | **second, only if the first is rejected** — [[Branch - Feature-Length Saturation Only]], the saturation half alone |
 | `scoring/stacked-r5-plus-advice` | `408166ae` | third — [[Branch - Stacked R5 plus Advice]] |
 | `scoring/r5-verbosity-bias` | `52bf410a` | [[Branch - R5 Verbosity Bias]] alone |

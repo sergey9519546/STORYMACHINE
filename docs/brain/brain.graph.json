@@ -1678,6 +1678,10 @@
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
     },
     {
