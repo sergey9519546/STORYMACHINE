@@ -416,3 +416,160 @@ beginning `@`.
 
 *Round 1. Reviewed SHA **`f258c405`**. On a revision, the same reviewer
 re-checks these items against the new diff.*
+
+---
+
+## Round 2 — re-check of `089bec91`
+
+**Object:** four commits over `f258c405` (`523c38c8`, `282fa2b6`, `75de2c55`,
+`089bec91`); origin is at the reviewed SHA and the worktree is clean at it.
+`git diff --stat 282fa2b6..089bec91 -- ':!docs'` is **empty**, so `282fa2b6` is
+the last commit touching code. Warm re-check of my own four non-blocking items;
+same method, nothing committed or pushed, `--lock` never run, no full
+`npm test`.
+
+### R2.a Item 1 — the cue-position guard, said where it is claimed and pinned
+
+`src/lib/fountain.ts` now carries "WHAT THAT DOES AND DOES NOT PROTECT,
+exactly" beside the parser branch, and it draws the line where the code draws
+it: the protection is **cue position**, not prose. The new subtest pins the
+boundary in three positions **on one sentence**, which is the right shape for
+this — the same bytes, three placements:
+
+| placement of `@everyone in the room turned.` | asserted |
+|---|---|
+| head of a paragraph, non-blank line under it | `scene_heading,character,dialogue` — **IS a cue** |
+| head of a paragraph, blank line under it | `scene_heading,action,action` |
+| second line of an action paragraph | `scene_heading,action,action` |
+
+The first row is the one I raised, and pinning it as *correct* rather than
+apologising for it is right: a parser that refused there could not express the
+caseless cue this whole lane exists for, and the failure message says so. The
+test now fails if someone "protects prose" and silently breaks the marker.
+
+`tests/core/parse-format-invariance.test.ts`: **66 / 66**, EXIT=0 (was 65).
+
+### R2.b Item 2 — the fourth disjunct's safety is a property now, and I re-ran the mutation myself
+
+The new assertion in `fountain-shape-guard-cue-parity.test.ts` builds the
+document I measured in round 1 — 60 scenes, 1,200 speeches, every **dialogue**
+line opening `@handle…` — and asserts three things: the walk counts 1,200 and
+not 2,400, the count is unchanged when the handles are stripped, and the
+document is ACCEPTED.
+
+Reproduced on the tip:
+
+```
+TIP  guardCueOccurrences            = 1200
+TIP  same document, handles stripped = 1200
+TIP  fountainShapeRejectionReason    = ACCEPTED
+```
+
+**And the mutation, run by me rather than read.** I exported `089bec91`,
+disabled the walk's cue-position check with one edit
+(`if (!nextLineIsDialogue) continue;` → `if (false && !nextLineIsDialogue)`),
+and re-ran:
+
+```
+MUTANT  guardCueOccurrences = 2400
+MUTANT  tests/security/fountain-shape-guard-cue-parity.test.ts
+        not ok — "a document whose every DIALOGUE line opens with `@handle` counts its cues and nothing else"
+        "the walk must count the 1200 cues and NOT the 1200 dialogue lines that merely start with \"@\"."
+        EXIT=1
+```
+
+Exactly 2,400 and the named failure. So the claim I could only measure in round
+1 is now a property the suite enforces, and it is enforced by the mechanism
+that actually does the work — the walk's cue-position check, not the disjunct.
+That is the correct place to have put the assertion.
+
+`fountain-shape-guard-cue-parity.test.ts`: **654 / 654** (was 653);
+`fountain-shape-guard-cue-bypass.test.ts`: **59 / 59**, both EXIT=0.
+
+### R2.c Items 3 and 4
+
+* **Item 3.** §6.7 now names both residuals with the shared mechanism —
+  `renderableText` strips `@` only from `character` / `dual_dialogue`, so a
+  `@` line that is not in cue position prints from every exporter — and it
+  grades them correctly: one step milder than `>`, because the line is not a
+  cue and the marker declares nothing. It also states the cost of closing it
+  (a decision that a leading `@` never prints, which is a claim about prose
+  this lane has no measurement for), which is the honest reason to leave it.
+  Both residuals now point at the one function either strip would live in.
+* **Item 4.** The better answer than the one I asked for. Rather than writing
+  a third literal SHA, the header pins **the last code commit** — `282fa2b6`,
+  with `git diff 282fa2b6..HEAD -- ':!docs'` empty as the proof — and explains
+  that a line inside a file cannot name the commit that writes it, which is
+  the failure mode rather than an accident. I verified the proof: that diff is
+  empty, so every measurement in the report was taken on the tree it names.
+  The three historical SHAs (`5be366be`, `22c6b03f`, `f258c405`) are kept as
+  the lineage.
+
+### R2.d The regression surface
+
+```
+GIT_SHA=FC2PIN, --tree <scratch>/fcbase (4cf5b2f3) and --tree . (089bec91)
+--compare  ->  OUTPUT IDENTITY: PASS — all 45 reports byte-identical           EXIT=0
+
+npm run benchmark:public                                                       EXIT=0
+  0.8438 / 0.7896 · 0.5938 / 0.5234 · 1.0000 / 0.9814
+
+node scripts/check-scoring-receipt.mjs 78ec4464..HEAD   EXIT=1, exactly ONE PENDING entry
+
+git diff --stat f258c405..089bec91 -- scripts/lib/auc.ts
+                                      tests/fixtures/public-corpus-manifest.json
+                                      tests/fixtures/public-benchmark-split.json
+  (empty — all three untouched)
+```
+
+| gate | result |
+|---|---|
+| `npm run lint` · `check-no-console` · `check-docs` · `honesty-audit` · `check-brain` | EXIT=0 (all five) |
+| `npm run gates` | **EXIT=0**; mutation check raised `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` to 0.8938 and the suite **FAILED on that floor by name** |
+
+Benchmark to the digit for the sixth consecutive object in this batch.
+
+## VERDICT: **READY-FOR-OWNER**
+
+Four items, four clean answers, and two of them better than what I asked for:
+the cue-position boundary is pinned as *correct behaviour on one sentence in
+three placements* rather than hedged, and the `Tip:` problem is solved by
+pinning the last code commit with a falsifiable proof instead of a third
+literal SHA that would have gone stale the same way. The guard property is now
+enforced where the work happens, and I confirmed by mutation that the
+assertion can fail and names the number when it does.
+
+Round 2 moves no score: 45 of 45 reports byte-identical to `4cf5b2f3`, six
+AUCs to the digit, `auc.ts` and both benchmark fixtures untouched, receipt
+still at one PENDING entry. Two new tests, both two-sided, neither able to pass
+vacuously.
+
+I have no further items on this branch.
+
+### Non-blocking
+
+1. **Carried forward, unchanged and still binding:**
+   `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1,500,000` must not land before the
+   `lane/rulebook-and-guard-bound` re-derivation to 675,000 is applied on the
+   merged tree with the analyzer pair cap in place. Neither round of this lane
+   touches that constant.
+2. **The two renderer residuals** (`>` forced transitions, and `@` lines that
+   are not in cue position) are named, mechanised and sized, and both would be
+   fixed in `renderableText` — the `>` one behind a parser branch first. They
+   are the next lane, not this one's debt.
+
+### What the owner's run settles and what it cannot
+
+Unchanged from round 1 — round 2 moves no number. The `@cue` column of
+`npm run --silent probe-corpus-shape` still settles, by counting, whether any
+of the 761 drafts carries a forced cue, and the FDX-import population is still
+the second thing to look at. What round 2 adds is that the two properties the
+change rests on — the parser's cue-position boundary and the guard's
+position-bounded walk — are now assertions in the suite rather than
+measurements in a review, so a future change that quietly widens either one
+fails a named test instead of waiting for a tenth round.
+
+---
+
+*Round 2. Reviewed SHA **`089bec91`** (last code commit `282fa2b6`); round 1's
+was `f258c405`.*
