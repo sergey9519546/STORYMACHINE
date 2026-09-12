@@ -10,10 +10,10 @@
 //    feature-scale deductions never fire on this corpus at all"
 //
 // `CLIMAX_DED_MIN_SCENES` gates `climaxZoneDecayDeduction`
-// (`server/nvm/analyze/doctor.ts:803`), which is EXPORTED and has no scoring-path
+// (`server/nvm/analyze/doctor.ts:805`), which is EXPORTED and has no scoring-path
 // call site: `aggregateReport`'s health line subtracts `structuralDeduction`,
 // `arcIncoherenceDeduction` and `dialogueDeduction` only, and
-// `doctor.ts:2430-2433` records the revert ("it over-fired on real scripts with
+// `doctor.ts:2580-2583` records the revert ("it over-fired on real scripts with
 // naturally flat climaxes"). So "never fires at this length" implied that it
 // fires at SOME length. It fires at no length. The honest sentence names
 // `ARC_DED_MIN_SCENES` alone.
@@ -93,7 +93,7 @@ describe('the printed feature-scale claim names ARC_DED_MIN_SCENES alone (findin
       LIMITS_STDOUT,
       /ARC_DED_MIN_SCENES and CLIMAX_DED_MIN_SCENES are both 15/,
       'the benchmark is printing CLIMAX_DED_MIN_SCENES as a live feature-scale gate again. '
-      + 'climaxZoneDecayDeduction is exported and wired into nothing (doctor.ts:2430-2433 records '
+      + 'climaxZoneDecayDeduction is exported and wired into nothing (doctor.ts:2580-2583 records '
       + 'the revert), so it fires at NO length — see docs/audits/2026-09-12-adversarial/'
       + 'engine-logic.md finding 6.',
     );
@@ -103,7 +103,7 @@ describe('the printed feature-scale claim names ARC_DED_MIN_SCENES alone (findin
   it('says the climax term is exported but unwired, and cites where the revert is recorded', () => {
     assert.match(LIMITS_STDOUT, /climaxZoneDecayDeduction, which is EXPORTED and/);
     assert.match(LIMITS_STDOUT, /wired into nothing/);
-    assert.match(LIMITS_STDOUT, /doctor\.ts:2430-2433 records the revert/);
+    assert.match(LIMITS_STDOUT, /doctor\.ts:2580-2583 records the revert/);
     assert.match(LIMITS_STDOUT, /It fires at no length\./);
   });
 });

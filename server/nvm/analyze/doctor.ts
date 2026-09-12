@@ -38,6 +38,8 @@ import { analyzeStructure } from '../screenplay/structure.ts';
 import { runRevisionPipeline, type RevisionResult } from '../revision/pipeline.ts';
 import { runDiagnoseOnly } from '../revision/rewrite.ts';
 import { analyzeFountainText } from './fountain-analyzer.ts';
+import { locateIssues, sceneLineSpans } from './locate.ts';
+import { spanSceneIdxs } from './cluster.ts';
 import { normalizeScreenplay, stripTitlePage } from './screenplay-normalizer.ts';
 import { deepReadRecords } from './deep-read.ts';
 import { computeEmotionalArc, scenesFromFountain } from './emotional-arc.ts';
@@ -1176,6 +1178,13 @@ function analyzeDimensionIssues(issues: RevisionIssue[]): DimensionIssueMix | nu
  *  gradeForHealth so a dimension's vocabulary tracks the same excellent/
  *  strong/solid/uneven/troubled scale as the overall grade) and dominant
  *  severity, naming the concrete top rule area whenever issues exist. */
+/** Above this many notes, the top-band summary adds one clause explaining how a
+ *  draft can score well with that many — because the honest sentence at feature
+ *  scale ("95/100 over 342 notes") reads like a contradiction without it. Set
+ *  at the point the old copy's word became indefensible: "a handful" is not
+ *  twelve. Below it the sentence stays short. */
+const HANDFUL_CEILING = 12;
+
 function buildDimensionSummary(
   label: string, sceneCount: number, score: number, mix: DimensionIssueMix | null,
 ): string {
@@ -1201,10 +1210,27 @@ function buildDimensionSummary(
   }
 
   const { dominantSeverity, dominantCount, topRuleArea } = mix;
+  // ── EVERY BRANCH STATES ITS COUNT (2026-09-12, writer's-loop finding 12) ──
+  // The top two bands used to read "a handful of <severity> notes" with no
+  // number in the sentence, while the caption directly beneath it in the panel
+  // stated the real one. On the 231-scene fixture that rendered as "Character
+  // is in good shape — a handful of minor notes" beside "Based on 342 issues
+  // across 3 passes"; Plot Logic read the same sentence over 278 and Structure
+  // over 175, and even the 12-scene sample managed it over 58.
+  //
+  // The score is density-normalised, so 95/100 over 342 notes at feature scale
+  // is a legitimate reading — and saying that is more credible than "a
+  // handful", which is the only word in the sentence a reader can check and
+  // the only one that was false. The three lower branches already interpolated
+  // `dominantCount` correctly; the fix is to stop making these two the
+  // exception. "handful" should not survive a grep of server/**.
+  const scaleNote = dominantCount >= HANDFUL_CEILING
+    ? ' — the score is density-normalised, so a long draft can read well with many notes'
+    : '';
   switch (gradeForHealth(score)) {
     case 'excellent':
     case 'strong':
-      return `${degeneracyCaveat}${label} is in good shape — a handful of ${dominantSeverity} notes, mostly around ${topRuleArea}.`;
+      return `${degeneracyCaveat}${label} is in good shape — ${dominantCount} ${dominantSeverity} note(s), mostly around ${topRuleArea}${scaleNote}.`;
     case 'solid':
       return `${degeneracyCaveat}${dominantCount} ${dominantSeverity} problem(s) here, mostly around ${topRuleArea}.`;
     case 'uneven':
@@ -2200,13 +2226,137 @@ const SEVERITY_RANK: Record<RevisionIssue['severity'], number> = { critical: 0, 
 
 /** Highest-priority issues across all passes: critical first, then major,
  *  then minor; ties broken by pipeline pass order. At most 10. */
-function buildTopPriorities(passes: DoctorPassSummary[]): Array<RevisionIssue & { pass: PassName }> {
+// ── CONCENTRATION OUTRANKS UBIQUITY (2026-09-12, writer's-loop finding 13) ──
+// MEASURED, on a 12-scene fixture of eleven near-identical clean scenes plus
+// one scene carrying fourteen exchanges of "As you know, Boris" exposition —
+// the easiest possible localisation test. The old ranking (severity, then pass
+// order) filled all ten slots with act-shape checks that fire on nearly every
+// short script, and SCENE 12 DID NOT APPEAR:
+//
+//   1 CRITICAL MISSING_INCITING_INCIDENT   Act 1 (Scenes 1-3)
+//   2 CRITICAL PASSIVE_ACT3_INTENTION      Act 3 (Scenes 10-12)
+//   3 CRITICAL NO_REVERSALS_LONG_STORY     Conflict layer
+//   4 MAJOR    WEAK_MIDPOINT               Scene 7 (midpoint)
+//   5 MAJOR    NO_REVERSALS                Overall structure
+//   6 MAJOR    ACT1_BOUNDARY_WEAK          End of Act 1 (Scene ~4)
+//   7 MAJOR    ACT2_BOUNDARY_WEAK          End of Act 2 (Scene ~10)
+//   8-10 MAJOR REVELATION_DROUGHT          Scenes 1-4 / 5-8 / 9-12
+//
+// The engine DID detect the defect — five separate rules name Scene 12 by
+// itself (FINAL_IMAGE_WEAK, DIALOGUE_VERBAL_PEAK_UNCAUSED, OVERLONG_LOW_TENSION,
+// PACING_SPIKE_SCENE, TONAL_WHIPLASH) and the scene heatmap gives it five
+// issues against a median of one. None of them reached the list a writer acts
+// on, because the sort had no notion of WHERE a finding is.
+//
+// THE RULE. Severity still leads — a critical is a critical. Within one
+// severity, a finding anchored to ONE scene outranks a narrow span, which
+// outranks a whole-draft check; and among single-scene findings the ones in
+// the scene carrying the most findings come first. Ties fall back to pass
+// order and then to original index, so the sort stays a total order and the
+// report stays byte-deterministic.
+//
+// The scene footprint is read with cluster.ts's own `spanSceneIdxs` over
+// locate.ts's resolved spans — the same two functions the root-cause pipeline
+// uses — rather than a second parse of the location grammar. That grammar has
+// already drifted once (a range like "Act 3 (Scenes 11-14)" carries no
+// "Scene N" token), and a private copy here would drift again.
+//
+// WHAT IT DOES NOT FIX, stated so the limit is not mistaken for a fix: a pass
+// that reports its location as "Dialogue throughout" when every instance sits
+// in one scene is still invisible to this ranking, because the issue record
+// carries a location STRING and nothing else. Resolving those needs the
+// emitting passes to carry the scene span they already know, which is a change
+// across the 14 passes and is recorded as open in
+// docs/scoring/REPORT_SEAM_2026-09-12.md.
+
+const TOP_PRIORITY_COUNT = 10;
+/** How many instances of one rule may occupy the ranked list before the rest
+ *  of the draft gets a turn. Two, so a repeated defect still reads as repeated
+ *  without becoming the whole list. */
+const MAX_PER_RULE_IN_PRIORITIES = 2;
+
+function buildTopPriorities(
+  passes: DoctorPassSummary[],
+  fountain: string,
+  sceneCount: number,
+): Array<RevisionIssue & { pass: PassName }> {
   const tagged: Array<RevisionIssue & { pass: PassName; passOrder: number }> = [];
   passes.forEach((p, passOrder) => {
     for (const issue of p.issues) tagged.push({ ...issue, pass: p.pass, passOrder });
   });
-  tagged.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || a.passOrder - b.passOrder);
-  return tagged.slice(0, 10).map(({ passOrder: _passOrder, ...rest }) => rest);
+
+  const spans = sceneLineSpans(fountain);
+  const located = locateIssues(tagged, fountain);
+  /** 0-based scene indices each tagged issue covers, in the same order. */
+  const scenesOf: number[][] = located.map((li) => spanSceneIdxs(li, spans));
+  const footprint = scenesOf.map((idxs) => (idxs.length === 0 ? Math.max(sceneCount, 1) : idxs.length));
+
+  // How much is each scene carrying? Counted from the SINGLE-scene findings
+  // only: a whole-draft note is evidence about the draft, not about any one
+  // scene, and letting it vote would make every scene look concentrated. On the
+  // one-bad-scene fixture this reads [0:6, 1:1, 2:1, 3:2, 4:1, 5:1, 6:3, 7:1,
+  // 8:1, 9:2, 10:1, 11:34] — the defect scene is not merely above a threshold,
+  // it is an order of magnitude above every other scene, and a BINARY hot/not
+  // test threw that away (five of the twelve scenes cleared 2x the median).
+  // So the count itself is the sort key.
+  const perScene = new Map<number, number>();
+  scenesOf.forEach((idxs) => {
+    if (idxs.length !== 1) return;
+    perScene.set(idxs[0], (perScene.get(idxs[0]) ?? 0) + 1);
+  });
+
+  /** 0 = anchored to one scene, 1 = a narrow span (up to a third of the
+   *  draft), 2 = everything wider, including document-anchored notes. */
+  const tier = scenesOf.map((idxs, i) => {
+    if (idxs.length === 1) return 0;
+    if (idxs.length > 1 && footprint[i] <= Math.max(1, Math.ceil(sceneCount / 3))) return 1;
+    return 2;
+  });
+  /** Within tier 0, the load of the scene the finding sits in (descending).
+   *  Within tiers 1 and 2, the span's width (ascending). One number, so the
+   *  comparator stays a single total order. */
+  const weight = scenesOf.map((idxs, i) => (tier[i] === 0 ? -(perScene.get(idxs[0]) ?? 0) : footprint[i]));
+
+  const order = tagged.map((_, i) => i);
+  order.sort((ai, bi) => {
+    const a = tagged[ai];
+    const b = tagged[bi];
+    return SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
+      || tier[ai] - tier[bi]
+      || weight[ai] - weight[bi]
+      || a.passOrder - b.passOrder
+      || ai - bi;
+  });
+  // ── AND NO ONE RULE MAY OWN THE LIST EITHER ──────────────────────────────
+  // The first version of this ranking fixed the reported defect and created
+  // the mirror image of it: on the one-bad-scene fixture SEVEN of the ten
+  // slots became AS_YOU_KNOW_BOB at seven consecutive line numbers. That is
+  // the same failure — one thing crowding out everything else — pointed the
+  // other way, and a writer learns no more from seven copies of a note than
+  // from none of it. At most two instances of any one rule are taken on the
+  // first pass; if that leaves fewer than ten, the cap is relaxed rather than
+  // shipping a short list, so the output length is unchanged for every script
+  // that never hits the cap.
+  const picked: number[] = [];
+  const perRule = new Map<string, number>();
+  for (const i of order) {
+    if (picked.length >= TOP_PRIORITY_COUNT) break;
+    const n = perRule.get(tagged[i].rule) ?? 0;
+    if (n >= MAX_PER_RULE_IN_PRIORITIES) continue;
+    perRule.set(tagged[i].rule, n + 1);
+    picked.push(i);
+  }
+  if (picked.length < TOP_PRIORITY_COUNT) {
+    const taken = new Set(picked);
+    for (const i of order) {
+      if (picked.length >= TOP_PRIORITY_COUNT) break;
+      if (!taken.has(i)) picked.push(i);
+    }
+  }
+  return picked.map((i) => {
+    const { passOrder: _passOrder, ...rest } = tagged[i];
+    return rest;
+  });
 }
 
 // ── Strengths / critical-finding consistency guard ──────────────────────────
@@ -2444,7 +2594,7 @@ export function aggregateReport(result: RevisionResult, analysis: FountainAnalys
   const graphHealthContribution = graphHealthFromReport(storyGraphResult, analysis.sceneCount) ?? undefined;
 
   const health = Math.max(0, Math.round((baseHealth - structuralDeduction - arcIncoherenceDeduction - dialogueDeduction) * 10) / 10);
-  const topPriorities = buildTopPriorities(passes);
+  const topPriorities = buildTopPriorities(passes, analysisFountain, analysis.sceneCount);
 
   // ── Coverage layer ──────────────────────────────────────────────────────
   const dimensionBuilds = buildDimensions(passes, analysis.sceneCount, analysis.wordCount);

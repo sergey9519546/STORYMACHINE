@@ -202,7 +202,14 @@ export function stripNonPrinting(text: string): string {
   let changed = false;
   for (let i = 0; i < lines.length; i++) {
     const t = typeByLine.get(i + 1);
-    if (t !== undefined && NON_PRINTING_BLOCK_TYPES.has(t)) { changed = true; continue; }
+    // BLANKED, NOT DELETED. Every issue location a writer clicks is a line
+    // number in this text (locate.ts resolves them here), so deleting a line
+    // would slide every location below it off the line the writer is looking
+    // at. A blank line is already an exact score invariant — it parses as an
+    // `empty` block, which extractSceneContent skips and no rule reads — so
+    // blanking costs nothing and keeps the line numbering the writer's editor
+    // shows. Asserted in tests/core/parse-format-invariance.test.ts.
+    if (t !== undefined && NON_PRINTING_BLOCK_TYPES.has(t)) { changed = true; out.push(''); continue; }
     const stripped = lines[i].replace(INLINE_NOTE_RE, ' ');
     if (stripped !== lines[i]) changed = true;
     out.push(stripped);
@@ -270,11 +277,11 @@ export function stripTitlePage(text: string): string {
   if (n === 0) return text;
   const lines = text.split('\n');
   // titlePageBlockCount counts BLOCKS, and parseFountain emits exactly one
-  // block per line, so the block count is the line count. The blank line that
-  // ends the title page is left in place: it is what separates the (now
-  // absent) metadata from the first element, and removing it too would join
-  // two elements that were never adjacent.
-  return lines.slice(n).join('\n');
+  // block per line, so the block count is the line count. The lines are
+  // BLANKED rather than removed, for the same reason stripNonPrinting blanks
+  // its own: an issue location is a line number in this text, and deleting
+  // four lines at the top would slide every location in the document.
+  return [...lines.slice(0, n).map(() => ''), ...lines.slice(n)].join('\n');
 }
 
 // ── ONE SPEECH IS ONE ELEMENT, HOWEVER MANY LINES IT OCCUPIES (2026-09-12) ──

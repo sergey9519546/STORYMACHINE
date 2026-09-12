@@ -227,7 +227,7 @@ const KNOWN_DISCRIMINATING = new Set<string>([
   // carried by ORPHAN_CLUE firing on CHARACTER NAMES, which the guard
   // removes from both halves unevenly — the "told" half was paying more
   // name-clue penalty than the "dramatized" half, so its score rose further.
-  // That is the AUC-0.076 weighted-rule channel (doctor.ts:2394-2395) showing
+  // That is the AUC-0.076 weighted-rule channel (doctor.ts:2544-2545) showing
   // up as the thing that was ordering a craft pair, which is a fact about
   // this fixture, not an argument for putting the noise back.
   // 'dramatized-vs-told-exposition',   <- re-add once it orders on evidence

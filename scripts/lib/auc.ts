@@ -275,7 +275,7 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * raising one is a measurement's job, never an edit's.
  *
  * THE PREDICTION THIS REFUTED, kept because it is the useful part. The
- * scene-count-artifact argument (doctor.ts:2394-2395 — scarcity AUC 0.938,
+ * scene-count-artifact argument (doctor.ts:2544-2545 — scarcity AUC 0.938,
  * rule channel 0.076) predicts that dropping every third scene of a 10-scene
  * script adds 140/7 - 140/10 = 6.00 points of scarcity penalty, against 0.58
  * points at the private corpus's median 118 scenes, and therefore that a

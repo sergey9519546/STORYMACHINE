@@ -1,0 +1,237 @@
+/*
+one-bad-scene.fountain — a localisation fixture, CC0 1.0 Universal.
+
+WHY IT EXISTS. docs/audits/2026-09-12-adversarial/writer-loop.md finding 13:
+a defect concentrated in ONE scene did not appear anywhere in the triage a
+writer acts on. This is the easiest possible localisation test — eleven
+near-identical clean scenes plus one scene carrying fourteen exchanges of
+"As you know, Boris" exposition — and before 2026-09-12 the ranked list was
+saturated by act-shape checks that fire on nearly every short script while
+scene 12 did not appear at all.
+
+It is deliberately dull. Every clean scene is the same shape, so the only
+thing that distinguishes scene 12 is the defect, and any ranking that finds
+scene 12 has found the defect rather than a coincidence.
+
+Written for this repository; released CC0 like data/screenplays/.
+*/
+
+INT. LOADING BAY - NIGHT
+
+Mara checks the seal on a crate and marks the manifest.
+
+MARA
+We move at three.
+
+BORIS
+Then we move at three.
+
+Mara pockets the marker. Boris lifts the crate.
+
+INT. CORRIDOR - NIGHT
+
+Mara checks the seal on a crate and marks the manifest.
+
+MARA
+We move at three.
+
+BORIS
+Then we move at three.
+
+Mara pockets the marker. Boris lifts the crate.
+
+INT. STAIRWELL - NIGHT
+
+Mara checks the seal on a crate and marks the manifest.
+
+MARA
+We move at three.
+
+BORIS
+Then we move at three.
+
+Mara pockets the marker. Boris lifts the crate.
+
+INT. ROOF - NIGHT
+
+Mara checks the seal on a crate and marks the manifest.
+
+MARA
+We move at three.
+
+BORIS
+Then we move at three.
+
+Mara pockets the marker. Boris lifts the crate.
+
+INT. OFFICE - NIGHT
+
+Mara checks the seal on a crate and marks the manifest.
+
+MARA
+We move at three.
+
+BORIS
+Then we move at three.
+
+Mara pockets the marker. Boris lifts the crate.
+
+INT. GARAGE - NIGHT
+
+Mara checks the seal on a crate and marks the manifest.
+
+MARA
+We move at three.
+
+BORIS
+Then we move at three.
+
+Mara pockets the marker. Boris lifts the crate.
+
+INT. LOBBY - NIGHT
+
+Mara checks the seal on a crate and marks the manifest.
+
+MARA
+We move at three.
+
+BORIS
+Then we move at three.
+
+Mara pockets the marker. Boris lifts the crate.
+
+INT. KITCHEN - NIGHT
+
+Mara checks the seal on a crate and marks the manifest.
+
+MARA
+We move at three.
+
+BORIS
+Then we move at three.
+
+Mara pockets the marker. Boris lifts the crate.
+
+INT. ALLEY - NIGHT
+
+Mara checks the seal on a crate and marks the manifest.
+
+MARA
+We move at three.
+
+BORIS
+Then we move at three.
+
+Mara pockets the marker. Boris lifts the crate.
+
+INT. STOREROOM - NIGHT
+
+Mara checks the seal on a crate and marks the manifest.
+
+MARA
+We move at three.
+
+BORIS
+Then we move at three.
+
+Mara pockets the marker. Boris lifts the crate.
+
+INT. YARD - NIGHT
+
+Mara checks the seal on a crate and marks the manifest.
+
+MARA
+We move at three.
+
+BORIS
+Then we move at three.
+
+Mara pockets the marker. Boris lifts the crate.
+
+INT. BACK ROOM - NIGHT
+
+Boris sits. Mara paces.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2011, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2012, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2013, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2014, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2015, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2016, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2017, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2018, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2019, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2020, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2021, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2022, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2023, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.
+
+MARA
+As you know, Boris, the shipment from Rotterdam was seized in 2024, which is why the family lost the northern route.
+
+BORIS
+As you know, Mara, I was the one who signed the manifest that year, and I have carried it since.

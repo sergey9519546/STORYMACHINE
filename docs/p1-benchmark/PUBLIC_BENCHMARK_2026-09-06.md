@@ -141,12 +141,12 @@ as one.
 | recipe | seeded Fisher-Yates shuffle of all scenes, then drop every third of the shuffled order | move the final scene to position 1 | replace every dialogue and parenthetical line with `Hello.` |
 | scene count | **changes** (10 → 7) | **preserved** (measured: mean scarcity delta **0.000** over all 32) | preserved |
 | imported from | `scripts/lib/auc.ts` `shuffleDropDegrade` — the AUC-24 ratchet's own recipe, byte for byte | `scripts/lib/rebuild-experiment-lib.mjs` `degradeClimaxRelocate` | `scripts/lib/rebuild-experiment-lib.mjs` `degradeDialogueFlatten` |
-| lineage number to read it against | AUC-24 (private corpus, feature length) last measured 0.731 | private-corpus act-swap ~0.48 (`doctor.ts:2394-2395`); P1 baseline `CLIMAX_RELOCATE` 0.523 on 153 test scripts | P1 baseline `DIALOGUE_FLATTEN` **0.990** — the one channel that PASSES its ≥0.80 gate |
+| lineage number to read it against | AUC-24 (private corpus, feature length) last measured 0.731 | private-corpus act-swap ~0.48 (`doctor.ts:2544-2545`); P1 baseline `CLIMAX_RELOCATE` 0.523 on 153 test scripts | P1 baseline `DIALOGUE_FLATTEN` **0.990** — the one channel that PASSES its ≥0.80 gate |
 
 **(b) exists because scene count is the doctor's dominant term.**
 `scarcityPenalty(sceneCount) = 140 / max(sceneCount,1)` (`doctor.ts:465-467`,
 summed into `craftPenalty` at `doctor.ts:657`); the file's own comment at
-`doctor.ts:2394-2395` records "scarcity term AUC 0.938; the weightedIssues rule
+`doctor.ts:2544-2545` records "scarcity term AUC 0.938; the weightedIssues rule
 channel AUC is 0.076". A degradation that changes scene count is partly
 measuring that arithmetic. One that preserves it cancels the term exactly and
 leaves order-sensitivity.
@@ -561,15 +561,15 @@ them, and this lane deliberately changed no file on any of those branches.
   that the score is valid — and mistaking one for the other would be the
   worst possible misreading of this document.
 * Transfer to feature-length real writing. N = 32 at 9–14 scenes.
-  `ARC_DED_MIN_SCENES` is 15 (`doctor.ts:2406`), so the one feature-scale
+  `ARC_DED_MIN_SCENES` is 15 (`doctor.ts:2556`), so the one feature-scale
   deduction that is wired into health never fires on this corpus at all — this
   benchmark measures a strictly smaller engine than the AUC-24 ratchet does.
   **Corrected 2026-09-12:** this line also named `CLIMAX_DED_MIN_SCENES`, as a
   second "feature-scale deduction". It gates `climaxZoneDecayDeduction`
-  (`doctor.ts:803`), which is exported and appears in no scoring-path call site
+  (`doctor.ts:805`), which is exported and appears in no scoring-path call site
   at all — `aggregateReport`'s health line subtracts `structuralDeduction`,
   `arcIncoherenceDeduction` and `dialogueDeduction` only, and
-  `doctor.ts:2430-2433` records why the climax term was reverted ("it over-fired
+  `doctor.ts:2580-2583` records why the climax term was reverted ("it over-fired
   on real scripts with naturally flat climaxes"). "Never fires at this length"
   implied it fires at some length. It fires at no length (adversarial finding 6).
 * Say anything about the AUC-24 ≥ 0.622 ratchet. Different corpus, different

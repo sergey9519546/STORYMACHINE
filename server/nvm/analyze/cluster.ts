@@ -158,8 +158,13 @@ function dominantRuleArea(members: LocatedIssue[]): string {
  *  a heatmap/navigation dead end for exactly the findings that DID know where
  *  they were. Scene spans are disjoint and cover the document, so for a
  *  single-scene anchor this returns the identical one index SCENE_RE would
- *  have. */
-function spanSceneIdxs(li: LocatedIssue, sceneSpans: SceneLineSpan[]): number[] {
+ *  have.
+ *
+ *  EXPORTED (2026-09-12) so doctor.ts's priority ranking can read the same
+ *  scene footprint this clusterer does. One definition: a second copy of
+ *  "which scenes does this issue cover" is exactly the kind of drift the
+ *  location grammar has already produced once. */
+export function spanSceneIdxs(li: LocatedIssue, sceneSpans: SceneLineSpan[]): number[] {
   if (li.startLine === undefined || li.endLine === undefined) return [];
   const out: number[] = [];
   for (let i = 0; i < sceneSpans.length; i++) {
