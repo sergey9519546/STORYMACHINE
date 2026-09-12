@@ -17,15 +17,28 @@
 // Craft Dimensions section.
 //
 // Plain text, words / 500 (a page of 12pt Courier prose), over the 20 CC0
-// screenplays in data/screenplays plus the 231-scene feature fixture:
+// screenplays in data/screenplays plus the 231-scene feature fixture, and
+// measured on the report AS A CALLER SHAPES IT — `buildRootCausePipeline`
+// output attached, plus a logline and the script text, which is what
+// server/routes/coverage-letter.ts:138-150 and the panel both hand this
+// renderer:
 //
-//   before this lane   runoff 1,017 w (~2.0 pp) · chain-of-custody 928 w (~1.9 pp)
-//   after              3.3 pp .. 3.6 pp across all 21, runoff 1,739 w (~3.5 pp)
+//   before this lane   runoff 1,017 w (~2.03 pp) · chain-of-custody 928 w (~1.86 pp)
+//   after              3.53 pp .. 3.96 pp across all 21 — the-detour 1,764 w
+//                      (3.53) shortest, counter-offer 1,979 w (3.96) longest,
+//                      runoff 1,929 w (3.86). None reaches 4.0.
+//
+// The first statement of this measurement said 3.3 .. 3.6 pp, which was
+// ~0.4 pp short: it rendered a bare `runScriptDoctor` report, a shape no caller
+// produces and one that omits the Root Causes section entirely (review round 2,
+// non-blocking 1). The sentence survived the correction, with about 20 words of
+// margin on the longest of the 21.
 //
 // The three-to-four-page range holds because the length is BOUNDED BY THE
 // ENGINE, not by this renderer: doctor.ts:1920 caps `topPriorities` at ten, so
-// a 231-scene feature and a 9-scene short produce letters within 0.3 pp of each
-// other. tests/core/coverage-letter.test.ts asserts the range.
+// a 231-scene feature and a 9-scene short produce letters within 0.5 pp of each
+// other. tests/core/coverage-letter.test.ts asserts the range, on the shipped
+// shape, at `<= 4.0` — the sentence itself rather than a window around it.
 //
 // Why the sentence was corrected rather than the letter cut back: the shortest
 // this document can be is its non-priorities content, which measures ~1,009

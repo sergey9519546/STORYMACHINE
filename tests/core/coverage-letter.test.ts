@@ -756,6 +756,12 @@ describe('renderCoverageLetter — honesty (no number outruns the report)', () =
 // three to four pages and it HOLDS for a 231-scene feature as well as a 9-scene
 // short, because the length is bounded by the engine rather than by the
 // renderer: server/nvm/analyze/doctor.ts:1920 caps `topPriorities` at ten.
+//
+// ROUND 3 (review round 2, non-blocking 1): the measurement below is taken on
+// the report a CALLER builds, not on a bare `runScriptDoctor` one. The first
+// version of this gate measured a document nobody receives and came out ~0.4 pp
+// low, which was most of the margin between the promise and the number; and it
+// allowed `< 5`, a page and a half of slack over a four-page sentence.
 
 describe('the letter is as long as every description of it says', () => {
   const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -764,27 +770,72 @@ describe('the letter is as long as every description of it says', () => {
    *  prose, and the basis every measurement of this document has used. */
   const pages = (text: string): number => text.split(/\s+/).filter(Boolean).length / 500;
 
-  // Measured 2026-09-12 across all 20 CC0 screenplays in data/screenplays plus
-  // the feature fixture: 3.3 pp .. 3.6 pp. The three below are the extremes of
-  // that run plus the longest script in the repository.
-  const SCRIPTS = [
-    'tests/fixtures/feature-length/assembled-feature.fountain',
-    'data/screenplays/runoff.fountain',
-    'data/screenplays/the-detour.fountain',
+  /** The letter AS THE PRODUCT SHIPS IT.
+   *
+   *  2026-09-12 (review round 2, non-blocking 1). This gate used to render a
+   *  bare `runScriptDoctor` report — a shape no caller produces. Every one
+   *  attaches `buildRootCausePipeline` output first and hands the renderer a
+   *  logline and the script text (server/routes/coverage-letter.ts:138-150, and
+   *  the panel the same way), and the Root Causes section that adds is worth
+   *  ~0.35 pp. So the range this gate enforced was measured on a document
+   *  nobody receives, and it was ~0.4 pp short of the real one — which is most
+   *  of the margin between the promise and the number.
+   *
+   *  MEASURED on all 21 committed screenplays (20 CC0 + the feature fixture):
+   *
+   *    bare report        3.25 .. 3.58 pp   — the shape this gate used to build
+   *    as the route ships 3.53 .. 3.96 pp   — the-detour low, counter-offer high
+   *
+   *  0 of 21 reach 4.0. The three scripts below are the measured extremes plus
+   *  the 231-scene feature, so the gate sits on the ends of the real range. */
+  async function shippedLetter(rel: string): Promise<string> {
+    const [{ runScriptDoctor }, { buildRootCausePipeline }, { analyzeFountainText }, { buildLogline }] =
+      await Promise.all([
+        import('../../server/nvm/analyze/doctor.ts'),
+        import('../../server/lib/root-cause-pipeline.ts'),
+        import('../../server/nvm/analyze/fountain-analyzer.ts'),
+        import('../../server/lib/logline.ts'),
+      ]);
+    const fountain = readFileSync(path.join(REPO_ROOT, rel), 'utf8');
+    const report = await runScriptDoctor(fountain);
+    const { rootCauses } = buildRootCausePipeline(report, fountain);
+    const { records } = analyzeFountainText(fountain);
+    const logline = buildLogline(report, records, fountain);
+    return renderCoverageLetter({ ...report, rootCauses }, { title: rel, logline, fountain }).text;
+  }
+
+  const SCRIPTS: Array<{ rel: string; measured: number }> = [
+    { rel: 'tests/fixtures/feature-length/assembled-feature.fountain', measured: 3.80 },
+    { rel: 'data/screenplays/the-detour.fountain', measured: 3.53 },     // shortest of the 21
+    { rel: 'data/screenplays/counter-offer.fountain', measured: 3.96 },  // longest of the 21
   ];
 
-  for (const rel of SCRIPTS) {
+  for (const { rel, measured } of SCRIPTS) {
     it(`${rel.split('/').pop()}: three to four pages, as the copy promises`, async () => {
-      const { runScriptDoctor } = await import('../../server/nvm/analyze/doctor.ts');
-      const report = await runScriptDoctor(readFileSync(path.join(REPO_ROOT, rel), 'utf8'));
-      const { text } = renderCoverageLetter(report, { title: rel });
-      const pp = pages(text);
-      assert.ok(pp >= 3 && pp < 5,
-        `${rel} renders a ~${pp.toFixed(1)}-page letter; every description of this document `
-        + 'says three to four pages. Either the renderer grew or the promise is stale — '
-        + 'the promise is stale only if you have re-measured and updated all nine of them.');
+      const pp = pages(await shippedLetter(rel));
+      // The upper bound is the SENTENCE, not a window around it. It used to be
+      // `< 5`, which is a page and a half wider than the promise it protects —
+      // the letter could have grown past four pages with every description of
+      // it still claiming otherwise, and this gate green.
+      assert.ok(pp >= 3 && pp <= 4,
+        `${rel} renders a ~${pp.toFixed(2)}-page letter (measured ${measured.toFixed(2)}); every `
+        + 'description of this document says three to four pages. Either the renderer grew or the '
+        + 'promise is stale — the promise is stale only if you have re-measured all 21 committed '
+        + 'screenplays the way the route renders them and updated all nine descriptions.');
     });
   }
+
+  it('the shape this gate measures is the shape the route renders', () => {
+    // The defect this case exists for is subtle and was found by a reviewer
+    // rather than by a failure: a length gate that builds its own report can
+    // drift from the product and keep passing. If the route ever stops
+    // attaching the pipeline, or starts attaching something else, the numbers
+    // above stop describing what a writer downloads.
+    const route = readFileSync(path.join(REPO_ROOT, 'server/routes/coverage-letter.ts'), 'utf8');
+    assert.match(route, /const \{ rootCauses \} = buildRootCausePipeline\(report, fountain\);/);
+    assert.match(route, /renderCoverageLetter\(\s*\{ \.\.\.report, rootCauses \}/);
+    assert.match(route, /logline,\s*fountain/);
+  });
 
   it('no description of the letter still promises one to two pages', () => {
     // The nine places, by file. A sentence a writer reads before pressing a
