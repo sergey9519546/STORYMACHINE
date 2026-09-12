@@ -74,8 +74,20 @@ const MIN_LINES = 50;   // same fragment cutoff measure-real uses
 
 interface Row {
   file: string;
-  doubleSpaced: boolean;
-  submitted: number;
+  // ── RUNNING THIS ON A PRE-BRANCH CHECKOUT (2026-09-12, round 4) ──────────
+  // The owner's comparison is this command on a tree from before this branch
+  // against this command here. The script does not exist there, so it has to
+  // be COPIED across — and on that tree `analyzeFountainText` has no
+  // `submittedWordCount` and no `isDoubleSpaced`, because neither field
+  // existed. Both come back `undefined`, which is correct and is itself the
+  // finding: on a pre-branch tree `wordCount` IS the raw submission, so the
+  // pre-branch `wordCount` column and this tree's `submittedWordCount` column
+  // are the same number. (Verified on a `git archive 8aa1f696` export:
+  // chain-of-custody wordCount 824 there, submittedWordCount 824 here.)
+  // These two are therefore optional, and every derived column, the table and
+  // the group summaries all say "not reported" rather than printing NaN.
+  doubleSpaced: boolean | undefined;
+  submitted: number | undefined;
   words: number;
   health: number;
   verdict: string;
@@ -145,7 +157,9 @@ let skippedShort = 0;
 for (const full of files) {
   const text = readFileSync(full, 'utf8');
   if (text.split('\n').length < MIN_LINES) { skippedShort++; continue; }
-  const analysis = analyzeFountainText(text);
+  // Read through a widened view: on a pre-branch checkout these two fields do
+  // not exist and arrive as undefined, which every consumer below handles.
+  const analysis = analyzeFountainText(text) as { wordCount: number; submittedWordCount?: number; isDoubleSpaced?: boolean };
   const report = await runScriptDoctor(text);
   rows.push({
     file: path.relative(base, full).replace(/\\/g, '/'),
@@ -164,13 +178,25 @@ for (const full of files) {
   });
 }
 
+/** The gap and its share, or undefined when this tree does not report the
+ *  diagnostic fields. Never NaN: an empty cell says "not reported", NaN says
+ *  nothing and breaks every csv reader. */
+function gapOf(r: Row): { gap: number; share: number } | undefined {
+  if (r.submitted === undefined) return undefined;
+  const gap = r.submitted - r.words;
+  return { gap, share: r.submitted === 0 ? 0 : (gap / r.submitted) * 100 };
+}
+
+const REPORTED = rows.filter((r) => r.submitted !== undefined);
+const UNREPORTED = rows.length - REPORTED.length;
+
 if (CSV) {
   console.log('file,isDoubleSpaced,submittedWordCount,wordCount,notScreenplayWords,notScreenplayPct,health,verdict,sceneCount,critical,major,minor');
   for (const r of rows) {
-    const gap = r.submitted - r.words;
+    const g = gapOf(r);
     console.log([
-      JSON.stringify(r.file), r.doubleSpaced, r.submitted, r.words, gap,
-      r.submitted === 0 ? '' : ((gap / r.submitted) * 100).toFixed(2),
+      JSON.stringify(r.file), r.doubleSpaced ?? '', r.submitted ?? '', r.words,
+      g ? g.gap : '', g ? g.share.toFixed(2) : '',
       r.health, r.verdict, r.scenes, r.critical, r.major, r.minor,
     ].join(','));
   }
@@ -188,24 +214,33 @@ const head = `${'script'.padEnd(38)} ${'2x'.padEnd(3)} ${'submitted'.padStart(9)
 console.log(head);
 console.log('-'.repeat(head.length));
 for (const r of rows) {
-  const gap = r.submitted - r.words;
+  const g = gapOf(r);
   console.log(
     `${r.file.length > 38 ? `…${r.file.slice(-37)}` : r.file.padEnd(38)} `
-    + `${(r.doubleSpaced ? 'YES' : '—').padEnd(3)} `
-    + `${String(r.submitted).padStart(9)} ${String(r.words).padStart(7)} ${String(gap).padStart(7)} `
-    + `${pct(gap, r.submitted).padStart(6)} ${r.health.toFixed(1).padStart(6)} ${r.verdict.padEnd(10)} `
+    + `${(r.doubleSpaced === undefined ? '?' : r.doubleSpaced ? 'YES' : '—').padEnd(3)} `
+    + `${(r.submitted === undefined ? '—' : String(r.submitted)).padStart(9)} ${String(r.words).padStart(7)} `
+    + `${(g ? String(g.gap) : '—').padStart(7)} `
+    + `${(g ? pct(g.gap, r.submitted!) : '—').padStart(6)} ${r.health.toFixed(1).padStart(6)} ${r.verdict.padEnd(10)} `
     + `${String(r.scenes).padStart(4)} ${`${r.critical}/${r.major}/${r.minor}`.padStart(12)}`,
   );
 }
 
+if (UNREPORTED > 0) {
+  console.log(`\n  NOTE: ${UNREPORTED} of ${rows.length} rows have no submittedWordCount / isDoubleSpaced.`);
+  console.log('  That is what this script prints on a checkout from BEFORE the two fields existed,');
+  console.log('  and it is correct rather than broken: on such a tree `wordCount` IS the raw');
+  console.log('  submission, so its wordCount column is the same number as this tree\'s');
+  console.log('  submittedWordCount column. Diff the two runs on that basis.');
+}
+
 for (const [name, group] of [
-  ['DOUBLE-SPACED (the reconstruction branch — the scraped-PDF / FDX shape)', rows.filter((r) => r.doubleSpaced)],
-  ['SINGLE-SPACED (the clean branch)', rows.filter((r) => !r.doubleSpaced)],
+  ['DOUBLE-SPACED (the reconstruction branch — the scraped-PDF / FDX shape)', REPORTED.filter((r) => r.doubleSpaced === true)],
+  ['SINGLE-SPACED (the clean branch)', REPORTED.filter((r) => r.doubleSpaced === false)],
 ] as Array<[string, Row[]]>) {
   console.log(`\n── ${name} ──`);
   if (group.length === 0) { console.log('  none'); continue; }
-  const gaps = group.map((r) => r.submitted - r.words);
-  const gapPcts = group.filter((r) => r.submitted > 0).map((r) => ((r.submitted - r.words) / r.submitted) * 100);
+  const gaps = group.map((r) => r.submitted! - r.words);
+  const gapPcts = group.filter((r) => r.submitted! > 0).map((r) => ((r.submitted! - r.words) / r.submitted!) * 100);
   const verdicts = new Map<string, number>();
   for (const r of group) verdicts.set(r.verdict, (verdicts.get(r.verdict) ?? 0) + 1);
   console.log(`  scripts                    ${group.length} of ${rows.length}`);
@@ -236,7 +271,12 @@ console.log(`
     count that changed against a pre-branch run is evidence of something else
     and should be read as such.
   * Compare these rows against the same command on a pre-branch checkout.
-    --csv makes that a diff. Issue COUNTS move before health does: 24 issues
+    COPY THIS FILE THERE FIRST — it does not exist on that tree — and expect
+    its isDoubleSpaced and submittedWordCount columns to be empty, which is
+    correct: those fields did not exist, and on that tree wordCount IS the raw
+    submission, so its wordCount column is this tree's submittedWordCount
+    column. Run "npm run --silent probe-corpus-shape -- --csv > shape.csv" on
+    both sides and diff the files. Issue COUNTS move before health does: 24 issues
     moved on one synthetic document whose health moved 0.9.
   * Then, and only then, the 72-row manifest and AUC-24. These changes move
     both halves of every matched pair, so a rank statistic that does not move

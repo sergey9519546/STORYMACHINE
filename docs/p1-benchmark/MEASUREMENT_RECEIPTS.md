@@ -2811,9 +2811,16 @@ the gap and its share of the submission / `health` / `verdict` / `sceneCount` /
 critical-major-minor, then the same summary for each of the two groups. It
 computes no AUC, asserts no floor and writes no file; the corpus is read on the
 owner's machine and nothing leaves it, and no screenplay text is printed. Run
-it once on a pre-branch checkout and once here and diff the `--csv`. With
-`REAL_SCRIPT_CORPUS_DIR` unset it skips with exit 0, like every other
-corpus-gated command in this repository.
+it once on a pre-branch checkout and once here and diff the `--csv`. **Copy
+`scripts/probe-corpus-shape.ts` onto the pre-branch checkout first** — it does
+not exist there — and expect its `isDoubleSpaced` and `submittedWordCount`
+columns to come back empty, which is correct rather than broken: neither field
+existed, and on that tree `wordCount` IS the raw submission, so the pre-branch
+`wordCount` column is this tree's `submittedWordCount` column. (Verified on a
+`git archive 8aa1f696` export: it runs under type stripping, exit 0, and
+`chain-of-custody` reads `wordCount` 824 there against `submittedWordCount` 824
+here.) With `REAL_SCRIPT_CORPUS_DIR` unset it skips with exit 0, like every
+other corpus-gated command in this repository.
 
 For calibration, the same command on the 32 committed scripts
 (`-- --public`): 0 of 32 double-spaced, 32 of 32 with a non-zero gap, a mean of
