@@ -582,7 +582,14 @@ export const DOCTOR_STREAM_ROUTE = '**/api/scriptide/doctor/stream';
  *  both shapes the app is served in: the Vite dev module URL
  *  (`/src/components/scriptide/CoverageSummary.tsx?t=…`, which is what
  *  `verify:p0-flow` actually drives — see `bootKeylessServer`) and the built
- *  chunk (`/assets/CoverageSummary-<hash>.js`). */
+ *  chunk (`/assets/CoverageSummary-<hash>.js`). The built name is a
+ *  chunk-name-shaped dependency: it comes from Vite's default
+ *  `build.rollupOptions.output.chunkFileNames` (`[name]-[hash].js`, `[name]`
+ *  being the lazy import's file basename). A `manualChunks` entry in
+ *  `vite.config.ts` that folded CoverageSummary into another chunk would
+ *  rename it, and this glob would then match nothing — `holdRoute` fails
+ *  loudly on that (`waitUntilHeld` times out with the route named), which is
+ *  the right mode: a silent miss would let MOUNT be asserted unpinned. */
 export const COVERAGE_SUMMARY_CHUNK_ROUTE = '**/CoverageSummary*';
 
 /**

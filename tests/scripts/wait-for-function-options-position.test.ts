@@ -201,7 +201,11 @@ function handRolledStreamHolds(source: string): { line: number; text: string }[]
     // being scanned is identified from the ORIGINAL text of the same span.
     const call = source.slice(at, Math.min(i + 1, source.length));
     if (!/doctor\/stream/.test(call)) continue;
-    if (/route\.fulfill\(|\.fulfill\(/.test(call)) continue;
+    // The ALLOW side reads the MASKED span: a handler whose only
+    // `route.fulfill(` sits inside a comment or a string is a hold, not a
+    // canned response, and must not be exempted by its own prose.
+    const maskedCall = masked.slice(at, Math.min(i + 1, masked.length));
+    if (/route\.fulfill\(|\.fulfill\(/.test(maskedCall)) continue;
     const line = source.slice(0, at).split('\n').length;
     bad.push({ line, text: call.replace(/\s+/g, ' ').slice(0, 120) });
   }
@@ -307,6 +311,23 @@ describe('in-flight doctor runs go through the one shared hold', () => {
       handRolledStreamHolds("await p.goto('http://127.0.0.1:1/x');\n"
         + "await p.route('**/api/scriptide/doctor/stream', (route) => route.fulfill({ status: 500 }));").length,
       0,
+    );
+  });
+
+  it('a hold whose handler only MENTIONS route.fulfill( in a comment or string is still a hold', () => {
+    // The round-2 review planted exactly this: the allow side used to read the
+    // unmasked span, so the comment exempted the hold (suite stayed 8/8).
+    const viaComment =
+      "await p.route('**/api/scriptide/doctor/stream', async (route) => {\n"
+      + "  // we do not route.fulfill( here\n  await gate;\n});";
+    const viaString =
+      "await p.route('**/api/scriptide/doctor/stream', async (route) => { const why = 'no route.fulfill( here'; await gate; });";
+    assert.equal(handRolledStreamHolds(viaComment).length, 1, 'comment-only mention must not exempt');
+    assert.equal(handRolledStreamHolds(viaString).length, 1, 'string-only mention must not exempt');
+    assert.equal(
+      handRolledStreamHolds("await p.route('**/api/scriptide/doctor/stream', (route) => route.fulfill({ status: 500 }));").length,
+      0,
+      'a real canned response is still allowed',
     );
   });
 
