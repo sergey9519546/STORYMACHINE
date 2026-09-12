@@ -572,70 +572,100 @@ const VOICE_ELIGIBLE_MIN_WORDS = 30;
 // (eligible character count) x (their total pooled dialogue words) must not
 // exceed this.
 //
-// 2026-09-12 RE-DERIVATION (docs/audits/2026-09-12-adversarial/engine-logic.md
-// finding 10). The round-2/3 value this replaces (300,000) bound at a cast of
-// 300,000 / 15,000 ≈ 20 on an ORDINARY ~15,000-dialogue-word feature —
-// MAX_FOUNTAIN_FREQUENT_CUE_LINES's own neighbouring comment says "a real
-// large-ensemble feature can comfortably have dozens of characters," but
-// this bound fired FIRST and rejected a routine 20-speaking-character
-// ensemble outright (heist, courtroom drama, war film, TV pilot) — no score,
-// no report. Re-derived by measurement, not guesswork:
+// 2026-09-12 RE-DERIVATION, ROUND 2 (docs/audits/2026-09-12-adversarial/
+// engine-logic.md finding 10; docs/audits/2026-09-12-adversarial/
+// rulebook-review.md round-1 review, BLOCKER item 1). Round 1 of this
+// re-derivation (300,000 -> 1,500,000) bracketed the value against FIXTURE
+// WEIGHTS and got the shape wrong: weight is (eligible-distinct-count) x
+// (total pooled words), and because every eligible character must ALSO
+// clear VOICE_ELIGIBLE_MIN_WORDS=30, the distinct count a given weight can
+// buy is bounded by distinct <= sqrt(weight / 30) — so the WORST-CASE shape
+// at any weight ceiling is not a realistic script's few-big-speakers
+// distribution, it is the thinnest one possible: every eligible character
+// sitting AT the 30-word floor, maximizing distinct count (and therefore
+// analyzeVoices's O(distinct²) pair count) for that weight. At round 1's
+// 1,500,000 that shape is 223 speakers x 30 words (weight 1,491,870, a 50 KB
+// document) — round-1's own header measured only the CHEAP few-big shape
+// (up to cast 60) and missed it. The reviewer measured this "uniform-min"
+// shape costing 27.3-27.6s in runScriptDoctor — 91% of the 30s
+// DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS (Decision #7) on their box, and this
+// lane's own box reproduces it almost exactly (27,361ms) — so the fix is not
+// "closer to a fixture", it is re-deriving from COST on that worst-case
+// shape directly:
 //
-// (a) Six timings, probe-cast shape (Zipf-distributed per-character speech
-//     allocation, 35-word floor so every character clears
-//     VOICE_ELIGIBLE_MIN_WORDS=30 with margin — the WORST case for this
-//     bound, since a real script's minor characters usually fall under the
-//     floor and skip the bound entirely — 110-page feature, ~15,150 pooled
-//     dialogue words total), runScriptDoctor with the guard bypassed, this
-//     lane's box:
-//       cast 15  weight   227,250  wall  8,396ms  cpu  7,962ms
-//       cast 20  weight   303,000  wall  8,665ms  cpu  8,451ms
-//       cast 25  weight   378,750  wall  9,449ms  cpu  9,105ms
-//       cast 30  weight   454,500  wall  9,471ms  cpu  9,214ms
-//       cast 40  weight   606,000  wall 10,691ms  cpu 10,451ms
-//       cast 60  weight   909,000  wall 13,734ms  cpu 13,592ms
-//     Confirms finding 10's own reproduction (cast 20 already crosses the
-//     OLD 300,000 bound, at weight 303,000) and that a fully-eligible
-//     60-character ensemble finishes in well under 14s — nowhere near a DoS
-//     shape; the O(distinct²) cost this bound exists to stop is driven by
-//     DISTINCT COUNT far more than by this product once the cast stays in
-//     the dozens, not the hundreds.
-// (b) The lightest payload the existing DoS/bypass regression fixtures
+// (a) uniform-min shape (N distinct speakers, each exactly 5 double-spaced
+//     "this is ordinary lowercase dialogue here" paragraphs = exactly 30
+//     real words -> right at the eligibility floor, so distinct = N is the
+//     MAXIMUM this weight buys), runScriptDoctor with the guard bypassed,
+//     this lane's box, median of repeated fresh-payload runs (a shared,
+//     loaded box: load average ~3-5 on 4 cores during measurement):
+//       N 100  weight   300,000  wall  ~5.5s
+//       N 140  weight   588,000  wall ~10.3s
+//       N 150  weight   675,000  wall ~12.1s (12,071 / 11,506 / 12,685ms)
+//       N 160  weight   768,000  wall ~14.3s (13,544 / 14,332 / 14,420ms)
+//       N 180  weight   972,000  wall  18.2s
+//       N 200  weight 1,200,000  wall  20.7s
+//       N 223  weight 1,491,870  wall  27.4s (this box) / 27.3-27.6s (reviewer's)
+//     Rate (wall-ms / weight) across this sweep: 0.0173-0.0187 ms/unit —
+//     inside this file's own historical fit above (0.01-0.022 ms/unit,
+//     measured on the CHEAP few-big shape), confirming one C explains both
+//     shapes' cost even though it does not explain their DISTINCT count for
+//     the same weight. N=150/160 is the load-bearing pair: 12.1s clears a
+//     half-budget target with real margin, 14.3s does not (see (c)).
+// (b) Confirms the round-1 review's own point directly: a FEW-BIG shape at
+//     essentially the SAME weight as N=150 (probe-cast cast=45, weight
+//     681,750, ~15,150 pooled words padded to a 110-page document) costs
+//     about the same, ~12.6s — at THIS lower weight the two shapes are not
+//     the 1.7x-apart pair the reviewer measured at 1.5M (99x15,150 at 16.1s
+//     vs 223x30 at 27.3s); the bound below is shape-robust in a way 1,500,000
+//     was not.
+// (c) DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS is 30,000ms (Decision #7, itself
+//     derived as 2x a measured ~14s accepted ceiling). Mirroring that same
+//     2x-headroom logic here: the worst-case (uniform-min) shape this bound
+//     admits must stay under HALF the budget, 15s, on this box, so that a
+//     box up to ~2x slower still lands at or under the 30s hard stop instead
+//     of burning a full worker slot before the writer gets "took longer than
+//     the budget" instead of the guard's honest "trim the cast". N=150
+//     (12.1s measured, ~2.9s / 24% of margin under 15s) clears this; N=160
+//     (14.3s, ~0.7s of margin) does not — noise on this shared box already
+//     moved N=165 by ~900ms between two fresh runs, so N=150 is the safer
+//     boundary, not N=160. New bound: **675,000** (= 150² x 30). Applying
+//     this file's own historical WORST rate (0.022ms/unit, not the
+//     0.0173-0.0187 measured here) as a conservative upper-bound check:
+//     675,000 x 0.022 = 14,850ms — still under the 15s target, corroborating
+//     the direct measurement rather than contradicting it.
+// (d) What this admits, honestly: the maximum distinct fully-eligible cast
+//     under the worst-case (uniform-min) shape is 150 — solidly "dozens" and
+//     into "over a hundred", not the 223 round 1 admitted, and MAX_FOUNTAIN_
+//     FREQUENT_CUE_LINES's neighbouring "dozens ... not HUNDREDS" framing
+//     below is corrected to say so. Every cast this finding's own brief
+//     named — 20, 30, 40 — clears it by wide margins (weights 303,000 /
+//     454,500 / 606,000, all measured at 8.4-10.7s wall on the CHEAP
+//     few-big shape): 20/30/40-cast normal features stay ACCEPTED. A
+//     60-cast fully-eligible ensemble (weight 909,000) now EXCEEDS this
+//     bound and is REJECTED — a real, if bounded, narrowing versus round 1 —
+//     because a scalar weight bound cannot admit that cast's WEIGHT without
+//     also admitting the uniform-min shape at the same weight, which is not
+//     safe. Unlocking casts beyond ~150 (uniform-min) / larger few-big
+//     ensembles safely is an analyzer-side fix — capping analyzeVoices's
+//     O(distinct²) pair count so cost stops scaling with the SQUARE of cast
+//     size — not a further increase of this bound; that pair-cap is
+//     scoring-path and is the scoring lane's item, not this guard's.
+// (e) The lightest payload the existing DoS/bypass regression fixtures
 //     (tests/security/fountain-shape-guard-cue-parity.test.ts) pin as
-//     REJECTED via this bound: ROUND 3's "bypass B" (200 uniform names, 4
-//     dialogue occurrences each, 3 hard-wrapped 4-real-word lines per
-//     occurrence) — weight 1,920,000. Every OTHER fixture in that file
-//     pinned REJECTED via this bound measures at or above 2,400,000 (the
-//     "200 names x ~2,000 occurrences" shape common to rounds 2, 3, 4, 5, 6
-//     and 7); bypass B is the minimum found.
-// (c) New bound, bracketed strictly inside (40-cast normal feature, bypass
-//     B) = (606,000, 1,920,000): 1,500,000 — derived from
-//     MAX_FOUNTAIN_FREQUENT_CUE_LINES's own "dozens ... not HUNDREDS"
-//     framing two constants up: 99 characters (the largest cast still
-//     short of "hundreds") at this same ~15,150-word feature is
-//     99 x 15,150 = 1,499,850, rounding to 1,500,000. The bound now admits
-//     any cast this repo's own neighbouring comment already calls ordinary
-//     (2.48x above the measured 40-cast weight), while staying 1.28x below
-//     the lightest fixture the security suite pins as an attack.
-//
-//     The independent scoring-branch re-derivation (scoring/feature-length-
-//     defects) landed on the SAME value, 1,500,000, bracketed inside
-//     [1,331,970, 1,920,000) — this lane's own measurement lands in that
-//     same bracket (the same value, in fact), from a lighter (~15,150-word)
-//     normal-feature assumption than whatever produced their 1,331,970
-//     lower endpoint; both derivations agree the binding constraint is the
-//     SAME upper bound (bypass B, 1,920,000), which is what actually caps
-//     how high this can safely go.
+//     REJECTED via this bound remains ROUND 3's "bypass B" at 1,920,000 —
+//     2.84x above this bound, a much wider margin than round 1's 1.28x.
 //
 // Every legitimate fixture measured against this bound (the 54 tracked
-// fixtures, the CC0 corpus, a realistic 150-name skewed feature, and now the
+// fixtures, the CC0 corpus, a realistic 150-name skewed feature, and the
 // probe-cast 20/30/40-cast features from finding 10) clears it — see this
 // file's own margin-proof tests and
 // tests/security/fountain-shape-guard-cue-parity.test.ts's "finding 10"
-// describe block. This bound stays STRICTLY below every fixture the DoS/
-// bypass regressions above pin as REJECTED — asserted directly (computed
-// from bypass B's own measured weight, not a literal) in that same block.
-export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1_500_000;
+// describe block, which also asserts the N=150/N=151 uniform-min boundary
+// directly (150 ACCEPTED with its measured cost under the margin, 151
+// REJECTED) and that bypass B and every other pinned DoS fixture still
+// rejects.
+export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 675_000;
 // 2026-09-06 review round 7 follow-up, non-blocking — RESIDUAL accepted
 // worst case, recorded here rather than left unstated: a document sitting
 // at the analyzer's own 400-scene ceiling, with a genuine (not hand-model-
@@ -650,9 +680,14 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1_500_000;
 // passes over a document at the size the analyzer itself advertises
 // supporting — not a mis-modelled eligibility set (that class, rounds 4-7,
 // is closed; see realVoiceEligibleWeightRejectionReason's own comment).
-// This sits above the ~8-14s range the 2026-09-12 re-derivation above
-// measured for fully-eligible casts up to 60, but bounding it further would
-// mean rejecting legitimate documents at the
+// This sits in the same ~12-14s range the 2026-09-12 round-2 re-derivation
+// above measured for the WORST fully-eligible shape this bound now admits
+// (N=150-160 uniform-min), which is the point: an ineligible walk-on's
+// residual cost and the bound's own worst case now land in the same
+// ballpark rather than the walk-on case being the cheaper of the two (as it
+// was under round 1's 1,500,000, where the fully-eligible worst case ran to
+// 27s). Bounding this residual case further would mean rejecting legitimate
+// documents at the
 // analyzer's OWN advertised ceiling for their ordinary cost, which is a
 // request-timeout/worker-pool sizing decision, not something a shape guard
 // should enforce by refusing otherwise-valid input. For scale: this

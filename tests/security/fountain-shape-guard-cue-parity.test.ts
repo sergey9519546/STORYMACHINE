@@ -2928,17 +2928,36 @@ describe('ROUND 7 equivalence: retiring the legacy voice-eligible-weight walk ch
 // voice-eligible-weight bound bound at a cast of 300,000 / 15,000 ≈ 20 on
 // an ORDINARY ~15,000-dialogue-word feature — an entirely ordinary
 // 20-character ensemble (heist, courtroom drama, war film, TV pilot) got no
-// score and no report. Re-derived by measurement (see
-// MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own comment in validation.ts for the
-// six timings and the full bracket derivation) to 1,500,000. This block
-// proves three things: (1) realistic 20/30/40-cast features are now
-// ACCEPTED, (2) the new bound is still STRICTLY BELOW the lightest payload
-// this file's own DoS/bypass regressions pin as REJECTED — computed here
-// from that fixture's own generator, not restated as a literal, so a future
-// edit to that fixture's shape re-checks the inequality rather than
-// silently trusting a stale number — and (3) every one of this file's
-// existing 648 pinned decisions is unchanged (verified by running this
-// whole suite after the bound change: 648/648 pass, none flipped).
+// score and no report.
+//
+// ROUND 1 (2026-09-12) re-derived the bound to 1,500,000 from fixture
+// WEIGHTS, and the round-1 review (docs/audits/2026-09-12-adversarial/
+// rulebook-review.md, BLOCKER item 1) found that under-derived: because
+// every eligible character must also clear VOICE_ELIGIBLE_MIN_WORDS=30, a
+// weight ceiling of W admits up to sqrt(W/30) distinct characters at the
+// eligibility floor — the "uniform-min" shape below — and at 1,500,000 that
+// is 223 speakers, a 50 KB document costing 27.3-27.6s in runScriptDoctor,
+// 91% of the 30s analysis budget (Decision #7). Weight alone is not a safe
+// cross-shape cost proxy: the round-1 header measured only the cheap
+// few-big shape (cast up to 60) and never measured this one.
+//
+// ROUND 2 re-derives the bound from COST on the worst-admitted (uniform-min)
+// shape directly — see MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own comment in
+// validation.ts for the full sweep, the rate fit, and the half-budget
+// (15s) target — landing on 675,000 (the largest N whose measured cost on
+// this box stays safely under that target is N=150). This block proves:
+// (1) the N=150/N=151 uniform-min boundary directly (150 ACCEPTED with its
+// measured cost under the margin, 151 REJECTED); (2) realistic 20/30/40-cast
+// features are still ACCEPTED (the brief's explicit targets), and a 60-cast
+// fully-eligible ensemble is now correctly REJECTED (a real narrowing from
+// round 1, disclosed rather than hidden — unlocking it safely is the
+// analyzer-side pair-cap, the scoring lane's item, not this bound); (3) the
+// new bound is still STRICTLY BELOW the lightest payload this file's own
+// DoS/bypass regressions pin as REJECTED, with a much wider margin than
+// round 1 (2.84x, not 1.28x) — computed here from that fixture's own
+// generator, not restated as a literal; and (4) every one of this file's
+// existing 654 pinned decisions is unchanged (verified by running this
+// whole suite after the bound change: 654/654 pass, none flipped).
 describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — realistic casts accept, DoS fixtures still reject', () => {
   const DLG6 = 'this is ordinary lowercase dialogue here.';
 
@@ -2983,6 +3002,72 @@ describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — reali
   it('a realistic 15-cast feature is ACCEPTED too (sanity: the pre-existing floor case still works)', () => {
     const text = buildProbeCastFeature(15);
     assert.equal(fountainShapeRejectionReason(text), null);
+  });
+
+  // Round-2 disclosure (brief item 2): the bound that keeps the worst-case
+  // shape's cost under the half-budget target does NOT admit every cast the
+  // round-1 draft happened to accept. A 60-cast fully-eligible ensemble
+  // (weight 909,000) exceeds 675,000 and is now correctly REJECTED — say so
+  // directly, rather than let it silently regress with no test either way.
+  // Unlocking a cast this large safely is the analyzer-side pair-cap
+  // (capping analyzeVoices's O(distinct²) pair count), not a further raise
+  // of this bound — see MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own comment,
+  // item (d).
+  it('a 60-cast fully-eligible feature is now REJECTED (weight 909,000 > 675,000) — the cost-safe bound does not stretch to this cast; the analyzer-side pair cap is what would', () => {
+    const text = buildProbeCastFeature(60);
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected a 60-cast fully-eligible feature to be rejected under the cost-derived bound');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
+
+  // The worst-case shape this bound is actually derived from (brief item 1):
+  // N distinct speakers, each at EXACTLY VOICE_ELIGIBLE_MIN_WORDS=30 real
+  // words — the thinnest, most O(distinct²)-expensive shape a given weight
+  // can buy, since distinct <= sqrt(weight / 30) once every speaker must
+  // clear the floor. Matches the round-1 reviewer's own "uniform-min"
+  // methodology exactly (verified: this generator's weight/chars at N=223
+  // reproduce the reviewer's reported 1,491,870 / 50,172 exactly).
+  function buildUniformMin(cast: number): string {
+    const DLG = 'this is ordinary lowercase dialogue here';
+    let t = '', occ = 0, scene = 0;
+    while (occ < cast) {
+      t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+      for (let i = 0; i < 40 && occ < cast; i++, occ++) {
+        t += `CHARACTER${occ}\n\n`;
+        for (let p = 0; p < 5; p++) t += `${DLG}\n\n`;
+      }
+    }
+    return t;
+  }
+
+  it('the uniform-min N=150 boundary (weight exactly 675,000) is ACCEPTED, and its measured runScriptDoctor cost stays under the margin', async () => {
+    const { runScriptDoctor } = await import('../../server/nvm/analyze/doctor.ts');
+    const text = buildUniformMin(150);
+    const w = 150 * (150 * 30);
+    assert.equal(w, 675_000, 'sanity: N=150 at exactly 30 words/speaker must land exactly on the bound');
+    const reason = fountainShapeRejectionReason(text);
+    assert.equal(reason, null, `expected the N=150 uniform-min boundary to be accepted, got: ${reason}`);
+    // This is the actual analysis, not just the guard — the whole point of
+    // this bound is that the guard's ACCEPT decisions stay cheap. The DESIGN
+    // target this bound was derived against is HALF the 30s analysis budget
+    // (15s — see MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own comment; measured
+    // ~12.1s median on this lane's shared box). The assertion below uses a
+    // looser 20s ceiling deliberately — a regression guard against this
+    // shape drifting toward or past the 30s hard budget, not a tight timing
+    // check that would flake under ordinary CI/shared-box noise.
+    const start = Date.now();
+    await runScriptDoctor(text);
+    const ms = Date.now() - start;
+    assert.ok(ms < 20_000, `expected the N=150 worst-case accepted shape to finish well under the 30s analysis budget, took ${ms}ms — investigate before this reaches 30s`);
+  });
+
+  it('the uniform-min N=151 boundary (one speaker over — weight 684,030) is REJECTED', () => {
+    const text = buildUniformMin(151);
+    const w = 151 * (151 * 30);
+    assert.equal(w, 684_030);
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected N=151 (one speaker past the boundary) to be rejected');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
   });
 
   // Brief item (b)/(c)/(d): the lightest payload this file's own DoS/bypass

@@ -1109,6 +1109,14 @@
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
+      "from": "docs/brain/Gates/Gate - Fountain Shape Guard.md",
+      "to": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Fountain Shape Guard.md",
+      "to": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
+    },
+    {
       "from": "docs/brain/Gates/Gate - Honesty Audit.md",
       "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
     },
