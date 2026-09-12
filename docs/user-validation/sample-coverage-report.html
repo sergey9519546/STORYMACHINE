@@ -280,6 +280,21 @@
        printable page sequence with no anchors to jump to, so a link affordance
        would promise navigation that does not exist on paper. */
     .xref { font-weight: 600; color: #3d3d3d; white-space: nowrap; }
+    /* ── Dimension percentile badges (2026-09-12, findings #4 and #14) ──
+       Beside the label, not beside the score: on a not-comparable draft the
+       badge reads "not comparable", which is a statement about the DIMENSION's
+       ranking rather than a second reading of the number — putting it next to
+       the 92/100 is what made the two look like two readings of one thing. */
+    .dim-pct {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #57606a;
+      margin-left: 8px;
+      white-space: nowrap;
+    }
+    .dim-pct-caption { font-size: 11px; color: #57606a; margin: 0 0 12px; }
     /* ── Priorities / appendix ── */
     .priority-list, .appendix-list {
       margin: 0;
@@ -615,10 +630,11 @@
 
   <section class="section">
     <h2>Craft Dimensions</h2>
+    <p class="dim-pct-caption">No percentile badges: this draft is outside the bounds of the hand-authored synthetic reference set (20 samples / 9–10 scenes / 256–337 words), the only set any percentile here is ranked against.</p>
     <div class="dim-list">
 
     <div class="dim-row">
-      <div class="dim-label">Structure &amp; Pacing</div>
+      <div class="dim-label">Structure &amp; Pacing<span class="dim-pct" title="Structure &amp; Pacing: no percentile — this draft is outside the bounds of the hand-authored synthetic reference set (20 samples / 9–10 scenes / 256–337 words), so a rank against it would measure this draft&#39;s length, not its craft.">not comparable</span></div>
       <div class="dim-bar-track">
         <div class="dim-bar-fill" style="width:91.7%; background:#1a7f37;"></div>
       </div>
@@ -628,7 +644,7 @@
     </div>
 
     <div class="dim-row">
-      <div class="dim-label">Character</div>
+      <div class="dim-label">Character<span class="dim-pct" title="Character: no percentile — this draft is outside the bounds of the hand-authored synthetic reference set (20 samples / 9–10 scenes / 256–337 words), so a rank against it would measure this draft&#39;s length, not its craft.">not comparable</span></div>
       <div class="dim-bar-track">
         <div class="dim-bar-fill" style="width:95.2%; background:#1a7f37;"></div>
       </div>
@@ -638,7 +654,7 @@
     </div>
 
     <div class="dim-row">
-      <div class="dim-label">Dialogue &amp; Voice</div>
+      <div class="dim-label">Dialogue &amp; Voice<span class="dim-pct" title="Dialogue &amp; Voice: no percentile — this draft is outside the bounds of the hand-authored synthetic reference set (20 samples / 9–10 scenes / 256–337 words), so a rank against it would measure this draft&#39;s length, not its craft.">not comparable</span></div>
       <div class="dim-bar-track">
         <div class="dim-bar-fill" style="width:98.5%; background:#1a7f37;"></div>
       </div>
@@ -648,7 +664,7 @@
     </div>
 
     <div class="dim-row">
-      <div class="dim-label">Plot Logic &amp; Payoff</div>
+      <div class="dim-label">Plot Logic &amp; Payoff<span class="dim-pct" title="Plot Logic &amp; Payoff: no percentile — this draft is outside the bounds of the hand-authored synthetic reference set (20 samples / 9–10 scenes / 256–337 words), so a rank against it would measure this draft&#39;s length, not its craft.">not comparable</span></div>
       <div class="dim-bar-track">
         <div class="dim-bar-fill" style="width:87.7%; background:#2f855a;"></div>
       </div>
@@ -658,7 +674,7 @@
     </div>
 
     <div class="dim-row">
-      <div class="dim-label">Theme &amp; Originality</div>
+      <div class="dim-label">Theme &amp; Originality<span class="dim-pct" title="Theme &amp; Originality: no percentile — this draft is outside the bounds of the hand-authored synthetic reference set (20 samples / 9–10 scenes / 256–337 words), so a rank against it would measure this draft&#39;s length, not its craft.">not comparable</span></div>
       <div class="dim-bar-track">
         <div class="dim-bar-fill" style="width:99.6%; background:#1a7f37;"></div>
       </div>
@@ -2717,12 +2733,12 @@
         <div><dt>Reference bounds</dt><dd><code>20 samples / 9–10 scenes / 256–337 words</code></dd></div>
         <div><dt>Logline</dt><dd><code>derived</code></dd></div>
         <div><dt>Page references</dt><dd><code>1 PROTAGONIST_PASSIVITY_CLIMAX#82581cda7f91871b p. 5; 2 NO_REVERSALS_LONG_STORY#9bed77ed917160b0 no page; 3 WEAK_MIDPOINT#db081ff82116ca78 p. 4</code></dd></div>
-        <div><dt>Engine commit</dt><dd><code>125170854b7eafbf01f73f6b2c9c14a845f3355a</code></dd></div>
+        <div><dt>Engine commit</dt><dd><code>00c94a9f667f83e2709e4afde1094e33268f408c</code></dd></div>
         <div><dt>Rulebook count</dt><dd><code>3217</code></dd></div>
       </dl>
       <div class="verify-scope">What is checked: every value listed above, recomputed from the script text you supply — including each finding’s page reference, re-resolved through the same paginator that lays out the PDF, and the counts and readings on the reader summary page. What is not checked: wording — the prose of this report, the finding descriptions, the logline’s text (only whether one was derived), the title and author, and the draft-rank line, all of which are supplied by whoever exported this report rather than derived by the engine.</div>
     </div>
-    <div class="footer-generated">Generated September 12, 2026 at 10:37:00 AM UTC</div>
+    <div class="footer-generated">Generated September 12, 2026 at 10:43:18 AM UTC</div>
   </footer>
   </div>
 </body>

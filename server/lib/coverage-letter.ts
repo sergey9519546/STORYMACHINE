@@ -111,6 +111,12 @@ import { orderedPriorities } from './priority-selection.ts';
 // those sections by name, and a hand-typed name is a reference that silently
 // stops resolving the next time that heading is reworded — which is the finding.
 import { REPORT_SECTION } from './report-sections.ts';
+// The DIMENSION percentile badges (2026-09-12, adversarial findings #4 and #14) —
+// the same three gated helpers the in-app panel and the exported coverage HTML
+// call. See src/lib/percentile-copy.ts's "DIMENSION percentile badges" section.
+import {
+  dimensionPercentileBadgeFor, dimensionPercentileCaptionFor,
+} from '../../src/lib/percentile-copy.ts';
 // ONE title and caption for the checks-that-found-nothing section, shared with
 // the exported coverage HTML (2026-09-11, discovery #8).
 import { STRENGTHS_SECTION_TITLE, STRENGTHS_SECTION_CAPTION } from './strengths-copy.ts';
@@ -232,6 +238,18 @@ interface LetterData {
   summary: string;
   excerptNote: string | null;
   strengths: string[];
+  /** The five craft dimensions, as `label — 92/100 — <badge>` lines, plus the
+   *  caption that says what the badge is ranked against.
+   *
+   *  2026-09-12 (adversarial findings #4 and #14). The letter stated dimension
+   *  READINGS in its Summary paragraph ("Theme & Originality is the
+   *  highest-scoring diagnostic dimension, at 100/100") and no dimension
+   *  percentile at all, while the in-app panel showed five badges and the
+   *  exported HTML showed none — three surfaces, one contentHash, three
+   *  different statements about the same five numbers. Empty (never a hollow
+   *  section) for a report carrying no dimensions. */
+  dimensions: ListEntry[];
+  dimensionsCaption: string | null;
   rootCauses: ListEntry[];
   priorities: ListEntry[];
   caveats: string[];
@@ -339,6 +357,27 @@ function buildPriorities(topPriorities: Array<RevisionIssue & { pass: PassName }
     return {
       heading: `${severityWord(issue.severity)} — ${issue.location}`,
       body: `${endWithPeriod(issue.description)}${fix}`,
+    };
+  });
+}
+
+/**
+ * The craft dimensions as letter list entries.
+ *
+ * `heading` is `label — 92/100`, `body` is the dimension's own one-sentence
+ * summary; the gated badge is appended to the heading when the report carries a
+ * percentile for that dimension, exactly as the exported coverage HTML appends
+ * it to the label. The score is rounded the same way both other surfaces round
+ * it (`Math.round`), so the three documents state the same integer.
+ */
+function buildDimensions(report: ScriptDoctorReport): ListEntry[] {
+  return (report.dimensions ?? []).map(dim => {
+    const badge = typeof dim.percentile === 'number'
+      ? ` — ${dimensionPercentileBadgeFor(dim.percentile, report.sceneCount, report.wordCount)}`
+      : '';
+    return {
+      heading: `${dim.label} — ${Math.round(dim.score)}/100${badge}`,
+      body: endWithPeriod(dim.summary),
     };
   });
 }
@@ -550,6 +589,13 @@ function buildLetterData(report: ScriptDoctorReport, opts: CoverageLetterOptions
     summary,
     excerptNote,
     strengths,
+    dimensions: buildDimensions(report),
+    // The caption renders only when at least one badge does — the same condition
+    // the coverage HTML uses — so the letter cannot state a rule about badges it
+    // did not print.
+    dimensionsCaption: (report.dimensions ?? []).some(d => typeof d.percentile === 'number')
+      ? dimensionPercentileCaptionFor(report.sceneCount, report.wordCount)
+      : null,
     rootCauses: buildRootCauses(report.rootCauses),
     priorities: buildPriorities(report.topPriorities),
     caveats: buildCaveats(report, opts),
@@ -595,6 +641,17 @@ function renderMarkdown(d: LetterData): string {
     lines.push(`*${STRENGTHS_SECTION_CAPTION}*`);
     lines.push('');
     for (const s of d.strengths) lines.push(`- ${s}`);
+  }
+
+  if (d.dimensions.length > 0) {
+    lines.push('');
+    lines.push(`## ${REPORT_SECTION.craftDimensions}`);
+    lines.push('');
+    if (d.dimensionsCaption) {
+      lines.push(`*${d.dimensionsCaption}*`);
+      lines.push('');
+    }
+    for (const dim of d.dimensions) lines.push(`- **${dim.heading}** — ${dim.body}`);
   }
 
   if (d.rootCauses.length > 0) {
@@ -662,6 +719,14 @@ function renderText(d: LetterData): string {
     lines.push('-'.repeat(STRENGTHS_SECTION_TITLE.length));
     lines.push(STRENGTHS_SECTION_CAPTION);
     for (const s of d.strengths) lines.push(`- ${s}`);
+  }
+
+  if (d.dimensions.length > 0) {
+    lines.push('');
+    lines.push(REPORT_SECTION.craftDimensions.toUpperCase());
+    lines.push('-'.repeat(REPORT_SECTION.craftDimensions.length));
+    if (d.dimensionsCaption) lines.push(d.dimensionsCaption);
+    for (const dim of d.dimensions) lines.push(`- ${dim.heading} — ${dim.body}`);
   }
 
   if (d.rootCauses.length > 0) {

@@ -280,6 +280,21 @@
        printable page sequence with no anchors to jump to, so a link affordance
        would promise navigation that does not exist on paper. */
     .xref { font-weight: 600; color: #3d3d3d; white-space: nowrap; }
+    /* ── Dimension percentile badges (2026-09-12, findings #4 and #14) ──
+       Beside the label, not beside the score: on a not-comparable draft the
+       badge reads "not comparable", which is a statement about the DIMENSION's
+       ranking rather than a second reading of the number — putting it next to
+       the 92/100 is what made the two look like two readings of one thing. */
+    .dim-pct {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #57606a;
+      margin-left: 8px;
+      white-space: nowrap;
+    }
+    .dim-pct-caption { font-size: 11px; color: #57606a; margin: 0 0 12px; }
     /* ── Priorities / appendix ── */
     .priority-list, .appendix-list {
       margin: 0;

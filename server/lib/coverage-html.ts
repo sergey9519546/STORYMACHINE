@@ -64,6 +64,13 @@ import { STRENGTHS_SECTION_TITLE, STRENGTHS_SECTION_CAPTION } from './strengths-
 // so the only occurrence of that phrase in a real export was the reference
 // pointing at it. See server/lib/report-sections.ts.
 import { REPORT_SECTION, sectionXrefHtml } from './report-sections.ts';
+// The DIMENSION percentile badges (2026-09-12, adversarial findings #4 and #14).
+// ONE gated, direction-safe implementation, shared with the in-app panel — see
+// src/lib/percentile-copy.ts's "DIMENSION percentile badges" section for both
+// defects (a gate that reached the headline and not the badges, and a band
+// vocabulary that read "TOP 80%" over a bottom-quintile dimension). The export
+// rendered NO badge at all, which is how the panel and the exported report of one
+// contentHash came to state different things about the same five numbers.
 // Shared percentile copy (2026-09-04 review — consolidates what used to be
 // four independent hand-copies of ordinal()/percentileBand() across the
 // panel, this file, SnapshotManager.tsx and SlatePanel.tsx into one
@@ -72,7 +79,10 @@ import { REPORT_SECTION, sectionXrefHtml } from './report-sections.ts';
 // server/routes/export.ts's imports of fountain.ts/fdx.ts/docx.ts — so this
 // is an established pattern, not a new one; it does not touch the scoring
 // path (no import edge to/from doctor.ts either direction).
-import { percentileSentenceFor, exactRankTooltipFor } from '../../src/lib/percentile-copy.ts';
+import {
+  percentileSentenceFor, exactRankTooltipFor,
+  dimensionPercentileBadgeFor, dimensionPercentileTooltipFor, dimensionPercentileCaptionFor,
+} from '../../src/lib/percentile-copy.ts';
 // Shared draft-rank copy (2026-09-05 migration — this file's buildDraftRankLine
 // was added by the cross-surface-parity lane BEFORE src/lib/draft-rank-copy.ts
 // existed (see that module's own header: the panel and the coverage LETTER
@@ -310,7 +320,30 @@ function buildHealthSection(report: ScriptDoctorReport, percentileLine: string, 
   </section>`;
 }
 
-function buildDimensionsSection(dimensions: DimensionScore[]): string {
+/**
+ * The Craft Dimensions block.
+ *
+ * 2026-09-12 (adversarial findings #4 and #14). This section rendered label /
+ * bar / score / summary / basis and NO percentile badge, while the in-app panel
+ * rendered five badges for the same five numbers — so the writer's screen and
+ * the producer's export of one contentHash said different things about the same
+ * report, and the finding's own reproduction ("TOP 10%" beside a dimension the
+ * headline called not comparable) was invisible in the document a producer
+ * actually receives.
+ *
+ * The badge, its tooltip and the section caption all come from
+ * src/lib/percentile-copy.ts's gated helpers — the same three functions the
+ * panel calls, with the same three arguments — so there is no second formatter
+ * to drift. Out of the reference set's bounds (which is every real draft: 0 of
+ * the 20 CC0 shorts are inside it) the badge reads "not comparable", the tooltip
+ * says why, and the caption stops promising a comparison the badges withhold.
+ *
+ * `sceneCount`/`wordCount` are the report's own, passed in because the
+ * comparability decision is about the DRAFT, not about a dimension.
+ */
+function buildDimensionsSection(
+  dimensions: DimensionScore[], sceneCount: number, wordCount: number,
+): string {
   if (dimensions.length === 0) {
     return `
   <section class="section">
@@ -331,9 +364,16 @@ function buildDimensionsSection(dimensions: DimensionScore[]): string {
     const passList = dim.passes.map(titleCase).join(', ');
     const basis = `Based on ${formatNumber(dim.issueCount)} issue${dim.issueCount === 1 ? '' : 's'} `
       + `across ${dim.passes.length} pass${dim.passes.length === 1 ? '' : 'es'} (${escapeHtml(passList)}).`;
+    // No badge at all when the report carries no percentile for this dimension
+    // (a report built without calibration data — types.ts marks the field
+    // optional). An absent statistic and a withheld one are different facts, and
+    // the withheld one is what "not comparable" says.
+    const badge = typeof dim.percentile === 'number'
+      ? `<span class="dim-pct" title="${escapeHtml(dimensionPercentileTooltipFor(dim.percentile, dim.label, sceneCount, wordCount))}">${escapeHtml(dimensionPercentileBadgeFor(dim.percentile, sceneCount, wordCount))}</span>`
+      : '';
     return `
     <div class="dim-row">
-      <div class="dim-label">${escapeHtml(dim.label)}</div>
+      <div class="dim-label">${escapeHtml(dim.label)}${badge}</div>
       <div class="dim-bar-track">
         <div class="dim-bar-fill" style="width:${width}%; background:${band.bg};"></div>
       </div>
@@ -343,9 +383,18 @@ function buildDimensionsSection(dimensions: DimensionScore[]): string {
     </div>`;
   }).join('\n');
 
+  // The caption renders whenever ANY dimension carries a percentile — the same
+  // condition the badges themselves render under, so the section cannot state a
+  // rule about badges that are not there.
+  const anyPercentile = dimensions.some(d => typeof d.percentile === 'number');
+  const caption = anyPercentile
+    ? `
+    <p class="dim-pct-caption">${escapeHtml(dimensionPercentileCaptionFor(sceneCount, wordCount))}</p>`
+    : '';
+
   return `
   <section class="section">
-    <h2>${escapeHtml(REPORT_SECTION.craftDimensions)}</h2>
+    <h2>${escapeHtml(REPORT_SECTION.craftDimensions)}</h2>${caption}
     <div class="dim-list">
       ${rows}
     </div>
@@ -1014,6 +1063,21 @@ const STYLES = `
        printable page sequence with no anchors to jump to, so a link affordance
        would promise navigation that does not exist on paper. */
     .xref { font-weight: 600; color: #3d3d3d; white-space: nowrap; }
+    /* ── Dimension percentile badges (2026-09-12, findings #4 and #14) ──
+       Beside the label, not beside the score: on a not-comparable draft the
+       badge reads "not comparable", which is a statement about the DIMENSION's
+       ranking rather than a second reading of the number — putting it next to
+       the 92/100 is what made the two look like two readings of one thing. */
+    .dim-pct {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #57606a;
+      margin-left: 8px;
+      white-space: nowrap;
+    }
+    .dim-pct-caption { font-size: 11px; color: #57606a; margin: 0 0 12px; }
     /* ── Priorities / appendix ── */
     .priority-list, .appendix-list {
       margin: 0;
@@ -1575,7 +1639,7 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
     buildHeaderSection(report, safeTitle, safeAuthor),
     readerTier,
     buildHealthSection(report, healthPercentileLine, draftRankLine),
-    buildDimensionsSection(dimensions),
+    buildDimensionsSection(dimensions, report.sceneCount, report.wordCount),
     buildStrengthsSection(strengths),
     buildGodmodeSection(report),
     buildHeatmapSection(report.sceneHeatmap ?? []),

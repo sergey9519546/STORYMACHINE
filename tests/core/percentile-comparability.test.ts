@@ -210,8 +210,23 @@ describe('the reference bounds are stated once per page, not twice', () => {
       const tierBlock = doc.slice(0, tierEnd);
       assert.equal(tierBlock.split(referenceBoundsLine()).length - 1, 1,
         `${label}: the tier states the bounds once`);
-      // Twice in the letter's PROSE: the tier, and the how-to-read caveat. The
-      // committed goldens carried it three times before the 2026-09-11 round.
+      // THREE times in the letter's PROSE, one per section that states a
+      // READING the bounds qualify, and no more:
+      //
+      //   1. the producer tier's percentile line
+      //   2. the Craft Dimensions caption (2026-09-12, adversarial findings #4
+      //      and #14) — five badges reading "not comparable" need the sentence
+      //      that says against what, beside them, and it is the SAME string from
+      //      src/lib/percentile-copy.ts's dimensionPercentileCaptionFor that the
+      //      exported HTML and the in-app panel print, not a third wording
+      //   3. the how-to-read caveat
+      //
+      // It was two until the letter carried no dimension section at all; the
+      // committed goldens carried it three times before the 2026-09-11 round,
+      // and THAT three was one section stating it twice, which is the defect
+      // this test exists for. The count is asserted exactly, and each occurrence
+      // is asserted to fall in a different section below, so a section that
+      // states it twice still fails here.
       //
       // 2026-09-12: the verify footer adds a third occurrence, and it is NOT a
       // third statement of the fact — it is the `Reference bounds:` CLAIM ROW
@@ -224,8 +239,22 @@ describe('the reference bounds are stated once per page, not twice', () => {
       assert.ok(footerStart > 0, `${label}: the letter must carry its verify footer`);
       const prose = doc.slice(0, footerStart);
       const footer = doc.slice(footerStart);
-      assert.equal(prose.split(referenceBoundsLine()).length - 1, 2,
-        `${label}: the letter's prose states the bounds exactly twice`);
+      assert.equal(prose.split(referenceBoundsLine()).length - 1, 3,
+        `${label}: the letter's prose states the bounds exactly three times`);
+      // One per section, never twice in one. Section boundaries are the three
+      // headings themselves, so this fails if any single section repeats it.
+      const dimsHeading = label === 'markdown' ? '\n## Craft Dimensions' : '\nCRAFT DIMENSIONS';
+      const howToHeading = label === 'markdown' ? '\n## How to Read This Report' : '\nHOW TO READ THIS REPORT';
+      const dimsAt = prose.indexOf(dimsHeading);
+      const howToAt = prose.indexOf(howToHeading);
+      assert.ok(dimsAt > 0 && howToAt > dimsAt, `${label}: expected both sections, in order`);
+      const sections = [
+        prose.slice(0, dimsAt), prose.slice(dimsAt, howToAt), prose.slice(howToAt),
+      ];
+      for (const [i, section] of sections.entries()) {
+        assert.equal(section.split(referenceBoundsLine()).length - 1, 1,
+          `${label}: section ${i} states the bounds exactly once`);
+      }
       assert.equal(footer.split(referenceBoundsLine()).length - 1, 1,
         `${label}: the verify block publishes the bounds exactly once, as a claim`);
       assert.match(footer, new RegExp(`^Reference bounds: ${referenceBoundsLine()}$`, 'm'),

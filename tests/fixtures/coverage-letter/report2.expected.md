@@ -38,6 +38,16 @@ CONSIDER — scored in the middle band, above the decline line but short of what
 
 - No fatal flaws surfaced across 6 scenes — nothing here would sink the draft outright.
 
+## Craft Dimensions
+
+*No percentile badges: this draft is outside the bounds of the hand-authored synthetic reference set (20 samples / 9–10 scenes / 256–337 words), the only set any percentile here is ranked against.*
+
+- **Structure & Pacing — 92/100 — not comparable** — Structure & Pacing is in good shape — a handful of minor notes, mostly around weak midpoint.
+- **Character — 95/100 — not comparable** — Character is in good shape — a handful of major notes, mostly around zero entropy scene.
+- **Dialogue & Voice — 99/100 — not comparable** — Dialogue & Voice is in good shape — a handful of minor notes, mostly around dialogue staccato overuse.
+- **Plot Logic & Payoff — 82/100 — not comparable** — Plot Logic & Payoff is in good shape — a handful of major notes, mostly around unmotivated decision.
+- **Theme & Originality — 100/100 — not comparable** — Theme & Originality is in good shape — a handful of minor notes, mostly around slug generic location.
+
 ## Root Causes
 
 1. **MAJOR — Widespread Structure & Pacing concerns** — 8 issues across 2 pass(es) in Structure & Pacing point to the same underlying problem, mostly around no reversals. Subsumes 8 issues.
