@@ -170,7 +170,7 @@ prose about the trap is not.
 | tree | result |
 |---|---|
 | tip, untouched | **12 pass / 0 fail** (3 suites) |
-| tip + the round-3 reviewer's plant in `verify-focus-traps.mjs`, and a hand-uppercased `textContent` poll in `verify-e5-command-palette.mjs` | **11 pass / 1 fail**, both named: `scripts/verify-focus-traps.mjs:409 — return /RECOMMEND\|CONSIDER\|PASS/.test(t); [`t` derives from an innerText read at line 408]` and `scripts/verify-e5-command-palette.mjs:232 — … [`up` derives from a textContent read uppercased by hand at line 230]` |
+| tip + the round-3 reviewer's plant in `verify-focus-traps.mjs`, and a hand-uppercased `textContent` poll in `verify-e5-command-palette.mjs` | **11 pass / 1 fail**, both named by file, line and origin — `verify-focus-traps.mjs:409` with "`t` derives from an innerText read at line 408", `verify-e5-command-palette.mjs:232` with "`up` derives from a textContent read uppercased by hand at line 230" |
 | **`main`'s own `scripts/`** + this scanner | **11 pass / 1 fail**, naming a REAL site: `scripts/verify-p2-p3-surfaces.mjs:808` |
 
 The third row is the one that matters: the new rule is not plant-only, it
