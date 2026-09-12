@@ -1191,3 +1191,118 @@ change. Keep `!== 503` — the exclusion itself is correct.
    finding 3's deeper half, `computeJumpSpan`'s missing caller, finding 4's
    ranking cause, `coverage-html.ts`'s unlabelled Graph Health block) is
    unchanged and still correctly named.
+
+---
+
+## Round 5 (follow-ups lane) — re-check of `5a95623c`
+
+**Reviewed object:** `5a95623c` — two commits (`8b9e5451` attribution,
+`5a95623c` the `limited > 0` condition) over the round-2 tip `da4a6539`, in
+`/home/user/wt-followups`. Same reviewer as Round 4, warm context; only my own
+two items were re-checked.
+**Method:** worktree driven read-only, `git status --porcelain` clean before and
+after. `ss` is not installed in this sandbox, so listening sockets were read
+from `/proc/net/tcp` before the run: **2024, 2025, 24678, 34877, 43229,
+45081** (two more than in Round 4 — other work on the box). `fuzz-routes.mjs`
+takes ephemeral ports from the OS, so no collision; nothing had to be killed and
+no process was killed. The only file written under `/home/user/STORYMACHINE` is
+this review.
+
+`git diff --stat da4a6539 5a95623c` → **one file**, `scripts/fuzz-routes.mjs`,
+**+37 / −19**. No test, no `src/`, no `server/`.
+
+### Item 1 (was blocking) — the 503 attribution · **closed at all three sites**
+
+| site | on `da4a6539` | on `5a95623c` |
+|---|---|---|
+| the comment justifying the exclusion (`:548-565`) | "`SessionCapacityError` … or the doctor-pool's … refusal (doctor-pool.ts)", then explained it as `MAX_SESSIONS` | names `DoctorAnalysisBudgetExceededError` (`state: 'queued'`, `server/lib/doctor-budget.ts`) as what this case observes, and says plainly that `SessionCapacityError` is a real 503 source elsewhere but cannot fire here |
+| the printed note (`:606`) | `${capacityRefused} refused on session capacity` | `${capacityRefused} refused by the doctor analysis budget (pool admission control)` |
+| the lane report | Round-2 paragraph left as written, superseded by a Round-3 correction section | same, per this file's own convention — Round 1's Item 1 carries an identical "**CORRECTED in round 2**" annotation (`followups-lane-report.md:66`), so the pattern is the repository's, not an invention |
+
+**The exclusion itself is byte-identical** — `git diff` shows
+`const crashedOutcomes = outcomes.filter(o => o.status === null || (o.status >= 500 && o.status !== 503));`
+as unchanged context at `:566`. Nothing was widened to close a documentation
+item. Both test files the new comment cites exist and cover what it says they
+cover: `tests/core/doctor-analysis-budget.test.ts` (the queued 503) and
+`tests/core/session-eviction.test.ts` (which imports `SessionCapacityError` and
+`MAX_SESSIONS` and sets `MAX_SESSIONS=3` to exercise the cap). No dangling
+pointer.
+
+The lane reproduced my body capture independently before editing anything —
+`{"200":90,"429":80,"503":30}`, 30 of 30 `DoctorAnalysisBudgetExceededError
+(queued)`, zero `SessionCapacityError` — which matches my Round-4 probe
+exactly, including the 92-second `Retry-After` sentence.
+
+### Item 2 (was non-blocking, built) — the condition now requires a 429
+
+`status: (succeeded > 0 && limited > 0) ? 'overflow-shed' : 'no-overflow-signal'`
+(`:603`). `capacityRefused` survives only in the printed note, as information.
+
+**Fuzzer, once, foreground, in `/home/user/wt-followups`** (`node
+scripts/fuzz-routes.mjs`, full mode, load 5.24/4 at start, 20.1 s wall):
+
+```
+Total requests: 197, flagged: 0        exit 0 — PASS
+[ok] ws-oversized-frame (10MB)     status=200 ms=97   — closed with code 1009
+[ok] ws-10000-message-burst        status=200 ms=1696 — connection survived burst
+  status breakdown: {"200":90,"429":81,"503":29}, wall=2380ms
+[ok] 200-concurrent-doctor-requests status=overflow-shed ms=0 — 90 succeeded,
+     81 rate-limited (gameLimiter), 29 refused by the doctor analysis budget
+     (pool admission control), wall=2380ms, on a fresh window, 0 crashed
+[ok] health-p95-during-200-concurrent-load status=200 ms=251
+```
+
+197 `[ok]` lines, **0** `status=429` lines anywhere in the probe stream. The
+breakdown `{"200":90,"429":81,"503":29}` is now identical across **five**
+independent runs (my two in Round 4, the lane's two, this one).
+
+**Fail-first, re-measured under the NEW condition** — the same mutation I used
+in Round 4 (the dedicated overflow server's `{ productionRateLimit: true }`
+opt-out removed), applied to a patched copy under `<session scratch>/fuzzY`,
+nothing in the worktree touched:
+
+| condition | breakdown | record | exit |
+|---|---|---|---|
+| `da4a6539` (`limited > 0 \|\| capacityRefused > 0`) | `{"200":90,"503":110}` — 0 429s | `[ok] status=overflow-shed` | **0 — PASS** (the hole) |
+| `5a95623c` (`limited > 0`) | `{"200":90,"503":110}` — 0 429s | `[UNEXPECTED-STATUS] status=no-overflow-signal` | **1 — FAIL** |
+
+That is the hole I measured in Round 4, closed, in the failure direction, with
+gameLimiter fully disengaged and the doctor budget's 503s no longer able to
+stand in for it.
+
+### Gates re-run by the reviewer on `5a95623c`
+
+| gate | command | result |
+|---|---|---|
+| fuzzer | `node scripts/fuzz-routes.mjs` (full) | **PASS, exit 0, 0 flagged, 197/197** |
+| touched-adjacent guard | `node --experimental-strip-types tests/core/rate-limit-verification-override.test.ts` | **14 pass / 0 fail** (its `bootServer(overflowPort, { productionRateLimit: true })` regex is unchanged by this diff and still matches) |
+| honesty audit | `node scripts/honesty-audit.mjs` | **0** — 461 files, 473 tracked markdown, 106 claims rows, clean |
+| no-console | `node scripts/check-no-console.mjs` | **0** — 305 files, 24 quarantine entries |
+| scoring receipt | `node scripts/check-scoring-receipt.mjs da4a6539..HEAD` | **0** — *"no scoring-path files changed"* |
+
+---
+
+## VERDICT: **MERGE**
+
+Both of my items are closed, each verified in the direction that matters: the
+attribution is corrected at all three sites with the crash-detector exclusion
+left byte-identical, and the strengthened condition now fails on the exact
+mutation that passed before it. Five runs of the fuzzer across three sessions
+agree to the request.
+
+### Non-blocking, one thing the new comment gets loosely
+
+`scripts/fuzz-routes.mjs:557` explains why `SessionCapacityError` cannot fire
+here as *"gameLimiter (120/min/IP) admits only ~90 of the 200 requests past the
+per-IP ceiling before the window is spent, well under MAX_SESSIONS=100"*. The
+conclusion is right and now measured twice, but that reasoning is doing more
+work than it can bear: gameLimiter admits ~119–120 per window, not ~90 — the 90
+is what the doctor pool goes on to SERVE, with 29 shed behind it — so the
+counting argument lands above the 100-session cap, not below it. There is a
+simpler and much stronger reason available: **`POST /api/scriptide/doctor`
+never creates a session at all.** `server/routes/scriptide.ts:483-484` states it
+on the route itself — *"Stateless by design: no sessionId, no
+getOrCreateSession/Stage — the doctor only needs the script text itself, so
+nothing here touches `sessions`"* — and the handler body repeats it at `:652`.
+`MAX_SESSIONS` cannot fire on this case for any admission count. One sentence,
+and it retires the arithmetic.
