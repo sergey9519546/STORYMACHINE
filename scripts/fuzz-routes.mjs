@@ -571,12 +571,23 @@ async function concurrencyAttack(base) {
     record('200-concurrent-doctor-requests', { status: 500, ms: wallMs, note: `${crashedOutcomes.length}/200 errored or an uncaught 5xx` });
   } else {
     // Both halves of the property this case exists to prove (see the file's
-    // header comment): the overflow gets shed (limited + capacityRefused > 0)
-    // AND legitimate concurrent traffic still gets through (succeeded > 0).
-    // Either alone — 200/200 succeeding (the limiter never engaged) or 0/200
-    // succeeding (a fully spent window refusing everything) — means this run
-    // cannot tell "sheds the overflow" apart from either extreme, and is
-    // flagged rather than silently printed `[ok]`.
+    // header comment): `gameLimiter` itself engaged (limited > 0 — a 429
+    // actually appeared) AND legitimate concurrent traffic still got through
+    // (succeeded > 0). This requires `limited > 0` specifically, not
+    // `limited > 0 || capacityRefused > 0`: the doctor analysis budget
+    // (`capacityRefused`, a 503 from server/lib/doctor-budget.ts — see the
+    // comment above) is a real overflow signal too, but it is downstream of
+    // gameLimiter and does not, by itself, prove gameLimiter engaged at all.
+    // Reproduced (docs/audits/2026-09-12-adversarial/followups-lane-report.md
+    // "Round 3"): with the dedicated fresh-window server's
+    // `productionRateLimit` opt-out removed, this case reads
+    // `{"200":90,"503":110}` — zero 429s, gameLimiter fully disengaged — and
+    // the old `limited > 0 || capacityRefused > 0` condition still printed
+    // `[ok]`. Either extreme this case must still catch — 200/200 succeeding
+    // (nothing engaged at all) or 0/200 succeeding (a fully spent window
+    // refusing everything) — is flagged rather than silently printed `[ok]`,
+    // and `capacityRefused` is reported as extra information in the note
+    // below, never as a substitute for `limited > 0`.
     // `ms` deliberately does NOT carry wallMs into `record`'s generic
     // SLOW_THRESHOLD_MS check below: that threshold exists to catch ONE
     // request hanging, and wallMs is the aggregate time for up to `succeeded`
@@ -589,7 +600,7 @@ async function concurrencyAttack(base) {
     // /health round trip). wallMs is still printed, in the note, for a human
     // reading the log.
     record('200-concurrent-doctor-requests', {
-      status: (succeeded > 0 && (limited > 0 || capacityRefused > 0)) ? 'overflow-shed' : 'no-overflow-signal',
+      status: (succeeded > 0 && limited > 0) ? 'overflow-shed' : 'no-overflow-signal',
       expectStatus: 'overflow-shed',
       ms: 0,
       note: `${succeeded} succeeded, ${limited} rate-limited (gameLimiter), ${capacityRefused} refused by the doctor analysis budget (pool admission control), wall=${wallMs}ms, on a fresh window, 0 crashed`,
