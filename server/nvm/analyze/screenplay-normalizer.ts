@@ -22,7 +22,7 @@
 // structural element until the next one. Wrapped fragments inside a block are
 // joined into flowing text.
 
-import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS, parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
+import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS, parseFountain, type FountainBlock, type FountainBlockType } from '../../../src/lib/fountain.ts';
 
 // Heading detection is kept BYTE-COMPATIBLE with src/lib/fountain.ts's
 // parseFountain (a scene_heading is `/^(INT|EXT|EST|I\/E)[. ]/i` OR any line
@@ -217,6 +217,142 @@ export function stripNonPrinting(text: string): string {
   return changed ? out.join('\n') : text;
 }
 
+// ── A MARKER IS NOT A WORD (2026-09-12, round 2) ───────────────────────────
+// Fountain's forced-element markers say what an element IS; they are never
+// printed. `parseFountain` reads them to TYPE a line and then leaves them in
+// the block's text, so the marker glues to the first word of the element and
+// reaches every rule lexicon, every word count and all fourteen revision
+// passes as prose. Measured on the 32 committed public scripts, applying each
+// marker where it is REDUNDANT — i.e. declaring the element the line already
+// parses as, so not one printed character changes:
+//
+//   forced-action `!` on every action line       32 of 32 moved, mean +1.056,
+//                                                largest +7.0, 1 verdict flip
+//   forced-heading `.` on every scene heading    32 of 32 moved, mean +0.659,
+//                                                largest +2.5
+//   forced-transition `>` on every transition    5 of 6 applicable moved,
+//                                                mean -4.080, largest -15.7
+//   forced-cue `@` on every character cue        32 of 32 moved, mean -1.172,
+//                                                largest -26.8  (NOT FIXED HERE —
+//                                                see below)
+//
+// `!` was the round-1 reviewer's own find and the reason this exists.
+//
+// WHAT THE STRIP MAY NOT DO. Removing a marker changes how the line re-parses,
+// and scene segmentation is the strongest signal the engine has — a `.`
+// silently dissolving a scene heading would be far worse than the leak. So the
+// marker is removed only when the resulting document still parses to the
+// element the marker DECLARED, and every unmarked line still parses to what it
+// parsed to before. Any marker that fails that test keeps its character, and
+// the leak with it; the alternative is a strip that can change the parse, and
+// there is no version of that which is safe. The check is a re-parse, so it is
+// exact rather than a heuristic about what "should" happen.
+//
+// THE FORCED CUE `@` IS DELIBERATELY NOT STRIPPED, AND IT IS THE BIGGEST OF
+// THE FOUR. This parser has never implemented `@` (src/lib/fountain.ts says so
+// and says why), so `@MARY` is action prose and so is every line of her speech
+// under it — measured above at 32 of 32 scripts and up to 26.8 points, more
+// than any other transform this branch has measured. Honouring it here would
+// be a PARSER FEATURE wearing a normaliser's clothes: unlike `!`, `.` and `>`,
+// stripping `@` changes the type of every line BELOW the cue (action becomes
+// dialogue), and the editor, the PDF, the FDX and the DOCX renderers would all
+// still print the `@` that the analysis had decided was invisible. It needs
+// the renderer work src/lib/fountain.ts names, measured as its own change. It
+// is asserted here as a KNOWN, QUANTIFIED gap rather than left to be found
+// again (tests/core/parse-format-invariance.test.ts).
+//
+// TWO MARKERS ARE DELIBERATELY ABSENT. The lyric `~` and the centered
+// `> ... <` have no line that already parses as `lyrics` or `centered`, so
+// removing their marker necessarily changes the element — there is no
+// redundant application and therefore no format-only transform to be invariant
+// under. Both block types are skipped by extractSceneContent, so neither
+// carries a word into the heuristics either way. Measured for the record:
+// wrapping every transition line as `> ... <` moves 5 of 6 applicable scripts
+// and a `~` on one dialogue line moves 8 of 32 — those are ELEMENT changes,
+// not formatting, and they are named as such in the invariance suite.
+interface ForcedMarker {
+  marker: string;
+  /** The block type(s) the marker declares its line to be. */
+  declares: FountainBlockType[];
+  test: (t: string) => boolean;
+  /** True when parseFountain already TYPES the line from this marker. When it
+   *  does not (`>`), the strip is what makes the declaration true, and the
+   *  re-parse check below is what makes that safe. */
+  parserTypes: boolean;
+}
+const FORCED_MARKERS: ForcedMarker[] = [
+  { marker: '!', declares: ['action'], test: (t) => t.startsWith('!'), parserTypes: true },
+  // `.` is a forced heading only when a NON-period follows it: `...` opening an
+  // action line is an ellipsis, and parseFountain already (separately) types it
+  // as a heading — that is a different defect and this must not touch it.
+  { marker: '.', declares: ['scene_heading'], test: (t) => /^\.[^.]/.test(t), parserTypes: true },
+  // `>` ending in `<` is centering, not a transition — excluded above. The
+  // parser has no forced-transition branch, so `>CUT TO:` arrives typed
+  // `action` and is scored as action prose, `>` and all; removing the marker
+  // hands the line to the transition branch that was always meant to have it,
+  // and changes no other line's type (nothing in parseFountain's state
+  // depends on a transition block).
+  { marker: '>', declares: ['transition'], test: (t) => t.startsWith('>') && !t.endsWith('<'), parserTypes: false },
+];
+const MARKER_SCAN_RE = /^[ \t]*[!.>]/m;
+
+/** Remove every forced-element marker whose removal leaves the document
+ *  parsing exactly as it did — see the block comment above for the rule, the
+ *  measurement and the two markers this deliberately does not touch. */
+export function stripForcedMarkers(text: string): string {
+  if (!text || !MARKER_SCAN_RE.test(text)) return text;
+  const lines = text.split('\n');
+  const original = typesByLine(text);
+
+  /** line index -> the block types its marker declares. */
+  const declared = new Map<number, FountainBlockType[]>();
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    for (const m of FORCED_MARKERS) {
+      if (!m.test(t)) continue;
+      // A marker the parser DOES type from is only a marker when the parser
+      // actually typed from it — otherwise the character is doing something
+      // else on that line and must not be touched.
+      if (m.parserTypes && !m.declares.includes(original[i])) break;
+      declared.set(i, m.declares);
+      break;
+    }
+  }
+  if (declared.size === 0) return text;
+
+  const allowed = new Set(declared.keys());
+  // Each round drops the markers that did not survive the re-parse. The set
+  // only ever shrinks, so this terminates; the cap is belt-and-braces against
+  // a future parser rule that makes the fixpoint oscillate.
+  for (let round = 0; round < 5 && allowed.size > 0; round++) {
+    const candidate = lines.map((l, i) => (allowed.has(i) ? l.replace(/^([ \t]*)./, '$1') : l)).join('\n');
+    const got = typesByLine(candidate);
+    const reject = new Set<number>();
+    for (let i = 0; i < lines.length; i++) {
+      if (allowed.has(i)) {
+        if (!declared.get(i)!.includes(got[i])) reject.add(i);
+      } else if (got[i] !== original[i]) {
+        // An unmarked line changed type, which means a marker earlier in the
+        // document moved a block boundary. Blame the nearest allowed marker at
+        // or above it; if there is none, the document is not strippable.
+        let blame = -1;
+        for (let j = i; j >= 0; j--) if (allowed.has(j)) { blame = j; break; }
+        if (blame < 0) return text;
+        reject.add(blame);
+      }
+    }
+    if (reject.size === 0) return candidate;
+    for (const i of reject) allowed.delete(i);
+  }
+  return text;
+}
+
+function typesByLine(text: string): FountainBlockType[] {
+  const out: FountainBlockType[] = [];
+  for (const b of parseFountain(text)) out[b.lineNumber - 1] = b.type;
+  return out;
+}
+
 // ── A TITLE PAGE IS METADATA, NOT PROSE (2026-09-12, finding 5) ────────────
 // Every real draft opens with `Title:` / `Credit:` / `Author:` / `Draft date:`.
 // `segmentScenes` prepends everything before the first heading into scene one's
@@ -393,7 +529,10 @@ function normalizeScreenplayUncached(raw: string): string {
   // the two must agree. Blanking boneyard lines adds blank lines, which would
   // move the decision if it were taken after.
   const allLines = raw.replace(/\r\n?/g, '\n').split('\n').map(l => l.replace(/\s+$/, ''));
-  const cleaned = stripNonPrinting(foldTypography(raw));
+  // fold typography -> drop what is never printed -> drop the markers that say
+  // what an element IS. The marker strip runs LAST of the three because it
+  // decides what to remove from the block types the two before it produce.
+  const cleaned = stripForcedMarkers(stripNonPrinting(foldTypography(raw)));
   // Preserve a title page verbatim if present (key: value lines before first blank/heading).
   // Clean input still gets the dialogue join: a wrapped speech is one element.
   if (!isDoubleSpaced(allLines)) return joinWrappedDialogue(cleaned); // structurally idempotent on clean input

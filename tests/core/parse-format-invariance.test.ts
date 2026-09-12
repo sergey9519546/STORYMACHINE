@@ -197,6 +197,24 @@ describe('the parser reads a wrapped speech as dialogue, not as action prose', (
   });
 });
 
+/** Prefix a Fountain forced-element marker to every line the repository's own
+ *  parser ALREADY types as that element. The marker is therefore REDUNDANT: it
+ *  declares what the line already is, so not one printed character changes and
+ *  no element changes — which is exactly what makes it a format transform and
+ *  not a writing one. (A `~` lyric or a `> ... <` centering has no redundant
+ *  application: no line in any of these scripts parses as `lyrics` or
+ *  `centered`, so adding those markers necessarily changes the element. They
+ *  are measured in the lane report and deliberately NOT claimed here.) */
+function redundantMarker(type: string, mark: string): (t: string) => string {
+  return (t) => {
+    const typeByLine = new Map<number, string>();
+    for (const b of parseFountain(t)) typeByLine.set(b.lineNumber, b.type);
+    return t.split('\n')
+      .map((l, i) => (typeByLine.get(i + 1) === type && l.trim() !== '' ? `${mark}${l.trim()}` : l))
+      .join('\n');
+  };
+}
+
 /** The transforms that change FORMAT and not one printed word. Each is the
  *  thing a real writer's real tools do to a real file. */
 const FORMAT_TRANSFORMS: Array<[string, (t: string) => string, string]> = [
@@ -224,9 +242,26 @@ const FORMAT_TRANSFORMS: Array<[string, (t: string) => string, string]> = [
   ['a section heading', (t) => `${t}\n\n# ACT THREE\n`, 'the fourth.'],
   ['CRLF line endings', (t) => t.replace(/\n/g, '\r\n'), 'already invariant before this work; asserted so it stays that way.'],
   ['a byte-order mark', (t) => `\uFEFF${t}`, 'already invariant before this work; asserted so it stays that way.'],
+
+  // ── The forced-element markers (round 2 of the adversarial review) ───────
+  // Fountain's markers say what an element IS and are never printed.
+  // parseFountain reads them to type a line and then leaves them in the
+  // block's text, so the marker glued to the first word of the element and
+  // reached every lexicon, the word count and all fourteen passes as prose.
+  ['a redundant forced-action `!` on every action line', redundantMarker('action', '!'),
+    "the round-1 reviewer's own find, and the largest of the three this branch closes: 32 of 32 scripts "
+    + 'moved at 85273742, mean +1.056, largest +7.0 on room-12, and transfer-window was PROMOTED '
+    + 'PASS -> CONSIDER by a marker that prints nothing.'],
+  ['a redundant forced-heading `.` on every scene heading', redundantMarker('scene_heading', '.'),
+    'same family. 32 of 32 moved at 85273742, mean +0.659, largest +2.5 on the-key-under-the-mat. Several '
+    + "scripts in the private corpus mark scenes this way (the normalizer's own header names Ratatouille, "
+    + 'Coco and Up), so this is not a synthetic shape.'],
+  ['a redundant forced-transition `>` on every transition line', redundantMarker('transition', '>'),
+    'the parser has no forced-transition branch at all, so `>CUT TO:` was scored as an ACTION LINE, `>` and '
+    + 'all. 5 of the 6 applicable scripts moved at 85273742, mean -4.080, largest -15.7 on room-12.'],
 ];
 
-describe('format is not writing: eleven transforms, 32 scripts, exact equality (findings 5 and 13)', () => {
+describe('format is not writing: fourteen transforms, 32 scripts, exact equality (findings 5 and 13, and round 2)', () => {
   for (const [label, fn, why] of FORMAT_TRANSFORMS) {
     it(`${label} does not move any of the 32 scripts`, async () => {
       const moved: string[] = [];
@@ -277,5 +312,41 @@ describe('the harness still separates writing from formatting (the both-directio
     }
     assert.equal(moved, FILES.length, `only ${moved} of ${FILES.length} scripts moved under dialogue flattening — `
       + 'the invariance assertions above are worthless if the analyzer cannot tell writing apart at all');
+  });
+});
+
+// ── THE MARKER THIS BRANCH DOES NOT CLOSE, PINNED WITH ITS SIZE ────────────
+// `@` is Fountain's forced character cue. src/lib/fountain.ts has never
+// implemented it, so `@MARY` is action prose and so is every line of the
+// speech beneath her. Honouring it is a PARSER FEATURE, not a normalisation:
+// unlike `!`, `.` and `>`, stripping `@` changes the type of every line BELOW
+// the cue, and the editor, PDF, FDX and DOCX renderers would all still print
+// the marker the analysis had decided was invisible.
+//
+// It is asserted here with its measured size so it cannot be rediscovered as
+// news, and so that the day someone DOES implement it this test goes red and
+// says where the row belongs.
+describe('the forced cue `@` is a known, quantified gap (round 2)', () => {
+  it('still moves every one of the 32 scripts, because the parser does not implement it', async () => {
+    const apply = redundantMarker('character', '@');
+    let moved = 0;
+    let applicable = 0;
+    for (const f of FILES) {
+      const src = read(f);
+      const marked = apply(src);
+      if (marked === src) continue;
+      applicable++;
+      const got = await runScriptDoctor(marked);
+      if (JSON.stringify(surface(got)) !== JSON.stringify(surface(baseline.get(f)!))) moved++;
+    }
+    assert.equal(applicable, FILES.length, 'every script must carry at least one character cue');
+    assert.equal(
+      moved, FILES.length,
+      `${moved} of ${FILES.length} scripts moved under a redundant forced cue "@". This is a PINNED KNOWN GAP, `
+      + 'not a tolerance: at 85273742 it was 32 of 32, mean -1.172, largest -26.8 on room-12 — the largest '
+      + 'format sensitivity this branch has measured. If this number has FALLEN, the parser has learned `@` '
+      + '(or something has changed the corpus): move this row into FORMAT_TRANSFORMS as an invariance '
+      + 'assertion, check that every renderer strips the marker too, and delete this test. Do not relax it.',
+    );
   });
 });

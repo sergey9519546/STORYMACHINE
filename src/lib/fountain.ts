@@ -125,7 +125,10 @@ const SCENE_HEADING_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT
 // `~`, and a recognised INT./EXT. scene heading. A `>` transition does NOT
 // break out — `>` is legal inside a speech in no sense, but `>text<` centering
 // is, and the pre-existing transition branch only matched the four fixed
-// strings anyway. Each escape is asserted in tests/core/fountain-dialogue-block.test.ts.
+// strings anyway. Each escape is asserted in tests/core/parse-format-invariance.test.ts
+// ("the four escapes still break out of a dialogue block"). This line named
+// tests/core/fountain-dialogue-block.test.ts until 2026-09-12 round 2; no such
+// file has ever existed, and npm run check-docs does not read comment prose.
 export function parseFountain(text: string): FountainBlock[] {
   const lines = text.split('\n');
   const blocks: FountainBlock[] = [];
