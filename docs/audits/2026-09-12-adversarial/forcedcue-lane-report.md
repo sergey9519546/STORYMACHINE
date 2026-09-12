@@ -2,7 +2,7 @@
 
 **Worktree:** `/home/user/wt-forcedcue`
 **Branch:** `scoring/forced-cue`, pushed to origin after every commit.
-**Tip:** `ca8de756`
+**Tip:** `b3b37277`
 **Base:** `3124a94e` — `origin/scoring/adversarial-2026-09-12` at the moment
 this lane was cut.
 **Answers:** the scoring lane's round-2 residual (`scoring-lane-report.md`
@@ -18,6 +18,7 @@ This is scoring-path work. It is **not merged here** and waits for the owner's
 anywhere in this report, in the receipt, or in any file on this branch.
 
 ```
+b3b37277 fix(guard): the shape guard learns the forced cue too — ROUND 9 of a pattern with eight prior rounds
 ca8de756 docs(receipt): row 11 and the one column the owner reads for it
 c72ea5a8 test(fountain): the round-2 `@` pin flips — it asserted 32 of 32, it asserts 0 of 32
 ddc9e3bf feat(imports): a Final Draft character whose name is not a Fountain cue comes back as a cue
@@ -228,6 +229,66 @@ mistaken for a test that cannot fail.
 
 ---
 
+## 5b. What the full suite found: the guard did not know about `@` either
+
+The first full `npm test` of this lane failed — **4 failures**, all in
+`tests/routes/fountain-shape-guard-cue-bypass.test.ts`, green on the base
+export. It is the most useful thing that happened in this lane, so it is
+written up rather than quietly fixed.
+
+`server/lib/validation.ts` carries a cheap, pre-parse cost guard whose job is
+to reject a pathological payload BEFORE anything parses it. Its line-shape
+predicate, `isCueLikeLine`, is documented as "a PROVABLE superset of every cue
+test this repository runs downstream" and is the union of three predicates.
+Eight review rounds are recorded above it, each one a reviewer finding one more
+shape a downstream consumer treated as a cue and the guard did not.
+
+**This was the ninth, and the first to arrive with a parser change rather than
+with a review.** All three disjuncts start at a cased-script capital — which
+is exactly what the forced cue exists to escape — so all three returned false
+on `@NAME` while `parseFountain` made a character block out of it. Measured on
+the shape the round-5/6 tests already use (distinct=600, occurrences=12,000,
+each cue adjacent to its speech), at `ca8de756` against this tip:
+
+| | at `ca8de756` (parser taught, guard not) | at `b3b37277` |
+|---|---|---|
+| `guardCueOccurrences` | **0** | **12,000** |
+| pipeline character blocks (`parseFountain(normalizeScreenplay(text))`) | 12,000 | 12,000 |
+| the round-8 oracle, `guard >= pipeline` | **FALSE** — the unsafe direction | TRUE |
+| rejected by | `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`, which runs a **real parse** | `MAX_FOUNTAIN_FREQUENT_CUE_LINES`, the cheap pre-parse bound |
+
+Writing one character in front of each cue turned the cheap bound off. On the
+unchanged base (`3124a94e`) the same payload is accepted and costs nothing,
+because `@` made no cues there either — so this is a hole the parser change
+opened, not one it revealed.
+
+`isCueLikeLine` gains a fourth disjunct, deliberately the widest of the four:
+any trimmed line starting with the marker and carrying a non-empty body, which
+is what `parseFountain` requires before the structural checks it shares with an
+unforced cue. Over-counting is this guard's safe direction and always has been.
+
+The second fix came out of the same failure. `formatCharacter` tested a Final
+Draft Character paragraph's WHOLE text against `CHARACTER_CUE_RE`, so a
+paragraph holding embedded newlines — which real Final Draft never writes and a
+hand-built `.fdx` can — failed the test and took a marker declaring the whole
+blob a cue. It is now left exactly as the importer has always emitted it.
+
+**Fail-first for both**, on a `git archive ca8de756` export:
+`tests/routes/fountain-shape-guard-cue-bypass.test.ts` ROUND 9 fails (and the
+4 pre-existing `.fdx` failures with it), `tests/security/fountain-shape-guard-cue-parity.test.ts`
+ROUND 9 fails; both green here (59 and 653 passing). One caveat recorded so the
+next reader does not misread it: four OTHER suites in the parity file fail on
+ANY `git archive` export, including the pristine `3124a94e` one, because
+`trackedFountainFiles()` shells out to `git ls-files` and an export has no
+`.git`. That is a harness artifact of the fail-first method, not a regression;
+in the worktree the file is 653 of 653.
+
+The route test asserts the BOUND BY NAME, not just the 400 — at `ca8de756` the
+payload was still rejected, by the expensive bound, so a test asserting only
+the status would have passed on the unfixed guard.
+
+---
+
 ## 6. Every cost
 
 1. **A draft that forces its cues gains characters and dialogue.** That is the
@@ -258,7 +319,14 @@ mistaken for a test that cannot fail.
    2162 / 2157 / 2235 ms with the column against 2191 / 2146 / 2122 ms with
    the call replaced by a constant — inside the run-to-run noise, because each
    row already pays two full analyses.
-6. **What this lane did NOT fix, with its size.** `>` forced transitions are
+6. **The cost guard now over-counts every line starting with `@`.** That is
+   the safe direction by the guard's own stated design, and the widening is
+   bounded to lines whose body is non-empty — but a draft whose DIALOGUE
+   repeatedly opens with a handle now contributes to a cue-count bound it did
+   not before. The thresholds are in the hundreds of distinct lines and
+   thousands of occurrences, and the other direction is asserted (an ordinary
+   30-speech forced-cue draft is accepted).
+7. **What this lane did NOT fix, with its size.** `>` forced transitions are
    stripped at the ANALYSIS seam (round 2) but not by the renderers: the
    parser has no forced-transition branch, so `>CUT TO:` arrives typed
    `action` and the exporters print it `>` and all, as an Action element.
@@ -305,6 +373,8 @@ says in words when a whole group is zero. On the 32 committed scripts it reads
 | | `… tests/core/core-02.test.ts` (427 pass, covers `harvestCueNames`) | 0 |
 | | `… tests/core/pure-core-boundary.test.ts` (6 pass) | 0 |
 | | the six together, one run: 202 pass, 0 fail | 0 |
+| | `… tests/routes/fountain-shape-guard-cue-bypass.test.ts` (59 pass, was 4 failing) | 0 |
+| | `… tests/security/fountain-shape-guard-cue-parity.test.ts` (653 pass) | 0 |
 | lint | `npx tsc --noEmit` | 0 |
 | console | `node scripts/check-no-console.mjs` — 304 files, 23 quarantine entries | 0 |
 | docs | `npm run check-docs` | 0 |
@@ -336,7 +406,7 @@ SUBDIRECTORY precisely so the harness's fixed set of 45 does not become 46.
 
 ## 9. What is left undone
 
-* The `>` renderer leak in §6.6 — named with its mechanism, not fixed.
+* The `>` renderer leak in §6.7 — named with its mechanism, not fixed.
 * The private corpus cannot be read from here, so how many of the 761 drafts
   carry a forced cue is unknown. The `@cue` column is the instrument that
   answers it in one run; this lane provides the instrument and claims no
