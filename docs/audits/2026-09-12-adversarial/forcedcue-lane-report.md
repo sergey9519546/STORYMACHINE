@@ -2,7 +2,7 @@
 
 **Worktree:** `/home/user/wt-forcedcue`
 **Branch:** `scoring/forced-cue`, pushed to origin after every commit.
-**Tip:** `b3b37277`
+**Tip:** `703903d9`
 **Base:** `3124a94e` — `origin/scoring/adversarial-2026-09-12` at the moment
 this lane was cut.
 **Answers:** the scoring lane's round-2 residual (`scoring-lane-report.md`
@@ -18,6 +18,8 @@ This is scoring-path work. It is **not merged here** and waits for the owner's
 anywhere in this report, in the receipt, or in any file on this branch.
 
 ```
+703903d9 fix(test): the ROUND 9 oracle names the bound it actually trips
+4abd675f docs(audit): the forced-cue lane report, and receipt row 12 for what the full suite found
 b3b37277 fix(guard): the shape guard learns the forced cue too — ROUND 9 of a pattern with eight prior rounds
 ca8de756 docs(receipt): row 11 and the one column the owner reads for it
 c72ea5a8 test(fountain): the round-2 `@` pin flips — it asserted 32 of 32, it asserts 0 of 32
@@ -287,6 +289,17 @@ The route test asserts the BOUND BY NAME, not just the 400 — at `ca8de756` the
 payload was still rejected, by the expensive bound, so a test asserting only
 the status would have passed on the unfixed guard.
 
+**And one mistake of my own, recorded because it is the same mistake in
+miniature.** The parity oracle's rejection assertion was written against a
+literal, passed, and was then "made robust" by swapping in this file's
+`REJECTION_RE` without re-running the file. `REJECTION_RE` is built from
+`MAX_FOUNTAIN_DISTINCT_CUE_LINES` (1500); this payload trips
+`MAX_FOUNTAIN_FREQUENT_CUE_LINES` (50 lines occurring more than 15 times).
+For one commit the assertion named the wrong bound and could not have caught
+the regression it exists for. The final `npm test` found it; `703903d9` builds
+it from the two constants it actually means, with a comment saying which bound
+is which.
+
 ---
 
 ## 6. Every cost
@@ -386,7 +399,7 @@ says in words when a whole group is zero. On the 32 committed scripts it reads
 | reachability | `node scripts/verify-server-reachability.mjs` | 0 |
 | receipt | `node scripts/check-scoring-receipt.mjs 78ec4464..HEAD` — 1, naming the single PENDING entry (intended) | 1 |
 | identity | `check-doctor-output-identity.mjs --tree <3124a94e export> / --tree . / --compare`, `GIT_SHA=identity` on both | 0 |
-| full suite | `npm test`, once, on the final tree | see below |
+| full suite | `npm test`, once, on the final tree — **13,325 pass, 0 fail, 91 skipped, 5 todo** (2356 suites, 238 s) | 0 |
 
 **Output identity: PASS — all 45 reports byte-identical** (`analyzedAt`
 excluded), with `GIT_SHA` pinned equal on both trees. **0 of 45 fixtures
@@ -419,15 +432,16 @@ SUBDIRECTORY precisely so the harness's fixed set of 45 does not become 46.
 
 ```
 $ git ls-remote origin scoring/forced-cue scoring/adversarial-2026-09-12 main
-0ecc8aea84a668c9279c5ffe46fd3c3c7dc26c2b	refs/heads/main
+3f4a68725edae64861ac5fececd97c86798e1b42	refs/heads/main
 4cf5b2f3c3bb61dafdb5afc2ac59a2c0ad674db0	refs/heads/scoring/adversarial-2026-09-12
-ca8de756b5efdb16b3c7990775ba2bb832c25583	refs/heads/scoring/forced-cue
+703903d9af070c11d6d3745963f4793cb4f41ff5	refs/heads/scoring/forced-cue
 ```
 
-`refs/heads/scoring/forced-cue` is at this lane's tip, `ca8de756`. Two notes
+`refs/heads/scoring/forced-cue` is at this lane's tip, `703903d9`. Two notes
 for the orchestrator: `origin/scoring/adversarial-2026-09-12` has moved since
-this lane was cut (`3124a94e` → `4cf5b2f3`), and `main` has moved too
-(`251e0840` → `0ecc8aea`), so this branch needs a rebase and a re-run of the
+this lane was cut (`3124a94e` → `4cf5b2f3`), and `main` has moved twice during
+this lane (`251e0840` → `0ecc8aea` → `3f4a6872`), so this branch needs a
+rebase and a re-run of the
 identity harness and the benchmark against whichever tree it is merged into —
 the harness's own header says the baseline must be the branch being merged
 INTO, not the commit branched FROM.
