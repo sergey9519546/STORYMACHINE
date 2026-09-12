@@ -442,7 +442,7 @@ purpose — the instrument for it is the P1 benchmark).
 | gate | result |
 |---|---|
 | `npm run lint` | **0** |
-| `check-no-console` | OK — 304 files, 23 quarantine entries |
+| `check-no-console` | OK — 304 files, **24** quarantine entries *(corrected in round 3: `tsconfig.json`'s `exclude` array is 24 entries and the gate prints how many it applied; it is 24 on every tree in this batch and byte-unchanged since `1e8241f5`, so 23 was a transcription error, not a widened exemption)* |
 | `npm run check-docs` | clean |
 | `npm run honesty-audit` | clean — 458 files, **474** markdown files, 93 claims rows *(round 2; round 1 recorded 470 and the reviewer measured 472 — the count drifts with every markdown file the batch adds, and this branch added two by bringing this report and its review onto it)* |
 | `npm run check-brain` | fresh — 104 notes, 386 links |
@@ -754,7 +754,7 @@ rather than relax it.
 | gate | result |
 |---|---|
 | `npm run lint` | **EXIT=0** |
-| `npm run check-no-console` | OK — 304 files, 23 quarantine entries |
+| `npm run check-no-console` | OK — 304 files, **24** quarantine entries *(corrected in round 3; see §7)* |
 | `npm run check-server-reachability` | OK |
 | `npm run build` | **EXIT=0**, 2.48 s |
 | `npm run check-docs` | clean |
