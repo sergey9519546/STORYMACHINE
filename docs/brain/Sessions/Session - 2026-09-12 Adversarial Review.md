@@ -42,8 +42,10 @@ independently before merge and none passing on its first pass.
 3124a94e after three review rounds, with `npm run probe-corpus-shape` as the
 owner's first instruction; `scoring/forced-cue` stacked on it.
 
-**Still open:** `lane/p0-flow-race` (REVISE round 1: the regression detector
-is 4 of 6, not deterministic).
+- `p0-flow-race` — the smoke gate's earliest-instant race was a gate race,
+  not a product defect; both windows (MOUNT, IN FLIGHT) are now pinned rather
+  than trusted, and the regressed tree is caught 6 of 6
+  (`docs/audits/2026-09-12-adversarial/p0flow-lane-report.md`).
 
 **What the process learned:** a claims-register row collision between two
 MERGE-reviewed lanes, fixed by renumbering at merge and a citation test that

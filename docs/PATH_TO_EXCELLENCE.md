@@ -119,13 +119,19 @@ implied or projected anywhere. Stacked on it, `scoring/forced-cue` (in
 flight) honours Fountain's `@` marker, the largest remaining format
 sensitivity (32 of 32 public scripts, up to −26.8).
 
-**Still open in this batch:** `lane/p0-flow-race` — the smoke gate's
-earliest-instant race, shown by a reviewer to fail 3 of 8 runs on main
-itself, was a gate race and not a product defect (the built-in sample's
-doctor POST answers in 0–49 ms, so the "earliest instant" landed after the
-run as often as before it); the lane holds the run in flight rather than
-trusting it to be, and its review returned REVISE because the regression
-detector caught the removed clause 4 of 6 times, not deterministically.
+**The seventh lane landed last:** `lane/p0-flow-race` (9816ffe0, REVISE 3 →
+MERGE) — the smoke gate's earliest-instant race, shown by a reviewer to fail
+3 of 8 runs on main itself, was a gate race and not a product defect: the
+built-in sample's doctor POST answers in 0–49 ms, so the "earliest instant"
+landed after the run as often as before it, and the gate misread a warm
+report as a cold panel. The gate now holds the lazy chunk at MOUNT and the
+run at IN FLIGHT, so both windows are pinned rather than trusted; the review
+returned REVISE because the regression detector caught the removed clause 4
+of 6 times, and the pinned version catches it 6 of 6 at MOUNT with the
+original cold panel reproduced on purpose. A deny-by-default scanner stops
+the next hand-rolled hold. One lesson from its merge: the lane was gated on
+a base that predated the exports merge, so the full suite and the battery
+were run again on merged main before the record was closed.
 
 **What the process learned, all recorded:** two lanes numbered their claims
 register rows from the same base and both were reviewed MERGE, so for a day
