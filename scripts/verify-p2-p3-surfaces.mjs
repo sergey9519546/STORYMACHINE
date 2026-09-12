@@ -203,6 +203,14 @@ const BASE = `http://127.0.0.1:${ISOLATED_PORT}`;
 let serverProc = null;
 let browser = null;
 let timing = null; // set at the top of main() — see scripts/lib/browser-verify.mjs
+// NOTE (2026-09-12): `page.waitForFunction(fn, arg, options)` takes its options
+// THIRD. Every call in this file passed `{ timeout }` in the ARG position, so
+// six waits that read as 30 s / 120 s / 180 s budgets all ran on Playwright's
+// 30 s default — which is why the feature-length "coverage completes on a
+// 231-scene draft" wait (~a 2-3 minute analysis under load) failed as
+// `Timeout 30000ms exceeded` in 2 of 6 runs of this suite while passing in the
+// other 4. Every call now passes `undefined` as the arg, so the budget written
+// beside it is the budget that applies.
 const genuineConsoleErrors = [];
 
 // { phase, assertion, pass, detail }
@@ -1227,6 +1235,7 @@ async function main() {
         return !t.includes('The sample is not ranked against your drafts')
           && /Rank among your drafts|First saved draft/.test(t);
       },
+      undefined,
       { timeout: timing.ms(120000) },
     )
     .then(() => true)
@@ -2027,7 +2036,7 @@ async function main() {
 
   await pageB.getByRole('button', { name: /try sample coverage/i }).first().click({ timeout: timing.ms(15000) });
   const verdictRenderedB = await pageB
-    .waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), { timeout: timing.ms(30000) })
+    .waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText), undefined, { timeout: timing.ms(30000) })
     .then(() => true)
     .catch(() => false);
   record('P2-generative', 'Sample coverage still produces a verdict with Labs ON', verdictRenderedB, '');
@@ -2279,7 +2288,7 @@ async function main() {
 
   await pageE.getByRole('button', { name: /^COVERAGE$/i }).first().click();
   await pageE.getByRole('button', { name: /run coverage/i }).first().click({ timeout: timing.ms(20000) });
-  await pageE.waitForFunction(() => /HEALTH/.test(document.body.innerText), { timeout: timing.ms(120000) });
+  await pageE.waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(120000) });
   await pageE.waitForTimeout(timing.ms(800));
   const healthBefore = await pageE.evaluate(() => {
     const m = document.body.innerText.match(/Health\s+([\d.]+)/i);
@@ -2329,6 +2338,7 @@ async function main() {
     await pageE
       .waitForFunction(
         () => !/Re-running coverage/i.test(document.body.innerText) && /HEALTH/.test(document.body.innerText),
+        undefined,
         { timeout: timing.ms(120000) },
       )
       .catch(() => {});
@@ -2471,7 +2481,7 @@ async function main() {
   // (server/routes/scriptide.ts) tests each line TRIMMED, and
   // `normalizeScreenplay` re-spaces blocks without ever inventing a slugline — so
   // from THIS state the repair can honestly only report that it did not help, and
-  // the actionable sentence ("Add one, such as INT. KITCHEN - DAY") is the outcome
+  // the one instruction that would fix it ("Add one, such as INT. KITCHEN - DAY") is the outcome
   // that matters. A double-spaced paste that DOES carry sluglines never reaches
   // this card at all: the route recognises it and the doctor analyses it. That
   // complementary claim is asserted in
@@ -2549,7 +2559,7 @@ async function main() {
 
   await pageC.getByRole('button', { name: /^COVERAGE$/i }).first().click();
   await pageC.getByRole('button', { name: /run coverage/i }).first().click({ timeout: timing.ms(20000) });
-  await pageC.waitForFunction(() => /HEALTH/.test(document.body.innerText), { timeout: timing.ms(180000) });
+  await pageC.waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(180000) });
   await pageC.waitForTimeout(timing.ms(1500));
   record(
     'P2-featurelen',
@@ -2660,7 +2670,7 @@ async function main() {
   await pageD.waitForTimeout(timing.ms(2500));
   await pageD.getByRole('button', { name: /^COVERAGE$/i }).first().click();
   await pageD.getByRole('button', { name: /run coverage/i }).first().click({ timeout: timing.ms(20000) });
-  await pageD.waitForFunction(() => /HEALTH/.test(document.body.innerText), { timeout: timing.ms(180000) });
+  await pageD.waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(180000) });
   await pageD.waitForTimeout(timing.ms(1500));
 
   // ── Finding #5 (2026-09-12): the COMPACT card's "next fix" must not invent

@@ -80,7 +80,7 @@ it is on the scoring path) and re-submits it through the same `run()`, with
 describe different bytes. **Its limit is written down, not discovered later:**
 the route's `hasSceneHeading` tests each line trimmed and the normaliser never
 invents a slugline, so from this state the repair reports that it did not help
-and lands the actionable sentence instead. `docs/CLAIMS_REGISTER.md` row 100.
+and lands the one instruction that would fix it instead. `docs/CLAIMS_REGISTER.md` row 100.
 
 **Browser suite:** `scripts/verify-p2-p3-surfaces.mjs` — the `P2-rerun` phase
 (9-scene draft, run, edit, click the banner, assert a real doctor POST and a

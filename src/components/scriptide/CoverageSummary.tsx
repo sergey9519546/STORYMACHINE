@@ -470,7 +470,7 @@ export default function CoverageSummary({
    *  re-spaces blocks without ever inventing a slugline — so a paste that reaches
    *  this card has no INT./EXT. line anywhere, and re-spacing cannot produce one.
    *  From this state the repair therefore lands on the second message above, whose
-   *  value is the actionable sentence it carries ("Add one, such as INT. KITCHEN -
+   *  value is the one instruction it carries ("Add one, such as INT. KITCHEN -
    *  DAY"), plus the re-spaced draft now in the editor for the writer to keep
    *  working in. A double-spaced paste that DOES carry sluglines never reaches
    *  this card: the route recognises it and the doctor analyses it (asserted in
