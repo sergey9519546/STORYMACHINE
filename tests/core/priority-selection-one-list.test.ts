@@ -235,3 +235,50 @@ describe('the coverage letter prints ONE priorities list', () => {
     });
   }
 });
+
+// ── The fourth surface ───────────────────────────────────────────────────────
+//
+// 2026-09-12 (review round 2, non-blocking 1). This lane's headline is "one
+// list, FOUR surfaces", and the fourth — the in-app Script Doctor panel — was
+// pinned by nothing: reverting `panelPriorities` to `report.topPriorities` left
+// every suite green, which is how it came to render the raw list with no
+// contradiction filter at all in the first place. The panel cannot be rendered
+// here, so it is read at source level — the same technique
+// tests/core/dimension-badge-export-parity.test.ts already uses on this file
+// three times for the badge half of findings #4/#14.
+
+describe('the in-app panel renders the shared selection, not the raw list', () => {
+  const PANEL = join(REPO, 'src/components/scriptide/ScriptDoctorPanel.tsx');
+  // Comments name `report.topPriorities` when they explain the defect, so the
+  // source is read with comments stripped — otherwise this case would pass on
+  // prose rather than on code.
+  const code = readFileSync(PANEL, 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^[ \t]*\/\/.*$/gm, '');
+
+  it('the panel derives its list from server/lib/priority-selection.ts', () => {
+    assert.match(code, /import \{ orderedPriorities \} from ".*priority-selection\.ts"/,
+      'the panel must import the one shared selection');
+    assert.match(code, /orderedPriorities\(report\?\.topPriorities\)/,
+      'the panel must build its list by passing the report through orderedPriorities');
+  });
+
+  it('nothing in the panel renders report.topPriorities directly', () => {
+    // The exact revert the review named: `panelPriorities` back to
+    // `report.topPriorities`. Any read of the raw array outside the one
+    // orderedPriorities call is that revert, whatever it is spelled.
+    const rawReads = [...code.matchAll(/report\??\.topPriorities/g)]
+      .filter(m => !code.slice(Math.max(0, (m.index ?? 0) - 30), m.index)
+        .includes('orderedPriorities('));
+    assert.deepEqual(rawReads.map(m => code.slice((m.index ?? 0) - 40, (m.index ?? 0) + 30)), [],
+      'the panel reads report.topPriorities outside the shared selection');
+  });
+
+  it('the heading and the list the panel renders are the same list', () => {
+    // The count in the heading must come from the list under it, or the panel
+    // can promise three and print ten — the cross-document half of finding #16
+    // as it applies to one surface.
+    assert.match(code, /prioritiesHeadingFor\(panelPriorities\.length\)/);
+    assert.match(code, /\{panelPriorities\.map\(/);
+  });
+});
