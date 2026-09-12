@@ -61,7 +61,11 @@ function pickFreePort() {
 
 async function bootServer(port) {
   const base = `http://127.0.0.1:${port}`;
-  const env = { ...keylessBrowserServerEnv(process.env, port), SESSION_DB_DIR: ':memory:' };
+  // productionRateLimit: true — this harness's own 200-concurrent-doctor-requests
+  // case (see the header comment) exists to prove gameLimiter 429s the overflow;
+  // the verification-only multiplier would hide that behind 10x headroom. See
+  // scripts/lib/keyless-browser-certification.mjs's doc comment.
+  const env = { ...keylessBrowserServerEnv(process.env, port, { productionRateLimit: true }), SESSION_DB_DIR: ':memory:' };
   const proc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
     cwd: new URL('..', import.meta.url).pathname,
     env,

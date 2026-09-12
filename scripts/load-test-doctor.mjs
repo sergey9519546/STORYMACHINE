@@ -332,7 +332,12 @@ async function bootOwnServer() {
   console.log(`[load-test] booting an isolated keyless server on port ${port}...`);
   const proc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
     cwd: REPO,
-    env: keylessBrowserServerEnv(process.env, port),
+    // productionRateLimit: true — this script measures doctor-pool latency
+    // "comfortably under gameLimiter's 120/min ceiling" (see the option docs
+    // above); the verification-only multiplier would silently change that
+    // ceiling to 1200/min. See
+    // scripts/lib/keyless-browser-certification.mjs's doc comment.
+    env: keylessBrowserServerEnv(process.env, port, { productionRateLimit: true }),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let booted = false;

@@ -33,6 +33,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { rateLimitMax } from '../../server/lib/session-store.ts';
+import { keylessBrowserServerEnv } from '../../scripts/lib/keyless-browser-certification.mjs';
 
 const REPO = path.resolve(import.meta.dirname, '../..');
 const VAR = 'VERIFY_RATE_LIMIT_MULTIPLIER';
@@ -180,6 +181,50 @@ describe('no deployment path sets it', () => {
         body,
         new RegExp(`${VAR}\\s*:\\s*[A-Za-z_$]`),
         `${file} assigns ${VAR}; only the gate's server-boot helper may`,
+      );
+    }
+  });
+});
+
+// ── Round-2 follow-up item 1 (2026-09-12) ───────────────────────────────────
+//
+// `keylessBrowserServerEnv` used to put the multiplier into EVERY server it
+// booted, including three callers that boot a keyless server specifically to
+// measure how the PRODUCTION limiter behaves under load:
+// `scripts/fuzz-routes.mjs` (its own 200-concurrent-doctor-requests case,
+// which exists to prove gameLimiter 429s the overflow — measured 0 429s at
+// 1200/min), `scripts/verify-production-build.mjs` (the one suite proving the
+// real Dockerfile-shaped boot), and `scripts/load-test-doctor.mjs` (which
+// documents itself as staying "comfortably under gameLimiter's 120/min
+// ceiling"). All three must opt OUT of the multiplier via
+// `{ productionRateLimit: true }`; every other (browser-gate) caller keeps it
+// by default.
+describe('the multiplier is scoped to browser gates, not every keyless caller', () => {
+  it('default (browser gates) gets the multiplier', () => {
+    const env = keylessBrowserServerEnv({}, 4000);
+    assert.equal(env[VAR], '10');
+  });
+
+  it('productionRateLimit: true removes the key entirely, even if the parent env carried it', () => {
+    const env = keylessBrowserServerEnv({ [VAR]: '10' }, 4000, { productionRateLimit: true });
+    assert.equal(VAR in env, false, `${VAR} must be absent, not just falsy, so the production ceiling applies`);
+  });
+
+  it('the three load/attack/production-boot callers all opt out in source', () => {
+    // verify-production-build.mjs imports the function under a local alias
+    // (`keylessBrowserServerEnv as buildKeylessEnv`), so the call-site regex
+    // has to accept either name.
+    const callers: Array<{ file: string; callee: string; reason: string }> = [
+      { file: 'scripts/fuzz-routes.mjs', callee: 'keylessBrowserServerEnv', reason: 'its own 200-concurrent-doctor-requests case measures gameLimiter 429s' },
+      { file: 'scripts/verify-production-build.mjs', callee: 'buildKeylessEnv', reason: 'the one suite proving the real Dockerfile-shaped boot' },
+      { file: 'scripts/load-test-doctor.mjs', callee: 'keylessBrowserServerEnv', reason: 'documents itself as staying under gameLimiter\'s 120/min ceiling' },
+    ];
+    for (const { file: rel, callee, reason } of callers) {
+      const body = readFileSync(path.join(REPO, rel), 'utf8');
+      assert.match(
+        body,
+        new RegExp(`${callee}\\([^)]*\\{\\s*productionRateLimit:\\s*true\\s*\\}`),
+        `${rel} (${reason}) must call ${callee}(..., { productionRateLimit: true })`,
       );
     }
   });

@@ -201,7 +201,11 @@ let browser = null;
 async function bootProduction() {
   console.log(`\n[verify:production] booting PRODUCTION server (tsx, NODE_ENV=production) on port ${PROD_PORT}...`);
   const env = {
-    ...buildKeylessEnv(process.env, PROD_PORT),
+    // productionRateLimit: true — this is the ONE server this suite exists to
+    // prove behaves like the real Dockerfile CMD; multiplying its rate-limit
+    // ceiling would make that proof false. See
+    // scripts/lib/keyless-browser-certification.mjs's doc comment.
+    ...buildKeylessEnv(process.env, PROD_PORT, { productionRateLimit: true }),
     NODE_ENV: 'production',
     SESSION_DB_DIR: PROD_STORE,
     VERSION: FAKE_VERSION,
