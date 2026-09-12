@@ -2,11 +2,16 @@
 
 **Worktree:** `/home/user/wt-forcedcue`
 **Branch:** `scoring/forced-cue`, pushed to origin after every commit.
-**Tip:** `6d8f1653`. The pre-rebase history ended at `5be366be`; the rebase
-onto `4cf5b2f3` produced `22c6b03f`, and `6d8f1653` is the commit carrying the
-rebase section at the end of this report. The `git log` and `git ls-remote`
-blocks below were taken before those two commits existed — the off-by-one a
-self-recording report always has, stated where each block appears.
+**Last code commit:** `282fa2b6` — `git diff 282fa2b6..HEAD -- ':!docs'` is
+empty, so every measurement in this report was taken on that tree and the
+commits after it are this report. The branch TIP is one past the last `git
+log` block in `## Round 2`; it is named there rather than here because a line
+inside a file cannot name the commit that writes it, and the previous attempt
+to solve that with a literal SHA (`f258c405`, subject "the report's Tip line
+survives the rebase") left the line naming its own parent. `git ls-remote
+origin scoring/forced-cue` gives the tip at any moment. The history in three
+SHAs: the pre-rebase branch ended at `5be366be`, the rebase onto `4cf5b2f3`
+produced `22c6b03f`, round 1 closed at `f258c405`.
 **Base:** `4cf5b2f3` — `origin/scoring/adversarial-2026-09-12`. The lane was
 CUT from `3124a94e` and every before/after number below is measured against
 that commit; it was rebased onto `4cf5b2f3` at the end, and that rebase and
@@ -538,3 +543,119 @@ rebase apart from this section.
 
 `AUC24_FLOOR` still untouched, `--lock` still never run, and no AUC-24 number
 is stated, implied or projected anywhere on the rebased branch.
+
+
+---
+
+## Round 2
+
+Four non-blocking items from `forcedcue-review.md` (verdict READY-FOR-OWNER,
+reviewed SHA `f258c405`), one commit each. No blocking item was raised, and
+nothing in §§1-8 above changed its meaning: the four are a clause, a property,
+a disclosure and a SHA.
+
+```
+$ git log --oneline f258c405..HEAD          # taken while writing this section
+75de2c55 docs(audit): the second renderer residual named beside the first
+282fa2b6 test(guard): the fourth disjunct's safety is a property now, not an argument
+523c38c8 docs+test(fountain): the in-speech guard protects CUE POSITION, not prose — said where it is claimed, pinned in three positions
+```
+
+**The tip is the commit carrying this section**, one past `75de2c55`. It is
+written that way and not as a literal SHA on purpose: a line inside a file
+cannot name the commit that writes it, and the previous attempt to solve that
+by writing a SHA (`f258c405`) produced a commit whose whole subject was fixing
+the Tip line and which left it naming its own parent. What CAN be pinned, and
+is what a reader of a scoring branch actually needs, is where the code stops:
+**the last commit touching anything outside `docs/` is `282fa2b6`**, so
+`git diff 282fa2b6..HEAD -- ':!docs'` is empty and every measurement in this
+report was taken on the tree at `282fa2b6`. `git ls-remote origin
+scoring/forced-cue` gives the tip itself at any moment. The branch is still
+owner-gated and still not merged.
+
+### 1. The guard protects cue position, not prose
+
+The reviewer is right and the finding is worth more than the sentence it
+corrects. §2 and the parser's own comment used `@everyone, listen up` as the
+example of what the change protects; the protection the code actually gives is
+**"not in cue position"**, which is narrower. Measured, one sentence in four
+positions:
+
+| position | type | renders |
+|---|---|---|
+| head of an action paragraph, **non-blank** line under it | **`character`**, next line `dialogue` | `everyone in the room turned.` |
+| head of an action paragraph, blank line under it | `action` | `@everyone in the room turned.` |
+| second line of an action paragraph | `action` | `@everyone in the room turned.` |
+| second line of a speech | `dialogue` | `@everyone, the meeting moved.` |
+
+Row one is the Fountain specification and the parser is right: that is a cue's
+shape, the marker forces a cue there, and a parser that refused could not
+express the caseless cue this whole change exists for. So the fix is to SAY
+so, not to narrow the parser. The clause is now in §2 and beside the branch,
+and all three of the non-speech positions are pinned on one sentence in
+`tests/core/parse-format-invariance.test.ts`; the existing in-speech subtest is
+untouched.
+
+### 2. The fourth disjunct's safety, as a property
+
+The suite asserted the weak half (a 30-speech forced-cue draft is accepted).
+The half that makes the widening defensible is that the WALK, not the
+disjunct, is what requires cue position. On the shape a writer who quotes
+handles produces — 60 scenes, 20 speeches each, 1,200 cues and 1,200 dialogue
+lines that every one of them opens with `@handle…`:
+
+| | |
+|---|---|
+| `guardCueOccurrences` here | **1,200** — the cues, not the 2,400 a position-blind count would give |
+| the same text with the handles stripped | 1,200 — the marker is not what is counted |
+| `guardCueOccurrences` on a `git archive 4cf5b2f3` export | **1,200** — the number the walk read before this lane |
+| `fountainShapeRejectionReason` | `null` — ACCEPTED |
+
+**Shown to fail on the thing it is about**, not merely to pass: one line added
+to `walkGuardCueOccurrences` that yields a `@` line without asking whether it
+is in cue position takes the count to **2,400** and the test goes red with its
+own message. The mutation was reverted and `server/lib/validation.ts` is
+byte-identical to HEAD (`git diff --quiet` clean). Note for anyone repeating
+it: the file has TWO walks, and mutating the legacy one changes nothing —
+`guardCueOccurrences` drains `walkGuardCueOccurrences`.
+
+### 3. The second renderer residual
+
+A `@` line that is not in cue position stays `action`, and `renderableText`
+strips the marker only from `character` / `dual_dialogue`, so it prints from
+every exporter. Same mechanism as the `>` residual, one step milder because
+the line is not a cue and the marker declares nothing. Named beside it in
+§6.7, with the cost of closing it stated: a decision that a leading `@` never
+prints, which is a claim about prose this lane has no measurement for.
+
+### 4. The `Tip:` line
+
+It named `6d8f1653` while origin was at `f258c405`, and the commit that existed
+to fix it had left it naming its own parent — the failure mode rather than an
+accident, and it would repeat here if this round wrote another literal SHA.
+The line now pins what is actually pinnable and useful on a scoring branch:
+**the last commit touching anything outside `docs/`, `282fa2b6`**, which is
+the tree every number in this report was measured on, with
+`git diff 282fa2b6..HEAD -- ':!docs'` empty as the proof. The tip itself is
+described (one past this section's `git log` block) and left to
+`git ls-remote`, which cannot go stale.
+
+### Re-measurements, on the `282fa2b6` tree
+
+| check | result | exit |
+|---|---|---|
+| the touched tests, one run (8 files) | **1,334 pass, 0 fail**, 154 suites | 0 |
+| `npm run benchmark:public` | **0.8438 / 0.7896 · 0.5938 / 0.5234 · 1.0000 / 0.9814** — to the digit | 0 |
+| output identity vs the `git archive 4cf5b2f3` export, `GIT_SHA=identity` both trees | **PASS — all 45 byte-identical** | 0 |
+| `check-scoring-receipt.mjs 78ec4464..HEAD` | exit 1, **exactly one** PENDING entry | 1 |
+| `npx tsc --noEmit` | clean | 0 |
+| `node scripts/brain-graph.mjs --check` | fresh, 104 notes / 386 links | 0 |
+| `npm run check-docs` | clean | 0 |
+
+No full `npm test` this round, as briefed. `AUC24_FLOOR` untouched, `--lock`
+never run, and no AUC-24 number is stated, implied or projected.
+
+Non-blocking 5 of the review is the sibling lane's
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` re-derivation to 675,000, which must be
+applied on the merged tree with the analyzer pair cap in place. This lane does
+not touch that constant and did not touch it this round.
