@@ -72,7 +72,7 @@ describe('the P0 smoke gate serves the built dist/, and says which', () => {
   });
 
   it('serveModeOf tells the two front ends apart (driven, both directions, plus neither)', async () => {
-    const stub = (html: string) => async () => ({ text: async () => html });
+    const stub = (html: string) => async () => ({ ok: true, status: 200, text: async () => html });
     const dev = await serveModeOf('http://127.0.0.1:1/', stub(
       '<!doctype html><script type="module" src="/@vite/client"></script>',
     ) as never);
@@ -85,6 +85,37 @@ describe('the P0 smoke gate serves the built dist/, and says which', () => {
     // A markup shape that is neither must not be silently called one of them.
     const neither = await serveModeOf('http://127.0.0.1:1/', stub('<!doctype html><body>nothing</body>') as never);
     assert.equal(neither.mode, 'unknown');
+  });
+
+  it('a non-2xx / is reported as a status, not as an unclassifiable page (review non-blocking 3)', async () => {
+    // The failure is the same either way (the boot throws); the MESSAGE is the
+    // difference between "the server 500s" and "I could not recognise 1183
+    // bytes of markup", and only one of those sends the reader to the cause.
+    const failing = (status: number, statusText: string) => async () => ({
+      ok: false,
+      status,
+      statusText,
+      text: async () => '<html><body>Internal Server Error</body></html>',
+    });
+    await assert.rejects(
+      () => serveModeOf('http://127.0.0.1:1/', failing(500, 'Internal Server Error') as never),
+      (e: Error) => {
+        assert.match(e.message, /HTTP 500 Internal Server Error/, 'the status is in the message');
+        assert.doesNotMatch(e.message, /neither \/@vite\/client/, 'not the misclassification message');
+        return true;
+      },
+    );
+    // A proxy's own error page, which is markup a classifier would happily
+    // read and call `unknown`.
+    await assert.rejects(
+      () => serveModeOf('http://127.0.0.1:1/', failing(502, 'Bad Gateway') as never),
+      /HTTP 502 Bad Gateway/,
+    );
+    // A 404 on `/` — what a production boot with no dist/ index.html does.
+    await assert.rejects(
+      () => serveModeOf('http://127.0.0.1:1/', failing(404, 'Not Found') as never),
+      /HTTP 404 Not Found/,
+    );
   });
 
   it('the hashed-asset match takes every quoting HTML allows (review non-blocking 2)', async () => {

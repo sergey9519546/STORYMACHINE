@@ -531,6 +531,19 @@ export function ensureBuiltDist({ repo, logPrefix = 'verify' } = {}) {
  */
 export async function serveModeOf(baseUrl, fetchImpl = fetch) {
   const res = await fetchImpl(new URL('/', baseUrl));
+  // A non-2xx is a fact about the server, not a markup shape to classify
+  // (review round 1, non-blocking 3): a 500 or a proxy error page used to
+  // reach the classifier as text and come back `unknown`, so the boot threw
+  // "neither /@vite/client nor a /assets/ URL in 1183 bytes of /" — the same
+  // outcome as a real misclassification, with the one fact that explains it
+  // thrown away.
+  if (!res.ok) {
+    throw new Error(
+      `GET / answered HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}, so there is no `
+      + 'served front end to classify — the server booted but cannot serve its own entry document '
+      + '(a dist/ that vanished between the build and the boot does exactly this)',
+    );
+  }
   const html = await res.text();
   if (html.includes('/@vite/client')) return { mode: SERVE_VITE_DEV, evidence: '/@vite/client in the markup' };
   // Every attribute quoting HTML allows, not just the one Vite emits today
