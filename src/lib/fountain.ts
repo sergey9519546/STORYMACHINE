@@ -290,6 +290,18 @@ export function parseFountain(text: string): FountainBlock[] {
     // matters more for `@` than for the other three, because `@` is a
     // character writers really do type inside dialogue (a handle, an address);
     // reading `@everyone, listen up` as a cue would be worse than the bug.
+    //
+    // WHAT THAT DOES AND DOES NOT PROTECT, exactly, because the two are easy
+    // to confuse. The protection is CUE POSITION, not prose: inside a speech,
+    // and on the second or later line of an action paragraph, a `@` line stays
+    // what it was. At the HEAD of an action paragraph with a non-blank line
+    // under it, `@everyone in the room turned.` IS a cue and the line below it
+    // IS dialogue — that is the shape of a cue, and the spec says the marker
+    // forces one there. It is the marker's whole purpose and not a defect; a
+    // writer who wants that sentence as prose either leaves the blank line
+    // under it (then it is action, `@` and all) or does not open a paragraph
+    // with `@`. Both directions are pinned in
+    // tests/core/parse-format-invariance.test.ts.
     const forcedCue = trimmed.startsWith(FORCED_CUE_MARKER);
     const cueLine = forcedCue ? trimmed.slice(FORCED_CUE_MARKER.length).trim() : trimmed;
 

@@ -123,7 +123,21 @@ the `prevBlock.type === 'empty'` guard is this parser saying the same thing.
 The reason it matters more for `@` than for the other three is that `@` is a
 character writers really do type inside a speech — a handle, an address —
 and reading `@everyone, listen up` as a cue would be worse than the bug being
-fixed. Asserted in both directions.
+fixed.
+
+**What that protects is CUE POSITION, not prose**, and the distinction is
+worth one clause because the two are easy to state as one (round-2 review,
+non-blocking 1). Inside a speech, and on the second or later line of an action
+paragraph, a `@` line stays what it was. At the HEAD of an action paragraph
+with a non-blank line under it, `@everyone in the room turned.` **is** a cue
+and the line below it **is** dialogue — that is a cue's shape and the spec
+says the marker forces one there. It is the marker's whole purpose, not a
+defect: a parser that refused there could not express the caseless cue this
+change exists for. A writer who wants that sentence as prose leaves the blank
+line under it, and then it is action with the `@` printed as the literal text
+it is. All three positions are asserted in
+`tests/core/parse-format-invariance.test.ts` and the boundary is stated beside
+the parser branch itself.
 
 **`renderableText`** replaces the three `cleanText` copies (layout, fdx,
 docx), adding the `@` strip once.

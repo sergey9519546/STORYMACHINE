@@ -494,6 +494,38 @@ describe('a forced cue `@` is a character cue everywhere (round 3)', () => {
     assert.equal(latin1(fountainToPdf(CASELESS, 'Forced Cue')).includes('@'), false, 'the PDF still carries the marker');
   });
 
+  it('the protection is CUE POSITION, not prose: at a paragraph head with text under it, `@` IS a cue', () => {
+    // The boundary, both directions, on ONE sentence. `@` forces a Character
+    // element where a cue can stand; the spec says so and the marker exists to
+    // be obeyed there. What it does not do is claim every `@` in prose is
+    // safe — that is the narrower promise the parser actually keeps, and the
+    // two are easy to state as one.
+    const types = (t: string) => parseFountain(t).filter((b) => b.type !== 'empty').map((b) => b.type).join(',');
+    const SENTENCE = '@everyone in the room turned.';
+
+    // IS a cue: the head of a paragraph, a non-blank line under it — a cue's
+    // shape. The line below becomes dialogue, exactly as under `@MARY`.
+    assert.equal(
+      types(`INT. ROOM - DAY\n\n${SENTENCE}\nNobody said a word.\n`),
+      'scene_heading,character,dialogue',
+      'at the head of a paragraph with text under it, `@` must force a cue — that is what the marker is FOR, '
+      + 'and a parser that refused here could not express the caseless cue this whole change exists for',
+    );
+    // Is NOT a cue: the same sentence with a blank line under it has no cue's
+    // shape, so it stays action and the marker prints as the literal text it is.
+    assert.equal(
+      types(`INT. ROOM - DAY\n\n${SENTENCE}\n\nNobody said a word.\n`),
+      'scene_heading,action,action',
+      'with a blank line under it the line is not in cue position and must stay action',
+    );
+    // Is NOT a cue: the second line of an action paragraph.
+    assert.equal(
+      types(`INT. ROOM - DAY\n\nThe door opens.\n${SENTENCE}\n`),
+      'scene_heading,action,action',
+      'a `@` line mid-paragraph is not in cue position and must stay action',
+    );
+  });
+
   it('`@` inside a speech is NOT a cue, and `@` on an action line is left alone', () => {
     // The deliberate non-escape. A Character element needs a preceding blank
     // line in the spec, and `@` is a character writers really do type inside
