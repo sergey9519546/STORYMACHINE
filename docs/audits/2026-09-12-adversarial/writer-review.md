@@ -844,3 +844,350 @@ only version in which the fuzzer measures both things it was built to measure.
   itself, finding 3's deeper half, `computeJumpSpan`'s missing caller, finding
   4's ranking cause, and `coverage-html.ts`'s unlabelled Graph Health block)
   is unchanged and still correctly named.
+
+---
+
+## Round 3 (client lane) — confirmation of `324a0db8`
+
+**Reviewed object:** `324a0db8` — `lane/writer-loop-client`'s round-3 commit
+`ca31828d` rebased onto `main` `331c20d7`; the tip of `/home/user/wt-writer`.
+Round 2 was reviewed MERGE at `6dbabc9c`. New reviewer, inheriting the record
+above; the earlier rounds were not re-run.
+**Method:** the worktree was driven read-only — no tracked file in it was
+edited, and every plant below was made in a copy under `<session scratch>`.
+`dist/` existed but was STALE (nine `src/` and `server/` files were newer than
+`dist/index.html` after the rebase), so `npm run build` was run first: **exit
+0**, "built in 4.61s". Browsers launched with
+`PW_CHROMIUM_PATH=/opt/pw-browsers/chromium`. The only file written under
+`/home/user/STORYMACHINE` is this review.
+
+`git diff --stat 324a0db8~1 324a0db8` → 4 files, **+157 / −3**:
+`scripts/lib/browser-verify.mjs`, `scripts/verify-p2-p3-surfaces.mjs`,
+`scripts/verify-ui-polish-affordances.mjs`,
+`tests/scripts/wait-for-function-options-position.test.ts`. No `src/`, no
+`server/`.
+
+### (1) Is the helper genuinely stricter, and does every former site use it?
+
+**Yes on all three counts, and the progress-copy list is complete.**
+
+- *Whole word.* `DOCTOR_VERDICT_RE = /\b(RECOMMEND|CONSIDER|PASS)\b/`
+  (`browser-verify.mjs:520`), case-sensitive, rebuilt inside the page function
+  per poll rather than shared — no `lastIndex` state crosses polls.
+- *Progress copy stripped.* `DOCTOR_PROGRESS_COPY_RE` is `gi` and covers
+  "Running pass N of M", "Reading the draft", "Reading the script", "Compiling
+  the report", "Reading each scene…". Checked against the source of truth:
+  `src/lib/doctor-stream.ts:166-178` (`doctorProgressLabel`) emits exactly four
+  strings — *Reading the script…*, *Reading each scene's meaning with AI…*,
+  *Compiling the report…*, *Running pass N of M…* — **all four are covered**,
+  and the fifth pattern covers `CoverageSummary`'s own "Reading the draft…".
+  No label escapes the strip, so the poll cannot be answered by progress copy.
+- *Scoped.* `selector` defaults to `body` but both call sites pass
+  `aside[role="region"]` — the Coverage summary, which is the surface the
+  assertions below each wait actually read.
+
+Every former bare poll is converted. `grep -rn "RECOMMEND|CONSIDER|PASS"` over
+`scripts/` on the tip leaves five verdict-regex sites, and none is a bare
+`innerText` poll:
+
+| site | why it is not the trap |
+|---|---|
+| `verify-a11y.mjs:819`, `:1746` | poll `textContent`, which does NOT reflect `text-transform` — the raw string is lowercase "Running pass 1 of 14…" and the regex is case-sensitive |
+| `verify-a11y.mjs:582`, `:862` | `waitForRenderedText(page, 'CONSIDER')`, which reads `page.textContent('body')` (`browser-verify.mjs:503`) and whose needle is a verdict, not "PASS" |
+| `verify-p2-p3-surfaces.mjs:808` | not a poll at all — reads `summaryPanel.innerText()` after the summary's own "Full report" button is visible (the 2026-09-05 fix, comment at `:790-800`) |
+| `verify-p2-p3-surfaces.mjs:2200` | `getByText(/^(RECOMMEND|CONSIDER|PASS)$/)`, anchored |
+
+The lane's claim that the two `verify-a11y.mjs` sites are deliberately left
+alone is correct, and the scanner encodes the same reasoning.
+
+### (2) The scanner, run and planted against
+
+| tree / plant | command | result |
+|---|---|---|
+| tip, untouched | `node --experimental-strip-types tests/scripts/wait-for-function-options-position.test.ts` (in `/home/user/wt-writer`) | **# pass 5 # fail 0** |
+| **`main` `331c20d7`'s `scripts/`** + the tip's scanner (`<session scratch>/scanMain`) | same | **# fail** — names exactly `scripts/verify-p2-p3-surfaces.mjs:1884` and `scripts/verify-ui-polish-affordances.mjs:123`, the two sites the lane claims |
+| tip's `scripts/` + **one planted** single-line bare poll at `verify-focus-traps.mjs:11` (`<session scratch>/scanA`) | same | **# pass 4 # fail 1**, offender quoted by file, line and text |
+| tip's `scripts/` + the same plant **pretty-printed** (predicate, `undefined` and options each on their own line) (`<session scratch>/scanB`) | same | **# pass 4 # fail 1** — caught |
+
+Fail-first is genuine, in both the "every site" direction and the "the scanner
+finds what it is meant to find" direction. One escape, non-blocking, below.
+
+### (3) The two named gates, in `/home/user/wt-writer`, foreground
+
+| gate | command | result |
+|---|---|---|
+| ui-polish | `PW_CHROMIUM_PATH=… npm run verify:ui-polish` (load 0.52/4) | **27/27 assertions passed, exit 0** |
+| surfaces | `PW_CHROMIUM_PATH=… npm run verify:surfaces` (load 4.06/4) | **248/248, exit 0**, peak 123 `/api/` in any 60 s against the gate server's 1200 ceiling |
+| claims register | `node scripts/honesty-audit.mjs` | **exit 0** — 461 files, 477 tracked markdown, 106 claims rows, clean |
+| scoring receipt | `node scripts/check-scoring-receipt.mjs main..HEAD` | **exit 0** — *"no scoring-path files changed"* |
+
+`verify:surfaces` was not on the brief's list but the round-3 diff edits it, and
+its `P2-generative` wait now depends on the new `aside[role="region"]` scope; a
+wrong selector there would have shown as 247/248. It did not.
+
+### (4) `verify:p0-flow` — **I reproduced it, and it fails on `main` too**
+
+The lane records six foreground runs across two commits with exit 0 and "no
+mechanism found in the diff". The first half of that is now superseded. Eight
+runs on the unmodified tip, `PW_CHROMIUM_PATH=… node
+scripts/smoke-p0-live-flow.mjs`, one at a time, load recorded at start:
+
+| run | load | exit | failure |
+|---|---|---|---|
+| 1 | 0.66 | **1** | *"golden-path regression: \"Open full report\" was NOT disabled at the earliest instant"* |
+| 2 | 0.60 | 0 | — |
+| 3 | 1.75 | 0 | — |
+| 4 | 3.39 | 0 | — |
+| 5 | 3.73 | 0 | — |
+| 6 | 6.09 | 0 | — |
+| 7 | 6.65 | **1** | same message |
+| 8 | 6.75 | 0 | — |
+
+**2 of 8**, at both ends of the load range — the first failure was on the
+*idlest* run of the eight.
+
+Then the same probe against `main` `331c20d7` itself:
+`git archive 331c20d7 | tar -x` into `<session scratch>/mainexp`, `node_modules`
+symlinked, `npm run build` (**exit 0**), six runs:
+
+| run | load | exit | failure |
+|---|---|---|---|
+| 1 | 2.25 | **1** | *"golden-path cold-panel regression: clicking \"Full report\" at the earliest instant it exists opened a dialog before the sample run resolved (text starts: \"SCRIPT DOCTOR…Verdict CONSIDER Health 78/100\")"* |
+| 2 | 3.68 | **1** | same |
+| 3–6 | 4.03 / 3.38 / 3.33 / 3.03 | 0 | — |
+
+**2 of 6 on `main`.** Both trees fail inside the SAME block —
+`scripts/smoke-p0-live-flow.mjs:138-191`, step 3b — and both failures say the
+same thing in two different words: by the time the gate reaches its "earliest
+instant", the sample run has already resolved. On the tip it surfaces through
+`earlyToggle.isDisabled()` reading `false`; on `main` the toggle still reads
+disabled and the forced click 300 ms later opens a *complete* report (health
+78 is in the dialog text), which is the other branch of the same race. The
+"earliest instant" is `waitFor({ state: 'attached' })` on a control that is in
+the DOM from first paint, so nothing holds the run open while the gate reads
+it — on a warm server the whole sample analysis can finish inside that gap.
+
+So: **item (a) is not this lane's.** It is a pre-existing flake in the gate,
+of exactly the same family as item (b) — a browser gate asserting on a
+readiness signal it does not actually control. The lane's record ("I am not
+claiming it cannot fail") is honest, and it is the only one of the two items it
+did not close; what it did not do is the thing it did do for item (b) — run
+the same probe against `main` — which would have settled attribution in ten
+minutes. That is a miss of thoroughness, not of honesty, and it is not this
+lane's defect to own.
+
+**For the orchestrator:** `npm run verify:p0-flow` flakes at roughly 1 run in
+4 on `main` today. A red p0-flow at merge time is not evidence against this
+lane; re-run it, and see follow-up 1 below.
+
+### Judgement, and what a stronger version would have done
+
+- The helper is the right shape and the right number of implementations (one).
+  Nothing was narrowed: no assertion changed, and the readiness signal got
+  strictly stricter in three independent ways (word boundary, progress strip,
+  surface scope).
+- The scanner has one escape, and it is a shape this repository already
+  writes. Hoisting the `innerText` read one line above the regex passes:
+
+  ```
+  <session scratch>/scanC — planted into scripts/verify-focus-traps.mjs:
+    await page.waitForFunction(
+      () => {
+        const t = document.body.innerText;
+        return /RECOMMEND|CONSIDER|PASS/.test(t);
+      }, undefined, { timeout: 5000 });
+  → # pass 5 # fail 0   NOT caught
+  ```
+
+  `bareVerdictPolls` requires the verdict alternation and `innerText` on the
+  SAME line. `const t = document.body.innerText;` on its own line already
+  exists twice in the repo — `scripts/verify-p2-p3-surfaces.mjs:1281` and
+  `:3138` — so this is not a contrived spelling. Same character as the round-3
+  (follow-ups) `;` escape: narrower than what it replaced, and worth one line.
+
+---
+
+## VERDICT: **MERGE**
+
+Item (b) is closed at the cause, once, with a fail-first scanner that names the
+two `main` sites by file and line, and both browser gates the diff touches are
+green in my own runs (27/27 and 248/248, exit 0). Item (a) is honestly left
+open by the lane — and is now measured: it fails 2/8 on the tip and 2/6 on a
+built export of `main` `331c20d7`, in the same block, so it is a pre-existing
+gate race and not a regression this lane introduced. Nothing here should hold
+the merge.
+
+### Follow-ups, non-blocking
+
+1. **Fix `smoke-p0-live-flow.mjs`'s step 3b at its cause, the way (b) was
+   fixed.** `waitFor({ state: 'attached' })` on a control present from first
+   paint is not "the earliest instant"; the gate needs to hold the sample run
+   open while it reads the toggle (the client lane's own round-1 review drove
+   this exact state by delaying the stream — `drive-cancel.mjs`), or to read
+   `disabled` from the same event that attaches the control. Until then the
+   golden-path smoke gate is a ~25% coin flip on `main`. Own lane, not this one.
+2. **Close the scanner's line-split escape** — strip comments and scan the
+   `waitForFunction` call body as a unit (the file's own `misusedCalls` already
+   walks bracket depth and could be reused) rather than matching one line.
+3. Carried forward unchanged from rounds 1–2: the unmount-abort gap itself,
+   finding 3's deeper half, `computeJumpSpan`'s missing production caller,
+   finding 4's ranking cause in `doctor.ts`, and `coverage-html.ts`'s
+   unlabelled Graph Health block.
+
+---
+
+## Round 4 (follow-ups lane) — re-check of `da4a6539`
+
+**Reviewed object:** `da4a6539` — two commits (`3a40bfd3` fuzzer, `da4a6539`
+guard) on the round-1 tip `55660c9f`, in `/home/user/wt-followups`. Round 1 of
+this lane is the "Round 3 (follow-ups lane)" section above; its verdict was
+REVISE with one blocking item (the fuzzer) and one carried non-blocking item
+(the `;` escape).
+**Method:** the worktree was driven read-only. Fail-first plants were made in
+`git archive da4a6539` exports and patched copies under `<session scratch>`.
+`ss` is not installed in this sandbox; listening sockets read from
+`/proc/net/tcp` before the run were **2024, 2025, 34877, 45081**, and
+`fuzz-routes.mjs` takes ephemeral ports from the OS (`pickFreePort`, `:66`) —
+observed `:35181` for the overflow server — so there is no collision with
+anything running.
+
+### Item 1 — the fuzzer · **closed, at the preferred fix**
+
+`node scripts/fuzz-routes.mjs`, full mode, foreground, twice:
+
+| | run 1 | run 2 (captured to file) |
+|---|---|---|
+| total requests / `[ok]` lines | 197 / 197 | **197 / 197** |
+| flagged | **0** | **0** |
+| `status=429` lines anywhere in the probe stream | — | **0** (`grep -c 'status=429'`) |
+| 200-concurrent breakdown | `{"200":90,"429":81,"503":29}` wall=1646 ms | `{"200":90,"429":81,"503":29}` wall=1358 ms |
+| exit | **0 — PASS** | **0 — PASS** |
+
+Wall clock 19.4 s. Both WebSocket attacks are back and run:
+`[ok] ws-oversized-frame (10MB) status=200 ms=47 — closed with code 1009` and
+`[ok] ws-10000-message-burst status=200 ms=1594 — connection survived burst`.
+Every number in the lane's table reproduces, including the breakdown, which was
+stable across both of my runs and all three of theirs.
+
+**The new assertion is not a tautology — measured.** Patched copies of
+`fuzz-routes.mjs` under `<session scratch>/fuzzX` (cwd and `./lib/` imports
+repointed at the worktree; nothing in the worktree touched):
+
+| mutation | breakdown | record | exit |
+|---|---|---|---|
+| (E) `concurrencyAttack(base)` — the overflow case back on the SHARED validation server, i.e. round-1 behaviour | `{"200":200}` | `[UNEXPECTED-STATUS] 200-concurrent-doctor-requests status=no-overflow-signal` | **1 — FAIL** |
+| (D) `bootServer(overflowPort)` — the `{ productionRateLimit: true }` opt-out removed | `{"200":90,"503":110}` | `[ok] status=overflow-shed` | **0 — PASS** |
+
+(E) is the fail-first the item asked for: with a spent-or-multiplied window the
+case now flags instead of printing `[ok]`. (D) is a hole, and it is the reason
+for follow-up 2 below.
+
+**The 503 exclusion is narrow and justified — but it is attributed to the wrong
+mechanism.** Justified: `POST /api/scriptide/doctor` is
+`server/routes/scriptide.ts:485-652` and contains **no** `res.status(503)` of
+its own (the four in that file are at `:872`, `:1325`, `:1576`, `:1725`, all on
+other routes), so the only 503s that can reach this case are
+`SessionCapacityError` via `server/app.ts:379` and the doctor pool's own
+contention answer. A genuine uncaught fault is still a 500 and still flags
+(`record`'s `extra.status >= 500` branch is untouched; `crashedOutcomes`
+excludes 503 alone). Narrow: yes.
+
+Wrong mechanism: I booted the same server myself on the production ceiling and
+captured the bodies (`<session scratch>/probe503.mjs`, 200 concurrent POSTs,
+`keylessBrowserServerEnv(..., { productionRateLimit: true })`,
+`SESSION_DB_DIR=':memory:'`, the worktree's own `server.ts`):
+
+```
+breakdown {"200":90,"429":80,"503":30}
+  x80  429 retry-after=60 :: {"error":"Too many requests, please slow down."}
+  x30  503 retry-after=92 :: {"error":"This server is busy: your draft waited longer than
+        the 60s it allows for a free analysis slot, so the run never started and nothing
+        was scored. Nothing is wrong with the draft — try again in about 92 seconds."}
+```
+
+That sentence is `server/lib/doctor-budget.ts:228`, i.e.
+`DoctorAnalysisBudgetExceededError` with `state: 'queued'`, `status: 503`
+(pinned at `tests/core/doctor-analysis-budget.test.ts:203-208`). **Thirty of
+thirty. Zero are `SessionCapacityError`, and `MAX_SESSIONS` is never reached** —
+only ~90 requests ever get past `gameLimiter`, well under the cap of 100, and
+`session-store.ts:309-332` evicts an idle session before it throws at all. The
+code comment at `scripts/fuzz-routes.mjs:548-558` names both sources but then
+explains the observation with the one that does not fire ("can legitimately trip
+MAX_SESSIONS … once enough sessions are simultaneously busy"), the printed note
+labels every 503 `refused on session capacity`, and the lane report repeats it
+as "a SECOND, orthogonal way this server sheds an overflow". It is one way, and
+it is the doctor pool's queue budget. Item 1 below.
+
+**A responsiveness signal does remain, and it is recorded on every run, not
+only when it trips.** `fuzz-routes.mjs:591-595` records
+`health-p95-during-200-concurrent-load` in both branches and flags SLOW above
+5 s: observed `[ok] health-p95-during-200-concurrent-load status=200 ms=226`
+(n=14 samples, max 226 ms) in run 1. Two honest notes on the `ms: 0` change:
+it is the right call (a 5 s single-request threshold against the aggregate
+drain time of ~90 real analyses would be measuring the wrong thing), but on
+this machine the aggregate was **1646 ms / 1358 ms** — comfortably inside the
+threshold anyway, so the change is forward-looking rather than load-bearing
+today, and the report should not be read as saying the run needed it.
+
+### Item 2 — the abort-count guard's `;` escape · **closed**
+
+`stripComments` + a `;`-free `/abortRef\.current\?\.abort\(\)/g` count, shared
+by the guard and its self-check block (one implementation). Fail-first on a
+`git archive da4a6539` export under `<session scratch>/fuexp`, route (C)
+planted into the real `src/components/scriptide/CoverageSummary.tsx` after the
+`const userCancelledRef = useRef(false);` anchor:
+
+| tree | guard from `55660c9f` | guard from `da4a6539` |
+|---|---|---|
+| untouched export | # pass 21 # fail 0 | **# pass 22 # fail 0** |
+| route (C) planted — `useEffect(() => () => abortRef.current?.abort(), []);` | **# pass 21 # fail 0 — missed** | **# pass 17 # fail 5 — caught** |
+
+The lane's 17/5, 22/0 and 21/0 all reproduce exactly. The five failures name
+the right things: the guard's own count assertion ("exactly two abort() call
+sites should exist…") and routes (A), (B), (C) in the self-check block.
+`node --experimental-strip-types tests/core/coverage-format-unrecognized-card.test.ts`
+in the worktree: **22 pass / 0 fail**;
+`tests/core/rate-limit-verification-override.test.ts`: **14 pass / 0 fail**.
+
+---
+
+## VERDICT: **REVISE**
+
+Both round-1 items are genuinely closed and every number in the lane's round-2
+report reproduces on my own runs — 197/197, 0 flagged, exit 0, both WebSocket
+attacks executing again, the overflow case a real measurement with a fail-first
+I planted myself, and the abort guard catching all three reintroduction routes.
+The behaviour is right. One item back, and it is textual:
+
+**1. The 503 is the doctor pool's queue budget, not session capacity — say so
+in the three places that say otherwise.** `scripts/fuzz-routes.mjs:548-558`
+(the comment justifying the exclusion), `:588` (the printed note, which labels
+every 503 `refused on session capacity` — this is the line a future engineer
+reads in CI output), and the lane report's "also trips `MAX_SESSIONS=100` …
+a SECOND, orthogonal way this server sheds an overflow". Measured above:
+30 of 30 are `DoctorAnalysisBudgetExceededError`, `state: 'queued'`,
+`Retry-After: 92`, from `server/lib/doctor-budget.ts:228`; `MAX_SESSIONS`
+cannot fire here because `gameLimiter` admits only ~90 of the 200. This is
+blocking only because it is the sentence that justifies widening a crash
+detector: a reader who later sees 503s on this case and follows the comment
+looks in `session-store.ts` and finds nothing. Three lines, no behaviour
+change. Keep `!== 503` — the exclusion itself is correct.
+
+### Non-blocking, carried
+
+2. **The runtime assertion accepts the pool's 503s as the overflow signal, so
+   it does not itself prove `gameLimiter` engaged.** Measured as mutation (D)
+   above: with `{ productionRateLimit: true }` removed, the burst reads
+   `{"200":90,"503":110}` — gameLimiter completely disengaged, zero 429s — and
+   the case still prints `[ok] status=overflow-shed` and exits 0. The
+   regression IS caught, but by a different test:
+   `tests/core/rate-limit-verification-override.test.ts` on the mutated tree
+   fails its "no deployment path sets it" and "fuzz-routes.mjs boots TWO
+   servers" cases. So nothing is falsely green today. The stronger version is
+   one condition: require `limited > 0` for the case whose own header says the
+   server must "429 the overflow", and report `capacityRefused` as extra
+   information rather than as a substitute for it.
+3. Everything the writer lane carried forward (the unmount-abort gap itself,
+   finding 3's deeper half, `computeJumpSpan`'s missing caller, finding 4's
+   ranking cause, `coverage-html.ts`'s unlabelled Graph Health block) is
+   unchanged and still correctly named.
