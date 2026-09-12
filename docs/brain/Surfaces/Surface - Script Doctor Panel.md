@@ -165,7 +165,7 @@ a badge ("Diagnostic — not part of Health") on each section header and a
 sentence naming the specific number and denying both the health and the verdict —
 and the mid-report line is renamed "Graph health score:" so it stops borrowing
 the header's own two words. Both scores and the −Nhp deduction still render;
-they are captioned, not removed. `docs/CLAIMS_REGISTER.md` rows 96–97. (The
+they are captioned, not removed. `docs/CLAIMS_REGISTER.md` rows 102–103. (The
 clue/name half of finding #9 — a protagonist's name read as an unpaid setup —
 is scoring-path work and is NOT part of this.)
 
@@ -180,7 +180,7 @@ score **98**. `src/lib/percentile-copy.ts` now owns
 `dimensionPercentileBadgeFor` / `dimensionPercentileTooltipFor` /
 `dimensionPercentileCaptionFor` — gated, using `percentileDescriptor`'s own
 direction-safe vocabulary, and shared with [[Surface - Coverage HTML]] so the
-two can never word one badge two ways. `docs/CLAIMS_REGISTER.md` rows 98–99.
+two can never word one badge two ways. `docs/CLAIMS_REGISTER.md` rows 104–105.
 
 **The badge still ranks a different statistic from the number beside it, and
 says so.** `server/nvm/analyze/doctor.ts` ranks `build.rawScore` — unclamped,

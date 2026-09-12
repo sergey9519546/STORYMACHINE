@@ -29,7 +29,7 @@ it already performs — `src/lib/sample-coverage-facts.ts` — and the card rend
 every value from it. The "Next" cell shows the top priority's own `location`
 ("Scene 9 (climax peak)"), not a phrase somebody summarised; "LLM judge" reads
 None because `report.deepRead` is absent. The card also states whose numbers
-these are. `docs/CLAIMS_REGISTER.md` row 94.
+these are. `docs/CLAIMS_REGISTER.md` row 100.
 
 The freshness guard is `tests/core/sample-coverage-facts.test.ts` — the same
 shape as [[Gate - Receipt Gate]]'s sibling drift guards
@@ -82,4 +82,4 @@ requests into the same 60-second window as the feature-length doctor run, and
   `tests/core/start-screen-sample-card.test.ts`,
   `tests/core/start-screen-labs-gate.test.ts`
 - `docs/audits/2026-09-12-adversarial/writer-loop.md` findings 6, 10
-- `docs/CLAIMS_REGISTER.md` row 94
+- `docs/CLAIMS_REGISTER.md` row 100

@@ -59,7 +59,7 @@ anchors and nothing else, so a document-tier priority renders
 The root cause's located notes are not lost: one is offered beneath the note,
 attributed to that finding and labelled with its own destination, resolved
 through `jumpTargetForMemberRule` so the span is a tight occurrence (measured
-31 lines) rather than the envelope. `docs/CLAIMS_REGISTER.md` row 95.
+31 lines) rather than the envelope. `docs/CLAIMS_REGISTER.md` row 101.
 
 **#15 — the "this isn't Fountain" card dropped half the server's answer.**
 `POST /api/scriptide/doctor` answers a heading-less paste with BOTH a `reason`
@@ -80,7 +80,7 @@ it is on the scoring path) and re-submits it through the same `run()`, with
 describe different bytes. **Its limit is written down, not discovered later:**
 the route's `hasSceneHeading` tests each line trimmed and the normaliser never
 invents a slugline, so from this state the repair reports that it did not help
-and lands the one instruction that would fix it instead. `docs/CLAIMS_REGISTER.md` row 100.
+and lands the one instruction that would fix it instead. `docs/CLAIMS_REGISTER.md` row 106.
 
 **Browser suite:** `scripts/verify-p2-p3-surfaces.mjs` — the `P2-rerun` phase
 (9-scene draft, run, edit, click the banner, assert a real doctor POST and a
@@ -99,4 +99,4 @@ assertions on the compact card. `scripts/verify-ui-polish-affordances.mjs` and
   `tests/core/coverage-format-unrecognized-card.test.ts`,
   `tests/core/jump-span.test.ts`, `tests/core/coverage-jump-highlight.test.ts`
 - `docs/audits/2026-09-12-adversarial/writer-loop.md` findings 3, 5, 15
-- `docs/CLAIMS_REGISTER.md` rows 95, 100
+- `docs/CLAIMS_REGISTER.md` rows 101, 106
