@@ -22,6 +22,14 @@ const read = (rel: string) => readFileSync(resolve(__dirname, rel), 'utf8');
 const panel = read('../../src/components/scriptide/ScriptDoctorPanel.tsx');
 const startScreen = read('../../src/components/StartScreen.tsx');
 const whatIfPanel = read('../../src/components/WhatIfPanel.tsx');
+// 2026-09-12 (adversarial findings #4/#14): the panel's percentile copy moved
+// into the ONE module that owns it. The disclosure is therefore asserted at the
+// panel (it renders only the shared, gated helpers) AND in that module (the
+// helpers carry the qualifier), rather than as a string literal in the
+// component — which is where it had been hand-written beside an UNGATED
+// dimension badge that contradicted the headline's own "not comparable"
+// sentence in the same scrolling document.
+const percentileCopy = read('../../src/lib/percentile-copy.ts');
 
 describe('G0-09 — report honesty copy contract', () => {
   it('verdict explainers are engine tiers, not human-reader endorsements', () => {
@@ -47,10 +55,31 @@ describe('G0-09 — report honesty copy contract', () => {
       /stronger than \d+% of the reference set/i,
       'percentile must not present an unqualified reference-set comparison',
     );
+    assert.doesNotMatch(
+      percentileCopy,
+      /stronger than \$\{clamped\}% of the reference set/i,
+      'the shared copy module must not present an unqualified reference-set comparison either',
+    );
     assert.match(
-      panel,
+      percentileCopy,
       /synthetic reference set/i,
       'percentile must disclose that the reference set is synthetic',
+    );
+    // …and the panel must reach that disclosure through the shared, GATED
+    // helpers rather than a hand-written literal of its own. A literal here is
+    // exactly how the dimension badges came to say "TOP 10%" 227 lines under a
+    // headline reading "not comparable" (findings #4/#14).
+    assert.match(panel, /percentileSentenceFor\(/, 'the headline percentile must use the gated helper');
+    assert.match(
+      panel,
+      /dimensionPercentileBadgeFor\(/,
+      'the dimension badges must use the gated helper, not percentileBand',
+    );
+    assert.match(panel, /dimensionPercentileCaptionFor\(/, 'the section caption must be gated too');
+    assert.doesNotMatch(
+      panel,
+      /\{percentileBand\(dim\.percentile\)\}/,
+      'the ungated band must not be rendered for a dimension badge',
     );
   });
 

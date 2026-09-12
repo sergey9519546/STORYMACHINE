@@ -74,7 +74,11 @@ decision, repo visibility. Each has its own note under `Owner/`; start at
   module is the authority: [[Surface - Root Cause Pipeline]] for the scene
   ranges, cluster counts and priority order every document states, and
   [[Surface - Producer Tier]] for the one printed page both coverage exports
-  now open with.
+  now open with. The two surfaces a stranger meets FIRST have their own notes:
+  [[Surface - Start Screen]] (the front door, whose headline card is generated
+  from a doctor run rather than typed) and [[Surface - Coverage Summary]] (the
+  compact card "Try sample coverage" lands on, one click shallower than the full
+  panel).
 - **"What happened in session N?"** → `Sessions/` — start at
   [[Session - 2026-08-24 Five Landings]].
 - **"What did audit N find?"** → `Audits/` — start at

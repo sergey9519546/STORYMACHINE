@@ -1,7 +1,7 @@
 ---
 type: surface
-updated: 2026-09-11
-sources: [src/components/scriptide/ScriptDoctorPanel.tsx, src/lib/finding-jump.ts, server/nvm/analyze/doctor.ts, tests/core/script-doctor.test.ts, tests/core/finding-jump.test.ts, src/lib/priorities-copy.ts, server/lib/strengths-copy.ts, server/lib/scene-ranges.ts]
+updated: 2026-09-12
+sources: [src/components/scriptide/ScriptDoctorPanel.tsx, src/lib/diagnostic-copy.ts, src/lib/percentile-copy.ts, src/lib/finding-jump.ts, server/nvm/analyze/doctor.ts, tests/core/script-doctor.test.ts, tests/core/finding-jump.test.ts, src/lib/priorities-copy.ts, server/lib/strengths-copy.ts, server/lib/scene-ranges.ts]
 status: active
 ---
 
@@ -150,6 +150,45 @@ withholds the exact-rank tooltip — for a draft outside the calibration
 reference set's scene and word band, exactly as every other surface does
 (row 88).
 
+**Two numbers this panel presented as health, and five badges that read
+backwards (2026-09-12, adversarial findings #9, #4 and #14).**
+
+On the product's own demo script one report stated THREE different health
+numbers: the header's `VERDICT CONSIDER · HEALTH 78`, "Health score: 35/100" in
+Story Structure Analysis, and "Graph Health 37/100 **−9hp**" in Structural
+Analysis — the last in the header's own "hp" unit, in stamp red, with no caption,
+so nine points looked subtracted when nothing was. `server/nvm/analyze/types.ts`
+already said what those panels are: `graphDeduction` is "a potential 0–15 point
+value, NOT part of health/verdict until repaired graph extraction passes
+real-writing calibration." `src/lib/diagnostic-copy.ts` is now the ONE label —
+a badge ("Diagnostic — not part of Health") on each section header and a
+sentence naming the specific number and denying both the health and the verdict —
+and the mid-report line is renamed "Graph health score:" so it stops borrowing
+the header's own two words. Both scores and the −Nhp deduction still render;
+they are captioned, not removed. `docs/CLAIMS_REGISTER.md` rows 96–97. (The
+clue/name half of finding #9 — a protagonist's name read as an unpaid setup —
+is scoring-path work and is NOT part of this.)
+
+The five Craft Dimensions badges had the mirror-image problem. The comparability
+gate that makes the headline say "not comparable" (row 88, above) never reached
+them, so the SAME scrolling document said "not comparable" on line 140 and
+"STRUCTURE & PACING TOP 10% · CHARACTER TOP 10% · DIALOGUE & VOICE TOP 10% ·
+PLOT LOGIC & PAYOFF TOP 10% · THEME & ORIGINALITY TOP 10%" on lines 367–399.
+And `percentileBand(20)` returns "top 80%", which reads as praise: on `runoff`
+the badge beside Dialogue & Voice (percentile 20) read "TOP 80%" next to the
+score **98**. `src/lib/percentile-copy.ts` now owns
+`dimensionPercentileBadgeFor` / `dimensionPercentileTooltipFor` /
+`dimensionPercentileCaptionFor` — gated, using `percentileDescriptor`'s own
+direction-safe vocabulary, and shared with [[Surface - Coverage HTML]] so the
+two can never word one badge two ways. `docs/CLAIMS_REGISTER.md` rows 98–99.
+
+**The badge still ranks a different statistic from the number beside it, and
+says so.** `server/nvm/analyze/doctor.ts` ranks `build.rawScore` — unclamped,
+scarcity term included — while the badge sits next to the clamped display score.
+That is why a 100/100 dimension could read "bottom 10%" and an 81.5 "top 10%":
+the badge was a scene-count readout. Re-ranking is a scoring change and was not
+made; the tooltip names the mismatch instead. See [[Patterns]] for the shape.
+
 ## Sources
 
 - `src/components/scriptide/ScriptDoctorPanel.tsx`,
@@ -162,4 +201,9 @@ reference set's scene and word band, exactly as every other surface does
   `tests/core/finding-jump.test.ts`,
   `tests/core/scriptide-render-loop-guard.test.ts`
 - `src/lib/priorities-copy.ts`; `server/lib/strengths-copy.ts`; `server/lib/scene-ranges.ts`
-- `docs/CLAIMS_REGISTER.md` rows 9, 32-33, 36-38, 49, 72-73, 80-81, 86-88, 91 (this panel's claims)
+- `src/lib/diagnostic-copy.ts`; `src/lib/percentile-copy.ts`
+- `tests/core/diagnostic-not-health-label.test.ts`,
+  `tests/core/dimension-percentile-badge.test.ts`,
+  `tests/core/dimension-badge-wiring.test.ts`
+- `docs/audits/2026-09-12-adversarial/writer-loop.md` findings 4, 9, 14
+- `docs/CLAIMS_REGISTER.md` rows 9, 32-33, 36-38, 49, 72-73, 80-81, 86-88, 91, 96-99 (this panel's claims)

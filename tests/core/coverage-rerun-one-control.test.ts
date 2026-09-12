@@ -66,7 +66,8 @@ describe("CoverageSummary publishes its own run() to the host", () => {
 describe("ScriptIDE — the outdated banner issues a real run", () => {
   it("holds the registered run and exposes ONE rerunCoverage handler", () => {
     assert.match(scriptIde, /const coverageRunRef = useRef<\(\(\) => void\) \| null>\(null\);/);
-    assert.match(scriptIde, /const registerCoverageRun = useCallback\(\(run: \(\(\) => void\) \| null\) => \{\s*coverageRunRef\.current = run;/);
+    assert.match(scriptIde, /const registerCoverageRun = useCallback\(\(coverageRun: \(\(\) => void\) \| null\) => \{/);
+    assert.match(scriptIde, /coverageRunRef\.current = coverageRun;/);
     assert.match(scriptIde, /const rerunCoverage = useCallback\(\(\) => \{/);
     // It invokes the registered run when the panel is mounted, and only falls
     // back to opening the panel (which runs on mount) when it is not.

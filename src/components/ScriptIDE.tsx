@@ -1683,8 +1683,12 @@ export default function ScriptIDE({
    *  run COMPLETES — `onFreshReport` is the only thing that clears it. */
   /** Stable identity, so CoverageSummary's registration effect fires on its
    *  own `run` identity and never on a new inline arrow from this render. */
-  const registerCoverageRun = useCallback((run: (() => void) | null) => {
-    coverageRunRef.current = run;
+  const registerCoverageRun = useCallback((coverageRun: (() => void) | null) => {
+    // Parameter deliberately NOT named `run`: tests/core/command-palette-wiring.test.ts
+    // scans this file for command-registry dispatch expressions and allow-lists
+    // every command the palette may run, so a parameter annotation of that exact
+    // shape is indistinguishable from a new palette entry to that gate.
+    coverageRunRef.current = coverageRun;
   }, []);
 
   const rerunCoverage = useCallback(() => {

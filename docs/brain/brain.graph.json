@@ -571,6 +571,12 @@
       "path": "docs/brain/Surfaces/Surface - Coverage Letter.md"
     },
     {
+      "id": "docs/brain/Surfaces/Surface - Coverage Summary.md",
+      "type": "surface",
+      "title": "Surface — Coverage Summary (the compact card)",
+      "path": "docs/brain/Surfaces/Surface - Coverage Summary.md"
+    },
+    {
       "id": "docs/brain/Surfaces/Surface - Exports.md",
       "type": "surface",
       "title": "Surface — Exports",
@@ -605,6 +611,12 @@
       "type": "surface",
       "title": "Surface — Slate",
       "path": "docs/brain/Surfaces/Surface - Slate.md"
+    },
+    {
+      "id": "docs/brain/Surfaces/Surface - Start Screen.md",
+      "type": "surface",
+      "title": "Surface — Start Screen (the front door)",
+      "path": "docs/brain/Surfaces/Surface - Start Screen.md"
     },
     {
       "id": "docs/brain/Surfaces/Surface - Versions and Snapshots.md",
@@ -667,6 +679,14 @@
     {
       "from": "docs/brain/00 Home.md",
       "to": "docs/brain/Surfaces/Surface - Producer Tier.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Surfaces/Surface - Start Screen.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage Summary.md"
     },
     {
       "from": "docs/brain/00 Home.md",
@@ -2017,6 +2037,18 @@
       "to": "docs/brain/Surfaces/Surface - Exports.md"
     },
     {
+      "from": "docs/brain/Surfaces/Surface - Coverage Summary.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage Summary.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage Summary.md",
+      "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
       "from": "docs/brain/Surfaces/Surface - Exports.md",
       "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
     },
@@ -2101,8 +2133,28 @@
       "to": "docs/brain/Surfaces/Surface - Root Cause Pipeline.md"
     },
     {
+      "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Script Doctor Panel.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
       "from": "docs/brain/Surfaces/Surface - Slate.md",
       "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Start Screen.md",
+      "to": "docs/brain/Surfaces/Surface - Coverage HTML.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Start Screen.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Start Screen.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Versions and Snapshots.md",
