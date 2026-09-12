@@ -221,10 +221,31 @@ async function main(): Promise<void> {
     out('CALIBRATION CONTROL (not part of any asserted number)');
     out(`  ${result.calibrationControl.note}`);
     for (const b of result.calibrationControl.bands) {
-      out(`  band ${b.band.padEnd(10)} n=${b.n}  mean health ${b.meanHealth.toFixed(2)}`);
+      out(`  band ${b.band.padEnd(10)} n=${b.n}  mean health ${b.meanHealth.toFixed(2)}`
+        + `  words ${b.minWords}-${b.maxWords} (mean ${b.meanWords.toFixed(0)})`);
     }
     const s = result.calibrationControl.strongOverTroubled;
-    out(`  strong over troubled: ${s.ordered} of ${s.of} ordered, mean gap ${fixed(s.meanGap, 2)}`);
+    const c = result.calibrationControl.confound;
+    // The all-pairs figure leads because it is the honest one; the index-wise
+    // count follows it, labelled, because the measurement docs quote it.
+    out(`  strong over troubled: all-25-pairs AUC ${fixed(result.calibrationControl.strongOverTroubledAllPairs, 4)}`
+      + `, mean gap ${fixed(s.meanGap, 2)}`);
+    out(`    (the "${s.ordered} of ${s.of} ordered" this line used to lead with is an INDEX-WISE pairing of two`);
+    out('     unrelated bands — there is no matched pair between strong[i] and troubled[i], and the count');
+    out('     depends on an array order nothing pins: it holds for 96 of the 120 orderings of the troubled band)');
+    out('  DISCLOSED CONFOUND — the word budget is not controlled:');
+    out(`    Spearman(band, wordCount) ${fixed(c.spearmanBandWords, 4)}  vs  Spearman(band, health) ${fixed(c.spearmanBandHealth, 4)}`);
+    out(`    Spearman(band, sceneCount) ${fixed(c.spearmanBandScenes, 4)}`);
+    out(`    re-scored at a common ${c.equalisedAtWords}-word / ${c.equalisedAtScenes}-scene budget, same issue mix:`);
+    for (const b of c.equalisedBandMeans) {
+      out(`      ${b.band.padEnd(10)} shipped ${b.shipped.toFixed(2)}  equalised ${b.equalised.toFixed(2)}`
+        + `  delta ${(b.equalised - b.shipped >= 0 ? '+' : '')}${(b.equalised - b.shipped).toFixed(2)}`);
+    }
+    out(`    strong-minus-troubled gap ${fixed(c.shippedGap, 2)} -> ${fixed(c.equalisedGap, 2)}`);
+    out(`    all-25-pairs AUC ${fixed(c.shippedAllPairs, 4)} -> ${fixed(c.equalisedAllPairs, 4)}`);
+    out('    The band ordering is therefore PART craft and PART budget. The corpus is not re-authored here');
+    out('    (CLAUDE.md\'s controlled-richness gotcha; owner-gated task #48) — see');
+    out('    docs/scoring/CALIBRATION_CONFOUND_2026-09-12.md for what re-authoring would require.');
     out();
   }
 

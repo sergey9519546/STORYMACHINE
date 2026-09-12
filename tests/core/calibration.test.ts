@@ -21,6 +21,7 @@ import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts
 import type { CorpusBand, CorpusSample } from '../../server/nvm/analyze/calibration/corpus.ts';
 import { runScriptDoctor, computeRawCraftScore, computeHealthScore } from '../../server/nvm/analyze/doctor.ts';
 import type { DimensionKey } from '../../server/nvm/analyze/types.ts';
+import { measureCalibrationControl } from '../../scripts/lib/public-benchmark.ts';
 
 const DIMENSION_KEYS: DimensionKey[] = [
   'structure-pacing', 'character', 'dialogue-voice', 'plot-logic', 'theme-originality',
@@ -502,5 +503,106 @@ describe('termination / no-recursion', () => {
     const second = await runScriptDoctor(buildSmallFountain());
     assert.equal(second.healthPercentile, report.healthPercentile,
       'the warm path must agree with the cold one — a differing percentile means the distribution rebuilt');
+  });
+});
+
+// ── THE CONTROLLED-RICHNESS CLAIM, MEASURED (2026-09-12, finding 8) ────────
+// CLAUDE.md states the corpus's design as a gotcha: "band monotonicity is a
+// property of the CONTROLLED-RICHNESS DESIGN — all 20 samples share scene/word
+// budgets and structural-signal presence, so craft is the only variable."
+//
+// The word budget is not shared, and the consequence is measurable. These
+// assertions do NOT re-author the corpus — that is exactly what the gotcha
+// forbids doing piecemeal, and it is owner-gated (task #48). They pin the
+// confound's size so that it is disclosed rather than believed away, and so
+// that a future change to the corpus or the formula has to move these numbers
+// deliberately. docs/scoring/CALIBRATION_CONFOUND_2026-09-12.md records what a
+// real re-authoring would require.
+describe('the calibration corpus\'s word budget is NOT controlled, and this is how much it matters', () => {
+  it('band rank correlates with word count MORE tightly than with health', async () => {
+    const control = await measureCalibrationControl();
+    const c = control.confound;
+    console.log(
+      `    Spearman(band, words) ${c.spearmanBandWords.toFixed(4)} vs Spearman(band, health) `
+      + `${c.spearmanBandHealth.toFixed(4)}; Spearman(band, scenes) ${c.spearmanBandScenes.toFixed(4)}`,
+    );
+    // The finding, asserted as a finding. If a future corpus change makes the
+    // word budget genuinely shared, this goes red and the gotcha becomes true —
+    // which is the good outcome, and the failure message says so.
+    assert.ok(
+      c.spearmanBandWords > 0.5,
+      `Spearman(band, wordCount) is now ${c.spearmanBandWords.toFixed(4)}. If the corpus was equalised, `
+      + "CLAUDE.md's controlled-richness gotcha has become true and this test should be rewritten as the "
+      + 'invariant (equal wordCount and sceneCount across all 20 samples) rather than left asserting a defect.',
+    );
+    assert.ok(
+      c.spearmanBandWords >= c.spearmanBandHealth,
+      `band rank now correlates with health (${c.spearmanBandHealth.toFixed(4)}) at least as tightly as with `
+      + `word count (${c.spearmanBandWords.toFixed(4)}) — the confound has shrunk below the headline it explains, `
+      + 'and this assertion needs re-deriving rather than relaxing',
+    );
+  });
+
+  it('equalising the budget collapses a third of the headline band gap', async () => {
+    const control = await measureCalibrationControl();
+    const c = control.confound;
+    const share = (c.shippedGap - c.equalisedGap) / c.shippedGap;
+    console.log(
+      `    strong-troubled gap ${c.shippedGap.toFixed(2)} -> ${c.equalisedGap.toFixed(2)} `
+      + `(${(share * 100).toFixed(1)}% of it was budget); all-25-pairs AUC `
+      + `${c.shippedAllPairs.toFixed(4)} -> ${c.equalisedAllPairs.toFixed(4)}`,
+    );
+    assert.ok(c.equalisedGap < c.shippedGap, 'equalising the budget must not WIDEN the band gap');
+    assert.ok(
+      share > 0.2,
+      `only ${(share * 100).toFixed(1)}% of the band gap is budget now (was 34.5%). If the corpus was `
+      + 'equalised this is the good outcome — rewrite this test as the invariant.',
+    );
+    assert.ok(
+      c.equalisedAllPairs < c.shippedAllPairs,
+      `budget-equalised all-pairs AUC ${c.equalisedAllPairs.toFixed(4)} is not below the shipped `
+      + `${c.shippedAllPairs.toFixed(4)}; measured 0.7600 vs 0.9600`,
+    );
+  });
+
+  it('the honest cross-band statistic is the all-pairs AUC, and it is not 1.0000', async () => {
+    const control = await measureCalibrationControl();
+    // The index-wise "5 of 5 ordered" the control used to lead with is a
+    // pairing of two unrelated bands and depends on an array order nothing
+    // pins — it holds for 96 of the 120 orderings of the troubled band. The
+    // all-pairs figure is 0.9600 because one troubled sample outscores one
+    // strong sample.
+    assert.ok(
+      control.strongOverTroubledAllPairs < 1.0,
+      `all-25-pairs AUC(strong > troubled) is ${control.strongOverTroubledAllPairs.toFixed(4)}. It was 0.9600 — `
+      + 'one troubled sample (58.8) outscores one strong sample (58.2). A value of exactly 1.0000 means the '
+      + 'corpus or the formula moved and the control copy needs re-deriving.',
+    );
+    assert.ok(control.strongOverTroubledAllPairs >= 0.9, 'the band ordering should still be strong overall');
+    assert.equal(
+      control.strongOverTroubled.of, 5,
+      'the index-wise count is kept only because the measurement docs quote it; if the bands stop being '
+      + 'five and five, delete it rather than re-deriving a statistic that was never one',
+    );
+  });
+
+  it('the bands really do differ in word budget, per band, with the numbers', async () => {
+    const control = await measureCalibrationControl();
+    const by = new Map(control.bands.map((b) => [b.band, b]));
+    for (const b of control.bands) {
+      console.log(`    ${b.band.padEnd(10)} n=${b.n} words ${b.minWords}-${b.maxWords} mean ${b.meanWords.toFixed(0)}`);
+    }
+    const strong = by.get('strong')!;
+    const troubled = by.get('troubled')!;
+    assert.ok(
+      strong.meanWords > troubled.meanWords,
+      `strong mean words ${strong.meanWords.toFixed(0)} is no longer above troubled ${troubled.meanWords.toFixed(0)} — `
+      + 'the direction of the confound changed and every number in this describe block needs re-measuring',
+    );
+    assert.ok(
+      strong.meanWords - troubled.meanWords > 20,
+      `the gap is now ${(strong.meanWords - troubled.meanWords).toFixed(0)} words (was 49). If the corpus was `
+      + 'equalised, rewrite these tests as the invariant.',
+    );
   });
 });

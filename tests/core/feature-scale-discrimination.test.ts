@@ -223,9 +223,29 @@ describe('Feature-scale discrimination — arcIncoherenceDeduction moves health'
       '21-scene script. Nothing else in the suite notices when that happens — that is why ' +
       'this assertion exists. See the header for the full before/after table.',
     );
+    // ── WHAT THIS ASSERTION IS, AND WHAT IT IS NOT (corrected 2026-09-12) ──
+    // It used to read: "a scrambled act order must never score HIGHER than the
+    // draft it was cut from", checked against this ONE committed permutation.
+    // The universal claim is false. The 2026-09-12 adversarial review ran 20
+    // seeded permutations of the SAME 21 scene bodies and found 13 of them
+    // scoring higher than the intact draft on `main`; on this branch it is
+    // still 5 of 20 (permutation AUC 0.7500). `act-swapped.fountain` scores
+    // BELOW all twenty — it is an extreme-value draw from a distribution with
+    // 13.3 points of spread, and a universal statement was resting on the most
+    // favourable possible sample.
+    //
+    // So the sentence below now says only what it checks: this particular,
+    // deliberately act-swapped arrangement scores lower. The general claim,
+    // stated as a statistic over an ensemble with its floor and the whole
+    // distribution printed, lives in tests/core/order-ensemble.test.ts — which
+    // also records that the committed witness is an extreme draw, so the two
+    // files cannot drift back into agreeing on something untrue.
     assert.ok(
       swapped.health < intact.health,
-      'a scrambled act order must never score HIGHER than the draft it was cut from',
+      `this specific act-swapped arrangement (${swapped.health}) must score below the intact draft `
+      + `(${intact.health}). This is NOT the general claim "a scrambled order never scores higher" — that is `
+      + 'false for 5 of 20 seeded permutations of this same fixture. See tests/core/order-ensemble.test.ts '
+      + 'for the ensemble statistic and its floor.',
     );
   });
 });

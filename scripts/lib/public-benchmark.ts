@@ -59,7 +59,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
+import { computeHealthScore, runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
 import {
   PUBLIC_FLOORS,
@@ -568,8 +568,29 @@ export interface ScriptRow {
 
 export interface CalibrationControlResult {
   note: string;
-  bands: { band: string; n: number; meanHealth: number }[];
+  bands: { band: string; n: number; meanHealth: number; meanWords: number; minWords: number; maxWords: number }[];
   strongOverTroubled: { ordered: number; of: number; meanGap: number };
+  /** The honest cross-band statistic: all 25 strong x troubled comparisons,
+   *  ties counting a half. See strongOverTroubled's own comment for why the
+   *  index-wise count beside it is not one. */
+  strongOverTroubledAllPairs: number;
+  /** The disclosed confound. The corpus's design claim is that scene and word
+   *  budgets are shared so craft is the only variable; the word budget is not
+   *  shared, and these three numbers are how far that goes. */
+  confound: {
+    spearmanBandWords: number;
+    spearmanBandHealth: number;
+    spearmanBandScenes: number;
+    /** Re-scoring every sample through computeHealthScore at a common word and
+     *  scene budget, keeping its own issue mix. */
+    equalisedAtWords: number;
+    equalisedAtScenes: number;
+    equalisedBandMeans: { band: string; shipped: number; equalised: number }[];
+    shippedGap: number;
+    equalisedGap: number;
+    shippedAllPairs: number;
+    equalisedAllPairs: number;
+  };
 }
 
 /**
@@ -676,9 +697,15 @@ export async function measureCalibrationControl(): Promise<CalibrationControlRes
   }
   const strong = REFERENCE_CORPUS.filter((s) => s.band === 'strong');
   const troubled = REFERENCE_CORPUS.filter((s) => s.band === 'troubled');
-  // Pair them by position, exactly as docs/p1-benchmark/BLIND_PAIRS_2026-09-04.md
-  // reports "5 of 5 with a 25.32 gap" — the strong and troubled bands hold five
-  // samples each and are compared index-wise.
+  // ── THE INDEX-WISE COUNT IS NOT A MATCHED-PAIR STATISTIC (2026-09-12) ─────
+  // These two bands hold five UNRELATED samples each. There is no pairing
+  // between strong[i] and troubled[i]; the count therefore depends on the
+  // array order, which nothing pins. Measured: "5 of 5 ordered" holds for only
+  // 96 of the 120 orderings of the troubled band. It is kept because the
+  // measurement docs quote it and deleting a published number is worse than
+  // labelling it, but `strongOverTroubledAllPairs` below is the statistic to
+  // read — and it is 0.9600, not 1.0000, because one troubled sample (58.8)
+  // outscores one strong sample (58.2).
   let ordered = 0;
   let gapSum = 0;
   const n = Math.min(strong.length, troubled.length);
@@ -688,15 +715,116 @@ export async function measureCalibrationControl(): Promise<CalibrationControlRes
     if (good > bad) ordered += 1;
     gapSum += good - bad;
   }
+  const strongHealth = strong.map((x) => health.get(x.label)!);
+  const troubledHealth = troubled.map((x) => health.get(x.label)!);
+  const allPairs = (pos: number[], neg: number[]): number => {
+    if (pos.length === 0 || neg.length === 0) return NaN;
+    let wins = 0;
+    for (const p of pos) for (const q of neg) wins += p > q ? 1 : p === q ? 0.5 : 0;
+    return wins / (pos.length * neg.length);
+  };
+
+  // ── THE DISCLOSED CONFOUND (2026-09-12, adversarial review finding 8) ─────
+  // The corpus's design claim, stated as a gotcha in CLAUDE.md, is that "all 20
+  // samples share scene/word budgets and structural-signal presence, so craft
+  // is the only variable". The word budget is NOT shared: the strong band
+  // averages 327 words and the troubled band 278, and band rank correlates with
+  // word count MORE TIGHTLY (+0.7526) than with the health score the corpus
+  // exists to calibrate (+0.7099). All 20 samples sit on the density power
+  // branch, where `density = weightedIssues / wordCount^0.7`, so extra words
+  // mechanically buy a lower penalty.
+  //
+  // These figures are COMPUTED, not written down, so they cannot go stale, and
+  // they are surfaced on `npm run benchmark:public -- --control` and asserted in
+  // tests/core/calibration.test.ts. The corpus is NOT re-authored here:
+  // CLAUDE.md's controlled-richness gotcha is explicit that changing one band's
+  // richness without matching every other reintroduces the measured confound,
+  // and re-authoring is owner-gated (task #48). What re-authoring would require
+  // is written down in docs/scoring/CALIBRATION_CONFOUND_2026-09-12.md.
+  const wordsByBand = new Map<string, number[]>();
+  const sceneByBand = new Map<string, number[]>();
+  const bandRankOf = (b: string): number => ({ strong: 4, competent: 3, weak: 2, troubled: 1 }[b] ?? 0);
+  const perSample: Array<{ band: string; health: number; words: number; scenes: number;
+    bySeverity: { critical: number; major: number; minor: number } }> = [];
+  for (const sample of REFERENCE_CORPUS) {
+    const report = await runScriptDoctor(sample.fountain);
+    if (!wordsByBand.has(sample.band)) { wordsByBand.set(sample.band, []); sceneByBand.set(sample.band, []); }
+    wordsByBand.get(sample.band)!.push(report.wordCount);
+    sceneByBand.get(sample.band)!.push(report.sceneCount);
+    perSample.push({
+      band: sample.band, health: report.health, words: report.wordCount,
+      scenes: report.sceneCount, bySeverity: report.bySeverity,
+    });
+  }
+  const equalisedAtWords = Math.round(perSample.reduce((a, c) => a + c.words, 0) / perSample.length);
+  const equalisedAtScenes = 10;
+  const equalisedByBand = new Map<string, number[]>();
+  for (const r of perSample) {
+    const v = computeHealthScore(r.bySeverity, equalisedAtScenes, equalisedAtWords);
+    if (!equalisedByBand.has(r.band)) equalisedByBand.set(r.band, []);
+    equalisedByBand.get(r.band)!.push(v);
+  }
+  const mean = (a: number[]): number => a.reduce((x, y) => x + y, 0) / a.length;
+  const bandOrder = ['strong', 'competent', 'weak', 'troubled'];
+
   return {
     note: CALIBRATION_CONTROL_NOTE,
     bands: [...byBand.entries()].map(([band, values]) => ({
       band,
       n: values.length,
-      meanHealth: values.reduce((a, b) => a + b, 0) / values.length,
+      meanHealth: mean(values),
+      meanWords: mean(wordsByBand.get(band) ?? [0]),
+      minWords: Math.min(...(wordsByBand.get(band) ?? [0])),
+      maxWords: Math.max(...(wordsByBand.get(band) ?? [0])),
     })),
     strongOverTroubled: { ordered, of: n, meanGap: n === 0 ? NaN : gapSum / n },
+    strongOverTroubledAllPairs: allPairs(strongHealth, troubledHealth),
+    confound: {
+      spearmanBandWords: spearman(perSample.map((r) => bandRankOf(r.band)), perSample.map((r) => r.words)),
+      spearmanBandHealth: spearman(perSample.map((r) => bandRankOf(r.band)), perSample.map((r) => r.health)),
+      spearmanBandScenes: spearman(perSample.map((r) => bandRankOf(r.band)), perSample.map((r) => r.scenes)),
+      equalisedAtWords,
+      equalisedAtScenes,
+      equalisedBandMeans: bandOrder
+        .filter((b) => equalisedByBand.has(b))
+        .map((b) => ({
+          band: b,
+          shipped: mean(byBand.get(b)!),
+          equalised: mean(equalisedByBand.get(b)!),
+        })),
+      shippedGap: mean(byBand.get('strong') ?? [NaN]) - mean(byBand.get('troubled') ?? [NaN]),
+      equalisedGap: mean(equalisedByBand.get('strong') ?? [NaN]) - mean(equalisedByBand.get('troubled') ?? [NaN]),
+      shippedAllPairs: allPairs(strongHealth, troubledHealth),
+      equalisedAllPairs: allPairs(equalisedByBand.get('strong') ?? [], equalisedByBand.get('troubled') ?? []),
+    },
   };
+}
+
+/** Tie-corrected Spearman rank correlation. Written here rather than imported
+ *  because this module has no stats dependency and the benchmark's AUC helpers
+ *  live in scripts/lib/auc.ts, which is about a different statistic. */
+export function spearman(x: readonly number[], y: readonly number[]): number {
+  const ranks = (v: readonly number[]): number[] => {
+    const idx = v.map((val, i) => [val, i] as const).sort((a, b) => a[0] - b[0]);
+    const out = new Array<number>(v.length).fill(0);
+    let i = 0;
+    while (i < idx.length) {
+      let j = i;
+      while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j += 1;
+      const avg = (i + j) / 2 + 1;
+      for (let k = i; k <= j; k += 1) out[idx[k][1]] = avg;
+      i = j + 1;
+    }
+    return out;
+  };
+  const a = ranks(x);
+  const b = ranks(y);
+  const n = x.length;
+  const ma = a.reduce((s, v) => s + v, 0) / n;
+  const mb = b.reduce((s, v) => s + v, 0) / n;
+  let num = 0; let da = 0; let db = 0;
+  for (let i = 0; i < n; i += 1) { num += (a[i] - ma) * (b[i] - mb); da += (a[i] - ma) ** 2; db += (b[i] - mb) ** 2; }
+  return num / Math.sqrt(da * db);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
