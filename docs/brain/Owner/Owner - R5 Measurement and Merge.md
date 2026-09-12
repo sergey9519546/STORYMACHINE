@@ -1,7 +1,7 @@
 ---
 type: owner
-updated: 2026-09-11
-sources: [docs/PATH_TO_EXCELLENCE.md, docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md, docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md]
+updated: 2026-09-12
+sources: [docs/PATH_TO_EXCELLENCE.md, docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md, docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md, docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md, docs/scoring/VOICE_PAIR_CAP_2026-09-12.md]
 status: active
 ---
 
@@ -12,6 +12,18 @@ as [[Owner - Run Measure Real]], plus a judgment call on scoring-path changes
 whose costs are written down and whose benefit has not been measured on real
 writing. The corpus cannot reach CI, so [[Gate - Receipt Gate]] can only
 check that a human ran the measurement, never that the number is real.
+
+**What changed 2026-09-12:** a FIFTH branch,
+`scoring/adversarial-2026-09-12`, is STACKED ON `scoring/feature-length-defects`
+(rebased onto `main` @ `8aa1f696`) rather than parallel to it. It is not another
+alternative: it does not touch either formula constant this note is about, and it
+cannot be measured before the branch it sits on. Its own section is below the
+decision tree — **[[Branch - Adversarial 2026-09-12]]** — and the one-line
+summary is that it makes the score invariant to how a draft is FORMATTED, which
+is a prerequisite to the measurement this note asks for rather than a competitor
+to it. Two things in it change the owner's run: four public-benchmark floors move
+DOWN for a named, isolated reason, and the AUC-24 it needs is the AUC-24 of the
+stacked tip, not of `scoring/feature-length-defects` alone.
 
 **What changed 2026-09-11:** `scoring/feature-length-defects` went through an
 independent review and a revision round, and it now has a SIBLING —
@@ -150,7 +162,8 @@ only a heading — that is the one route the entry text itself forbids.
 
 | branch | tip | what it is |
 | --- | --- | --- |
-| `scoring/feature-length-defects` | see the branch note | **measure this one FIRST** — [[Branch - Feature-Length Defects]] |
+| `scoring/adversarial-2026-09-12` | `bdda4e75` | **STACKED on the row below — measure the stacked tip** — [[Branch - Adversarial 2026-09-12]] |
+| `scoring/feature-length-defects` | see the branch note | the base of the row above; **measure it via that tip** — [[Branch - Feature-Length Defects]] |
 | `scoring/feature-length-saturation-only` | see the branch note | **second, only if the first is rejected** — [[Branch - Feature-Length Saturation Only]], the saturation half alone |
 | `scoring/stacked-r5-plus-advice` | `408166ae` | [[Branch - Stacked R5 plus Advice]] |
 | `scoring/r5-verbosity-bias` | `52bf410a` | [[Branch - R5 Verbosity Bias]] alone |
@@ -267,8 +280,114 @@ is not evidence the score got better at judging craft. Treat any fall in
 AUC-24 as a real finding about these changes and do not answer it by moving
 the floor in `scripts/lib/auc.ts`; see [[Gate - AUC-24 Ratchet]].
 
+## The fifth branch — `scoring/adversarial-2026-09-12`
+
+**Where it sits.** It is `scoring/feature-length-defects` REBASED onto `main` @
+`8aa1f696` (that rebase is its base commit `78ec4464`, which is not the same
+object as `origin/scoring/feature-length-defects` @ `bcc96f85`), plus seven
+commits. Measuring the base branch on its own pushed tip now measures a scorer
+whose harness is out of date: main's instrument fix `63d7ede1` moved
+`CLIMAX_RELOCATE` to position ONE and gave the benchmark one shared scene
+segmenter. **Check out `scoring/adversarial-2026-09-12` and run the same two
+commands.** The base branch's AUC-24, if it were measured separately, would not
+be comparable to anything this tree reports.
+
+**What it changes, in one sentence each.** Nothing here alters
+`SUB_DENSITY_STEEPNESS` or `scarcityPenalty` — the two constants the decision
+tree above is about.
+
+1. **Parse and format invariance.** Identical writing now scores identically
+   however it reaches the analyzer. Eleven transforms that moved the score on
+   the 32 committed scripts — a dialogue reflow, a standard title page, curly
+   apostrophes, a boneyard note, an inline note, a synopsis, a section heading —
+   all read **0 of 32** afterwards.
+2. **The score denominator is the screenplay.** `wordCount` was the raw
+   submission; it is now the printing words the analyzer read. This closes a
+   free-score attack (an 800-repetition boneyard moved health on 32 of 32
+   scripts, mean **+7.206**, up to **+18.6**, flipping FOUR verdicts
+   CONSIDER → RECOMMEND without one word of screenplay changing).
+3. **Three property tests and no scoring change**: a live density gradient, a
+   seeded permutation ensemble for every order claim, and the calibration
+   corpus's word-budget confound disclosed with its numbers.
+4. **Report truth**: every dimension summary states its count, and the ranked
+   list weights concentration so a defect in one scene is not buried by
+   act-shape checks.
+5. **The voice pair grid's WORK is bounded** at 40 speakers, so an ordinary
+   20-to-60-character ensemble feature is analyzed instead of refused.
+
+**THE ONE THING TO READ BEFORE THE RUN: four floors moved DOWN.**
+
+```
+PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR   0.855  -> 0.8238  (measured 0.8750 -> 0.8438)
+PUBLIC_SHUFFLE_DROP_FLOOR          0.8091 -> 0.7696  (measured 0.8291 -> 0.7896)
+PUBLIC_ORDER_FLOOR                 0.5069 -> 0.5034  (measured 0.5269 -> 0.5234)
+PUBLIC_DIALOGUE_FLATTEN_FLOOR      0.98   -> 0.9614  (measured 1.0000 -> 0.9814)
+```
+
+`AUC24_FLOOR` was not touched. The cause is isolated by rerun, not argued: each
+of the four changes in that commit was disabled in turn with the other three
+live, and the typography fold, the title-page strip and the non-printing strip
+move the primary statistic by **0.0000**. The denominator change moves all of
+it, because every one of the 32 fixtures opens with its own CC0 licence record
+in a boneyard — 24 to 151 words, close to a fifth of the denominator on the two
+shortest scripts — and those words were being counted as screenplay. The
+benchmark's separation was partly a measurement of this repository's filing
+habits. Full table: `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §14.3.
+
+**WHAT THE CORPUS IS NEEDED FOR, half by half.**
+
+* **Needs the corpus to RE-MEASURE, not to establish.** The parse and format
+  fixes are correctness against the Fountain specification; whether a boneyard
+  is a comment is answered by the format, not by a statistic. What AUC-24 can
+  settle is **how much of the private corpus is text Fountain never prints** —
+  which nobody here can inspect. Three cases: no non-printing text and no title
+  page, and AUC-24 does not move; a title page on most drafts (the likely case),
+  and every script loses a few words from the denominator, both halves of each
+  matched pair equally, so the LEVEL shifts and the rank statistic largely does
+  not — the 72-row manifest still needs re-locking; substantial boneyard or note
+  text, and the same correction that cost **0.031** of the primary public
+  shuffle-drop AUC here moves AUC-24 by an amount proportional to how much of
+  each draft was never meant to be printed, in a direction this corpus cannot
+  predict.
+* **Needs no corpus at all.** The gradient property test, the permutation
+  ensembles, the calibration disclosure and the report-truth commits change no
+  scored number — output identity is byte-identical outside the named copy and
+  ordering keys — so AUC-24 cannot move because of them.
+* **Needs a COST measurement, not the corpus.** The voice-eligible weight bound.
+  See the next paragraph.
+
+**THE VOICE-ELIGIBLE BOUND NEEDS ONE MORE DECISION, AND IT IS NOT THIS BRANCH'S.**
+`docs/audits/2026-09-12-adversarial/rulebook-review.md` found that
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1,500,000` — the value
+`scoring/feature-length-defects` adopted at `111d72ed` — admits a 223-speaker x
+30-word document costing **27.3 s**, over the 30 s analysis budget, and
+`lane/rulebook-and-guard-bound` re-derived it from cost to **675,000**. That
+finding is correct and its method is right. Two things go with it:
+
+1. **It is a `main` measurement.** Same shape, same recipe, measured on this
+   branch: `main` costs 5,919 ms at cast 100 and REJECTS cast 223; this branch
+   costs **300 ms** at cast 223 before its analyzer cap and **139 ms** after,
+   because `scoring/feature-length-defects` already landed the per-character
+   abstention rewrite (42,062 ms → 191 ms on a 200-name payload). A
+   1,200-speaker, 269 KB document costs 1.5 s here.
+2. **Re-derive the bound ONCE, on the merged tree, with the cap in place.** A
+   cost-derived bound measured against an O(distinct²) grid is a bound against a
+   cost that no longer exists once the grid is flat. `scoring/adversarial-2026-09-12`
+   therefore changed no constant in `server/lib/validation.ts`, and
+   `111d72ed`'s 1,500,000 still needs the sibling lane's correction applied.
+
+The numbers are in `docs/scoring/VOICE_PAIR_CAP_2026-09-12.md`.
+
+**Converting its receipt.** It adds ONE pending entry — the 2026-09-12
+"ADVERSARIAL LANE" heading — so the three-scan recipe above applies to it
+unchanged, and to one entry rather than three. Verified mechanically on a
+scratch copy of this branch's ledger: as shipped the gate exits **1** naming
+exactly that entry; with the three scans applied it exits **0**.
+
 ## Sources
 
 - `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` — the three PENDING entries and the 2026-09-06 addenda
 - `docs/PATH_TO_EXCELLENCE.md` "What only the owner can do now"
 - `docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md`
+- `docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md`, `docs/scoring/DENSITY_GRADIENT_2026-09-12.md`, `docs/scoring/CALIBRATION_CONFOUND_2026-09-12.md`, `docs/scoring/REPORT_SEAM_2026-09-12.md`, `docs/scoring/VOICE_PAIR_CAP_2026-09-12.md`
+- `docs/audits/2026-09-12-adversarial/rulebook-review.md` — the voice-eligible bound's cost finding

@@ -2663,3 +2663,34 @@ the thirteen other passes, which are linear in document size. The base branch's
 own bound commit (`111d72ed` on this rebased branch — 300,000 -> 1,500,000 on
 `scoring/feature-length-defects`) needs the same correction the sibling lane
 applied, and it should be applied once, on the merged tree, from a rerun.
+
+**THE OWNER'S THREE-SCAN CONVERSION IS PROVEN TO CLOSE THIS ENTRY.** Not
+asserted: run, in a throwaway clone of this branch, against the real CLI.
+
+* As shipped: `node scripts/check-scoring-receipt.mjs 78ec4464..HEAD` exits **1**
+  and names exactly one problem — this entry, as a PENDING entry. Seven
+  scoring-path files are listed as changed (`doctor.ts`,
+  `fountain-analyzer.ts`, `screenplay-normalizer.ts`, `cluster.ts`, `types.ts`,
+  `voice-delta.ts`, `src/lib/fountain.ts`). No other problem is reported: no
+  simulation language, no unresolvable SHA, no missing required field.
+* With [[Owner - R5 Measurement and Merge]]'s three scans applied to this one
+  entry — scan one the `###` heading, scan two the four `PENDING_PHRASES`
+  anywhere in the body (matched with `\s+` between words, so a phrase broken by
+  a line wrap is caught), scan three the VALUE of every required field — and
+  the AUC-24 number, corpus fingerprint and first-person attestation filled in,
+  the same command exits **0** in an isolated clone with
+  "docs/p1-benchmark/MEASUREMENT_RECEIPTS.md gained a well-formed new entry in
+  the same range. OK."
+* The conversion has to be COMMITTED, not merely saved. The gate reads the
+  receipt through `git diff --unified=0 <range>`, so an edit sitting in the
+  working tree is invisible to it and the run looks unchanged. That cost one
+  confusing rerun here and is written down so it does not cost one there.
+* Rehearse it in a real `git clone`, not a copy of a worktree. A linked
+  worktree's `.git` is a FILE reading `gitdir: <main repo>/.git/worktrees/<name>`,
+  so a directory copied from one shares the real repository: a commit made in
+  the copy lands on the live branch. That happened once here and was undone with
+  `git reset --mixed` before anything was pushed. `git clone --shared <repo>
+  <dir>` gives a scratch tree whose commits go nowhere.
+
+This entry is ONE pending entry, not three, so the recipe applies to it
+unchanged and once.

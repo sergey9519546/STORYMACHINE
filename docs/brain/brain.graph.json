@@ -61,6 +61,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
     },
     {
+      "id": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
+      "type": "branch",
+      "title": "Branch — `scoring/adversarial-2026-09-12`",
+      "path": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
       "type": "branch",
       "title": "Branch — Advice-Rule-Fixes",
@@ -873,6 +879,18 @@
       "to": "docs/brain/Patterns.md"
     },
     {
+      "from": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
       "from": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
       "to": "docs/brain/Measurements/Measurement - DETECTOR_DEFECTS_2026-08-03.md"
     },
@@ -1634,7 +1652,15 @@
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "to": "docs/brain/Owner/Owner - Lock AUC24 Table.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
