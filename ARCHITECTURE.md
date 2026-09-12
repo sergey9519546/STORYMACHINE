@@ -195,16 +195,39 @@ separately from `report`, so a hand edit to any of them printed
 `VERIFIED`, exit 0 (`docs/audits/2026-09-12-adversarial/server-data-tests.md`
 BUG-1; `writer-loop.md` finding 2 for the tier's verdict/health line).
 
-Two rules hold the offline verifier honest. Every claim is **recomputed**, not
-read off the report — page references are re-resolved through the paginator and
-the logline state re-derived from the text, with the verifier deliberately never
-handed the value it is checking. And a document that renders a summary page
-whose numbers its verify block does not publish is **refused**, because
-"only what was claimed is checked" would otherwise let a forger opt a number
-out of verification by deleting its row. What the verifier does NOT check —
-wording, the logline's text, the title, the author, the caller-supplied draft
-rank — is stated on the artifact itself, in `--help`, and in the register
-(`docs/CLAIMS_REGISTER.md`).
+Two rules hold the offline verifier honest.
+
+**Every claim is recomputed, not read off the report** — page references are
+re-resolved through the paginator and the logline state re-derived from the text,
+with the verifier deliberately never handed the value it is checking.
+
+**The page and the block must agree about which claims EXIST**, not only about
+their values, because "only what was claimed is checked" would otherwise let a
+forger opt a number out of verification by deleting its row. Two independent
+conditions, and the first needs no tier detection at all:
+
+1. A block that publishes any summary-page claim must publish every required one
+   — the unconditional ones, plus each conditional one (page estimate, percentile
+   reading, logline state) whose value the page states. Deleting *some* rows is
+   refused whatever the markup says.
+2. For a block with no summary-page claims left, the question "was there a
+   summary page?" is answered from a SET of structural signals — the scope
+   sentence, the tier caption, the tier's stylesheet rules and section classes,
+   the labelled Length / Logline / Verdict lines, the spaced health reading — none
+   of which a pre-2026-09-11 artifact carries.
+
+The honest limit, because the first version of this gate claimed more: that is N
+independent edits rather than one, not an unforgeable property. A forger who
+strips every signal leaves a document that no longer renders a summary page in any
+recognisable form, at which point it is indistinguishable from a pre-tier report
+and is verified on the claims it does publish — which is the correct outcome for
+such a report. A genuine reader summary page also states the reference bounds
+exactly once, so a tier page with no bounds text has had that statement removed
+and is refused on its own.
+
+What the verifier does NOT check — wording, the logline's text, the title, the
+author, the caller-supplied draft rank — is stated on the artifact itself, in
+`--help`, and in the register (`docs/CLAIMS_REGISTER.md`).
 
 ### Execution off the main thread
 

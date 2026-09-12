@@ -1456,6 +1456,29 @@ async function main() {
     return resp.json();
   }
 
+  // 2026-09-12 (BUG-1, round 2): this form posts only the values a recipient TYPES
+  // IN — it never sees the document, so it cannot do the body-versus-block check
+  // the offline command does. The page has to say so, or it silently checks less
+  // than the tool can. Driven in the browser because a sentence that is only in the
+  // source is not a sentence a verifier reads.
+  const scopeNoteOk = await pageA
+    .getByText(/This form checks the values you type in\./)
+    .first().isVisible().catch(() => false);
+  record(
+    'P3',
+    '#verify states what its form cannot check, and names the command that can (npm run verify-report)',
+    scopeNoteOk,
+    scopeNoteOk ? '' : 'the form-scope sentence was not visible on #verify',
+  );
+  const scopeNoteNamesCommand = await pageA
+    .getByText(/npm run verify-report/).first().isVisible().catch(() => false);
+  record(
+    'P3',
+    '#verify names the offline command in the same note',
+    scopeNoteNamesCommand,
+    scopeNoteNamesCommand ? '' : 'npm run verify-report was not visible on #verify',
+  );
+
   const positiveResult = await runVerify(sampleFountain);
   record(
     'P3',

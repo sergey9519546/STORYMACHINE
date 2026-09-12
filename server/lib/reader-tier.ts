@@ -171,6 +171,18 @@ export function buildReaderTier(
   // script text recomputes this exact state through this exact function
   // (server/lib/verify-compare.ts's recomputeArtifactClaims), with no access to
   // whatever the original caller passed.
+  //
+  // THE ONE CONSEQUENCE WORTH KNOWING (2026-09-12 round-2 review observation). A
+  // caller that supplies its OWN logline for a script whose dialogue-share gate
+  // FIRES would publish `Logline: derived` against a recomputed `not derived`, and
+  // its artifact would fail verification on that claim — correctly, since the
+  // verifier attests the engine's output rather than the caller's. Not reachable
+  // today: every caller in this repository (both export routes,
+  // scripts/generate-p0-sample-report.ts, scripts/measure-reader-tier-page.mjs)
+  // passes buildLogline's own output, and the gate fires on none of the 20 CC0
+  // scripts in data/screenplays/. A future caller with its own logline should pass
+  // `null` when the engine would not derive one, or accept that the claim is about
+  // the engine.
   const supplied = opts.logline === undefined && fountain
     ? buildLogline(report, analyzeFountainText(fountain).records, fountain)
     : opts.logline;

@@ -91,10 +91,34 @@ the block. Three properties are worth knowing:
   `buildReaderTier` with only the script text, so page references are
   re-resolved through the paginator and the logline state re-derived; the
   verifier is deliberately never handed the value it is checking.
-- **A tier with no tier claims is refused.** Deleting a claim row is a missing
-  value, not a wrong one, and "only what was claimed is checked" would let a
-  forger opt a number out of verification. Gated on the tier's PRESENCE, so
-  every artifact exported before 2026-09-11 (no tier) still verifies.
+- **The page and the block must agree about which claims EXIST.** Deleting a
+  claim row is a missing value, not a wrong one, and "only what was claimed is
+  checked" would let a forger opt a number out of verification. Two independent
+  conditions, the first needing no tier detection: (1) a block that publishes ANY
+  tier claim must publish every required one — the unconditional ones, plus each
+  conditional one (page estimate, percentile reading, logline state) whose value
+  the page states; (2) a block with no tier claims left, in a document that still
+  shows any of several structural tier signals (the scope sentence, the tier
+  caption, the tier stylesheet rules and section classes, the labelled Length /
+  Logline / Verdict lines, the spaced health reading).
+
+  ROUND 2 (2026-09-12 review findings 1-3) corrected two overclaims here. The
+  required set was a hand-written list of five of the nine tier labels, so
+  deleting `Estimated pages`/`Estimated runtime (minutes)` re-enabled the brief's
+  own `~500 pages / ~500 min (est.)` forgery at exit 0, and deleting
+  `Health percentile reading` let a page claim `top 5%`; it is now DERIVED from
+  `CLAIM_ROW_SPECS`'s `tier` column. And the detection was keyed on ONE marker
+  string per shape, so `## Reader summary` → `## Reader Summary` turned off both
+  the body-versus-block scrape and the refusal at once. The honest limit, stated
+  rather than implied: N independent edits, not an unforgeable property — a forger
+  who strips every signal leaves a document that renders no summary page in any
+  recognisable form, and it is then the pre-2026-09-11 report it resembles and
+  verifies on the claims it publishes. A genuine summary page also states the
+  reference bounds exactly once, so a tier page with no bounds text is refused on
+  its own (the half of finding 2 that row-deletion does not cover).
+  `tests/fixtures/verify-report/` holds byte copies of real pre-tier artifacts
+  (rendered by `318493c9`) so that back-compatibility is proven against a genuine
+  document rather than a simulation.
 - **The gap is written down.** `VERIFY_SCOPE_SENTENCE` ships in both exported
   documents and in `--help`: wording, the logline's text, the title, the author
   and the caller-supplied draft-rank line are not checked, because re-running the
