@@ -53,6 +53,7 @@ import {
   launchChromium,
   pickFreePort,
   shutdown,
+  textCarriesDoctorVerdict,
   waitForDoctorVerdict,
   wireConsoleCapture,
 } from './lib/browser-verify.mjs';
@@ -805,7 +806,13 @@ async function main() {
     .then(() => true)
     .catch(() => false);
   const summaryText = summaryReportRendered ? await summaryPanel.first().innerText() : '';
-  const verdictRendered = summaryReportRendered && /RECOMMEND|CONSIDER|PASS/.test(summaryText);
+  // Through the shared predicate (2026-09-12): this is a one-shot read rather
+  // than a poll, but "RUNNING PASS 1 OF 14…" answers a bare alternation here
+  // exactly as it answered the polls — the button-visible wait above makes
+  // that unlikely, not impossible, and an assertion that CAN be satisfied by
+  // progress copy is weaker than it reads. `textCarriesDoctorVerdict` strips
+  // the progress copy and requires the verdict as a whole word.
+  const verdictRendered = summaryReportRendered && textCarriesDoctorVerdict(summaryText);
   record('P3', 'Sample coverage produces a rendered verdict (Doctor reachable end to end)', verdictRendered, `summary panel verdict text present=${verdictRendered}`);
 
   const fullReportBtn = pageA.getByRole('button', { name: 'Full report', exact: true }).first();

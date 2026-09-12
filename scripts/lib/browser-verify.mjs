@@ -687,6 +687,24 @@ export const DOCTOR_PROGRESS_COPY_RE =
 export const DOCTOR_VERDICT_RE = /\b(RECOMMEND|CONSIDER|PASS)\b/;
 
 /**
+ * Does text ALREADY READ from the page carry a real verdict?
+ *
+ * The node-side twin of `waitForDoctorVerdict`'s page-side predicate, and the
+ * one place a suite should ask that question about a string it has in hand —
+ * a one-shot assertion after some other readiness signal is not a poll, but it
+ * is answered wrongly by exactly the same "RUNNING PASS 1 OF 14…" that
+ * defeated the polls, because `innerText` reflects `text-transform`. Strip the
+ * doctor's own progress copy, then require the verdict as a whole word.
+ *
+ * A fresh `RegExp` per call: `DOCTOR_PROGRESS_COPY_RE` is `/g`, and a shared
+ * global regex carries `lastIndex` between callers.
+ */
+export function textCarriesDoctorVerdict(text) {
+  const progress = new RegExp(DOCTOR_PROGRESS_COPY_RE.source, 'gi');
+  return DOCTOR_VERDICT_RE.test(String(text ?? '').replace(progress, ' '));
+}
+
+/**
  * Wait until a real doctor VERDICT is on screen — not the progress copy that
  * contains the word "pass".
  *
