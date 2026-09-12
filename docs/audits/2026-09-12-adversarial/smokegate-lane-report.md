@@ -246,3 +246,175 @@ e41e55ca8f846c1d2c464a1d8d0ef480118cb1d9	refs/heads/main
 
 The branch is pushed and rebased onto `main` `e41e55ca`; every commit was
 pushed as it was made.
+
+---
+
+## Round 2 — the review's one blocking item and all four non-blocking
+
+**Reviewed object was** `f0b5d787`; **round-2 tip is
+`96ab1ac1035f67be527539d16ede91a86eeae7e1`**, five commits on top, one per
+item, each pushed as it was made. `git diff --stat f0b5d787..HEAD` → **3
+files, +362 / −11** (`scripts/lib/browser-verify.mjs`, the two
+`tests/scripts/` files). No `src/`, no `server/`, no documents: every item was
+code or a fixture.
+
+```
+96ab1ac1 perf(gates): verify dist/ freshness once per repo per gate run
+93513cf9 fix(gates): a non-2xx / is a status, not an unclassifiable page
+142c4e47 fix(gates): serveModeOf accepts every attribute quoting HTML allows
+a586884e test(scanner): the taint follows a value into a local verdict predicate
+3f504d99 fix(gates): public/ is a client build input — the staleness rule was blind to it
+```
+
+### 1 (BLOCKING) — `public/` is a build input · **fixed, and the input list re-audited**
+
+The reviewer is right and the failure is exactly as reported. `public/` is
+copied verbatim into `dist/`: `index.html:6` links `/favicon.svg` and
+`src/index.css` loads eleven `/fonts/*.woff2` faces, and `dist/`'s top level is
+`assets  favicon.svg  fonts  index.html` — the middle two exist for no other
+reason.
+
+The list is now audited entry by entry, with each decision written beside it in
+`browser-verify.mjs`. **In:** `src/`, **`public/`**, `index.html`,
+`vite.config.ts`, `package.json`, `package-lock.json`, plus root build
+configuration matched **by shape** (`tsconfig*.json`,
+`postcss|tailwind|vite.config.*`) rather than listed, so a config this repo does
+not have today is covered the day someone adds one rather than the day someone
+remembers the list. **Out, with reasons:** `server/**` (runs from source in both
+modes), `metadata.json` (unreferenced), `.env*` — Vite only inlines
+`import.meta.env.VITE_*` and `grep -rn "import\.meta\.env\.VITE_" src/ index.html`
+is **empty** on this tree, so no env value reaches the bundle; if that stops
+being true, `.env` belongs in the list.
+
+`ensureBuiltDist`'s doc comment stops being an absolute. It now says what it
+is: a claim about an AUDITED set, only as strong as `DIST_BUILD_INPUTS`, to be
+re-audited when the build gains an input.
+
+**Fail-first, unit** — the new `public/`-shaped fixture (favicon edit, a nested
+font face, `tsconfig.json`, and a `postcss.config.js` added mid-test) run
+against the **old** input list:
+
+| tree | result |
+|---|---|
+| `f0b5d787`'s `browser-verify.mjs` + the new fixture | **6 pass / 1 fail**, naming exactly `distStaleness fires on public/ — the input that was missing` |
+| tip | **7 pass / 0 fail** (10/10 once the round's other fixtures landed) |
+
+**Fail-first, end to end** — the reviewer's own experiment repeated on a built
+export with `data-lane="LANE_PUBLIC_9c2e"` planted into `public/favicon.svg`,
+booted through the lane's own helper:
+
+```
+[lane] dist/ is stale — dist/index.html is older than public/favicon.svg
+       (2026-09-12T23:08:24.344Z < 2026-09-12T23:08:24.407Z); running `npm run build`...
+[lane] dist/ rebuilt (2026-09-12T23:08:25.944Z).
+[lane] serving: the BUILT dist/ under NODE_ENV=production (hashed asset /assets/index-MmPcFF4j.js) …
+served favicon carries the tree edit: true        ← the reviewer measured false
+```
+
+### 2 (non-blocking 1) — the call-boundary escape · **closed**
+
+Plant D (`const check = (s) => /RECOMMEND|CONSIDER|PASS/.test(s); … check(t);`)
+moved the regex instead of the read, so no line carried both the alternation
+and a tainted name. A pre-pass now collects the file's **local verdict
+predicates** — any `const`/`let`/`var` bound to a function, or a `function`
+declaration, whose body carries a verdict alternation and does not route
+through the shared helper — and a call to one with a tainted argument is the
+same offender. Declarations are found on the masked copy and their span walked
+to the closing brace or the statement's `;`, so a brace inside a string cannot
+end one early.
+
+| tree | result |
+|---|---|
+| tip, untouched | **13 pass / 0 fail** |
+| tip + `scripts/verify-plant-d.mjs` (the reviewer's plant D) | **12 pass / 1 fail** — ``verify-plant-d.mjs:6 — return check(t); [`t` derives from an innerText read at line 5, tested by `check()`]`` |
+
+One boundary, within one file — the shape a person writes when a wait grows a
+helper. An **imported** predicate is deliberately out of scope and is asserted
+to be (`→ 0`), so the edge is a test rather than a surprise; the function
+comment says a cross-module spelling should be closed deny-by-default the way
+`handRolledStreamHolds` closes its own, not by growing a textual scan into an
+import graph. Both directions are also pinned: an untainted (`textContent`)
+argument and a predicate that routes through `textCarriesDoctorVerdict` are not
+flagged.
+
+### 3 (non-blocking 2) — asset-attribute quoting · **widened**
+
+`serveModeOf` matched double-quoted URLs only, and it fails CLOSED, so a
+minifier in the build chain would have turned the golden-path gate red for a
+quoting style. It now takes double, single and unquoted values plus whitespace
+around the `=`, and the evidence line still names the asset whichever form it
+arrived in. Fail-first: the six-case fixture against the old regex → **7 pass /
+1 fail** on "single-quoted markup must classify as the built bundle"; with the
+fix **8/8**. The fixture also pins what must NOT change — `/@vite/client` still
+wins when both appear, and a hashed path outside `/assets/` is still not
+evidence of a build.
+
+### 4 (non-blocking 3) — `res.ok` · **a status, not a markup shape**
+
+A 500, a proxy's 502 page, or the 404 a production boot with no
+`dist/index.html` answers all reached the classifier as markup and came back
+`unknown`, throwing "neither /@vite/client nor a /assets/ URL in N bytes of /" —
+the same outcome as a real misclassification with the one explanatory fact
+discarded. `serveModeOf` now throws naming the status and what that shape
+usually means. Fail-first: the three-status fixture against the old function →
+**8 pass / 1 fail** with *"Missing expected rejection"*; with the fix **9/9**.
+The fixture also asserts the message is **not** the misclassification sentence,
+so a refactor cannot satisfy it by throwing the old text.
+
+### 5 (non-blocking 4) — one walk per run · **memoized per repo**
+
+`ensureBuiltDist` is now answered from the verified result on a second call in
+the same process, returns `cached: true`, and says so. The memo is keyed by
+resolved repo path (two worktrees in one process are still checked separately)
+and only ever holds a verified-current result — the build path writes it after
+the post-build re-check. Fail-first: two calls on one temp repo plus a third on
+a second repo, against the old function → **9 pass / 1 fail**; with the memo
+**10/10**. Visible in the real gate's own log:
+
+```
+[smoke]        dist/ is current (built 2026-09-12T22:25:38.677Z, newest build input vite.config.ts) — not rebuilding.
+[smoke-budget] dist/ already verified current in this run — not re-checking.
+```
+
+`distStaleness` and `ensureBuiltDist` also gained explicit `@param` types: the
+inferred options type dropped `repo`, and the first `.ts` caller to pass it
+(the new fixture) failed `tsc`. Caught and fixed before the commit was final.
+
+### Gates (foreground, exit codes)
+
+| gate | command | exit |
+|---|---|---|
+| touched tests | `node --experimental-strip-types --test tests/scripts/smoke-gate-serve-mode.test.ts tests/scripts/wait-for-function-options-position.test.ts` | **0** — 23 pass, 0 fail |
+| lint | `npx tsc --noEmit` | **0** |
+| no-console | `node scripts/check-no-console.mjs` | **0** — 307 files |
+| docs | `npm run check-docs` | **0** |
+| claims register | `node scripts/honesty-audit.mjs` | **0** — 465 files, 489 tracked md, 115 rows, clean |
+| brain graph | `node scripts/brain-graph.mjs --check` | **0** — 110 notes, 419 links, fresh |
+| scoring receipt | `node scripts/check-scoring-receipt.mjs main..HEAD` | **0** — "no scoring-path files changed" |
+| p0-flow ×3 on the tip | `PW_CHROMIUM_PATH=… npm run verify:p0-flow` | **0** ×3 — 13.5 / 14.4 / 13.4 s at load 0.59 / 1.17 / 2.26 |
+
+No full `npm test` this round, per the coordinator. `ss` is not installed in
+this container; listeners were read from `/proc/net/tcp` instead before each
+boot (four unrelated infrastructure sockets, none of them a gate's, and the
+gate picks an ephemeral port anyway), and
+`ps -eo args | grep -c '[s]moke-p0-live-flow\|[v]erify-p2-p3'` was **0** before
+every browser run.
+
+### Still open after round 2
+
+Unchanged from §7 above: per-worktree `VITE_CACHE_DIR` for the six remaining
+dev-middleware suites (own lane; the 504 measurement in §3 is the evidence for
+it), `ARCHITECTURE.md:481`'s stale "seven suites", and the gate still not
+asserting that the released run completes. Nothing from this round is left
+undone.
+
+### Round-2 tip and origin
+
+```
+$ git rev-parse HEAD
+96ab1ac1035f67be527539d16ede91a86eeae7e1
+
+$ git ls-remote origin lane/smoke-gate-boot main
+96ab1ac1035f67be527539d16ede91a86eeae7e1	refs/heads/lane/smoke-gate-boot
+943ffa8f6459d16b3b2118eaa6939754e77ab35a	refs/heads/main
+```
