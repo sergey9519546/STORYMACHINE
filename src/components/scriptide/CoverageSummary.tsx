@@ -8,11 +8,12 @@ import type { ScriptDoctorReport } from "../../../server/nvm/analyze/types.ts";
 import { title as sampleScriptTitle, fountain as sampleScriptFountain } from "../../lib/sample-script.ts";
 import { isWholeDraftAnalysisComplete } from "../../lib/analysis-completeness.ts";
 import { isDraftStale, type ThreadedCoverageReport } from "../../lib/coverage-staleness.ts";
-import { computeJumpSpan } from "../../lib/jump-span.ts";
+import { computeTopPriorityJumpSpan } from "../../lib/jump-span.ts";
 import {
   indexLocatedIssuesByLocation,
   documentTierLocations,
   jumpLabel,
+  jumpTargetForMemberRule,
   NO_LOCATION_DOCUMENT_REASON,
   NO_LOCATION_UNRESOLVED_REASON,
   type JumpTarget,
@@ -489,12 +490,21 @@ export default function CoverageSummary({
   // resolve and which therefore showed no jump button at all. The root
   // cause's own span is the fallback, and the regex parse is the last resort
   // for a report shape that predates locatedIssues.
-  // Retrospective #10 (tighter jump highlight): computeJumpSpan prefers a
-  // line-precise member span over a root cause's own wider envelope — see
-  // its doc comment in jump-span.ts for the full four-source priority order.
-  const jumpSpan = computeJumpSpan({
+  // Retrospective #10 (tighter jump highlight): the root-cause resolver prefers
+  // a line-precise member span over a root cause's own wider envelope — see
+  // jump-span.ts's doc comments.
+  //
+  // FINDING #5 (2026-09-12): this card leads with the TOP PRIORITY, so it
+  // resolves the TOP PRIORITY's own anchors and nothing else. The composite
+  // computeJumpSpan used to fall through to the first root cause's member
+  // envelope, and this card rendered that as the priority's location — "JUMP TO
+  // LINE 137" for a whole-draft "Conflict layer" finding, flashing lines
+  // 137–2709 of a 2,927-line feature. A document-tier priority now renders the
+  // honest NO_LOCATION_DOCUMENT_REASON note that finding-jump.ts already had,
+  // and the root cause's own located notes are offered SEPARATELY below, named
+  // after the note they actually point at.
+  const jumpSpan = computeTopPriorityJumpSpan({
     topLocation: top?.location,
-    root,
     locatedIssues: report?.locatedIssues,
   });
 
@@ -523,6 +533,31 @@ export default function CoverageSummary({
         : undefined;
     const { label, sceneNumber } = jumpLabel(jumpSpan.startLine, report?.sceneLineSpans, anchor);
     return { kind: "jump", startLine: jumpSpan.startLine, endLine: jumpSpan.endLine, label, sceneNumber };
+  })();
+
+  /** FINDING #5's never-subtract half.
+   *
+   *  When the top priority genuinely has no line, the report's LOCATED notes are
+   *  still worth reaching — the old code reached them by mislabelling one of
+   *  them as the priority's own location. They are reached here instead as what
+   *  they are: the first member rule of the leading root cause that resolves to
+   *  a real anchor, carrying that note's OWN jump label (from the one shared
+   *  naming rule in finding-jump.ts) and the root cause's title as its visible
+   *  attribution.
+   *
+   *  `jumpTargetForMemberRule` picks ONE member occurrence inside the root
+   *  cause's own envelope, so this is a tight span, not the 2,572-line envelope
+   *  that made the old control useless even where it was honest. Offered only
+   *  when the priority above has no jump of its own, so the card never shows two
+   *  competing primary destinations. */
+  const rootCauseMemberJump: { target: Extract<JumpTarget, { kind: "jump" }>; rootTitle: string } | null = (() => {
+    if (whatNextJump.kind === "jump") return null;
+    if (!root) return null;
+    for (const rule of root.memberRules ?? []) {
+      const target = jumpTargetForMemberRule(rule, root, report?.locatedIssues, report?.sceneLineSpans);
+      if (target.kind === "jump") return { target, rootTitle: root.title };
+    }
+    return null;
   })();
 
   const nextLabel =
@@ -820,6 +855,32 @@ export default function CoverageSummary({
                       `dark:text-gray-400` default would read 2.2:1 in dark
                       mode (verify-a11y's dark sweep caught exactly that). */}
                   <FindingJump target={whatNextJump} surface="invariant" />
+                </div>
+              )}
+              {/* Finding #5: the located notes stay reachable, attributed to the
+                  finding they belong to rather than relabelled as the priority's
+                  location. Registered as docs/CLAIMS_REGISTER.md row 102. */}
+              {rootCauseMemberJump && (onNavigateToFinding || onJumpToLine) && (
+                <div className="mt-3 border-t border-[var(--sm-hair)] pt-3">
+                  <p className="text-[11px] font-[family-name:var(--sm-font-mono)] leading-snug text-[var(--sm-ink-mute)]">
+                    A located note from “{rootCauseMemberJump.rootTitle}” — a different finding:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onNavigateToFinding
+                        ? onNavigateToFinding(
+                            rootCauseMemberJump.target.startLine,
+                            rootCauseMemberJump.target.endLine,
+                          )
+                        : onJumpToLine?.(rootCauseMemberJump.target.startLine)
+                    }
+                    aria-label={rootCauseMemberJump.target.label}
+                    className="sm-btn mt-2"
+                  >
+                    {rootCauseMemberJump.target.label}
+                    <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                  </button>
                 </div>
               )}
             </div>

@@ -2400,6 +2400,49 @@ async function main() {
   await pageD.waitForFunction(() => /HEALTH/.test(document.body.innerText), { timeout: timing.ms(180000) });
   await pageD.waitForTimeout(timing.ms(1500));
 
+  // ── Finding #5 (2026-09-12): the COMPACT card's "next fix" must not invent
+  // a line for a whole-draft priority. This fixture's top priority is
+  // NO_REVERSALS_LONG_STORY at "Conflict layer", which the server resolves to
+  // the 'document' tier; the card used to borrow the first root cause's member
+  // envelope and render "JUMP TO LINE 137", flashing 87.9% of the 2,928-line
+  // file. Driven here on the compact panel, before "Full report" replaces it.
+  const coverageAside = pageD.getByRole('region', { name: /coverage/i }).first();
+  const nextFixNoLocation = await coverageAside.locator('[data-no-location]').count();
+  const strayLineJump = await coverageAside
+    .getByRole('button', { name: /^Jump to line 137$/ })
+    .count();
+  record(
+    'P2-featurelen',
+    'finding #5: the "next fix" card shows an honest "no location" note for the whole-draft top priority (it used to say "JUMP TO LINE 137")',
+    nextFixNoLocation >= 1 && strayLineJump === 0,
+    `noLocationNotes=${nextFixNoLocation} strayLine137Jumps=${strayLineJump}`,
+  );
+  const attributedNote = coverageAside.getByText(/A located note from .+ — a different finding:/);
+  const attributedVisible = await attributedNote
+    .first()
+    .waitFor({ state: 'visible', timeout: timing.ms(10000) })
+    .then(() => true)
+    .catch(() => false);
+  record(
+    'P2-featurelen',
+    'finding #5: the root cause\'s own located note is still offered, attributed to THAT finding rather than relabelled as the priority\'s',
+    attributedVisible,
+    attributedVisible ? '' : 'no attributed "A located note from …" row beside the no-location note',
+  );
+  if (attributedVisible) {
+    const attributedJump = coverageAside.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).last();
+    const attributedName = await attributedJump.getAttribute('aria-label');
+    await attributedJump.click({ timeout: timing.ms(10000) });
+    await pageD.waitForTimeout(timing.ms(800));
+    const attributedLanded = await pageD.evaluate(() => document.querySelectorAll('.cm-sm-finding-flash').length);
+    record(
+      'P2-featurelen',
+      'finding #5: that attributed jump really moves the editor (the capability is kept, only its label changed)',
+      attributedLanded > 0,
+      `name=${JSON.stringify(attributedName)} flashed=${attributedLanded}`,
+    );
+  }
+
   await pageD.getByRole('button', { name: /full report/i }).first().click({ timeout: timing.ms(20000) });
   // 2026-09-11: the heading is derived from prioritiesHeadingFor (the ONE shared
   // implementation, src/lib/priorities-copy.ts), not the literal "Top Priorities"

@@ -39,12 +39,20 @@ describe('CoverageSummary.tsx — jump button targets a span, not a bare line', 
     assert.match(source, /\n  onNavigateToFinding,\n/);
   });
 
-  it('computes both endpoints of the span via computeJumpSpan', () => {
-    assert.match(source, /import \{ computeJumpSpan \} from "\.\.\/\.\.\/lib\/jump-span\.ts";/);
-    assert.match(source, /const jumpSpan = computeJumpSpan\(\{/);
+  it('computes both endpoints of the span via the top-priority-scoped resolver', () => {
+    // 2026-09-12 (adversarial finding #5): the card now calls
+    // computeTopPriorityJumpSpan, not the composite computeJumpSpan. The
+    // composite used to fall through to the first ROOT CAUSE's member envelope
+    // when the top priority had no span, and this card rendered that as the
+    // priority's own location ("JUMP TO LINE 137" for a whole-draft finding,
+    // flashing 87.9% of the 2,928-line feature fixture). See
+    // tests/core/coverage-next-fix-jump-honesty.test.ts.
+    assert.match(source, /import \{ computeTopPriorityJumpSpan \} from "\.\.\/\.\.\/lib\/jump-span\.ts";/);
+    assert.match(source, /const jumpSpan = computeTopPriorityJumpSpan\(\{/);
     assert.match(jumpSpanLibSource, /endLine: root\.endLine \?\? root\.startLine/);
     // The retrospective #10 tightening itself — a line-precise member's span
-    // must win over the root's own wider envelope.
+    // must win over the root's own wider envelope — still lives in the
+    // root-cause-scoped resolver.
     assert.match(jumpSpanLibSource, /l\.anchor === "lines" && memberSet\.has\(l\.issue\.rule\)/);
   });
 
