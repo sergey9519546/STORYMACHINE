@@ -106,6 +106,11 @@ import { prioritiesHeadingFor, prioritiesHeadingUpper } from '../../src/lib/prio
 // — see server/lib/priority-selection.ts for the two contradictory lists this
 // letter used to print in one document.
 import { orderedPriorities } from './priority-selection.ts';
+// ONE spelling of every section title the exported coverage HTML renders
+// (2026-09-12, adversarial finding #16). This letter points a reader at one of
+// those sections by name, and a hand-typed name is a reference that silently
+// stops resolving the next time that heading is reworded — which is the finding.
+import { REPORT_SECTION } from './report-sections.ts';
 // ONE title and caption for the checks-that-found-nothing section, shared with
 // the exported coverage HTML (2026-09-11, discovery #8).
 import { STRENGTHS_SECTION_TITLE, STRENGTHS_SECTION_CAPTION } from './strengths-copy.ts';
@@ -451,8 +456,14 @@ function buildCaveats(report: ScriptDoctorReport, opts: CoverageLetterOptions): 
   // "Shape & Rhythm" section and the exported coverage HTML's strip surface.
   if (report.structuralSignals?.scored) {
     const { meanAbsDialogueShareDelta, actionSentenceCvOverall } = report.structuralSignals;
+    // The section title is INTERPOLATED from server/lib/report-sections.ts, the
+    // same constant the exported HTML renders its own <h2> from, so this
+    // cross-document reference names a heading that document actually contains
+    // (2026-09-12, finding #16). It used to be the hand-typed string
+    // "Structural Signals", which the HTML heading has not been since the
+    // "(new, unwired diagnostics)" qualifier was added to it.
     caveats.push(
-      'Shape and rhythm: the exported HTML report carries a new "Structural Signals" strip — scene '
+      `Shape and rhythm: the exported HTML report carries a new "${REPORT_SECTION.structuralSignals}" strip — scene `
       + `length, talk-versus-action mix, speech turns, speaker pairings and ${ACTION_PROSE_VARIATION_LABEL_LOWER}, `
       + 'read from the shape of the document rather than from any word list. Two readings from it: the '
       + `mean scene-to-scene change in the dialogue/action word mix is ${formatSignalValue(meanAbsDialogueShareDelta)}, `
@@ -588,7 +599,11 @@ function renderMarkdown(d: LetterData): string {
 
   if (d.rootCauses.length > 0) {
     lines.push('');
-    lines.push('## Root Causes');
+    // The same title the exported coverage HTML heads its own section with
+    // (2026-09-12, finding #16): two documents of one contentHash must not name
+    // the same section two ways, which is the cross-document half of the same
+    // defect. See server/lib/report-sections.ts.
+    lines.push(`## ${REPORT_SECTION.rootCauses}`);
     lines.push('');
     d.rootCauses.forEach((rc, i) => {
       lines.push(`${i + 1}. **${rc.heading}** — ${rc.body}`);
@@ -651,8 +666,8 @@ function renderText(d: LetterData): string {
 
   if (d.rootCauses.length > 0) {
     lines.push('');
-    lines.push('ROOT CAUSES');
-    lines.push('-----------');
+    lines.push(REPORT_SECTION.rootCauses.toUpperCase());
+    lines.push('-'.repeat(REPORT_SECTION.rootCauses.length));
     d.rootCauses.forEach((rc, i) => {
       lines.push(`${i + 1}. ${rc.heading} — ${rc.body}`);
     });

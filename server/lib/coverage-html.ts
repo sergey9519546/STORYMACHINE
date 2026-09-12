@@ -58,6 +58,12 @@ import { prioritiesHeadingFor } from '../../src/lib/priorities-copy.ts';
 // ONE title and caption for the checks-that-found-nothing section, shared with
 // the coverage letter and the in-app panel — see server/lib/strengths-copy.ts.
 import { STRENGTHS_SECTION_TITLE, STRENGTHS_SECTION_CAPTION } from './strengths-copy.ts';
+// ONE spelling of every section title, and ONE way one section refers to another
+// (2026-09-12, adversarial finding #16). This document used to tell its reader to
+// "read after Top Priorities" — a heading the 2026-09-11 consolidation renamed,
+// so the only occurrence of that phrase in a real export was the reference
+// pointing at it. See server/lib/report-sections.ts.
+import { REPORT_SECTION, sectionXrefHtml } from './report-sections.ts';
 // Shared percentile copy (2026-09-04 review — consolidates what used to be
 // four independent hand-copies of ordinal()/percentileBand() across the
 // panel, this file, SnapshotManager.tsx and SlatePanel.tsx into one
@@ -308,7 +314,7 @@ function buildDimensionsSection(dimensions: DimensionScore[]): string {
   if (dimensions.length === 0) {
     return `
   <section class="section">
-    <h2>Craft Dimensions</h2>
+    <h2>${escapeHtml(REPORT_SECTION.craftDimensions)}</h2>
     <p class="empty-note">Dimension scoring is not available for this report.</p>
   </section>`;
   }
@@ -339,7 +345,7 @@ function buildDimensionsSection(dimensions: DimensionScore[]): string {
 
   return `
   <section class="section">
-    <h2>Craft Dimensions</h2>
+    <h2>${escapeHtml(REPORT_SECTION.craftDimensions)}</h2>
     <div class="dim-list">
       ${rows}
     </div>
@@ -402,7 +408,7 @@ function buildHeatmapSection(heatmap: SceneDiagnostics[]): string {
   if (heatmap.length === 0) {
     return `
   <section class="section">
-    <h2>Scene Heatmap</h2>
+    <h2>${escapeHtml(REPORT_SECTION.sceneHeatmap)}</h2>
     <p class="empty-note">No scenes were analyzed for this report.</p>
   </section>`;
   }
@@ -417,7 +423,7 @@ function buildHeatmapSection(heatmap: SceneDiagnostics[]): string {
 
   return `
   <section class="section heatmap-section">
-    <h2>Scene Heatmap</h2>
+    <h2>${escapeHtml(REPORT_SECTION.sceneHeatmap)}</h2>
     <div class="heat-row">
       ${cells}
     </div>
@@ -545,15 +551,21 @@ function rootCauseListItems(rootCauses: RootCauseFinding[]): string {
  *  section, matching buildStrengthsSection's convention) whenever
  *  clustering produced no named finding for this report — most reports,
  *  since named templates require a specific, audited rule co-occurrence. */
-function buildNamedRootCausesSection(rootCauses: RootCauseFinding[] | undefined): string {
+function buildNamedRootCausesSection(
+  rootCauses: RootCauseFinding[] | undefined,
+  /** See buildClusterFindingsSection's own note: the count the priorities
+   *  section rendered, so this section's forward reference names the heading
+   *  that document actually contains. */
+  prioritiesRendered: number,
+): string {
   if (!rootCauses) return '';
   const named = rootCauses.filter(isNamedRootCause);
   if (named.length === 0) return '';
 
   return `
   <section class="section">
-    <h2>Root Causes</h2>
-    <p class="dim-basis" style="margin:0 0 12px;">The ${formatNumber(named.length)} finding${named.length === 1 ? '' : 's'} below name the specific underlying craft problem behind several issues at once &mdash; read these first.</p>
+    <h2>${escapeHtml(REPORT_SECTION.rootCauses)}</h2>
+    <p class="dim-basis" style="margin:0 0 12px;">The ${formatNumber(named.length)} finding${named.length === 1 ? '' : 's'} below name the specific underlying craft problem behind several issues at once &mdash; read these first, before ${sectionXrefHtml(prioritiesHeadingFor(prioritiesRendered), escapeHtml)}.</p>
     <ol class="priority-list">
       ${rootCauseListItems(named)}
     </ol>
@@ -564,7 +576,16 @@ function buildNamedRootCausesSection(rootCauses: RootCauseFinding[] | undefined)
  *  Scene N" / "Widespread X concerns") — kept (never deleted, per the audit's
  *  explicit instruction), but ranked below Top Priorities, in the position
  *  the combined Root Causes section held before this split. */
-function buildClusterFindingsSection(rootCauses: RootCauseFinding[] | undefined): string {
+function buildClusterFindingsSection(
+  rootCauses: RootCauseFinding[] | undefined,
+  // The count the priorities section ACTUALLY rendered (2026-09-12, adversarial
+  // finding #16). Passed in rather than re-derived from report.topPriorities
+  // here, because the heading this sentence points at is
+  // `prioritiesHeadingFor(n)` for the n that SURVIVED the shared selection — and
+  // a reference computed from a different n names a heading the document does
+  // not contain, which is the defect in a new costume.
+  prioritiesRendered: number,
+): string {
   // Guard: only render when the report actually carries a synthesis — an
   // absent rootCauses means the caller never attached one (this field is
   // optional on ScriptDoctorReport), not that clustering ran and found nothing
@@ -582,8 +603,8 @@ function buildClusterFindingsSection(rootCauses: RootCauseFinding[] | undefined)
 
   return `
   <section class="section">
-    <h2>Recurring Issue Clusters</h2>
-    <p class="dim-basis" style="margin:0 0 12px;">The ${formatNumber(generic.length)} finding${generic.length === 1 ? '' : 's'} below cluster the detailed issue list by where they land in the script &mdash; read after Top Priorities, alongside the full appendix.</p>
+    <h2>${escapeHtml(REPORT_SECTION.recurringIssueClusters)}</h2>
+    <p class="dim-basis" style="margin:0 0 12px;">The ${formatNumber(generic.length)} finding${generic.length === 1 ? '' : 's'} below cluster the detailed issue list by where they land in the script &mdash; read after ${sectionXrefHtml(prioritiesHeadingFor(prioritiesRendered), escapeHtml)}, alongside ${sectionXrefHtml(REPORT_SECTION.fullPassAppendix, escapeHtml)}.</p>
     <ol class="priority-list">
       ${rootCauseListItems(generic)}
     </ol>
@@ -597,7 +618,7 @@ function buildAppendixSection(passes: ScriptDoctorReport['passes']): string {
   if (passes.length === 0) {
     return `
   <section class="section">
-    <h2>Full Pass Appendix</h2>
+    <h2>${escapeHtml(REPORT_SECTION.fullPassAppendix)}</h2>
     <p class="empty-note">No revision passes were run for this report.</p>
   </section>`;
   }
@@ -606,7 +627,7 @@ function buildAppendixSection(passes: ScriptDoctorReport['passes']): string {
   if (withIssues.length === 0) {
     return `
   <section class="section">
-    <h2>Full Pass Appendix</h2>
+    <h2>${escapeHtml(REPORT_SECTION.fullPassAppendix)}</h2>
     <p class="empty-note">No issues surfaced in any of the ${passes.length} revision passes.</p>
   </section>`;
   }
@@ -638,7 +659,7 @@ function buildAppendixSection(passes: ScriptDoctorReport['passes']): string {
 
   return `
   <section class="section">
-    <h2>Full Pass Appendix</h2>
+    <h2>${escapeHtml(REPORT_SECTION.fullPassAppendix)}</h2>
     ${passBlocks}
   </section>`;
 }
@@ -985,6 +1006,14 @@ const STYLES = `
       white-space: nowrap;
     }
     .diagnostic-note { color: #57606a; }
+    /* ── Cross-references (2026-09-12, adversarial finding #16) ──
+       A reference to another section of this document, marked so that "every
+       reference resolves to a heading this document rendered" is checked by
+       tests/core/report-cross-references.test.ts rather than by reading. Styled
+       as the heading it names — small caps, not a link: the document is a single
+       printable page sequence with no anchors to jump to, so a link affordance
+       would promise navigation that does not exist on paper. */
+    .xref { font-weight: 600; color: #3d3d3d; white-space: nowrap; }
     /* ── Priorities / appendix ── */
     .priority-list, .appendix-list {
       margin: 0;
@@ -1331,7 +1360,7 @@ function buildStructuralSignalsSection(report: ScriptDoctorReport): string {
     if (block.sceneCount === 0) return '';
     return `
   <section class="section">
-    <h2>Structural Signals (new, unwired diagnostics)</h2>
+    <h2>${escapeHtml(REPORT_SECTION.structuralSignals)}</h2>
     <p class="sig-note">Shape &amp; Rhythm needs at least two scenes; this draft has ${block.sceneCount}.</p>
     <p class="sig-note">${ACTION_PROSE_VARIATION_LABEL_LOWER} ${escapeHtml(formatSignalValue(block.actionSentenceCvOverall))}</p>
     <p class="sig-note">These readings are computed from document structure alone &mdash; word, line, sentence, turn and speaker counts &mdash; with no word list involved. They are <strong>diagnostic only and are not part of the score</strong>: no health, grade, verdict, dimension or priority above is derived from any number in this section.</p>
@@ -1368,7 +1397,7 @@ function buildStructuralSignalsSection(report: ScriptDoctorReport): string {
 
   return `
   <section class="section">
-    <h2>Structural Signals (new, unwired diagnostics)</h2>
+    <h2>${escapeHtml(REPORT_SECTION.structuralSignals)}</h2>
     <p class="sig-legend">One bar per scene. The filled lower portion is that scene&rsquo;s share of dialogue words; the pale remainder is action. Hover a bar for that scene&rsquo;s full reading.</p>
     <div class="sig-row">
 ${cells}
@@ -1479,7 +1508,7 @@ function buildGodmodeSection(report: ScriptDoctorReport): string {
   // The section's own badge, in the heading row where a reader meets the block —
   // the same two-part treatment (badge above, sentence on the card) the in-app
   // panel's Structural Analysis section carries, from the same module.
-  return `<section class="section"><h2>Structural Analysis <span class="diagnostic-badge">${escapeHtml(DIAGNOSTIC_NOT_IN_HEALTH_LABEL)}</span></h2><div class="metrics-grid">${parts.join('\n')}</div></section>`;
+  return `<section class="section"><h2>${escapeHtml(REPORT_SECTION.structuralAnalysis)} <span class="diagnostic-badge">${escapeHtml(DIAGNOSTIC_NOT_IN_HEALTH_LABEL)}</span></h2><div class="metrics-grid">${parts.join('\n')}</div></section>`;
 }
 
 /**
@@ -1534,6 +1563,11 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
   // `report` — which is how the tier's scene count, word count, page estimate,
   // page references and priorities count came to be unverifiable (BUG-1,
   // docs/audits/2026-09-12-adversarial/server-data-tests.md).
+  // How many priorities this document's own priorities section will render —
+  // the ONE shared selection (server/lib/priority-selection.ts), counted once so
+  // that the heading and every cross-reference to it agree.
+  const renderedPriorityCount = orderedPriorities(report.topPriorities).length;
+
   const tier = buildReaderTier(report, { logline: opts.logline, fountain: opts.fountain });
   const readerTier = renderReaderTierHtml(tier, escapeHtml, verdictStampHtml);
 
@@ -1546,9 +1580,13 @@ export function renderCoverageHtml(report: ScriptDoctorReport, title: string, op
     buildGodmodeSection(report),
     buildHeatmapSection(report.sceneHeatmap ?? []),
     buildStructuralSignalsSection(report),
-    buildNamedRootCausesSection(report.rootCauses),
+    // The priorities count is computed ONCE, here, and handed to all three
+    // sections (2026-09-12, finding #16): the section that PRINTS the heading and
+    // the two that REFER to it must use the same number, or the reference names a
+    // heading this document does not contain.
+    buildNamedRootCausesSection(report.rootCauses, renderedPriorityCount),
     buildTopPrioritiesSection(report.topPriorities ?? []),
-    buildClusterFindingsSection(report.rootCauses),
+    buildClusterFindingsSection(report.rootCauses, renderedPriorityCount),
     buildAppendixSection(report.passes ?? []),
     buildFooterSection(report, tier.claims),
   ].join('\n');

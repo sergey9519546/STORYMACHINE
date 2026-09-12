@@ -272,6 +272,14 @@
       white-space: nowrap;
     }
     .diagnostic-note { color: #57606a; }
+    /* ── Cross-references (2026-09-12, adversarial finding #16) ──
+       A reference to another section of this document, marked so that "every
+       reference resolves to a heading this document rendered" is checked by
+       tests/core/report-cross-references.test.ts rather than by reading. Styled
+       as the heading it names — small caps, not a link: the document is a single
+       printable page sequence with no anchors to jump to, so a link affordance
+       would promise navigation that does not exist on paper. */
+    .xref { font-weight: 600; color: #3d3d3d; white-space: nowrap; }
     /* ── Priorities / appendix ── */
     .priority-list, .appendix-list {
       margin: 0;
