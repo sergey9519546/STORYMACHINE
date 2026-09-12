@@ -258,3 +258,198 @@ reports); nothing in that range touches `scripts/` or `tests/`, so this branch
 needs no rebase and cannot conflict — `check-scoring-receipt.mjs main..HEAD`
 was run against the advanced `main` and still reports "no scoring-path files
 changed".
+
+---
+
+# Round 2 — answering `p0flow-review.md` (VERDICT REVISE)
+
+**Reviewed object:** `42f510ee` · **Round-2 tip:** `632592ec`, three commits,
+each pushed on its own. No `src/`, no `server/`, in any of them.
+
+| commit | item |
+|---|---|
+| `457469f8` | blocking 2 — pin the MOUNT window by holding `CoverageSummary`'s lazy chunk |
+| `d7a82a3e` | blocking 3 — qualify `holdDoctorRunInFlight`'s invariant (+ non-blocking 1) |
+| `632592ec` | non-blocking 3 and 4 — close the scanner's hoisted-handler escape, mask comments |
+
+## Item 1 — the correction: §4's determinism claim was false
+
+**§4 of this report said the mount-window regression "is now caught on every
+run", and §7 said the gate "fails deterministically on a product tree that
+loses either clause". Both were wrong.** The reviewer ran the same
+`doctorAutoSample`-clause-removed tree six times and measured **4 of 6 exit 1**
+(runs 2 and 6 passed), every catch at the MOUNT assertion. My round-1 evidence
+for that sentence was **two** runs of that tree, both red, and two runs cannot
+support the word "deterministic" — the correct claim from that evidence was
+"caught twice out of two", and I wrote a stronger sentence than I had measured.
+
+**What made it non-deterministic.** The round-1 change held the doctor POST,
+which pins the IN FLIGHT window. It does not pin the MOUNT window, and that is
+where the `doctorAutoSample` clause is the only thing disabling the toggle.
+The mount window is the sub-frame gap between the toolbar toggle attaching and
+`CoverageSummary`'s own "loading" status reaching the parent, and nothing was
+holding that gap open: whenever `attached` resolved after the propagation,
+`coverageSummaryStatus === "loading"` disabled the toggle on its own and the
+regressed tree passed. The reviewer's diagnosis is exactly right.
+
+The sentence is not being softened — item 2 makes it true. What is corrected
+is the record: **as of `42f510ee` the detector was 4 of 6, not 6 of 6.**
+
+## Item 2 — MOUNT is now pinned, and the regressed tree fails 6 of 6
+
+`CoverageSummary` is `lazy(() => import("./scriptide/CoverageSummary"))`
+(`ScriptIDE.tsx:98`) while the toolbar toggle lives in `ScriptIDE` itself, so
+holding its chunk holds the toggle in the state where the child has not mounted
+at all: `coverageSummaryStatus` is still its initial `"idle"` and the ONLY
+thing that can disable the toggle is `doctorAutoSample`.
+
+`holdDoctorRunInFlight` was generalised into one internal `holdRoute` with two
+named holds over it — `holdDoctorRunInFlight` (behaviour unchanged) and
+`holdCoverageSummaryChunk` — so hold/`waitUntilHeld`/`release` still has one
+implementation. `COVERAGE_SUMMARY_CHUNK_ROUTE` (`**/CoverageSummary*`) matches
+both the Vite dev module URL this gate actually drives and the built
+`/assets/CoverageSummary-<hash>.js`.
+
+Step 3b now walks two **pinned** windows in sequence and attempts the
+earliest-instant forced click in **both**:
+
+1. **MOUNT** — chunk held → `isDisabled()` must be true → forced click → no
+   `[role="dialog"]`.
+2. **IN FLIGHT** — chunk released, POST held → same two assertions again.
+
+The dialog check and its failure sentence are unchanged (they now carry a
+`[window: …]` tail); the click that used to be attempted in whichever window
+the timing landed in is now attempted in both.
+
+### Re-measured (N = 6), regressed tree = `main` + this tip's gate, `doctorAutoSample` clause removed
+
+| run | load | exit | assertion that caught it |
+|---|---|---|---|
+| 1 | 4.26 | **1** | MOUNT |
+| 2 | 4.17 | **1** | MOUNT |
+| 3 | 5.35 | **1** | MOUNT |
+| 4 | 4.23 | **1** | MOUNT |
+| 5 | 3.90 | **1** | MOUNT |
+| 6 | 3.76 | **1** | MOUNT |
+
+**6 of 6** (`4 of 6` before), all six the same message verbatim. An earlier
+identical table was taken at `457469f8` and is also 6 of 6; the table above is
+the final tip. The fully-regressed tree (whole disabled logic removed) is 2 of 2.
+
+**The cold-open branch fires too, and it is genuinely cold.** With ONLY the
+MOUNT `isDisabled()` throw removed from a scratch copy of the gate — so the
+forced click is actually reached on the regressed tree — the click at the
+pinned MOUNT window opens:
+
+```
+[probe] MOUNT disabled=false
+[smoke] FAIL — golden-path cold-panel regression: … opened a dialog …
+        (text starts: "SCRIPT DOCTOR\nUPLOAD SCRIPT\n\nWRITE SOME SCRIPT CONTENT, …")
+```
+
+That is the ORIGINAL defect verbatim — a cold `ScriptDoctorPanel` with no
+report — not round 1's accidental warm one. The gate now reaches the real
+failure mode on purpose.
+
+### Tip, N = 6, foreground
+
+| run | load | exit | wall |
+|---|---|---|---|
+| 1 | 3.07 | 0 | 22 s |
+| 2 | 4.91 | 0 | 23 s |
+| 3 | 4.61 | 0 | 20 s |
+| 4 | 4.31 | 0 | 21 s |
+| 5 | 5.08 | 0 | 22 s |
+| 6 | 5.74 | 0 | 20 s |
+
+## Item 3 — the invariant is qualified: it is the FIRST run's window
+
+The doc comment claimed, unqualified, that the toggle "stays disabled for as
+long as the run is actually running". The reviewer measured that false from the
+second run onward, and that comment is what the next lane reads before trusting
+an in-flight assertion elsewhere. It now says, with the reviewer's numbers:
+
+- **First run** (what this gate drives, before any report exists): the
+  guarantee holds — 4 of 4 in-flight DOM commits of a real unintercepted run
+  disabled, and a genuinely dispatched, unanswered run slowed with CDP latency
+  (`posted:1, responded:0`, Cancel visible, `disabled:true`, forced click → 0
+  dialogs).
+- **Re-run**: `coverageFullReportToggleState`'s FIRST clause
+  (`if (coverageReport) return { disabled: false }`) short-circuits, so the
+  toggle is **enabled** for the whole of an in-flight re-run — 5 of 5 in-flight
+  commits — and a real non-forced click opens the hydrated report and silently
+  abandons the re-run. Benign (same draft generation), and when the draft has
+  moved the toolbar renders "Re-run coverage" and the toggle does not exist at
+  all (20 of 20). **No product change**, per the reviewer's own request.
+
+Non-blocking 1 in the same commit: "the real request reaches the real server
+and its response is held" was imprecise — `page.route` intercepts before
+dispatch, so nothing has reached the server while a hold is on. The comment now
+says what is actually held (the caller's window) and warns a gate asserting on
+server-side state.
+
+## Scanner — the hoisted-handler escape is closed (non-blocking 3 and 4)
+
+The old test asked whether the `.route(` call text contained `setTimeout` or
+`route.continue(` — which a handler hoisted into a named `const` defeats
+entirely. It is now **deny-by-default**: a doctor-stream route is allowed only
+if it answers with a canned response (`route.fulfill(`), which is what the two
+legitimate stubs do. Everything else is an offender.
+
+| tree | result |
+|---|---|
+| tip's own `scripts/` | **8 pass, 0 fail** (both `fulfill` stubs correctly clean) |
+| tip + the reviewer's plant rebuilt (`verify-escape-a.mjs`: hoisted `const`, live 4 s hold) | **7 pass, 1 fail**, named at `verify-escape-a.mjs:9` — 8/8 green before |
+| `git archive main` export + this test file | **6 pass, 2 fail**, still naming `scripts/smoke-p0-live-flow.mjs:209` |
+
+Non-blocking 4 in the same commit: `maskCommentsAndStrings` blanks comments and
+string bodies while preserving every byte position and line break, so a
+`.route(` inside prose no longer starts the brace-walk (three self-test cases:
+line comment, block comment, and a URL whose `//` must not read as a comment).
+
+## Round-2 gates (foreground, exit codes)
+
+| gate | exit |
+|---|---|
+| `tests/scripts/wait-for-function-options-position.test.ts` | **0** — 8 pass, 0 fail |
+| `npx tsc --noEmit` | **0** |
+| `node scripts/check-no-console.mjs` | **0** |
+| `npm run check-docs` | **0** |
+| `node scripts/honesty-audit.mjs` | **0** |
+| `node scripts/brain-graph.mjs --check` | **0** |
+| `node scripts/check-scoring-receipt.mjs main..HEAD` | **0** — "no scoring-path files changed" |
+| `verify:p0-flow` ×6 on the tip | **0** ×6 |
+| `verify:p0-flow` ×6 on the regressed scratch tree | **1** ×6 (the point) |
+
+No full `npm test` this round, per the brief. `verify:ui-polish` /
+`verify:surfaces` were not re-run either: round 2 adds a new export and does not
+change any existing one, and both suites were green on `42f510ee`.
+
+## Still open after round 2
+
+- **Non-blocking 2 — the gate never asserts that the released run completes.**
+  Step 3b releases and closes the context. Not taken: the golden-path context
+  (step 2/3) already drives a full unintercepted run to a rendered verdict, so
+  a broken `release()` would surface as `waitUntilHeld` timeouts in 3b/3c
+  rather than silently. Worth one assertion if someone is in there again.
+- **Non-blocking 5 — per-worktree `VITE_CACHE_DIR`**, and the fact that this
+  gate certifies the Vite dev-middleware app rather than `dist/`. Both remain
+  out of scope and both are now named in two reviews.
+- **`bareVerdictPolls`'s own hoisting escape** (writer lane's, review item 5b)
+  is still open; my scanner no longer shares that shape, but I did not close
+  theirs.
+
+## Round-2 tip and origin
+
+```
+$ git rev-parse HEAD
+632592ecec7a8afe8057bbf34a9a3a7f5d43cab6
+
+$ git ls-remote origin lane/p0-flow-race
+632592ecec7a8afe8057bbf34a9a3a7f5d43cab6	refs/heads/lane/p0-flow-race
+
+$ git status --short
+(clean)
+```
+
+origin == local tip.
