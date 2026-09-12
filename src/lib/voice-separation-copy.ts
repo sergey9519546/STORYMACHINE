@@ -91,6 +91,26 @@ export function voiceSeparationShortValue(
   return voiceSeparationValue(voiceAnalysis) ?? VOICE_SEPARATION_ABSTAINED_VALUE;
 }
 
+/** The value shown when the channel abstained on a surface that has room for
+ *  words rather than a badge — the exported coverage report's metric row.
+ *
+ *  2026-09-12 (review round 2, non-blocking 2). server/lib/coverage-html.ts
+ *  hand-typed `'not measured'` at its metric row while the panel read
+ *  `VOICE_SEPARATION_ABSTAINED_VALUE` from here, so two surfaces stated one fact
+ *  in two words from two places — inside a lane whose own brief item is "no
+ *  second formatter". The export's wording is the better of the two and is now
+ *  the module's; the badge-width `N/A` stays for the tile, which has no room
+ *  for it. Which one a surface uses is a layout decision; the WORDS are this
+ *  module's, and tests/core/voice-separation-abstention.test.ts asserts no
+ *  surface types either of them itself. */
+export const VOICE_SEPARATION_NOT_MEASURED_VALUE = 'not measured';
+
+export function voiceSeparationLongValue(
+  voiceAnalysis: VoiceAnalysisReading | null | undefined,
+): string {
+  return voiceSeparationValue(voiceAnalysis) ?? VOICE_SEPARATION_NOT_MEASURED_VALUE;
+}
+
 /**
  * WHY the channel abstained, or `null` when it did not.
  *

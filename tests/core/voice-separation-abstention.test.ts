@@ -160,3 +160,52 @@ describe('the Coverage tile asks the shared module which sentence its state dese
     }
   });
 });
+
+// ── One wording for the abstention, in one place ─────────────────────────────
+//
+// 2026-09-12 (review round 2, non-blocking 2). The export hand-typed
+// `'not measured'` at its metric row while the panel read
+// `VOICE_SEPARATION_ABSTAINED_VALUE` ('N/A') from the shared module, so one
+// fact was stated in two words from two places — inside a lane whose own brief
+// item 4/14 is "call the shared function, add no second formatter". The
+// export's wording was the better one and is now the module's
+// (`VOICE_SEPARATION_NOT_MEASURED_VALUE`); which of the two a surface uses is a
+// layout decision, and the WORDS belong to one file.
+
+describe('the abstention has one wording, and it lives in the copy module', () => {
+  const SURFACES = [
+    'server/lib/coverage-html.ts',
+    'src/components/scriptide/CoverageSummary.tsx',
+  ];
+
+  it('the module owns both values, and they are different lengths for different room', async () => {
+    const mod = await import('../../src/lib/voice-separation-copy.ts');
+    assert.equal(mod.VOICE_SEPARATION_ABSTAINED_VALUE, 'N/A');
+    assert.equal(mod.VOICE_SEPARATION_NOT_MEASURED_VALUE, 'not measured');
+    assert.equal(mod.voiceSeparationLongValue({ pairs: [], scored: false }), 'not measured');
+    assert.equal(mod.voiceSeparationLongValue({ pairs: [{ swapRisk: false }], scored: true }), '1/1 Pairs');
+    assert.equal(mod.voiceSeparationShortValue({ pairs: [], scored: false }), 'N/A');
+  });
+
+  for (const surface of SURFACES) {
+    it(`${surface} states the abstention through the module, never in its own words`, () => {
+      const code = readFileSync(join(REPO, surface), 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^[ \t]*\/\/.*$/gm, '');
+      // The literal, in quotes, anywhere in live code is the second copy.
+      assert.ok(!/'not measured'|"not measured"|`not measured`/.test(code),
+        `${surface} hand-types the abstention value instead of reading it from the copy module`);
+      assert.ok(/voiceSeparation(Long|Short)Value\(/.test(code),
+        `${surface} must take the value from the shared module`);
+    });
+  }
+
+  it('the rendered export prints the module\'s word, on a report that really abstains', async () => {
+    const src = readFileSync(join(REPO, 'tests/fixtures/feature-length/assembled-feature.fountain'), 'utf8');
+    const report = await runScriptDoctor(src);
+    assert.equal(report.voiceAnalysis?.scored, false, 'this fixture must still abstain, or the case proves nothing');
+    const html = renderCoverageHtml(report, 'abstention');
+    assert.ok(html.includes('>not measured<'), 'the export must print the module\'s abstention value');
+    assert.ok(!html.includes('>N/A<'), 'the badge-width value has no business in a row with room for words');
+  });
+});

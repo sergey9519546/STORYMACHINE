@@ -48,8 +48,8 @@ import {
 // to read a number that was not there. One module, shared with that tile — see
 // src/lib/voice-separation-copy.ts.
 import {
-  VOICE_SEPARATION_LABEL, voiceSeparationValue, voiceSeparationAbstentionReason,
-  VOICE_SEPARATION_DEFINITION,
+  VOICE_SEPARATION_LABEL, voiceSeparationAbstentionReason,
+  VOICE_SEPARATION_DEFINITION, voiceSeparationLongValue,
 } from '../../src/lib/voice-separation-copy.ts';
 // ONE root-cause wording (2026-09-11) — see server/lib/root-cause-pipeline.ts.
 import { rootCauseStatements } from './root-cause-pipeline.ts';
@@ -1538,11 +1538,10 @@ function buildGodmodeSection(report: ScriptDoctorReport): string {
   // channel and abstained". Same guard convention the sections around this one
   // use for graphHealth, disclosureAnalysis and subplots.
   if (report.voiceAnalysis) {
-    const reading = voiceSeparationValue(report.voiceAnalysis);
     const reason = voiceSeparationAbstentionReason(
       report.voiceAnalysis, report.characters?.length ?? 0,
     );
-    parts.push(`<div class="metric-row"><span class="metric-label">${escapeHtml(VOICE_SEPARATION_LABEL)}</span><span class="metric-value">${escapeHtml(reading ?? 'not measured')}</span></div>`);
+    parts.push(`<div class="metric-row"><span class="metric-label">${escapeHtml(VOICE_SEPARATION_LABEL)}</span><span class="metric-value">${escapeHtml(voiceSeparationLongValue(report.voiceAnalysis))}</span></div>`);
     parts.push(`<p class="dim-basis diagnostic-note" style="margin:0 0 10px;">${escapeHtml(reason ?? VOICE_SEPARATION_DEFINITION)}</p>`);
   }
 
