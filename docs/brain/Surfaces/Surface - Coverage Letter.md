@@ -1,7 +1,7 @@
 ---
 type: surface
-updated: 2026-09-11
-sources: [server/lib/coverage-letter.ts, server/routes/coverage-letter.ts, server/lib/verify-compare.ts, scripts/verify-report.mjs, tests/core/coverage-letter.test.ts, server/lib/reader-tier.ts, server/lib/strengths-copy.ts]
+updated: 2026-09-12
+sources: [server/lib/coverage-letter.ts, server/routes/coverage-letter.ts, server/lib/verify-compare.ts, server/lib/artifact-claims.ts, scripts/verify-report.mjs, tests/core/coverage-letter.test.ts, server/lib/reader-tier.ts, server/lib/strengths-copy.ts]
 status: active
 ---
 
@@ -73,9 +73,21 @@ verbatim, the out-of-band path says why no percentile is given
 (`docs/CLAIMS_REGISTER.md` row 93). The three letter goldens were re-locked, and
 the duplicated reference-bounds line in the tier went with them.
 
+**The letter publishes a claim block too (2026-09-12).** Its footer carried the
+script-text hash, the engine identity and prose — so its scene count, word count,
+page estimate, priorities count, percentile reading, reference bounds, page
+references and even its verdict and health readings were unverifiable, and a hand
+edit to any of them printed `VERIFIED` at exit 0. The footer now lists every claim
+as a `Label: value` line from the SAME table the exported HTML publishes as
+`<dt>/<dd>` pairs ([[Surface - Exports]]), omitting the three the letter already
+states in its own prose (the hash and the engine identity) so no fact is printed
+twice. `Confirm the health, verdict, and hash above all match.` became
+`Every value listed below must match.` (`docs/CLAIMS_REGISTER.md` row 95), and the
+scope sentence naming what is NOT checked ships beside the rows (row 94).
+
 ## Sources
 
-- `server/lib/coverage-letter.ts`
+- `server/lib/coverage-letter.ts`; `server/lib/artifact-claims.ts`
 - `server/lib/verify-compare.ts`
 - `scripts/verify-report.mjs`
 - `tests/core/coverage-letter.test.ts`

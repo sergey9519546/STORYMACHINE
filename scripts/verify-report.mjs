@@ -72,7 +72,8 @@ import { commit as localEngineCommit } from '../server/lib/build-info.ts';
 import {
   decodeClaimRows, encodePageRefs, parseLengthLine, parseHealthLine,
   parseLetterTierVerdictLine, percentileReadingFromText, referenceBoundsFromText,
-  verdictFromWord, TIER_CLAIM_LABELS, VERIFY_SCOPE_SENTENCE,
+  verdictFromWord, CLAIM_ROW_SPECS, LETTER_PROSE_CLAIMS, TIER_CLAIM_LABELS,
+  VERIFY_SCOPE_SENTENCE,
 } from '../server/lib/artifact-claims.ts';
 import { prioritiesCountFromHeading } from '../src/lib/priorities-copy.ts';
 import {
@@ -468,6 +469,14 @@ function parseHtmlReport(text) {
 // server/lib/artifact-claims.ts's VERDICT_WORD/verdictFromWord, the same map the
 // three renderers emit through (2026-09-12).
 
+/** The labels the coverage LETTER publishes as rows — the shared table minus the
+ *  three it states in its own prose (artifact-claims.ts's LETTER_PROSE_CLAIMS).
+ *  Derived, not listed, so a row added to the table is read here without a second
+ *  edit. */
+const LETTER_ROW_LABELS = new Set(
+  CLAIM_ROW_SPECS.filter(spec => !LETTER_PROSE_CLAIMS.includes(spec.field)).map(spec => spec.label),
+);
+
 /** The letter's footer claim rows — `Label: value` lines, the same label table the
  *  HTML report publishes as `<dt>/<dd>` pairs (claimRowsFor, omitting the three the
  *  letter already states in its own prose).
@@ -482,7 +491,12 @@ function parseLetterClaimRows(text) {
   const rows = {};
   for (const line of text.slice(footerStart).split('\n')) {
     const m = line.match(/^([A-Z][^:]*): (.*)$/);
-    if (m) rows[m[1].trim()] = m[2].trim();
+    // Only labels the letter actually PUBLISHES as rows. The footer has other
+    // `Label: value`-shaped prose — the scope sentence opens "What is checked: …",
+    // and `Engine commit: <sha> · Rulebook: 3,217 rule concepts.` is the letter's
+    // own provenance line, whose label collides with a real claim label and whose
+    // value is a whole sentence. Both are read by their own patterns below.
+    if (m && LETTER_ROW_LABELS.has(m[1].trim())) rows[m[1].trim()] = m[2].trim();
   }
   return rows;
 }

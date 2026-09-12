@@ -1,6 +1,6 @@
 ---
 type: surface
-updated: 2026-09-11
+updated: 2026-09-12
 sources: [server/lib/coverage-html.ts, server/routes/export.ts, server/lib/verify-compare.ts, scripts/verify-report.mjs, tests/core/coverage-html.test.ts, server/lib/reader-tier.ts, server/lib/strengths-copy.ts, tests/core/reader-tier.test.ts]
 status: active
 ---
@@ -30,7 +30,10 @@ shows.
 **Verify block, offline-first (P3, 2026-09-06):** the footer's "Verify this
 report" `<dl class="verify-claims">` (contentHash, health, verdict,
 totalIssues, and — when `report.provenance` exists — engineCommit/
-rulebookCount) is unchanged; the three instructional steps above it were
+rulebookCount; **since 2026-09-12 also every number and reading
+[[Surface - Producer Tier]] states** — see [[Surface - Exports]] for the claim
+set, which these rows are now rendered FROM rather than hand-written beside)
+is unchanged in its six original labels; the three instructional steps above it were
 reordered so the OFFLINE path is named first: `npm run verify-report --
 report.html script.fountain` (the script never leaves the verifier's
 machine), with the hosted `#verify`/`POST /api/export/verify` path kept

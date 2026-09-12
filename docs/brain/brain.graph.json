@@ -1956,6 +1956,14 @@
     },
     {
       "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Producer Tier.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
+      "to": "docs/brain/Surfaces/Surface - Exports.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
       "to": "docs/brain/Surfaces/Surface - Exports.md"
     },
     {
@@ -1997,6 +2005,10 @@
     {
       "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
       "to": "docs/brain/Surfaces/Surface - Script Doctor Panel.md"
+    },
+    {
+      "from": "docs/brain/Surfaces/Surface - Coverage Letter.md",
+      "to": "docs/brain/Surfaces/Surface - Exports.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Exports.md",
