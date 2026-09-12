@@ -3040,25 +3040,44 @@ describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — reali
     return t;
   }
 
-  it('the uniform-min N=150 boundary (weight exactly 675,000) is ACCEPTED, and its measured runScriptDoctor cost stays under the margin', async () => {
+  it('the uniform-min N=150 boundary (weight exactly 675,000) is ACCEPTED, and its measured runScriptDoctor cost stays inside the budget', async () => {
     const { runScriptDoctor } = await import('../../server/nvm/analyze/doctor.ts');
+    const { DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS } = await import('../../server/lib/doctor-budget.ts');
     const text = buildUniformMin(150);
     const w = 150 * (150 * 30);
     assert.equal(w, 675_000, 'sanity: N=150 at exactly 30 words/speaker must land exactly on the bound');
     const reason = fountainShapeRejectionReason(text);
     assert.equal(reason, null, `expected the N=150 uniform-min boundary to be accepted, got: ${reason}`);
     // This is the actual analysis, not just the guard — the whole point of
-    // this bound is that the guard's ACCEPT decisions stay cheap. The DESIGN
-    // target this bound was derived against is HALF the 30s analysis budget
-    // (15s — see MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own comment; measured
-    // ~12.1s median on this lane's shared box). The assertion below uses a
-    // looser 20s ceiling deliberately — a regression guard against this
-    // shape drifting toward or past the 30s hard budget, not a tight timing
-    // check that would flake under ordinary CI/shared-box noise.
-    const start = Date.now();
+    // this bound is that the guard's ACCEPT decisions stay cheap. Round-2
+    // review round 2, item 9: a plain wall-clock ceiling is the EXACT form
+    // tests/core/doctor-analysis-budget.test.ts already retired for flaking
+    // (its own header: 18,512ms / 21,624ms under a parallel `npm test` on an
+    // 8.5s-standalone fixture — 2.5x load inflation; this shape costs
+    // 13.4-15.2s standalone, so the same inflation clears any wall-only
+    // ceiling this test could set). Use that file's two-part form verbatim,
+    // derived from DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS instead of a bare
+    // literal: CPU time (immune to a busy box — `npm test` runs each file in
+    // its own process) against HALF the budget — the exact quantity the
+    // bound's own 2x-headroom design target is about — and wall clock
+    // against the FULL budget, the literal product guarantee. Measured
+    // 12.4-13.2s of CPU for this shape on the round-2 review's own box —
+    // inside the 15s half-budget with 12-17% margin — and this form would
+    // have caught round 1's 223-speaker document (27s of CPU) outright.
+    const cpuStart = process.cpuUsage();
+    const wallStart = Date.now();
     await runScriptDoctor(text);
-    const ms = Date.now() - start;
-    assert.ok(ms < 20_000, `expected the N=150 worst-case accepted shape to finish well under the 30s analysis budget, took ${ms}ms — investigate before this reaches 30s`);
+    const wallMs = Date.now() - wallStart;
+    const cpu = process.cpuUsage(cpuStart);
+    const cpuMs = (cpu.user + cpu.system) / 1000;
+    assert.ok(
+      cpuMs < DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS / 2,
+      `expected the N=150 worst-case accepted shape to cost under half the ${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms analysis budget of CPU, used ${Math.round(cpuMs)}ms — the bound's 2x-headroom derivation no longer holds`,
+    );
+    assert.ok(
+      wallMs < DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS,
+      `expected the N=150 worst-case accepted shape to finish under the ${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms analysis budget, took ${Math.round(wallMs)}ms wall`,
+    );
   });
 
   it('the uniform-min N=151 boundary (one speaker over — weight 684,030) is REJECTED', () => {

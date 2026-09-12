@@ -612,13 +612,22 @@ const VOICE_ELIGIBLE_MIN_WORDS = 30;
 //     shapes' cost even though it does not explain their DISTINCT count for
 //     the same weight. N=150/160 is the load-bearing pair: 12.1s clears a
 //     half-budget target with real margin, 14.3s does not (see (c)).
-// (b) Confirms the round-1 review's own point directly: a FEW-BIG shape at
-//     essentially the SAME weight as N=150 (probe-cast cast=45, weight
-//     681,750, ~15,150 pooled words padded to a 110-page document) costs
-//     about the same, ~12.6s — at THIS lower weight the two shapes are not
-//     the 1.7x-apart pair the reviewer measured at 1.5M (99x15,150 at 16.1s
-//     vs 223x30 at 27.3s); the bound below is shape-robust in a way 1,500,000
-//     was not.
+// (b) Round 3 correction (docs/audits/2026-09-12-adversarial/
+//     rulebook-review.md round 2, non-blocking item 10): a prior draft of
+//     this comment cited "probe-cast cast=45" as a same-weight, converging
+//     comparator; cast 45 on the committed generator
+//     (tests/security/…:2963's buildProbeCastFeature) weighs 686,340 and is
+//     ITSELF REJECTED by this bound — not a document the guard admits, so
+//     it proved nothing. The largest FEW-BIG cast this bound still admits is
+//     44 (weight 672,408, ~15,150 pooled words padded to a 110-page
+//     document), measured at 6.9-7.5s — and the spread against the
+//     uniform-min worst case at essentially this weight (13.4-15.2s, see
+//     (a)) is ~1.9x, WIDER than the 1.7x the round-1 reviewer measured at
+//     1.5M (99x15,150 at 16.1s vs 223x30 at 27.3s), not narrower. The two
+//     shapes do not converge at a lower weight; the bound is safe anyway —
+//     not because the shapes converge, but because it is derived from the
+//     worst one directly, which is the correct method regardless of how
+//     wide the spread is at any given weight.
 // (c) DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS is 30,000ms (Decision #7, itself
 //     derived as 2x a measured ~14s accepted ceiling). Mirroring that same
 //     2x-headroom logic here: the worst-case (uniform-min) shape this bound
@@ -636,9 +645,12 @@ const VOICE_ELIGIBLE_MIN_WORDS = 30;
 //     the direct measurement rather than contradicting it.
 // (d) What this admits, honestly: the maximum distinct fully-eligible cast
 //     under the worst-case (uniform-min) shape is 150 — solidly "dozens" and
-//     into "over a hundred", not the 223 round 1 admitted, and MAX_FOUNTAIN_
-//     FREQUENT_CUE_LINES's neighbouring "dozens ... not HUNDREDS" framing
-//     below is corrected to say so. Every cast this finding's own brief
+//     into "over a hundred", not the 223 round 1 admitted. This no longer
+//     contradicts MAX_FOUNTAIN_FREQUENT_CUE_LINES's neighbouring (ABOVE, not
+//     below) "dozens ... not HUNDREDS" framing — that comment was not
+//     itself edited; the contradiction is gone because this value was
+//     lowered to something the framing is actually true of. Every cast this
+//     finding's own brief
 //     named — 20, 30, 40 — clears it by wide margins (weights 303,000 /
 //     454,500 / 606,000, all measured at 8.4-10.7s wall on the CHEAP
 //     few-big shape): 20/30/40-cast normal features stay ACCEPTED. A
