@@ -1,4 +1,4 @@
-# Independent review — `lane/writer-loop-client`, tip **718a0b1d**
+# Independent review — `lane/writer-loop-client`: round 1 **718a0b1d**, round 2 **d0d1b759**
 
 **Reviewed object:** `718a0b1d` (the lane's `c19000c7` rebased onto `main`
 `f94d587e`; ten commits; on `origin/lane/writer-loop-client`).
@@ -407,3 +407,264 @@ orphans a full analysis on both trees.
   across `src/`, `server/`, `scripts/` finds only tests). Keeping it is the
   conservative choice and it is documented; a follow-up should either give it a
   caller or retire it through the normal path.
+
+---
+
+## Round 2
+
+**Reviewed object:** `d0d1b759` (four round-2 commits on the round-1 tip
+`718a0b1d`; on `origin/lane/writer-loop-client`). Same reviewer, warm context.
+**Method:** `git archive d0d1b759 | tar -x` into
+`<session scratch>/writer-review/tip2` beside the round-1 exports, `npm run
+build` (exit 0), and a keyless server of my own
+(`llmReady:false`). `/home/user/wt-writer` was not opened for writing; the only
+file written under `/home/user/STORYMACHINE` is this review.
+
+**One method note against myself.** My first pass at item 5 read a stale
+server: a round-1 build was still answering on the port I reused, and it showed
+the round-2 fixes missing. Caught it by fetching the served chunk
+(`curl …/assets/CoverageSummary-*.js | grep -c "Rewrites your draft"` → 0),
+killed every node process, rebound on a clean port, and re-drove everything
+below against a server whose served bundle contains the round-2 bytes
+(`index-BikXokst.js`, grep → 1). Every number in this round is from that
+server.
+
+### The seven items
+
+| # | item | verdict |
+|---|---|---|
+| 1 | `verify:surfaces` green, fixed at the cause | **closed** — 3/3 runs 246/246 exit 0, one of them at load 6.0/4 cpus; production ceiling proved unchanged on a live server |
+| 2 | stray `// probe` | **closed** |
+| 3 | two dangling claims pointers + a guard | **closed** — guard fires on a planted bad row |
+| 4 | the eight remaining `waitForFunction` misuses | **closed** — my own scanner: 12 / 8 / **0** across the three trees |
+| 5 | "Paste from PDF?" rewrote the draft silently | **closed** — driven in both states |
+| 6 | stale docstring | **closed** |
+| 7 | follow-up B restated; the unmount gap | **closed as a statement; the guard is half a tautology** — item 3 below |
+
+---
+
+### Item 1 — the limiter
+
+**The production ceiling is unchanged, read and measured.**
+`server/lib/session-store.ts:137-193` resolves `VERIFY_RATE_LIMIT_MULTIPLIER`
+once at module load, defaults to 1, and ignores anything outside a finite
+1–50. Driven against real servers, one port each, `GET /api/ai-providers`
+(`gameLimiter`), 130 requests per server:
+
+```
+MULT unset          200s=119  429s=11   first 429 at request #120   ← production, unchanged
+MULT=10             200s=130  429s=0                                ← the gate's server
+MULT=51             …first 429 at #120     MULT=Infinity  …#120
+MULT=NaN            …#120                  MULT=0         …#120
+MULT=-5             …#120                  MULT="10; rm -rf /"  …#120
+MULT=9.9            200s=130  429s=0    ← floors to 9x, as claimed
+```
+
+(The unset run allows exactly 120 in the window; the boot health-check I used
+to wait for the port spends the first one, which is why the first refusal lands
+on my 120th request rather than my 121st. A separate single-server run with no
+health-check probe gave `200s=120 … first429at=121`.)
+
+**Nothing else can reach it from the repository.** Independent grep: four files
+name the variable — `server/lib/session-store.ts` (reads it),
+`scripts/lib/keyless-browser-certification.mjs` (sets it),
+`scripts/verify-p2-p3-surfaces.mjs` (prints it in the meter line),
+`tests/core/rate-limit-verification-override.test.ts` (the guard). No
+Dockerfile, docker-compose, package.json, `.github/**`, `server/**` or `src/**`
+mention. The guard is not decorative: planting
+`// VERIFY_RATE_LIMIT_MULTIPLIER hint` in `server/app.ts` takes it to
+**7 pass / 2 fail** (restored).
+
+**The suite is green, and green under load.** Three runs of the unmodified
+`d0d1b759` export:
+
+| run | load at start | assertions | exit | peak `/api/` in any 60 s |
+|---|---|---|---|---|
+| 1 | 3.8 / 4 cpus | **246/246** | **0** | 122 |
+| 2 | **6.0 / 4 cpus** | **246/246** | **0** | 119 |
+| 3 | 3.6 / 4 cpus | **246/246** | **0** | 124 |
+
+That is stronger than the report's three idle runs: run 2 sat at a load higher
+than any of the three round-1 runs that failed. The three `HEALTH` waits are
+now `.then(…).catch(…)` feeding `record(...)`
+(`scripts/verify-p2-p3-surfaces.mjs`, both feature-length phases and the
+re-run phase), so a lost request costs one assertion rather than the 24 it cost
+in round 1.
+
+One correction to the report: the peak is **not** "identical across all three
+runs". I measured 122 / 119 / 124. That does not weaken the diagnosis — it
+sharpens it: the suite straddles the 120 line, which is exactly why the failure
+was a coin flip rather than a constant.
+
+### Items 2, 3, 4, 6 — verified, each in the failure direction
+
+- **2.** `// probe` is gone from `src/lib/percentile-copy.ts`.
+- **3.** `StartScreen.tsx:723` → row 94, `CoverageSummary.tsx:1094` → row 95.
+  Planting `// See docs/CLAIMS_REGISTER.md row 147 …` in
+  `src/lib/diagnostic-copy.ts` makes `tests/core/claims-row-citations.test.ts`
+  fail naming it exactly — *"src/lib/diagnostic-copy.ts: \"CLAIMS_REGISTER.md
+  row 147\" — row 147 does not exist"* (pass 2 / fail 1; restored).
+- **4.** I wrote my own bracket-depth scanner rather than trust the lane's
+  (`<session scratch>/writer-review/scan.py`, walking each
+  `waitForFunction(` call and counting a two-argument call whose second argument
+  is an options object). It reproduces the lane's numbers exactly:
+
+  ```
+  f94d587e : 12 misuse(s)
+  718a0b1d :  8 misuse(s)   ← exactly the eight round 1 named
+  d0d1b759 :  0 misuse(s)
+  ```
+
+  The two budgets round 1 called out are real now:
+  `verify-a11y.mjs:817` and `:1744` (45 s) and
+  `verify-ui-polish-affordances.mjs:123` (40 s) all pass `undefined` third-arg
+  style. The lane's own scanner is not toothless either: re-introducing one
+  misuse at `verify-focus-traps.mjs:175` fails
+  `tests/scripts/wait-for-function-options-position.test.ts` with the offending
+  line quoted (restored).
+- **6.** `CoverageSummary.tsx:509-515` names `onRepairDraft` and says why
+  `onLoadSampleIntoEditor` would be wrong.
+
+### Item 5 — driven, in both states
+
+Against the round-2 build, on my own keyless server:
+
+```
+A) title-page-only paste (the normaliser cannot act)
+   server hint rendered = true
+   "Paste from PDF?" buttons in the DOM = 0        ← withheld, hide-don't-disable
+   buttons = RETRY, USE SAMPLE
+
+B) double-spaced heading-less paste (the normaliser acts)
+   "Paste from PDF?" present, title = "Rewrites your draft with the screenplay
+     normaliser — blank lines collapsed, wrapped lines joined — and runs coverage
+     on the result. Ctrl+Z undoes it."           ← disclosed BEFORE the click
+   editor BEFORE = "The room was cold.\n\n\n\n\nMaya opened the door.\n\n\n\n\nShe said…"
+   editor AFTER  = "The room was cold. Maya opened the door. She said nothing…"  changed=true
+   outcome = "Re-spaced the paste and ran it again — still no scene headings. Your
+     draft was rewritten to do it: blank lines collapsed and wrapped lines joined.
+     Press Ctrl+Z (⌘Z on a Mac) to put it back. To get coverage, add a scene
+     heading such as INT. KITCHEN - DAY."        ← disclosed AFTER, word for word
+   button re-offered = false
+   Ctrl+Z restores the paste = true
+```
+
+The outcome sentence is byte-identical to the rewritten claims row 100, and
+that row now says in its own words that its round-1 text was wrong. The
+judgement round 1 asked for is answered: the control is offered only where it
+acts, and it says what it does before and after. Accepted in full.
+
+### Item 7 — the statement is right; the guard is half a tautology
+
+The restatement is correct and I agree with it: the supersede-abort is proved
+by source and by a guard that fails without it, no UI path starts two
+concurrent analyses on either tree, and the round-1 commit message's "two full
+14-pass analyses competing for the doctor pool" described the harness's
+double-click. The StrictMode finding is a real one, well told, and reverting was
+right.
+
+The *test*, though, is weaker than "a test asserting the naive fix is not in the
+tree". Measured, by planting each of the two ways someone would reintroduce it
+into `tests/core/coverage-format-unrecognized-card.test.ts`:
+
+```
+A) abortRef.current?.abort() appended to the existing aliveRef unmount cleanup
+   → # pass 17 # fail 1     CAUGHT (by the cleanup-shape assertion, not the doesNotMatch)
+B) a separate useEffect(() => { return () => { abortRef.current?.abort(); }; }, [])
+   — the exact defect the lane says it built, formatted normally —
+   → # pass 18 # fail 0     NOT CAUGHT
+```
+
+The `doesNotMatch` regex names one single-line spelling
+(`useEffect(() => () => { abortRef.current?.abort(); }, []);`) that nobody would
+write. What gives the test teeth is the neighbouring exact-shape assertion on
+the `aliveRef` cleanup — which is real, and catches route (A). See item 3 below
+for the one-line strengthening.
+
+### Gates, re-run by the reviewer on `d0d1b759`
+
+| gate | command | result |
+|---|---|---|
+| lint | `npx tsc --noEmit` | **0** |
+| no-console | `check-no-console.mjs` | **0** |
+| docs | `npm run check-docs` | **0** |
+| honesty audit | `honesty-audit.mjs` | **0** — 460 files, 100 claims rows, clean |
+| brain | `brain-graph.mjs --check` | **0** — 103 notes, 358 links, fresh |
+| scoring receipt | `check-scoring-receipt.mjs f94d587e..d0d1b759` | **0** — *"no scoring-path files changed"* |
+| output identity | `--compare` vs `git archive f94d587e`, `GIT_SHA=r2reviewpin` on both trees | **PASS — 45/45 byte-identical** |
+| public benchmark | `tests/core/public-benchmark.test.ts` | **28/28** |
+| browser | `verify:surfaces` ×3 | **246/246, exit 0, three times** |
+| touched suites | run individually | `coverage-format-unrecognized-card` 18, `rate-limit-verification-override` 9, `claims-row-citations` 3, `wait-for-function-options-position` 2, `keyless-browser-certification` 2, `coverage-rerun-one-control` 8, `dimension-percentile-badge` 11, `start-screen-labs-gate` 6, `start-screen-sample-card` 5, `sample-coverage-facts` 3, `diagnostic-not-health-label` 8, `percentile-copy-consistency` 30, `honesty-audit-claims` 5, `brain-coverage` 7 — **all 0 fail** |
+
+`npm test` and the eight-suite battery were not re-run here, per the review
+budget; the orchestrator runs both once on the rebased branch.
+
+---
+
+## VERDICT: **MERGE**
+
+All seven round-1 items are closed, each verified in the failure direction, and
+the blocking one is closed at its cause with a number rather than a guess. The
+three items below are follow-ups, not blockers: none of them changes what a
+writer sees, none of them can loosen a production limiter, and none needs to
+hold the merge.
+
+**1. The gate multiplier reaches more than "every browser gate".**
+`scripts/lib/keyless-browser-certification.mjs:49` puts
+`VERIFY_RATE_LIMIT_MULTIPLIER=10` into the env of **every** server booted
+through `keylessBrowserServerEnv`, which is three callers beyond the browser
+suites: `scripts/fuzz-routes.mjs:64`, `scripts/verify-production-build.mjs:204`
+and `scripts/load-test-doctor.mjs:335`. Measured, same endpoint, 200 requests:
+
+```
+gate server (MULT=10)      200s=200  429s=0     ← no overflow at all
+default server (no MULT)   200s=120  429s=80    first 429 at #121
+```
+
+`fuzz-routes.mjs:37` states the behaviour it exists to exercise: the server
+must stay responsive "and to 429 the overflow rather than let the [process fall
+over]", and its `200-concurrent-doctor-requests` record at `:487` reports the
+429 count. At 1200/min that overflow never happens, so the scenario is recorded
+as zero rather than exercised. Nothing asserts on it today, so nothing is
+falsely green — but the fuzzer is measuring a server the product never runs.
+The fix is small: set the multiplier in the browser suites that need it rather
+than in the shared boot helper, or have `fuzz-routes` and
+`verify-production-build` opt out. Either way the report's "gives every browser
+gate's own isolated server 10×" should name the three non-browser callers.
+
+**2. The guard's scope is the repository, and the comment claims a little more.**
+`server/lib/session-store.ts:167-171` says the variable is one "that only
+`scripts/lib/keyless-browser-certification.mjs` sets". True of the repository,
+and the guard proves it. It is not true of the running process: `dotenv/config`
+loads `.env` before the limiters are constructed, and an untracked `.env` line
+is honoured — measured, `VERIFY_RATE_LIMIT_MULTIPLIER=10` in `tip2/.env` gave
+`200s=130 429s=0` (file removed). `.env` is gitignored, so no guard can cover
+it; the honest form is one clause — "nothing in the repository sets it; a value
+placed in a deployment's own environment or in an untracked `.env` is honoured,
+bounded to 50×". The sentence right below it ("a deployment that never sets the
+variable is byte-for-byte the deployment that existed before") is already
+exactly right and needs no change.
+
+**3. Strengthen item 7's guard, or stop calling it what it is not.**
+`tests/core/coverage-format-unrecognized-card.test.ts:84-88` names one
+unrealistic spelling. A count assertion catches every route: the tree contains
+exactly two `abortRef.current?.abort()` sites — `run()`'s supersede prefix and
+`cancelRun` — so
+
+```ts
+assert.equal((coverageSummary.match(/abortRef\.current\?\.abort\(\)/g) ?? []).length, 2,
+  'the unmount abort breaks the golden path under StrictMode — see the note above abortRef');
+```
+
+fails on both reintroduction routes I planted, including the one that passes
+today. Until then, the report should say the guard pins the note and the
+`aliveRef` cleanup's shape, not that it asserts the naive fix is absent.
+
+### Carried forward unchanged (named by the lane, agreed)
+
+The unmount-abort gap itself (attempted, measured, reverted, documented);
+finding 3's deeper half (`onLoadFountain` still clears the stale flag on a
+programmatic install); `computeJumpSpan` having no production caller; finding
+4's real cause in `doctor.ts`'s ranking of `build.rawScore`; and
+`server/lib/coverage-html.ts`'s unlabelled `Graph Health` block, left to the
+export lane with the functions named in Round 1.
