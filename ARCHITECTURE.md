@@ -216,12 +216,19 @@ conditions, and the first needs no tier detection at all:
    the labelled Length / Logline / Verdict lines, the spaced health reading — none
    of which a pre-2026-09-11 artifact carries.
 
-The honest limit, because the first version of this gate claimed more: that is N
-independent edits rather than one, not an unforgeable property. A forger who
-strips every signal leaves a document that no longer renders a summary page in any
-recognisable form, at which point it is indistinguishable from a pre-tier report
-and is verified on the claims it does publish — which is the correct outcome for
-such a report. A genuine reader summary page also states the reference bounds
+The known limit, measured rather than asserted, because the first two versions of
+this sentence each claimed more than the gate delivers: that is N independent
+edits rather than one, not an unforgeable property. Every one of those signals is
+a machine-readable label — a class name, a heading's wording, a stylesheet
+selector, the scope sentence — so a forger who renames all of them keeps a page
+that still reads as a reader summary to a human while this tool treats it as the
+pre-2026-09-11 report it now resembles. Measured on 2026-09-12: **14 mechanical
+edits to an exported coverage HTML, 17 to a letter**, after which the page states
+`9,999 scenes`, `~500 pages`, `p. 999`, `The 9 things to fix first` and
+`Health percentile: top 5%` and the verifier says VERIFIED. Both artifacts are
+committed as `tests/fixtures/verify-report/known-limit-relabelled-*` with tests
+asserting they still exit 0 — a fail-first target for the lane that closes this,
+not a guard. A genuine reader summary page also states the reference bounds
 exactly once, so a tier page with no bounds text has had that statement removed
 and is refused on its own.
 

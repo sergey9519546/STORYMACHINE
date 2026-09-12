@@ -881,6 +881,50 @@ describe('the producer tier\u2019s claims are verifiable in every artifact shape
     });
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // THE KNOWN LIMIT (2026-09-12 round-2 review finding 1).
+  //
+  // THESE TWO FIXTURES VERIFY AT EXIT 0, AND THEY ARE FORGERIES. That is what
+  // this block documents. It is not a guard; it is a fail-first target for the
+  // lane that closes the limit, and the evidence behind the sentence README.md,
+  // ARCHITECTURE.md, the brain Exports note and claims-register row 97 all carry.
+  //
+  // The gate keys on structural signals — class names, stylesheet selectors, a
+  // heading's wording, the tier caption, the verify block's scope sentence. Every
+  // one of them is a machine-readable LABEL, not the page a human reads. Rename
+  // the markup classes AND the stylesheet selectors together and nothing is left
+  // unstyled: the page renders exactly as the genuine one does, states four things
+  // that are false — one of them flattering — and this tool treats it as the
+  // pre-2026-09-11 report it now resembles. 14 mechanical edits for the HTML, 17
+  // for the letter (tests/fixtures/verify-report/README.md lists them).
+  //
+  // WHEN THIS IS CLOSED, these two assertions flip to `status === 1` and the
+  // fixtures become ordinary forgery cases. Do not regenerate them.
+  for (const [fixture, states] of [
+    ['known-limit-relabelled-coverage.html', '9,999 scenes / ~500 pages / p. 999 / "The 9 things" / "top 5%"'],
+    ['known-limit-relabelled-letter.md', 'the same four false statements, under relabelled headings'],
+  ] as Array<[string, string]>) {
+    it(`KNOWN LIMIT — ${fixture} still verifies at exit 0 while stating ${states}`, () => {
+      const p = path.join(REPO_ROOT, 'tests/fixtures/verify-report', fixture);
+      // Both were built from a genuine export of this script, so this is the text
+      // whose hash they carry.
+      const script = path.join(REPO_ROOT, 'data/screenplays/chain-of-custody.fountain');
+      const { status, stdout } = runCli([p, script]);
+      assert.equal(status, 0,
+        'if this now exits 1 the limit has been CLOSED — flip this assertion, move the fixture out of the '
+        + 'known-limit block, and delete the known-limit section of the fixtures README and the four '
+        + `shipped sentences that cite it.\n${stdout}`);
+      assert.match(stdout, /^VERIFIED/m);
+      // And the forged numbers really are on the page: a fixture that had lost its
+      // forgery would make this block a tautology.
+      const body = readFileSync(p, 'utf8');
+      assert.match(body, /9,999 scenes/);
+      assert.match(body, /Health percentile: top 5%/);
+      assert.match(body, /The 9 things to fix first/);
+      assert.match(body, /p\. 999/);
+    });
+  }
+
   it('a document with the tier markup cut out but its stylesheet and scope sentence left IS refused — it is tampered, not pre-tier', () => {
     const tierStart = genuine.html.indexOf('<section class="reader-tier">');
     const dividerEnd = genuine.html.indexOf('/>', genuine.html.indexOf('<hr class="tier-divider"')) + 2;
