@@ -101,8 +101,23 @@ has no ELEMENT for cross over on attributes FDX already defines —
 dialogue needed nothing new at all: `src/lib/fdx.ts` had always written
 `<DualDialogue>`, and `server/lib/fdx-import.ts` simply never read it. The
 non-printing four are now omitted from the FDX body outright, which is what "not
-carried" always claimed. On all 21 committed screenplays the exported FDX is
-**byte-identical** to what it was before, so no writer's existing export moved.
+carried" always claimed.
+
+**Against which base, exactly.** The exporter rewrite is byte-neutral: on all 21
+committed screenplays (the 20 CC0 scripts in `data/screenplays` plus
+`assembled-feature.fountain`) the exported FDX is byte-identical to the tree
+before the rewrite — `sha256` of `fountainToFdx` output per script, **21 of 21**.
+Against the tree before this LANE it is **20 of 21**, and the one script that
+differs does so by exactly one line:
+
+```
++ <Paragraph Type="Draft Date"><Text>2026-09-06</Text></Paragraph>     4,809 -> 4,810 lines
+```
+
+which is this lane's own intended draft-date fix, on the only committed script
+carrying a `Draft date:` line. Naming the base matters because those are two
+different claims and a reader checking the wrong one finds a difference and
+reads it as a regression.
 
 The `!` force marker is the one partial case, and it is disclosed as such
 (`FDX_CONSTRUCT_FATE`'s `'unforced'`): it comes back where Fountain would
