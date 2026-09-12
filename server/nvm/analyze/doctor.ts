@@ -38,6 +38,7 @@ import { analyzeStructure } from '../screenplay/structure.ts';
 import { runRevisionPipeline, type RevisionResult } from '../revision/pipeline.ts';
 import { runDiagnoseOnly } from '../revision/rewrite.ts';
 import { analyzeFountainText } from './fountain-analyzer.ts';
+import { joinWrappedDialogue } from './screenplay-normalizer.ts';
 import { deepReadRecords } from './deep-read.ts';
 import { computeEmotionalArc, scenesFromFountain } from './emotional-arc.ts';
 import { detectSlop } from './anti-slop.ts';
@@ -2804,7 +2805,28 @@ export async function runScriptDoctor(
   }
 
   const compiled: CompiledScreenplay = {
-    fountain,
+    // THE PIPELINE READS THE TEXT THE ANALYZER READ (2026-09-12). The 14
+    // passes get `compiled.fountain`, and several of them measure per-line
+    // shape (rhythm's opener runs, dialogue's monologue length). Until now
+    // this was the RAW submission while `mergedAnalysis.records` came from
+    // `normalizeScreenplay(fountain)` — two texts, one report. A speech
+    // wrapped at 35 columns therefore reached the passes as three lines and
+    // the analyzer as one, and the score moved with the wrap width: measured
+    // over the 32 committed scripts re-wrapped at 30/35/40/60 columns, the
+    // parser fix and the normalizer join together left 111 of 128 pairs still
+    // moving (max 2.0 points) purely through this seam.
+    //
+    // The join is applied rather than the whole normalizer. `normalizeScreenplay`
+    // ALSO reconstructs double-spaced imports (uppercasing cues, reflowing
+    // action paragraphs), and handing the passes that reconstruction is a
+    // larger change whose effect lands entirely on the private AUC-24 corpus —
+    // scraped PDFs are exactly the double-spaced case — so it cannot be
+    // measured here. `joinWrappedDialogue` is a no-op on every input whose
+    // speeches are already one line (all 32 benchmark scripts, all 20
+    // calibration samples), which is why it is the half that can be shown
+    // safe from this tree. The other half is recorded as measured-and-not-taken
+    // in docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md.
+    fountain: joinWrappedDialogue(fountain),
     annotations: mergedAnalysis.annotations,
     structureSummary: buildStructureSummaryLine(mergedAnalysis),
     wordCount: mergedAnalysis.wordCount,

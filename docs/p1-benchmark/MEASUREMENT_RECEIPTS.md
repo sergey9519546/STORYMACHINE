@@ -2527,3 +2527,75 @@ value is claimed anywhere in this entry, and this entry is therefore marked
 PENDING and is not a receipt for this range. The conversion recipe — all three
 of `pendingReason`'s scans, not just the heading — is in
 `docs/brain/Owner/Owner - R5 Measurement and Merge.md`.
+
+---
+
+### 2026-09-12 — ADVERSARIAL LANE: parse and format invariance, a live-gradient property test, permutation-ensemble order invariants, report truth at the scoring seam, and a bounded voice grid (PENDING OWNER MEASUREMENT — no real-corpus run happened)
+
+**Branch:** `scoring/adversarial-2026-09-12`, stacked on
+`scoring/feature-length-defects` REBASED onto `main` @ `8aa1f696`. The base of
+this branch is that rebase (`78ec4464`), which is not the same object as
+`origin/scoring/feature-length-defects` @ `bcc96f85`: main's instrument fix
+(`63d7ede1` — `CLIMAX_RELOCATE` to position ONE, one shared scene segmenter)
+landed after that branch was cut, so everything here is measured on main's
+harness. **This is a scoring-path change and its AUC-24 is not known.**
+`node scripts/check-scoring-receipt.mjs 78ec4464..HEAD` exits **1** on this
+entry, which is the intended state: the entry is an honest ledger row, not a
+receipt.
+
+- **Command:** `npm run benchmark:public` · `npm run benchmark:public -- --lock`
+  (once, in the rebase-reconciliation commit) ·
+  `node --experimental-strip-types tests/core/parse-format-invariance.test.ts` ·
+  `node --experimental-strip-types tests/core/calibration.test.ts` ·
+  `node --experimental-strip-types tests/core/blind-pairs-discrimination.test.ts` ·
+  `npm run test:metamorphic` ·
+  `node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <dir>`,
+  `--tree . --out <dir>` and `--compare <before> <after>
+  --ignore-keys provenance.engineCommit` · `npm run lint` ·
+  `npm run honesty-audit` · `npm run check-docs` · `npm run check-brain` ·
+  `npm test`. Every one was run in the foreground in this worktree and its
+  output read. **`npm run measure-real` was NOT among them** — see the
+  attestation below.
+- **Corpus fingerprint:** none for AUC-24 — no private corpus was read, and no
+  AUC-24 value appears anywhere in this entry. The corpus that WAS read is the
+  32 committed distributable screenplays the public benchmark scores (20 CC0 in
+  `data/screenplays/` + the 12 blind-pair fixtures), locked by sha256 per file
+  in `tests/fixtures/public-corpus-manifest.json` and
+  `tests/fixtures/public-benchmark-split.json`, plus the 20 calibration samples
+  in `server/nvm/analyze/calibration/corpus.ts` and the committed 21- and
+  231-scene feature-length fixtures.
+- **Runner attestation:** I ran every command above myself, in this worktree,
+  and read its output. I did **not** run `npm run measure-real`, and no AUC-24
+  number in this entry is claimed, implied or projected — the private corpus is
+  not present in this environment and `REAL_SCRIPT_CORPUS_DIR` is unset, so
+  `tests/core/real-script-corpus.test.ts` skipped every assertion. Nothing here
+  was simulated.
+- **Git SHA:** measured at each commit of `scoring/adversarial-2026-09-12` in
+  turn, against the baseline `78ec4464` (the rebased
+  `scoring/feature-length-defects` tip) and, for the public-benchmark numbers,
+  against `main` @ `8aa1f696`.
+- **Measured AUC-24:** **PENDING** — the private 761-script corpus is not
+  present in this environment, so this branch has no AUC-24 number and claims
+  none.
+
+**Commit ledger** *(extended as the lane commits; each row's before/after is in
+the measurement doc it names)*
+
+| # | commit | what moved | evidence |
+|---|---|---|---|
+| 1 | rebase reconciliation + re-lock | `PUBLIC_ORDER_PAIRED_FLOOR` 0.5269 → 0.5738, `PUBLIC_ORDER_FLOOR` 0.4951 → 0.5069, from a rerun forced by main's stronger degradation. Manifest and split re-locked BYTE-IDENTICAL — the instrument moved, the score did not. | `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §13 |
+| 2 | parse and format invariance (dialogue reflow) | Reflow at 30/35/40/60 columns over 32 scripts: **119 of 128 pairs moved, max 8.8 points, one verdict flip → 0 of 128, max 0.0**. Public benchmark byte-identical; all 45 output-identity fixtures byte-identical modulo `provenance.engineCommit`. | `docs/scoring/PARSE_FORMAT_INVARIANCE_2026-09-12.md` §1 |
+
+**WHAT THE OWNER'S AUC-24 RUN CAN AND CANNOT SETTLE (commit 2).** The three
+parse fixes are byte-identical on every committed fixture, so AUC-24 **cannot**
+move because of them on any document whose speeches are already one line. The
+private corpus is scraped PDFs, and those take `normalizeScreenplay`'s
+double-spaced branch, which already joined wrapped dialogue — so the expected
+AUC-24 movement from this commit is **zero**, and the owner's run is a
+confirmation rather than a discovery. What it **can** settle is whether any
+corpus document sits on the boundary between the two normalizer branches (clean
+enough to skip reconstruction, wrapped enough to have multi-line speeches); that
+document's report changes here and nothing in this repository can tell the owner
+whether it exists. If AUC-24 moves at all on this commit, that is the finding,
+and the answer is to look for that document — not to move the floor in
+`scripts/lib/auc.ts`.

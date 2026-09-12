@@ -22,7 +22,7 @@
 // structural element until the next one. Wrapped fragments inside a block are
 // joined into flowing text.
 
-import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS } from '../../../src/lib/fountain.ts';
+import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS, parseFountain } from '../../../src/lib/fountain.ts';
 
 // Heading detection is kept BYTE-COMPATIBLE with src/lib/fountain.ts's
 // parseFountain (a scene_heading is `/^(INT|EXT|EST|I\/E)[. ]/i` OR any line
@@ -134,11 +134,68 @@ function isDoubleSpaced(lines: string[]): boolean {
   return nonBlank > 0 && followedByBlank / nonBlank >= 0.9;
 }
 
+// ── ONE SPEECH IS ONE ELEMENT, HOWEVER MANY LINES IT OCCUPIES (2026-09-12) ──
+// A Fountain dialogue element runs from its character cue to the next blank
+// line; whether the writer typed it as one long line or let an editor wrap it
+// at 35 columns is a property of the keyboard, not of the writing. The
+// analyzer measures per-line shape in several places (monologue length, action
+// paragraph peaks, opener runs, arc sampling), so without this join the SAME
+// speech scores differently depending on the wrap width.
+//
+// MEASURED, on the 32 committed benchmark scripts re-wrapped at 30/35/40/60
+// columns (dialogue lines only, located with the repository's own parser, no
+// blank line introduced, whitespace-normalised text byte-identical):
+//   before the parser fix + this join   119 of 128 pairs moved, range -8.8 .. +5.0
+//                                       (room-12 at 60 cols: 63.9 -> 55.1, CONSIDER -> PASS)
+//   after the parser fix alone          119 of 128 moved, range -5.9 .. +5.9
+//   after both                          see tests/core/parse-format-invariance.test.ts
+//
+// WHY HERE AND NOT IN parseFountain. parseFountain returns one block per
+// physical line and every editor surface depends on that (incremental reparse,
+// decorations, line-addressed lint). The JOIN is an analysis-time
+// normalisation, so it belongs beside the other one, and it uses parseFountain
+// itself to find the runs — the dialogue-block rule stays written down once.
+//
+// It is a no-op on the 32 committed scripts (every speech is one line), which
+// is why the public benchmark does not move; the scripts it changes are the
+// ones a writer actually pastes in.
+export function joinWrappedDialogue(text: string): string {
+  if (!text) return text;
+  const lines = text.split('\n');
+  const typeByLine = new Map<number, string>();
+  for (const b of parseFountain(text)) typeByLine.set(b.lineNumber, b.type);
+  const out: string[] = [];
+  let i = 0;
+  let joined = false;
+  while (i < lines.length) {
+    if (typeByLine.get(i + 1) === 'dialogue') {
+      // The FIRST line of the run is kept byte-for-byte (its indentation is the
+      // speech's own); only the continuation lines are trimmed before joining,
+      // so a speech that was never wrapped comes back out unchanged.
+      let j = i;
+      let text0 = lines[j];
+      j++;
+      while (j < lines.length && typeByLine.get(j + 1) === 'dialogue') {
+        text0 = `${text0.replace(/\s+$/, '')} ${lines[j].trim()}`;
+        joined = true;
+        j++;
+      }
+      out.push(text0);
+      i = j;
+    } else {
+      out.push(lines[i]);
+      i++;
+    }
+  }
+  return joined ? out.join('\n') : text;
+}
+
 export function normalizeScreenplay(raw: string): string {
   if (!raw || typeof raw !== 'string') return raw ?? '';
   const allLines = raw.replace(/\r\n?/g, '\n').split('\n').map(l => l.replace(/\s+$/, ''));
   // Preserve a title page verbatim if present (key: value lines before first blank/heading).
-  if (!isDoubleSpaced(allLines)) return raw; // idempotent on clean input
+  // Clean input still gets the dialogue join: a wrapped speech is one element.
+  if (!isDoubleSpaced(allLines)) return joinWrappedDialogue(raw); // structurally idempotent on clean input
 
   const lines = allLines.filter(l => l.trim() !== '');
   const out: string[] = [];

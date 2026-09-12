@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { MetamorphicCase } from '../contracts/scoring-eval-case.ts';
+import { parseFountain } from '../../../src/lib/fountain.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -139,6 +140,30 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return a;
 }
 
+/** Re-wrap DIALOGUE lines at `cols`, using the repository's own parser to decide
+ *  which lines those are — the same transform tests/core/parse-format-invariance.test.ts
+ *  applies to all 32 committed scripts, written once here for the runner. No
+ *  blank line is introduced and no word changes. */
+export function reflowDialogueAt(text: string, cols: number): string {
+  const typeByLine = new Map<number, string>();
+  for (const b of parseFountain(text)) typeByLine.set(b.lineNumber, b.type);
+  const lines = text.split('\n');
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (typeByLine.get(i + 1) !== 'dialogue' || line.trim().length <= cols) { out.push(line); continue; }
+    const words = line.trim().split(/\s+/);
+    let cur = '';
+    for (const w of words) {
+      if (cur === '') cur = w;
+      else if ((cur + ' ' + w).length <= cols) cur += ' ' + w;
+      else { out.push(cur); cur = w; }
+    }
+    if (cur !== '') out.push(cur);
+  }
+  return out.join('\n');
+}
+
 export const METAMORPHIC_CASES: MetamorphicCase[] = [
   { id: 'identity', category: 'invariance', disposition: 'hard', description: 'no change → identical score',
     transform: b => b, expect: { kind: 'unchanged', epsilon: 0 },
@@ -149,6 +174,21 @@ export const METAMORPHIC_CASES: MetamorphicCase[] = [
   { id: 'rename_character', category: 'invariance', disposition: 'hard', description: 'consistent character rename → score invariant',
     transform: b => b.replace(/MARA/g, 'ELINA'), expect: { kind: 'unchanged', epsilon: 0.5 },
     provenance: { author: 'phaseB', created: '2026-07-11' } },
+  // ── dialogue_reflow (2026-09-12, adversarial review finding 4) ────────────
+  // A Fountain dialogue element runs from its character cue to the next blank
+  // line. Wrapping a long speech across three lines is what every editor does
+  // and changes not one word — but until 2026-09-12 the parser classified every
+  // line of a speech after the first as ACTION PROSE, and the pipeline was
+  // handed the raw text while the analyzer read a normalised one. Measured on
+  // the 32 committed benchmark scripts at 30/35/40/60 columns: 119 of 128
+  // (script, width) pairs moved, range -8.8 to +5.0, against a shuffle-drop
+  // mean gap of 1.9 points on the same corpus. epsilon is 0 because this is
+  // format, not writing: the assertion is equality.
+  { id: 'dialogue_reflow', category: 'invariance', disposition: 'hard',
+    description: 'wrap every speech at 35 columns → score identical (same words, same speakers, same order)',
+    transform: b => reflowDialogueAt(b, 35), expect: { kind: 'unchanged', epsilon: 0 },
+    provenance: { author: 'scoring/adversarial-2026-09-12', created: '2026-09-12',
+      note: 'engine-logic.md finding 4; the per-script assertion set is tests/core/parse-format-invariance.test.ts' } },
   { id: 'empty_verbosity', category: 'invariance', disposition: 'known-failing', description: 'append stateless filler action → health must NOT increase (§14 verbosity bias)',
     transform: b => { const { head, scenes } = splitScenes(b);
       return head + scenes.map(s => s + 'The wind continues. Nothing else happens. Time passes without event.\n\n').join(''); },

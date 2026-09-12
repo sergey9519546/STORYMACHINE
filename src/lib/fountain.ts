@@ -90,11 +90,51 @@ export const CHARACTER_CUE_RE = new RegExp(
  *  eligible to be tested against those terms. */
 const SHOT_LINE_RE = new RegExp(`^[${CUE_LETTER_CLASS}0-9 \\t\\-]+$`, 'u');
 
+/** A Fountain SCENE HEADING, by the same alphabet the classifier uses. Hoisted
+ *  out of the classification chain so the dialogue-block rule below can ask
+ *  the question without duplicating the pattern — one definition, two readers. */
+const SCENE_HEADING_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
+
+// ── THE DIALOGUE BLOCK RUNS TO THE NEXT BLANK LINE (2026-09-12) ────────────
+// WHAT WAS WRONG. A line was classified `dialogue` only when the PREVIOUS
+// block was `character`, `dual_dialogue` or `parenthetical`. A previous block
+// of type `dialogue` was not accepted, so the second and every subsequent line
+// of a multi-line speech fell through to the default and was scored as ACTION
+// PROSE — same words, same speaker, same order. (The parenthetical branch
+// below already accepted a previous `dialogue` block, so the omission was
+// local to one condition.)
+//
+// WHY IT MATTERED MORE THAN IT LOOKS. Measured on this branch before the fix,
+// over the 32 committed benchmark scripts re-wrapped at 30/35/40/60 columns
+// using the repository's own parser to find the dialogue lines (no blank line
+// introduced, whitespace-normalised text byte-identical, scene count
+// unchanged on every one): health moved on 119 of 128 script-width pairs,
+// range -8.8 .. +5.0, and `room-12` at 60 columns fell 63.9 -> 55.1, taking
+// its verdict from CONSIDER to PASS. The entire measured shuffle-drop mean
+// health gap on the same corpus is 1.9 points. Pressing Enter inside a speech
+// moved the score by four times the signal the benchmark exists to detect, and
+// it was invisible to every committed test because all 32 scripts write
+// one-line speeches.
+//
+// THE RULE, AND ITS FOUR ESCAPES. Fountain's dialogue element runs from the
+// character cue to the next blank line, so inside that span a non-blank line
+// is a parenthetical if it is wrapped in `()` and dialogue otherwise. Four
+// unambiguous author signals still break out, because real drafts drop the
+// blank line before them and reading them as dialogue would be worse than the
+// bug being fixed: a forced action `!`, a forced scene heading `.`, a lyric
+// `~`, and a recognised INT./EXT. scene heading. A `>` transition does NOT
+// break out — `>` is legal inside a speech in no sense, but `>text<` centering
+// is, and the pre-existing transition branch only matched the four fixed
+// strings anyway. Each escape is asserted in tests/core/fountain-dialogue-block.test.ts.
 export function parseFountain(text: string): FountainBlock[] {
   const lines = text.split('\n');
   const blocks: FountainBlock[] = [];
 
   let inBoneyard = false;
+  /** True while inside a dialogue element — i.e. after a character cue (or a
+   *  line already classified as its parenthetical or dialogue) and before the
+   *  blank line that ends the block. */
+  let inDialogueBlock = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -103,6 +143,7 @@ export function parseFountain(text: string): FountainBlock[] {
 
     if (trimmed === '') {
       blocks.push({ id: `block-${i}`, type: 'empty', text: line, lineNumber });
+      inDialogueBlock = false;
       continue;
     }
 
@@ -121,8 +162,22 @@ export function parseFountain(text: string): FountainBlock[] {
 
     let type: FountainBlockType = 'action';
 
+    // Inside a dialogue element, the only two elements Fountain defines are
+    // dialogue and parenthetical — see the block comment above parseFountain
+    // for the rule, the four escapes and the measurement that motivated it.
+    const escapesDialogueBlock = trimmed.startsWith('!')
+      || trimmed.startsWith('.')
+      || trimmed.startsWith('~')
+      || SCENE_HEADING_RE.test(trimmed);
+    if (inDialogueBlock && !escapesDialogueBlock) {
+      type = trimmed.startsWith('(') && trimmed.endsWith(')') ? 'parenthetical' : 'dialogue';
+      blocks.push({ id: `block-${i}`, type, text: line, lineNumber });
+      continue;
+    }
+    inDialogueBlock = false;
+
     // Basic Fountain parsing rules
-    if (trimmed.match(/^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu) || trimmed.startsWith('.')) {
+    if (SCENE_HEADING_RE.test(trimmed) || trimmed.startsWith('.')) {
       type = 'scene_heading';
     } else if (trimmed.startsWith('#')) {
       type = 'section';
@@ -165,9 +220,13 @@ export function parseFountain(text: string): FountainBlock[] {
       type = 'transition';
     } else if (SHOT_LINE_RE.test(trimmed) && CAMERA_TERMS.some(term => trimmed.includes(term))) {
       type = 'shot';
-    } else if (i > 0 && blocks.length > 0 && (blocks[blocks.length - 1].type === 'character' || blocks[blocks.length - 1].type === 'dual_dialogue' || blocks[blocks.length - 1].type === 'parenthetical')) {
-      type = 'dialogue';
     }
+    // (The old `prev is character | dual_dialogue | parenthetical -> dialogue`
+    // clause lived here. It is not deleted so much as generalised: the
+    // dialogue-block branch above decides every line inside a speech, and it
+    // reaches this point only when that branch did not — i.e. never for a line
+    // that clause could have matched. Keeping both would be two definitions of
+    // one rule, which is how the missing `dialogue` case survived.)
 
     // Forced Action
     if (trimmed.startsWith('!')) {
@@ -184,6 +243,8 @@ export function parseFountain(text: string): FountainBlock[] {
         }
       }
     }
+
+    if (type === 'character' || type === 'dual_dialogue') inDialogueBlock = true;
 
     blocks.push({
       id: `block-${i}`,
