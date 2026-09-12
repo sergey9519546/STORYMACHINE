@@ -2695,3 +2695,23 @@ asserted: run, in a throwaway clone of this branch, against the real CLI.
 
 This entry is ONE pending entry, not three, so the recipe applies to it
 unchanged and once.
+
+**ONE MORE THING THE OWNER'S RUN NOW TOUCHES (row 8), and it is the one most
+likely to move AUC-24.** Moving `stripNonPrinting` ahead of the double-spaced
+reconstruction does more than close the guard's oracle: it means the four
+never-printed Fountain constructs are removed from the analysis on the
+DOUBLE-SPACED path as well, and the double-spaced path is the private corpus's
+own shape (scraped PDFs and FDX exports). Before row 8 that path stripped
+nothing, because the reconstruction had already moved `/*` into the middle of a
+joined line. So row 3's denominator correction, which on this repository's 32
+single-spaced fixtures cost 0.031 of the primary public AUC, now also reaches
+every corpus document that carries a boneyard, a note, a synopsis or a section
+heading — and no fixture here is double-spaced, so the size of that effect
+cannot be measured from this tree at all.
+
+It is still the correct behaviour: a boneyard is a comment on every path or on
+none. But it converts the "three cases" above from a question about how much
+non-printing text those drafts contain into the *only* thing the run has left to
+discover, and it is why row 8 — which is otherwise a guard fix with 45
+byte-identical reports — belongs in the owner's reading rather than in a
+footnote.

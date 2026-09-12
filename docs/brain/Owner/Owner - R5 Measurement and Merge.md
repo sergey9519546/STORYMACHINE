@@ -349,6 +349,15 @@ habits. Full table: `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §14.3.
   shuffle-drop AUC here moves AUC-24 by an amount proportional to how much of
   each draft was never meant to be printed, in a direction this corpus cannot
   predict.
+* **The one most likely to move AUC-24, added late.** `stripNonPrinting` was
+  moved ahead of the double-spaced reconstruction (it had been running after it,
+  where `/*` is already joined into the middle of a line and so invisible). That
+  closes a real guard-oracle failure AND extends the non-printing strip to the
+  DOUBLE-SPACED path — which is the private corpus's own shape, scraped PDFs and
+  FDX exports. No fixture in this repository is double-spaced, so the size of
+  that effect cannot be measured from this tree. It is correct either way (a
+  boneyard is a comment on every path or on none), and it means the three cases
+  above are the only thing left for the run to discover.
 * **Needs no corpus at all.** The gradient property test, the permutation
   ensembles, the calibration disclosure and the report-truth commits change no
   scored number — output identity is byte-identical outside the named copy and
