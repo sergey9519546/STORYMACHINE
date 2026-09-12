@@ -70,19 +70,28 @@ describe('the compact card shows the hint, not just the reason', () => {
     assert.match(runPrefix, /abortRef\.current\?\.abort\(\);\s*\n\s*const controller = new AbortController\(\);/);
   });
 
-  it('unmounting Coverage mid-run aborts the request, not just its result', () => {
-    // ROUND-2 REVIEW ITEM 7. The supersede-abort stopped a run that a NEW run
-    // replaced; it did not stop the run nobody replaced. `aliveRef` made a late
-    // response harmless, but closing Coverage mid-analysis left a full 14-pass
-    // run occupying a doctor-pool worker for a result nobody would read.
-    assert.match(coverageSummary, /useEffect\(\(\) => \(\) => \{ abortRef\.current\?\.abort\(\); \}, \[\]\);/);
-    // Declared AFTER abortRef, so the cleanup does not close over a const
-    // declared below it — the shape CLAUDE.md's doctor.ts note warns about.
-    const abortRefDecl = coverageSummary.indexOf('const abortRef = useRef<AbortController | null>(null);');
-    const unmountAbort = coverageSummary.indexOf('useEffect(() => () => { abortRef.current?.abort(); }, []);');
-    assert.ok(abortRefDecl > -1 && unmountAbort > abortRefDecl, 'the unmount abort must follow abortRef\'s declaration');
+  it('the unmount-abort gap is recorded in the code, not silently absent', () => {
+    // ROUND-2 REVIEW ITEM 7. Closing Coverage mid-run still orphans a full
+    // analysis. The one-line repair was BUILT AND REVERTED: `src/main.tsx`
+    // renders under StrictMode, so its cleanup aborted the panel's first sample
+    // run and the B-4 run-once guards then refused to restart it — the gate
+    // caught it as `P3 :: Sample coverage produces a rendered verdict` failing
+    // with "verdict text present=false" on the golden path.
+    //
+    // What this asserts is that the finding is written down where the next
+    // person to reach for the cleanup will read it first, and that the naive
+    // fix is NOT in the tree.
+    assert.doesNotMatch(
+      coverageSummary,
+      /useEffect\(\(\) => \(\) => \{ abortRef\.current\?\.abort\(\); \}, \[\]\);/,
+      'the unmount abort breaks the golden path under StrictMode — see the note above abortRef',
+    );
+    assert.match(coverageSummary, /IT WAS BUILT AND REVERTED, because the gate caught what it does\./);
+    assert.match(coverageSummary, /Sample coverage\s*\n\s*\*\s*produces a rendered verdict/);
     // The aliveRef cleanup keeps its single job.
     assert.match(coverageSummary, /return \(\) => \{\s*\n\s*aliveRef\.current = false;\s*\n\s*\};/);
+    // …and the supersede-abort, which StrictMode never triggers, is untouched.
+    assert.match(coverageSummary, /abortRef\.current\?\.abort\(\);\s*\n\s*const controller = new AbortController\(\);/);
   });
 
   it('clears the hint when a new run starts, so it cannot describe text that is gone', () => {

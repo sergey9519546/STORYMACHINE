@@ -297,27 +297,30 @@ export default function CoverageSummary({
   // worker immediately (server/nvm/analyze/doctor-pool.ts) rather than
   // leaving it to run to completion for a result nobody will see.
   const abortRef = useRef<AbortController | null>(null);
-  /** ROUND-2 REVIEW ITEM 7 — the gap the supersede-abort did not close.
+  /** ROUND-2 REVIEW ITEM 7 — a gap that is real, and NOT a one-line fix.
    *
-   *  `aliveRef` above already stopped a late RESPONSE from touching a torn-down
-   *  editor, but the REQUEST kept running: closing Coverage mid-run left a full
-   *  14-pass analysis occupying a doctor-pool worker for a result nobody would
-   *  ever read. On a 231-scene draft that is seconds of a worker the next writer
-   *  is queued behind. Aborting closes the connection, which frees the worker
-   *  immediately (server/nvm/analyze/doctor-pool.ts) — the same mechanism
-   *  `cancelRun` relies on and the same one `run` now uses to stop a superseded
-   *  request.
+   *  Closing Coverage mid-run leaves a full 14-pass analysis occupying a
+   *  doctor-pool worker for a result nobody will read: `aliveRef` above stops the
+   *  late RESPONSE from touching a torn-down editor, but the REQUEST keeps going.
+   *  The obvious repair is a cleanup that calls `abortRef.current?.abort()`.
    *
-   *  Its own effect, declared AFTER `abortRef`, rather than a second statement
-   *  in the `aliveRef` cleanup above: this repository has already paid for one
-   *  temporal-dead-zone bug that a fallback swallowed (CLAUDE.md's doctor.ts
-   *  note), and a cleanup that reads a `const` declared 30 lines below it is the
-   *  same shape even where it happens to work.
+   *  IT WAS BUILT AND REVERTED, because the gate caught what it does. `src/main.tsx`
+   *  renders under `<StrictMode>`, so in the dev build every browser gate drives,
+   *  React mounts, runs effects, runs cleanups and runs effects again — the
+   *  cleanup therefore aborts the panel's FIRST sample run, and the mount
+   *  effect's own B-4 guards (`sampleRunRef` / `lastRunTextRef`, whose doc
+   *  comment above explains the double-analysis they exist to prevent) then
+   *  correctly refuse to start a second. Measured: `P3 :: Sample coverage
+   *  produces a rendered verdict (Doctor reachable end to end)` failed —
+   *  "verdict text present=false" — on the product's own golden path.
    *
-   *  Safe: the catch checks `gen`, then returns for an AbortError with
-   *  `userCancelledRef` false, so nothing calls setState on an unmounted
-   *  component. */
-  useEffect(() => () => { abortRef.current?.abort(); }, []);
+   *  Closing it properly means distinguishing a real unmount from StrictMode's
+   *  simulated one, or making the run-once guards survivable across an aborted
+   *  run. That is a change to the golden path's concurrency contract, not a
+   *  cleanup line, and it is recorded in
+   *  docs/audits/2026-09-12-adversarial/writer-lane-report.md rather than
+   *  attempted here. `run`'s own supersede-abort (below) is unaffected: it fires
+   *  only when a NEW run replaces an old one, which StrictMode never does. */
   // Set only by the Cancel button's own handler, so the catch block can tell
   // a real Cancel apart from the 120s watchdog or a teardown/superseded
   // abort — all three share the same DOMException("AbortError") shape.
