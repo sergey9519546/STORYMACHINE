@@ -873,3 +873,284 @@ finding is about what those drafts contain and what shape they arrive in.
 ---
 
 *Round 2. Reviewed SHA **`b798a0c4`**; round 1's was `85273742`.*
+
+---
+
+## Round 3 — re-check of `3124a94e`
+
+**Object:** five commits over `b798a0c4` (`43081743`, `51a19352`, `08579b4c`,
+`06843c39`, `3124a94e`); `origin/scoring/adversarial-2026-09-12` is at the
+reviewed SHA and the worktree is clean at it. Scope: my round-2 non-blocking
+items 1, 2, 4 and 5, plus the usual regression surface. Method unchanged —
+my own `git archive` exports of `b798a0c4` and `85273742` in
+`<session scratch>` with `node_modules` symlinked; nothing committed, pushed,
+merged or checked out; `--lock` never run; no full `npm test`; no private
+corpus on this machine and none sought.
+
+### R3.a Non-blocking 1 — the owner's step 1 is now one command
+
+`submittedWordCount` and `isDoubleSpaced` are reported on `FountainAnalysis`
+(`types.ts:63-86`, `fountain-analyzer.ts:2780-2781`), documented as diagnostic
+only, and **deliberately not on `ScriptDoctorReport`** — which is the right
+call, because it is what keeps the 45 committed identity fixtures fixed.
+`isDoubleSpacedText(raw)` is exported from `screenplay-normalizer.ts:122` and
+`normalizeScreenplayUncached` now **calls it** rather than keeping its own
+line-prep, so the decision the analyzer reports and the decision the normalizer
+takes are one piece of code; the duplicated `allLines` prep is deleted and
+replaced by a single `rawLines()` helper. That is the one-definition rule
+applied to the thing my item was about, not just an accessor bolted on.
+
+```
+cd /home/user/wt-scoring && npm run probe-corpus-shape -- --public      EXIT=0   (3.07 s)
+  Scripts read: 32 · Nothing was written to disk and no screenplay text is printed.
+  DOUBLE-SPACED  none
+  SINGLE-SPACED  32 of 32 · words NOT screenplay total 2299, mean 71.8, median 61.5, max 151
+                 as a share of the submission mean 8.58%, median 6.72%, max 20.84%
+                 scripts with a non-zero gap 32 of 32
+```
+
+**Can an owner execute step 1 with it? Yes, and the numbers are right.** I
+cross-checked the probe's output against my own round-1 hand counts, which were
+made before this script existed:
+
+| script | probe `submitted` / `words` / gap | my round-1 hand count |
+|---|---|---|
+| `room-12.fountain` | 427 / 338 / **89** | 427 → 338, an 89-word boneyard |
+| `transfer-window.fountain` | 454 / 379 / **75** | 454 → 379, 75 words |
+| `dead-frequency.fountain` | 1830 / 1806 / **24** | 1830 → 1806, 24 words |
+
+and the probe's corpus-wide total gap of **2299** is, to the word, my own
+independent sum of every boneyard in the 32 files
+(`<session scratch>/hand2.mjs` plus a one-line sum: 2299). The max gap of 151
+is the same 151 I measured in round 1. So the field is not merely present, it
+carries the number the receipt says to read.
+
+**Diffing two trees with `--csv` works.** The script is not on `b798a0c4`, but
+copying it there runs cleanly under type stripping — the two diagnostic columns
+come back empty and the step-2 columns are intact:
+
+```
+cd <scratch>/r2tree && node --experimental-strip-types scripts/probe-corpus-shape.ts --public --csv   EXIT=0
+cd /home/user/wt-scoring && node --experimental-strip-types scripts/probe-corpus-shape.ts --public --csv   EXIT=0
+diff <(cut -d, -f1,7- b798a0c4.csv) <(cut -d, -f1,7- 3124a94e.csv)  ->  IDENTICAL on the step-2 columns
+```
+
+32 rows on each side, and the step-2 columns (health, verdict, sceneCount,
+c/m/n) are identical — which is the same fact as R3.c's identity pass, arrived
+at through the owner's own instrument. That is the test of whether the
+instruction is executable, and it passes.
+
+**It cannot leak corpus text and it writes nothing.** Checked three ways:
+
+* Static: the only `node:fs` imports are `readdirSync`, `readFileSync`,
+  `existsSync`, `statSync`. Zero occurrences of `writeFile`, `appendFile`,
+  `createWriteStream`, `mkdir`, `unlink`, `fetch`, `http`/`https`, `net`,
+  `child_process`, `execSync` or `spawn` in the file.
+* Dynamic: `touch` a marker, run the probe, then
+  `find . -newer <marker> -type f` over the worktree — **empty**. The only
+  files anywhere under `/tmp` newer than the marker are this session's own tool
+  logs.
+* Output surface: every printed row is a file path plus integers; the table and
+  the CSV both build from `Row`, which holds no text. No screenplay line can
+  reach stdout.
+
+The two env paths behave as documented: unset → `[SKIP] … not set`, **EXIT=0**
+(an unset var can never masquerade as a result); a non-existent path →
+`[FATAL]`, **EXIT=2**.
+
+### R3.b Non-blocking 2, 4 and 5
+
+* **2 (four changes, not two).** The receipt's WHAT TO COMPARE now carries
+  "**FOUR CHANGES REACH THE CORPUS, NOT TWO**", naming rows 9 and 10, stating
+  that they fire on **either** document shape rather than only the
+  double-spaced one, carrying the measured "zero forced markers, zero
+  non-canonical extensions on the 32" as the reason a benchmark could not catch
+  them, and flagging `@` and `.` as the two with the most exposure in converted
+  drafts. It also states the falsifiable corollary I suggested — rows 9 and 10
+  **cannot** move `sceneCount`, so a changed scene count is evidence of
+  something else. Complete.
+* **4 (`DOOR SLAMS (OS)`).** The clause is in
+  `screenplay-normalizer.ts:393-404` under "WHAT IT DOES CHANGE THE CLASS OF,
+  said plainly", with the right framing (a consistency fix inside a class
+  `CHARACTER_CUE_RE` already had, not a new ambiguity) and it is **pinned by an
+  assertion** rather than left as prose — see R3.d.
+* **5 (23 → 24).** Corrected in both gate tables. One nuance for the record:
+  the lane calls 23 "a transcription error", and it is nearer to an artifact —
+  the gate prints how many exclusions **exist on disk**, and a `git archive`
+  export is missing a gitignored excluded path, so 23 is what it legitimately
+  prints there. The material fact is the one that matters and it is right: the
+  `exclude` array is **24 entries on every tree in this batch and byte-unchanged**
+  (empty `tsconfig*.json` diffstat), so nothing was newly exempted from the
+  console gate. `check-no-console` prints 24 here.
+
+### R3.c The regression surface
+
+```
+npm run benchmark:public                                                  EXIT=0
+  SHUFFLE_DROP      0.8438 [0.7188, 0.9688] floor 0.8238 · 0.7896 [0.6738, 0.8975] floor 0.7696
+  CLIMAX_RELOCATE   0.5938 [0.4219, 0.7500] floor 0.5738 · 0.5234 [0.4678, 0.5874] floor 0.5034
+  DIALOGUE_FLATTEN  1.0000 floor 0.98        · 0.9814 [0.9531, 1.0000] floor 0.9614
+```
+
+Identical to rounds 1 and 2 **to the digit**, third round running.
+`scripts/lib/auc.ts` is untouched in round 3 (not in the diffstat at all);
+`AUC24_FLOOR` still 0.622; manifest and split untouched.
+
+```
+GIT_SHA=R3PIN  --tree <scratch>/r2tree (b798a0c4)  --out <scratch>/ident-b798
+GIT_SHA=R3PIN  --tree .                (3124a94e)  --out <scratch>/ident-3124
+--compare  ->  OUTPUT IDENTITY: PASS — all 45 reports byte-identical (analyzedAt excluded)   EXIT=0
+```
+
+**45 of 45 byte-identical**, as claimed, and the reason is structural rather
+than lucky: the two new fields are on `FountainAnalysis`, which the harness
+does not snapshot, and on no scoring path.
+
+```
+node scripts/check-scoring-receipt.mjs 78ec4464..HEAD
+  EXIT=1 — exactly ONE "PENDING ENTRY", 8 scoring-path files, no other problem
+```
+
+No AUC-24 value is stated, implied or projected in the round-3 diff: the only
+added line matching `auc.?24` with a number is
+"`scripts/lib/auc.ts` | untouched in round 3; `AUC24_FLOOR` still 0.622".
+
+| gate | result |
+|---|---|
+| `npm run lint` | **EXIT=0** |
+| `npm run check-no-console` | EXIT=0 — 304 files, **24** quarantine entries |
+| `npm run check-docs` · `honesty-audit` · `check-brain` | EXIT=0 · EXIT=0 (458 files, 474 markdown, 93 claims rows) · EXIT=0 (104 notes, 386 links) |
+| `npm run gates` | **EXIT=0**; mutation check raised `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` to 0.8938 and the suite **FAILED on that floor by name**, no passing twin |
+| `tests/core/corpus-shape-fields.test.ts` | **8 / 8**, EXIT=0 |
+| `tests/core/parse-format-invariance.test.ts` | **60 / 60**, EXIT=0 |
+| `tests/core/fountain-analyzer.test.ts` · `script-doctor.test.ts` | 69 / 69 · 90 / 90 |
+
+The three incidental test edits (`l37-l38`, `script-doctor`,
+`story-graph-ops`) are fixture-object completions forced by two new
+non-optional fields — two literals each, **no assertion widened**. I read all
+three diffs.
+
+### R3.d Are the new assertions real?
+
+Yes, and two of the eight are the kind I would have asked for.
+
+* **An independent recompute, not a tautology.**
+  `corpus-shape-fields.test.ts:58-66` asserts
+  `analysis.submittedWordCount === fastWordCount(read(f))` for all 32 — the
+  field is checked against a separately computed figure, not against itself.
+* **Two-sided on the thing the field exists for.** A boneyard padded ×800 must
+  move `submittedWordCount` by >3000 **and** leave `wordCount`, `sceneCount`,
+  `dialogueLineCount` and `actionLineCount` exactly where they were. That is
+  the padding attack the denominator fix closed, asserted from the diagnostic
+  side.
+* **The one-definition claim is asserted, not just commented**
+  (`:127-139`): `isDoubleSpacedText(messy) === true` together with
+  `normalizeScreenplay(messy) !== joinWrappedDialogue(messy)` — i.e. the
+  reported decision and the branch actually taken cannot drift without the test
+  going red. Plus the `false` direction on clean text.
+* **Both directions on the corpus split**: `isDoubleSpaced` false on all 32
+  committed scripts (with a message saying that if a fixture reaches that
+  branch the *claim* needs re-checking, not the assertion relaxing) and true on
+  a double-spaced re-emission of every one of them. Empty and whitespace-only
+  submissions are pinned false.
+* **The `DOOR SLAMS` test is two-sided too**: the three alias spellings must
+  parse identically to the canonical one, **and** `MARY (into phone)` /
+  `THE SIGN READS KEEP OUT (beat)` must still parse `action,action` — so the
+  fold is pinned against widening what counts as a cue.
+
+**Fail-first.** `corpus-shape-fields.test.ts` cannot even load on a `b798a0c4`
+export (`SyntaxError: … does not provide an export named 'isDoubleSpacedText'`,
+EXIT=1) — a hard fail, though of the trivial kind, which is inherent to a test
+about fields that did not previously exist. The behavioural fail-first is the
+invariance suite: the round-3 file is **60/60 on `b798a0c4`** (correct — the
+extension fold already existed there, so the new pinning test should pass) and
+**51 pass / 9 fail on `85273742`**, the round-2 eight plus the new `DOOR SLAMS`
+row. So the pinning test is not vacuous: it fails on the tree where the
+behaviour it pins was different.
+
+## VERDICT: **READY-FOR-OWNER**
+
+All four items built, and three of them built better than asked: the probe is
+not an accessor but a command that answers steps 1 and 2 together, with its
+copyright boundary stated and enforced; the `isDoubleSpaced` export is wired so
+the reported decision *is* the taken decision rather than a second copy of it;
+and the `DOOR SLAMS` clause carries an assertion instead of a paragraph. The
+round moves no score — six AUCs to the digit, 45 of 45 reports byte-identical,
+`auc.ts` untouched, no re-lock — and the receipt still exits 1 on exactly one
+PENDING entry. I verified the probe's headline numbers against hand counts I
+made in round 1, before the script existed, and they agree to the word.
+
+Nothing blocking. The branch is waiting only on
+`REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`, and it now hands the
+owner a second command to run first.
+
+### Non-blocking
+
+1. **`npm run probe-corpus-shape -- --csv > out.csv` is not a clean CSV.** npm
+   writes four banner/blank lines before the header, so the file needs
+   stripping before a spreadsheet or `csvdiff` will read it (a plain `diff` of
+   two such files is unaffected, since the banner is identical on both sides).
+   `npm run --silent probe-corpus-shape -- --csv` produces the header as line 1
+   — verified. Worth putting `--silent` in the receipt's code block and in the
+   script's RUN comment.
+2. **"Run it once on a pre-branch checkout and once here and diff the `--csv`"
+   needs one more sentence.** The script does not exist on the pre-branch tree,
+   so the owner must copy it across first. I confirmed that works and is clean:
+   under type stripping the two diagnostic columns come back empty and every
+   step-2 column is intact and diffable. One clause — "copy this file onto the
+   pre-branch checkout first; its `isDoubleSpaced` and `submittedWordCount`
+   columns will be empty there, which is correct, because the denominator was
+   the raw submission" — makes the instruction self-contained the way step 1
+   now is.
+3. **The probe prints corpus file paths.** That is disclosed ("prints numbers
+   and file names to stdout") and it is not screenplay text, so the copyright
+   boundary holds. But on the private corpus those names are the titles of 761
+   real screenplays, so the output is a local artifact rather than something to
+   paste into a ticket or a receipt. One line in the script's COPYRIGHT
+   BOUNDARY block would say so; a `--no-names` flag would be over-engineering.
+4. **`analyzeFountainText` now calls `isDoubleSpacedText(fountain)` on every
+   analysis** — one extra split-and-scan of the document per report, for a
+   field nothing scores from. It is O(n) against a pipeline that already parses
+   the document many times and no timing assertion moved, but it is a real cost
+   paid by the product for a diagnostic; memoising it alongside the existing
+   `normalizeScreenplay` one-entry memo would make it free.
+5. **Carried forward, unchanged and still binding:**
+   `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1,500,000` must not land before the
+   sibling lane's 675,000 re-derivation is applied on the merged tree with the
+   analyzer cap in place; `@` remains the largest measured format sensitivity
+   (32 of 32, up to −26.8), pinned and unfixed, and needs its own lane.
+
+### What the owner's run settles and what it cannot
+
+Unchanged in substance from round 2. What round 3 changes is that the first two
+steps are now executable instead of described:
+
+**Settles.** How much of those 761 drafts is text Fountain never prints, and
+what the four corpus-visible changes do to per-script health, verdict, scene
+count and issue counts — via `npm run probe-corpus-shape`, run once on a
+pre-branch checkout and once here, `--csv` diffed, before any rank statistic.
+The `--public` calibration run gives the owner a reference reading to compare
+shape against: 0 of 32 double-spaced, 32 of 32 with a gap, mean 8.58% of each
+submission not screenplay. A private-corpus run of all-zero gaps would mean the
+denominator correction cannot have moved anything there.
+
+**Settles, with four changes in scope.** The strip-order change and the passes
+reading the reconstructed text fire on double-spaced documents only; the
+forced-marker strip and the cue-extension fold fire on either shape, wherever a
+draft carries a forced marker or a non-canonical extension — which the 32
+committed scripts provably do not, and converted drafts routinely do.
+
+**Cannot settle.** Whether the corrections are right. A boneyard is a comment,
+a forced marker is not a word, and one spelling of an extension is one speaker:
+the format answers all three, not a statistic. If AUC-24 falls, the finding is
+about what those drafts contain and what shape they arrive in. `AUC24_FLOOR`
+does not move.
+
+**Cannot move at all.** Round 3 itself: 45 of 45 reports byte-identical to
+`b798a0c4`, six AUCs unchanged to the digit, `auc.ts` untouched, no re-lock
+run, and the two new fields on no scoring path.
+
+---
+
+*Round 3. Reviewed SHA **`3124a94e`**; round 2's was `b798a0c4`, round 1's
+`85273742`.*
