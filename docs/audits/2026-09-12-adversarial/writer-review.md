@@ -1,4 +1,4 @@
-# Independent review — `lane/writer-loop-client`: round 1 **718a0b1d**, round 2 **d0d1b759**
+# Independent review — `lane/writer-loop-client` rounds 1-2 (**718a0b1d**, **d0d1b759**) and `lane/writer-followups` round 3 (**55660c9f**)
 
 **Reviewed object:** `718a0b1d` (the lane's `c19000c7` rebased onto `main`
 `f94d587e`; ten commits; on `origin/lane/writer-loop-client`).
@@ -668,3 +668,179 @@ programmatic install); `computeJumpSpan` having no production caller; finding
 4's real cause in `doctor.ts`'s ranking of `build.rawScore`; and
 `server/lib/coverage-html.ts`'s unlabelled `Graph Health` block, left to the
 export lane with the functions named in Round 1.
+
+---
+
+## Round 3 (follow-ups lane)
+
+**Reviewed object:** `55660c9f` — three commits on the writer lane's tip
+`6dbabc9c`, on `origin/lane/writer-followups`. Same reviewer.
+**Method:** `git archive 55660c9f` and `git archive 6dbabc9c` into
+`<session scratch>/writer-review/{fu,fubase}` with `node_modules` symlinked,
+`npm run build` on the tip (exit 0), and both trees' `npm run fuzz-routes` run
+end to end. `/home/user/wt-followups` was not opened for writing; the only file
+written under `/home/user/STORYMACHINE` is this review.
+
+### Item 2 — the `.env` clause · **closed**
+
+`server/lib/session-store.ts:168-178` now says the guard "covers everything a
+guard CAN cover — it cannot cover an untracked `.env`: `dotenv/config` loads one
+before this module runs, so a value placed there (or in a deployment's own real
+environment) is honored the same as any other environment variable, bounded to
+the same 1-50 range". That is exactly what I measured in round 2
+(`VERIFY_RATE_LIMIT_MULTIPLIER=10` in an untracked `.env` → `200s=130 429s=0`),
+and the sentence I said was already right is untouched.
+
+### Item 3 — the abort-count guard · **closed, with one escape left**
+
+The `doesNotMatch` shape is gone, replaced by a call-site count
+(`tests/core/coverage-format-unrecognized-card.test.ts:94-99`). Planted into the
+real `CoverageSummary.tsx` (not the suite's synthetic strings), one route at a
+time, restoring between each:
+
+| planted | result |
+|---|---|
+| untouched tree | **# pass 21 # fail 0** |
+| (A) `abortRef.current?.abort();` appended to the `aliveRef` unmount cleanup | **# pass 17 # fail 4** — caught |
+| (B) a separate, pretty-printed `useEffect(() => { return () => { abortRef.current?.abort(); }; }, [])` | **# pass 17 # fail 4** — caught |
+| (C) `useEffect(() => () => abortRef.current?.abort(), []);` | **# pass 21 # fail 0** — **not caught** |
+
+Both routes round 2 measured are now closed, which is what the item asked for.
+(C) survives because the pattern requires the trailing `;` immediately after
+`abort()` — the concise double-arrow cleanup has none. It is a narrower escape
+than the one it replaced and the fix is one line: strip block comments from the
+source first (so the doc comment's backticked mention does not count) and then
+count `/abortRef\.current\?\.abort\(\)/g`, still expecting 2. Non-blocking.
+
+### Item 1 — the multiplier is scoped, and the scoping costs the fuzzer
+
+**The scoping itself is right and verified.** Calling the helper directly:
+
+```
+browser gate                        VERIFY_RATE_LIMIT_MULTIPLIER = "10"
+{ productionRateLimit: true }       key absent from the env entirely
+parent env already carries "10",
+  with productionRateLimit: true    key absent — the `delete` is load-bearing
+```
+
+Every call site accounted for: `scripts/lib/browser-verify.mjs:391` (the one
+boot path all eight browser suites share) takes the default and keeps the
+headroom; `fuzz-routes.mjs:64`, `verify-production-build.mjs:204` and
+`load-test-doctor.mjs:335` opt out. `npm run verify:surfaces` on the export:
+**248/248, exit 0**, load 2.9/4 cpus, peak 123 `/api/` requests in a 60 s window
+against its 1200 ceiling — the browser gates still get what they need.
+
+The guard grew from 9 to 13 assertions and is not decorative:
+
+| planted | guard suite |
+|---|---|
+| untouched | **13 pass / 0 fail** |
+| opt-out removed from `verify-production-build.mjs` | **12 / 1** |
+| `// VERIFY_RATE_LIMIT_MULTIPLIER hint` appended to `server/app.ts` | **11 / 2** |
+
+Default-is-production is still asserted in a process that does not set the
+variable, and no deployment path names it.
+
+**But the fuzzer now fails, and the report undercounts the cost by 9×.** Both
+trees, full (non-`--quick`) `npm run fuzz-routes`, same machine:
+
+| | baseline `6dbabc9c` | tip `55660c9f` |
+|---|---|---|
+| `status=429` lines in the run | **0** | **18** |
+| `ws-oversized-frame (10MB)` / `ws-10000-message-burst` | **both run** — "closed with code 1009", "connection survived burst" | **skipped** — *"room mint returned 429, likely rate-limited by an earlier phase of this same run"* |
+| 200-concurrent-doctor-requests | `{"200":200}` — 200 succeeded, 0 rate-limited | `{"429":200}` — **0 succeeded**, 200 rate-limited |
+| total requests / `[ok]` lines | 197 / 197 | 195 / 193 |
+| flagged findings | **0** | **2** |
+| exit | **0 — PASS** | **1 — FAIL** |
+
+The report discloses the exit-code change and both flagged findings, and it
+explicitly declines the pacing redesign as out of scope — that is honest, and
+§2 allows it. Two things it does not say:
+
+1. **"two unrelated probes late in the sequence also see 429" is 18 probes.**
+   Two are *flagged*; the other sixteen are absorbed as `[ok]` because 429 is in
+   the harness's accepted-status set — `empty-body /api/analyze-script`,
+   `array-body /api/simulate-to-fountain`, `no-content-type /api/nvm/selfplay`,
+   `commitId-path-traversal`, `numeric-1e308` and eleven more. Each of those was
+   written to prove a *validation* rejection and is now answered by the rate
+   limiter, scored green. That is not two probes; it is a whole tier of the
+   suite quietly measuring the limiter instead of the routes.
+2. **Two WebSocket attack cases stopped running altogether**, and the report
+   does not mention them. On the baseline both execute and pass; on the tip the
+   section prints a skip line. Coverage lost, undisclosed.
+
+And the headline case no longer demonstrates what it was written for.
+`fuzz-routes.mjs:37` states the property: the server must stay responsive "and
+to 429 the overflow rather than let the [process fall over]". `{"429":200}` with
+**zero** successes is not overflow-shedding — it is a window that was already
+spent 195 requests earlier, so the case can no longer distinguish "the limiter
+sheds the overflow while legitimate traffic gets through" from "the limiter
+refuses everything". The brief asked me to judge whether the fuzzer is still
+measuring what it claims: **it is not.** Before the change it could never
+exercise the limiter; after it, the limiter answers for the routes. Neither
+tree is right.
+
+### Gates, re-run by the reviewer
+
+| gate | command | result |
+|---|---|---|
+| scoring receipt | `check-scoring-receipt.mjs 6dbabc9c..55660c9f` | **0** — *"no scoring-path files changed"* |
+| output identity | `--compare` vs `git archive 6dbabc9c`, `GIT_SHA=r3reviewpin` both trees | **PASS — 45/45 byte-identical** |
+| browser | `verify:surfaces` (tip export, once) | **248/248, exit 0** |
+| touched suites | run individually | `rate-limit-verification-override` **13**, `coverage-format-unrecognized-card` **21**, `keyless-browser-certification` **2** — all 0 fail |
+
+**On the three `npm test` failures.** They are not this lane's:
+`tests/core/doctor-analysis-budget.test.ts` appears in
+`git diff --name-only 6dbabc9c 55660c9f` **zero** times, and the file fails
+identically on the baseline export (`# pass 26 # fail 1`, same subtest — *"the
+budget does not fire on real writing (no-fire table)"*). I could not verify the
+report's *characterisation* of them as wall-clock assertions: in my export the
+failing assertion is `trackedFountainFiles()` returning 35 where the test wants
+≥ 45, because that helper shells out to `git ls-files` and a `git archive`
+export has no index (the real repo returns 55). So: same file, same failure,
+both trees, not caused by this lane — but "wall-clock under load" is the lane's
+reading, not one I reproduced.
+
+---
+
+## VERDICT: **REVISE**
+
+Two of the three items are closed outright, the third is closed in the sense I
+asked for — the multiplier now reaches only the browser gates, proved by direct
+inspection of the helper's output and by `verify:surfaces` still passing 248/248
+— and `verify-production-build.mjs` really does run on the production ceiling
+now. One item back:
+
+**1. The fuzzer lost more than the report says, and it can be given back cheaply.**
+`scripts/fuzz-routes.mjs:64`
+
+`npm run fuzz-routes` went from **PASS / 0 flagged / 0 429s / 197 probes** to
+**FAIL / 2 flagged / 18 429s / 193 `[ok]`**, with `ws-oversized-frame` and
+`ws-10000-message-burst` no longer executing at all. Close it either way:
+
+- **Preferred (small).** `bootServer` already takes a port; boot **two**
+  servers — the ~195 sequential validation probes on the multiplied one (they
+  are not about the limiter and never were), and the
+  `200-concurrent-doctor-requests` case, alone, on a `productionRateLimit: true`
+  one. That restores every probe the baseline ran *and* makes the concurrency
+  case a real overflow measurement (a fresh window, so some requests succeed and
+  the rest are shed) — strictly better than either tree, and it is the thing the
+  case's own header comment claims to prove.
+- **Acceptable (smaller).** Leave the behaviour and correct the record: say 18
+  probes rather than two, list the skipped WebSocket attacks as coverage this
+  change costs, and say plainly that with a spent window the concurrency case no
+  longer distinguishes overflow-shedding from blanket refusal. A reader of the
+  report should not have to run the fuzzer to learn that.
+
+I would take either; the first is worth the extra half hour because it is the
+only version in which the fuzzer measures both things it was built to measure.
+
+### Non-blocking, carried
+
+- **The abort-count guard's one remaining escape** — `useEffect(() => () =>
+  abortRef.current?.abort(), []);` passes 21/0. Strip comments and drop the
+  `;` from the pattern.
+- Everything the writer lane carried forward in Round 2 (the unmount-abort gap
+  itself, finding 3's deeper half, `computeJumpSpan`'s missing caller, finding
+  4's ranking cause, and `coverage-html.ts`'s unlabelled Graph Health block)
+  is unchanged and still correctly named.
