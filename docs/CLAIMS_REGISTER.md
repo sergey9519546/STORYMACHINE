@@ -217,7 +217,7 @@ verify lane merged first. The lane's audit record
 (`docs/audits/2026-09-12-adversarial/writer-review.md`, rounds 1–3, and
 `writer-lane-report.md`) quotes the lane-side numbers as they stood on the
 day: its "row 94" is row 100 here, "row 95" is 101, "row 100" is 106. The
-two source comments and the six brain-note citations (Start Screen, Coverage
+two source comments and the seven brain-note citations (Start Screen, Coverage
 Summary, Script Doctor Panel) that cite these rows were moved with them, and
 `tests/core/claims-row-citations.test.ts` now fails on a duplicate number,
 on a gap, and on a pointer whose target row does not carry the claim it

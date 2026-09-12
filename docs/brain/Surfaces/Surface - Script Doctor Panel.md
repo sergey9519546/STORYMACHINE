@@ -206,4 +206,4 @@ made; the tooltip names the mismatch instead. See [[Patterns]] for the shape.
   `tests/core/dimension-percentile-badge.test.ts`,
   `tests/core/dimension-badge-wiring.test.ts`
 - `docs/audits/2026-09-12-adversarial/writer-loop.md` findings 4, 9, 14
-- `docs/CLAIMS_REGISTER.md` rows 9, 32-33, 36-38, 49, 72-73, 80-81, 86-88, 91, 96-99 (this panel's claims)
+- `docs/CLAIMS_REGISTER.md` rows 9, 32-33, 36-38, 49, 72-73, 80-81, 86-88, 91, 102-105 (this panel's claims)
