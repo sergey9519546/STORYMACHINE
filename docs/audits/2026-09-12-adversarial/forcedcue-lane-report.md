@@ -370,6 +370,20 @@ is which.
    named here with its mechanism so it is not rediscovered as news, and
    `renderableText` is now the one place its strip would go.
 
+   **The same family, one step milder: a `@` line that is NOT in cue position
+   prints its marker too** (round-2 review, non-blocking 3). `@everyone in the
+   room turned.` with a blank line under it is typed `action`, and
+   `renderableText` strips `@` only from `character` / `dual_dialogue` blocks,
+   so the character reaches the PDF, the FDX Text node and the DOCX run as
+   literal text. That is defensible where `>` is not — the line is not a cue,
+   so the marker is not declaring anything and is just a character the writer
+   typed — but it is the same mechanism (a marker-shaped character on a block
+   the parser typed something else) and it belongs beside the `>` line rather
+   than one discovery away from it. Changing it would mean deciding that a
+   leading `@` never prints, which is a claim about prose this lane has no
+   measurement for; both residuals now have the same single home if either is
+   ever closed.
+
 ---
 
 ## 7. The receipt row
