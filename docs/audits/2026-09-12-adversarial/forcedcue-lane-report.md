@@ -2,7 +2,11 @@
 
 **Worktree:** `/home/user/wt-forcedcue`
 **Branch:** `scoring/forced-cue`, pushed to origin after every commit.
-**Tip:** `6eeef062`, plus the commit carrying this report (see §Tip and origin)
+**Tip:** `6d8f1653`. The pre-rebase history ended at `5be366be`; the rebase
+onto `4cf5b2f3` produced `22c6b03f`, and `6d8f1653` is the commit carrying the
+rebase section at the end of this report. The `git log` and `git ls-remote`
+blocks below were taken before those two commits existed — the off-by-one a
+self-recording report always has, stated where each block appears.
 **Base:** `4cf5b2f3` — `origin/scoring/adversarial-2026-09-12`. The lane was
 CUT from `3124a94e` and every before/after number below is measured against
 that commit; it was rebased onto `4cf5b2f3` at the end, and that rebase and
