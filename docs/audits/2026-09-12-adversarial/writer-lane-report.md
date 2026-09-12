@@ -603,3 +603,112 @@ Touched suites, each run individually: `coverage-format-unrecognized-card` 18,
 - **`server/lib/coverage-html.ts`** still prints `Graph Health n/100` and
   `→ Health deduction −n` unlabelled, and has no dimension badge to gate. Left to
   the export lane, with the functions named in Round 1 above.
+
+---
+
+## Round 3
+
+**Worktree:** `/home/user/wt-writer` · **Branch:** `lane/writer-loop-client`,
+rebased onto `main` `8c99f92d` · **Round-2 reviewed object:** `6dbabc9c` ·
+**Round-3 tip:** `ca31828d`, one commit, pushed.
+
+Two deterministic gate failures were reported against `6dbabc9c`. I measured
+both before changing anything, and they are not the same kind of thing.
+
+### (b) `verify:ui-polish` phase A — real, and the cause is in the gate
+
+**The suspicion was that finding 5 took the sample's jump away. It did not.**
+Measured on the sample, through the same pipeline the route uses:
+
+```
+topPriorities[0].location = "Scene 9 (climax peak)"  rule PROTAGONIST_PASSIVITY_CLIMAX
+document-tier? false
+computeTopPriorityJumpSpan = {"startLine":155,"endLine":171,"owner":"top-priority"}
+```
+
+The sample's first card has a genuinely located finding, and the card renders
+**"Jump to scene 9"** for it. The honest-note path is not reached on the sample
+at all — it is the feature fixture's document-tier priority that reaches it.
+
+**What actually fails is the gate's readiness wait.** It was
+`waitForFunction(() => /RECOMMEND|CONSIDER|PASS/.test(document.body.innerText))`.
+`innerText` reflects CSS `text-transform`, and `.sm-slug` uppercases, so the
+doctor's own per-pass counter renders as **"RUNNING PASS 1 OF 14…"** — and its
+literal "PASS" satisfies a poll that was asking for a verdict. The phase then
+counts the jump control while the panel is still streaming. Probed four times
+per tree, same steps:
+
+| tree | run 1 | runs 2-4 | control once settled |
+|---|---|---|---|
+| `6dbabc9c` (this lane) | `loading:true` → **count=0** | count=1 | `["Jump to scene 9"]` |
+| `main` | `loading:true` → **count=0** | count=1 | `["Jump to scene 9"]` |
+
+**Identical on both trees** — a pre-existing ~1-in-4 race in the gate, not a
+product regression. A second probe names the culprit exactly:
+
+```
+{"hit":"PASS","owner":{"cls":"sm-slug","text":"RUNNING PASS 1 OF 14…"},"loading":true,"hasJump":false}
+```
+
+This is the **third independent rediscovery** of the same trap, each time fixed
+in one suite only — `verify-production-build.mjs` (waits for the literal
+"CONSIDER", and its comment explains why), `verify-p2-p3-surfaces.mjs`'s P3 phase
+(fixed 2026-09-05 with the same diagnosis in its comment), and now ui-polish's
+phase A and the P2-generative wait. Fixed at the cause and once:
+`waitForDoctorVerdict` in `scripts/lib/browser-verify.mjs` strips the progress
+copy, requires a verdict as a whole **word**, and takes a `selector` so the wait
+is scoped to the surface the assertions read. The two `verify-a11y.mjs` sites are
+deliberately untouched — they poll `textContent`, which does not reflect
+`text-transform`, so the raw lowercase "Running pass 1 of 14…" cannot match a
+case-sensitive verdict regex.
+
+**The gate is not weakened.** No assertion changed; the readiness signal became
+stricter (a verdict, as a word, inside the Coverage panel, with progress copy
+removed — instead of any occurrence of "PASS" anywhere on the page).
+`tests/scripts/wait-for-function-options-position.test.ts` grows a second scanner
+so a fourth hand-rolled copy cannot be written; **fail-first on `main`: both
+`innerText` sites named by file and line**.
+
+**One correction to my own round-2 report.** `P2-generative :: Sample coverage
+still produces a verdict with Labs ON` failed once during round 2 and I
+attributed it to a mid-run edit of my own. The mid-run edit was real and that run
+was rightly voided — but this bare-poll race is the likelier cause of that
+specific assertion, and it is the one now fixed.
+
+### (a) `verify:p0-flow` — could not reproduce, and no mechanism found
+
+Reported as exit 1 on `6dbabc9c` with *"Open full report was NOT disabled at the
+earliest instant"*. Run alone, in the foreground, **three times on `6dbabc9c`'s
+tree and again after this commit — exit 0 every time**, at load 7.21, 9.75 and
+9.97 (harder than idle, not easier), each printing the gate's own
+`[smoke] earliest-instant "Full report" click did not cold-open the full report.`
+
+I looked for a mechanism in this lane's diff and did not find one. The toggle's
+disabled state is `coverageSummaryStatus === "loading" || (status === "idle" &&
+doctorAutoSample)`; this lane never touched `coverageFullReportToggleState`,
+`onStatusChange`, or the order in which `CoverageSummary` reports its first
+status (the status effect is declared well before the `onRegisterRun` effect this
+lane added). The round-2 supersede-abort is a no-op on the first run, where
+`abortRef` is still null.
+
+**I am not claiming it cannot fail** — I am recording that it did not fail in six
+foreground runs across two commits, and that I found no line in the diff that
+could cause it. If it reproduces, the log to capture is the one that shows the
+toggle's `disabled`/`title` at the earliest instant; that is the state I would
+need to see.
+
+### Round-3 gates, each run alone in the foreground
+
+| gate | result |
+|---|---|
+| `verify:ui-polish` ×3 | **27/27, exit 0** each |
+| `verify:p0-flow` ×3 | **PASS, exit 0** each (load 7.2 / 9.8 / 10.0) |
+| `verify:focus-traps` | **27/27, exit 0** |
+| `verify:a11y` | **134/134, exit 0** |
+| `verify:surfaces` | **248/248, exit 0** — peak 124/60 s, unchanged |
+| lint · no-console | **0** |
+| scoring receipt `8c99f92d..HEAD` | **0** — *"no scoring-path files changed"* |
+| output identity vs `git archive 8c99f92d`, `GIT_SHA=r3pin` | **PASS — 45/45 byte-identical** |
+
+No full `npm test` this round, per the brief — the orchestrator runs the merge
+gates.
