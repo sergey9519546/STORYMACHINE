@@ -3092,3 +3092,58 @@ describe('ROUND 7 equivalence: retiring the legacy voice-eligible-weight walk ch
     assertSameDecision('round-2 realistic 150-name skewed feature', text);
   });
 });
+
+// ── ROUND 9: the forced character cue `@` (2026-09-12) ─────────────────────
+// The ninth instance of this file's recurring pattern, and the first to arrive
+// with a PARSER CHANGE rather than with a review. `src/lib/fountain.ts` now
+// reads Fountain's forced cue, so `@NAME` is a `character` block whatever the
+// name looks like — including names none of isCueLikeLine's three original
+// disjuncts can see, because all three start at a cased-script capital and the
+// marker is the spec's escape hatch for names that do not.
+//
+// The pure-function proof, and it is the oracle this file already maintains:
+// guardCueOccurrences(text) must never be smaller than the character-block
+// count the pipeline produces from the same text.
+describe('ROUND 9: a forced cue `@` is a cue the guard must count', () => {
+  const CASELESS = ['田中', 'מרים', 'مريم'];
+
+  it('isCueLikeLine accepts the whole cue grammar with the marker in front, and the caseless names only `@` can express', () => {
+    for (const [scriptName, base] of Object.entries(BASE_NAMES)) {
+      for (const caret of CARET_VARIANTS) {
+        for (const tail of TAIL_VARIANTS) {
+          const forced = `@${base}${caret}${tail}`;
+          assert.equal(isCueLikeLine(forced), true,
+            `BYPASS: parseFountain types ${JSON.stringify(forced)} as a cue (${scriptName}) but isCueLikeLine rejects it`);
+        }
+      }
+    }
+    for (const name of CASELESS) {
+      assert.equal(isCueLikeLine(`@${name}`), true,
+        `BYPASS: ${JSON.stringify(`@${name}`)} is a cue ONLY because of the marker — it is exactly the shape `
+        + 'the guard cannot see any other way');
+      // And the other direction, so this is not a test that passes on a
+      // predicate that returns true for everything: the bare caseless name is
+      // not a cue to the parser and must not be counted as one.
+      assert.equal(isCueLikeLine(name), false, `${JSON.stringify(name)} is not a cue without the marker`);
+    }
+  });
+
+  it('the oracle holds on the forced-cue payload: guard >= pipeline character blocks', () => {
+    // The measured shape. At the commit that taught the parser `@` and had not
+    // yet widened the guard, this read guard 0 / pipeline 12,000 — the oracle
+    // FALSE in the unsafe direction, and the payload reaching the bound that
+    // runs a real parse instead of the cheap one that exists to stop it first.
+    const parts: string[] = ['INT. ROOM - DAY', ''];
+    for (let k = 0; k < 12_000; k++) parts.push(`@CHARACTER${k % 600}`, 'Line of speech here.', '');
+    const text = parts.join('\n');
+
+    const guard = guardCueOccurrences(text);
+    const pipeline = parseFountain(normalizeScreenplay(text))
+      .filter((b) => b.type === 'character' || b.type === 'dual_dialogue').length;
+    assert.ok(pipeline > 0, `generator sanity: the pipeline must actually make cues out of this payload, got ${pipeline}`);
+    assert.ok(guard >= pipeline,
+      `ORACLE VIOLATION: guardCueOccurrences ${guard} < pipeline character blocks ${pipeline}. The guard must `
+      + 'count every line the pipeline will turn into a character block.');
+    assert.match(String(fountainShapeRejectionReason(text)), REJECTION_RE);
+  });
+});

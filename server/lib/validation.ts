@@ -32,7 +32,7 @@ import { MAX_FOUNTAIN_CHARS } from './runtime-limits.ts';
 // on this range), so importing FROM the scoring-reachable src/lib/fountain.ts
 // does not touch a scoring-path file. See realVoiceEligibleWeightRejectionReason's
 // own comment for why this is now called directly instead of hand-modelled.
-import { CHARACTER_CUE_RE, CUE_INITIAL_CLASS, CUE_LETTER_CLASS, parseFountain, type FountainBlock } from '../../src/lib/fountain.ts';
+import { CHARACTER_CUE_RE, CUE_INITIAL_CLASS, CUE_LETTER_CLASS, FORCED_CUE_MARKER, parseFountain, type FountainBlock } from '../../src/lib/fountain.ts';
 // isCharacterCue is the OTHER cue predicate in this repo — the one
 // server/nvm/analyze/screenplay-normalizer.ts's normalizeScreenplay() itself
 // uses to decide, during its double-spaced reflow, whether a line becomes a
@@ -807,7 +807,30 @@ export const CUE_LIKE_LINE_RE = new RegExp(
 // grammar-product corpus spanning every family rounds 1-8 used — so the next
 // shape variance in ANY of these three predicates is caught by that
 // invariant directly, rather than needing a ninth review round to notice it.
+//
+// ROUND 9 (2026-09-12, the forced-cue lane — the SAME pattern again, and this
+// time the new shape arrived with a PARSER CHANGE rather than with a review).
+// `src/lib/fountain.ts` now reads Fountain's forced character cue: `@NAME` is
+// a `character` block whatever the name looks like, which is the entire point
+// of the marker. None of the three predicates below can see it — all three
+// start at a cased-script capital — so every one of them returns false on a
+// forced cue while the parser makes a cue out of it. Measured on the raw
+// double-spaced payload the round-5/6 bypass tests use (distinct=600,
+// occurrences=12,000): `guardCueOccurrences` **12,000 -> 0** and
+// `fountainShapeRejectionReason` **rejected -> ACCEPTED** when every cue was
+// forced, i.e. writing one character in front of each cue turned the whole
+// cost guard off. tests/routes/fountain-shape-guard-cue-bypass.test.ts caught
+// the .fdx half of it on the first full run of the lane that made the parser
+// change; the raw-Fountain half needed no importer at all.
+//
+// The disjunct is deliberately the WIDEST of the four: any trimmed line
+// starting with the marker and carrying a non-empty body, which is exactly
+// what `parseFountain` requires of a forced cue before the structural checks
+// it shares with an unforced one. Over-counting is the safe direction for
+// this guard and always has been.
 export function isCueLikeLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed.startsWith(FORCED_CUE_MARKER) && trimmed.slice(FORCED_CUE_MARKER.length).trim() !== '') return true;
   return CHARACTER_CUE_RE.test(line) || CUE_LIKE_LINE_RE.test(line) || isCharacterCue(line);
 }
 const SCENE_HEADING_PREFIX_RE = /^(INT|EXT|EST|I\/E)[. ]/;

@@ -557,3 +557,66 @@ describe('ROUND 8 bypass (lowercase-parenthetical-tail) — POST /api/scriptide/
     assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
   });
 });
+
+// ── ROUND 9 bypass (forced character cue `@`, 2026-09-12) ──────────────────
+// The same pattern as rounds 1-8, arriving for the first time with a PARSER
+// CHANGE rather than with a review. `src/lib/fountain.ts` now reads Fountain's
+// forced cue: `@NAME` is a character block whatever the name looks like. All
+// three predicates isCueLikeLine was built from start at a cased-script
+// capital, so all three returned false on a forced cue while the parser made
+// a cue out of it — one character in front of each cue turned the cheap
+// pre-parse cue-count bound off.
+//
+// Measured on this shape (distinct=600, occurrences=12,000) at the commit that
+// made the parser change and had not yet widened the guard:
+// `guardCueOccurrences` 12,000 -> **0** while the pipeline still produced
+// **12,000** character blocks, so the round-8 oracle
+// (guard >= pipeline) was FALSE — the unsafe direction. The payload was still
+// rejected, but by `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`, which runs a REAL
+// PARSE, instead of by the cue-count bound that exists to reject it before
+// any parse happens. That is exactly the class of defect rounds 1-8 closed.
+function buildForcedCueBypass(distinct: number, occurrences: number): string {
+  const parts: string[] = ['INT. ROOM - DAY', ''];
+  for (let k = 0; k < occurrences; k++) {
+    parts.push(`@CHARACTER${k % distinct}`, 'Line of speech here.', '');
+  }
+  return parts.join('\n');
+}
+
+describe('ROUND 9 bypass (forced character cue `@`) — POST /api/scriptide/doctor', async () => {
+  let server: TestServer;
+  before(async () => { server = await startTestServer(); });
+  after(async () => { await server.close(); });
+
+  const post = (body: unknown) => fetch(`${server.baseUrl}/api/scriptide/doctor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  it('forced cues are rejected by the CHEAP cue-count bound, not by the bound that parses', async () => {
+    const fountain = buildForcedCueBypass(600, 12_000);
+    assert.ok(fountain.length < 900_000, `test payload (${fountain.length} chars) must stay under MAX_FOUNTAIN_CHARS`);
+    const start = Date.now();
+    const res = await post({ fountain });
+    const ms = Date.now() - start;
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    // The named bound matters as much as the status: before the fix this same
+    // payload was rejected by MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT after a real
+    // parse, so asserting only `400` would have passed on the unfixed guard.
+    assert.match(body.error, /MAX_FOUNTAIN_FREQUENT_CUE_LINES/);
+    assert.ok(ms < FAST_REJECTION_MS, `expected a fast rejection (<${FAST_REJECTION_MS}ms), took ${ms}ms`);
+  });
+
+  it('a legitimate small cast that forces its cues is NOT rejected', async () => {
+    // The other direction: `@` is how a caseless writer marks a cue at all, so
+    // the widened guard must not turn an ordinary forced-cue draft away.
+    let fountain = 'INT. TEA HOUSE - DAY\n\n';
+    for (let i = 0; i < 30; i++) {
+      fountain += `@${i % 2 === 0 ? '田中' : '佐藤'}\nSomething ordinary gets said here, line ${i}.\n\n`;
+    }
+    const res = await post({ fountain });
+    assert.equal(res.status, 200);
+  });
+});

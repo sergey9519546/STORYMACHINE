@@ -99,6 +99,11 @@ function formatTransition(text: string): string {
 // grammar here is what keeps the two from drifting apart.
 function formatCharacter(text: string): string {
   const upper = text.toUpperCase();
+  // A Character paragraph holding embedded newlines is not a name. Real Final
+  // Draft never writes one, but a hand-built or hostile .fdx can, and a marker
+  // on the first line of a multi-line blob would declare the WHOLE blob a cue.
+  // Left exactly as this importer has always emitted it.
+  if (/[\r\n]/.test(upper)) return upper;
   return CHARACTER_CUE_RE.test(upper) ? upper : `${FORCED_CUE_MARKER}${upper}`;
 }
 
