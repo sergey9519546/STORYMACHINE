@@ -2349,6 +2349,135 @@ async function main() {
   await contextE.close();
 
   // ══════════════════════════════════════════════════════════════════════
+  // CONTEXT F — the compact "this isn't Fountain" card (2026-09-12, finding #15).
+  //
+  // POST /api/scriptide/doctor answers a heading-less paste with BOTH a `reason`
+  // and a `hint`; the compact Coverage card rendered only the reason, under the
+  // heading "Coverage failed", beside RETRY and USE SAMPLE. The full
+  // ScriptDoctorPanel has always rendered the hint — but the compact card is the
+  // surface a first-time visitor lands on, and the visitor it most often catches
+  // is someone who pasted a draft out of Word or a PDF.
+  //
+  // Both fixtures are typed into the editor rather than uploaded, because typing
+  // is what a paste is.
+  // ══════════════════════════════════════════════════════════════════════
+  console.log('\n=== P2-format — the compact "not a screenplay" card ===');
+  const contextF = await browser.newContext();
+  const pageF = await contextF.newPage();
+  wireConsoleCapture(pageF, genuineConsoleErrors);
+  await pageF.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  await pageF.getByRole('button', { name: /start fresh/i }).first().click({ timeout: timing.ms(15000) });
+  await pageF.locator('.cm-content').first().waitFor({ timeout: timing.ms(20000) });
+
+  // The server's own answer for these bytes is the floor for what the card must
+  // say — not a literal copied out of the route.
+  const titleOnlyPaste = 'Title: The Second Key\nAuthor: A. Writer\nDraft date: 2026-09-12\n';
+  const formatAnswerRes = await fetch(`${BASE}/api/scriptide/doctor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fountain: titleOnlyPaste, title: 'The Second Key' }),
+  });
+  const formatAnswer = await formatAnswerRes.json();
+  record(
+    'P2-format',
+    'the route really answers this paste with a reason AND a hint (an answer with no hint makes the card assertions vacuous)',
+    formatAnswer.formatUnrecognized === true
+      && typeof formatAnswer.reason === 'string' && formatAnswer.reason.length > 0
+      && typeof formatAnswer.hint === 'string' && formatAnswer.hint.length > 0,
+    `formatUnrecognized=${formatAnswer.formatUnrecognized} reasonLen=${(formatAnswer.reason ?? '').length} hintLen=${(formatAnswer.hint ?? '').length}`,
+  );
+
+  // focus(), not click(): on a blank draft the editor's own "type FADE IN:"
+  // placeholder overlay sits above .cm-content and intercepts pointer events
+  // (pointer-events-none on the wrapper, but not on the <pre> inside it). The
+  // affordance under test here is the error card, not the editor's hit area, so
+  // focusing is the honest way in rather than a force click.
+  await pageF.locator('.cm-content').first().focus();
+  await typeWithoutDrainGaps(pageF, titleOnlyPaste);
+  await pageF.waitForTimeout(timing.ms(800));
+  await pageF.getByRole('button', { name: /^COVERAGE$/i }).first().click();
+  const runBtnF = pageF.getByRole('button', { name: /run coverage/i }).first();
+  if (await runBtnF.isVisible().catch(() => false)) {
+    await runBtnF.click({ timeout: timing.ms(20000) });
+  }
+  const notAScreenplayVisible = await pageF
+    .getByText('Not a screenplay', { exact: true })
+    .first()
+    .waitFor({ state: 'visible', timeout: timing.ms(60000) })
+    .then(() => true)
+    .catch(() => false);
+  record(
+    'P2-format',
+    'the compact card calls it "Not a screenplay" rather than "Coverage failed" (the request succeeded — the route returns 200)',
+    notAScreenplayVisible,
+    notAScreenplayVisible ? '' : 'no "Not a screenplay" heading on the compact card',
+  );
+  const cardText = await pageF.evaluate(() => {
+    const el = document.querySelector('[role="alert"]');
+    return el ? el.textContent.replace(/\s+/g, ' ') : null;
+  });
+  const hintOnCard = await pageF.locator('[data-format-hint]').count();
+  record(
+    'P2-format',
+    'it shows the server\'s HINT, not only the reason (the half that says what to do)',
+    hintOnCard >= 1 && cardText !== null && cardText.includes(formatAnswer.hint.replace(/\s+/g, ' ')),
+    `hintNodes=${hintOnCard} card=${JSON.stringify((cardText ?? '').slice(0, 260))}`,
+  );
+  const pdfBtn = pageF.getByRole('button', { name: 'Paste from PDF?', exact: true }).first();
+  const pdfBtnVisible = await pdfBtn.isVisible().catch(() => false);
+  record(
+    'P2-format',
+    'it offers the relevant third affordance, "Paste from PDF?", beside Retry and Use sample',
+    pdfBtnVisible,
+    pdfBtnVisible ? '' : '"Paste from PDF?" not offered',
+  );
+  if (pdfBtnVisible) {
+    await pdfBtn.click({ timeout: timing.ms(10000) });
+    await pageF.waitForTimeout(timing.ms(1200));
+    const honestOutcome = await pageF.evaluate(() => {
+      const t = document.body.innerText;
+      return /Nothing to re-space/i.test(t) || /still no scene headings/i.test(t);
+    });
+    const stillOffered = await pageF
+      .getByRole('button', { name: 'Paste from PDF?', exact: true })
+      .count();
+    record(
+      'P2-format',
+      'clicking it produces an honest outcome and is not re-offered as a button that changes nothing',
+      honestOutcome && stillOffered === 0,
+      `honestOutcome=${honestOutcome} buttonStillOffered=${stillOffered}`,
+    );
+  }
+
+  // NOTE ON WHAT THIS AFFORDANCE CAN AND CANNOT DO, asserted rather than
+  // assumed: `hasSceneHeading` (server/routes/scriptide.ts) tests each line
+  // TRIMMED, and `normalizeScreenplay` re-spaces blocks without ever inventing a
+  // slugline — so from THIS state the repair can honestly only report that it did
+  // not help, and the actionable sentence ("Add one, such as INT. KITCHEN - DAY")
+  // is the outcome that matters. A double-spaced paste that does carry sluglines
+  // never reaches this card at all: the route recognises it and the doctor
+  // analyses it, which is what the assertion below pins.
+  const doubleSpacedWithHeadings = [
+    'INT. KITCHEN - DAY', '', '', 'Maya stands at the counter.', '', '',
+    'MAYA', '', 'You kept the tape.', '', '',
+    'EXT. PORCH - NIGHT', '', '', 'Rain on the boards.', '',
+  ].join('\n');
+  const doubleSpacedRes = await fetch(`${BASE}/api/scriptide/doctor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fountain: doubleSpacedWithHeadings, title: 'PASTED' }),
+  });
+  const doubleSpacedAnswer = await doubleSpacedRes.json();
+  record(
+    'P2-format',
+    'a double-spaced paste that DOES carry sluglines is analysed, not refused — so the refusal card is only ever shown for text with no headings at all',
+    doubleSpacedAnswer.formatUnrecognized !== true && typeof doubleSpacedAnswer.sceneCount === 'number' && doubleSpacedAnswer.sceneCount >= 2,
+    `formatUnrecognized=${doubleSpacedAnswer.formatUnrecognized} sceneCount=${doubleSpacedAnswer.sceneCount}`,
+  );
+
+  await contextF.close();
+
+  // ══════════════════════════════════════════════════════════════════════
   // CONTEXT C — FEATURE LENGTH (2026-09-06).
   //
   // Everything above this line runs on 12-scene input, which is how four

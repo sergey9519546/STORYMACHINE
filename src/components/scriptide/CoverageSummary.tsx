@@ -19,7 +19,13 @@ import {
   type JumpTarget,
 } from "../../lib/finding-jump.ts";
 import { FindingJump } from "./FindingJump.tsx";
+// Finding #15 (2026-09-12): the server answers a non-screenplay paste with BOTH
+// a `reason` and a `hint`, and this card rendered only the reason — dropping the
+// one sentence that says what to do. FormatUnrecognizedError carries both
+// (src/lib/doctor-stream.ts), so the hint was already in this component's hands.
+import { normalizeScreenplay } from "../../../server/nvm/analyze/screenplay-normalizer.ts";
 import {
+  FormatUnrecognizedError,
   streamDoctorProgress,
   applyDoctorProgressEvent,
   doctorProgressLabel,
@@ -50,6 +56,13 @@ interface CoverageSummaryProps {
    *  clicked it in. Now it doesn't. */
   onNavigateToFinding?: (startLine: number, endLine: number) => void;
   onLoadSampleIntoEditor?: (text: string) => void;
+  /** Install a REPAIRED version of the writer's own draft into the editor —
+   *  finding #15's "Paste from PDF?" affordance. Deliberately NOT
+   *  {@link CoverageSummaryProps.onLoadSampleIntoEditor}, whose host handler
+   *  carries sample semantics (it sets the title page to the sample's title and
+   *  marks the sample as installed); this draft is the writer's, only
+   *  re-spaced. */
+  onRepairDraft?: (text: string) => void;
   onClose: () => void;
   onFreshReport?: () => void;
   /** W4: hands the just-computed report (plus the draft generation it
@@ -204,6 +217,7 @@ export default function CoverageSummary({
   onJumpToLine,
   onNavigateToFinding,
   onLoadSampleIntoEditor,
+  onRepairDraft,
   onClose,
   onFreshReport,
   onReportComputed,
@@ -212,6 +226,19 @@ export default function CoverageSummary({
 }: CoverageSummaryProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  /** Finding #15: the server's `hint` for a non-screenplay paste — the half of
+   *  its answer that tells a writer what to change. null for every other kind of
+   *  failure, which is what keeps the "Not a screenplay" card distinct from the
+   *  red "Coverage failed" one (the request SUCCEEDED; the text just isn't a
+   *  screenplay — see server/routes/scriptide.ts's own 200-not-4xx note). */
+  const [formatHint, setFormatHint] = useState<string | null>(null);
+  /** Set once a "Paste from PDF?" repair has been submitted, so the card can say
+   *  honestly that normalisation did not find any sluglines either rather than
+   *  offering the same button again. */
+  const [pdfRepairTried, setPdfRepairTried] = useState(false);
+  /** Set when the normaliser returns the text unchanged — there was nothing
+   *  double-spaced to repair, so no request is worth making. */
+  const [pdfRepairNoop, setPdfRepairNoop] = useState(false);
   // DoctorReportWithAnchors, not the bare ScriptDoctorReport: the route
   // attaches `locatedIssues` to every doctor response (server/routes/
   // scriptide.ts), and the jump button below reads them to resolve the top
@@ -296,6 +323,12 @@ export default function CoverageSummary({
       const startDraftGen = getDraftGeneration?.() ?? 0;
       setStatus("loading");
       setError(null);
+      // Finding #15: a new run's answer replaces the previous one's — a hint
+      // left over from an earlier paste would describe text that is gone, and a
+      // spent repair attempt must not suppress the affordance for a NEW paste.
+      setFormatHint(null);
+      setPdfRepairTried(false);
+      setPdfRepairNoop(false);
       // Watchdog. This is the FIRST request a new visitor's browser makes
       // ("Try sample coverage" lands here), and without a deadline a stalled
       // connection — a proxy that never errors, a very long draft — left the
@@ -383,6 +416,11 @@ export default function CoverageSummary({
           return;
         }
         setStatus("error");
+        // Finding #15: carry BOTH halves of the server's answer. `message` is the
+        // reason; `hint` is the sentence that names what a screenplay's scene
+        // headings look like — the one thing the highest-value visitor (someone
+        // who pasted a draft out of Word or a PDF) actually needs.
+        if (e instanceof FormatUnrecognizedError) setFormatHint(e.hint);
         setError(
           timedOut
             ? "Coverage timed out. The draft may be very long, or the connection stalled — try again."
@@ -404,6 +442,60 @@ export default function CoverageSummary({
     userCancelledRef.current = true;
     abortRef.current?.abort();
   }, []);
+
+  /** "Paste from PDF?" — finding #15's third affordance.
+   *
+   *  The server refuses text with no scene heading, and offers RETRY (the same
+   *  text, the same answer) and USE SAMPLE (somebody else's script). Neither
+   *  helps the visitor the refusal is most likely to catch: someone who pasted a
+   *  draft out of a PDF, where the paste is double-spaced and hard-wrapped.
+   *
+   *  This routes through `normalizeScreenplay`
+   *  (server/nvm/analyze/screenplay-normalizer.ts) — the EXISTING normaliser the
+   *  engine already uses for scraped-PDF imports, not a second copy of that
+   *  logic — and then submits the repaired text through the same `run()`, with
+   *  `onLoadSampleIntoEditor` installing it so the editor and the report never
+   *  describe different bytes.
+   *
+   *  Honest in both outcomes: when the normaliser changes nothing there is
+   *  nothing double-spaced to repair and no request is made (`pdfRepairNoop`),
+   *  and when the repaired text is still refused the card says that normalisation
+   *  found no sluglines either rather than re-offering the button
+   *  (`pdfRepairTried`). Whether the repair WORKED is decided by the server's own
+   *  answer to the repaired bytes, not by a second copy of its scene-heading
+   *  test living in the client.
+   *
+   *  WHAT IT CANNOT DO, written down rather than discovered later. The route's
+   *  `hasSceneHeading` tests each line TRIMMED, and `normalizeScreenplay`
+   *  re-spaces blocks without ever inventing a slugline — so a paste that reaches
+   *  this card has no INT./EXT. line anywhere, and re-spacing cannot produce one.
+   *  From this state the repair therefore lands on the second message above, whose
+   *  value is the actionable sentence it carries ("Add one, such as INT. KITCHEN -
+   *  DAY"), plus the re-spaced draft now in the editor for the writer to keep
+   *  working in. A double-spaced paste that DOES carry sluglines never reaches
+   *  this card: the route recognises it and the doctor analyses it (asserted in
+   *  scripts/verify-p2-p3-surfaces.mjs's P2-format phase). Making the repair able
+   *  to RECOVER a heading — stripping the page-header and scene-number artifacts a
+   *  PDF paste glues onto a slugline — needs a heading repair that does not exist
+   *  yet, and would be a fourth copy of the scene-heading test; it is named in
+   *  docs/audits/2026-09-12-adversarial/writer-lane-report.md as out of scope for
+   *  this lane, not forgotten. */
+  const tryPdfRepair = useCallback(() => {
+    const current = fountain;
+    const repaired = normalizeScreenplay(current);
+    if (repaired.trim() === current.trim()) {
+      setPdfRepairTried(true);
+      setPdfRepairNoop(true);
+      return;
+    }
+    onRepairDraft?.(repaired);
+    // `run`'s synchronous prefix clears both repair flags (a new run, a new
+    // answer), so they are set AFTER the call — otherwise this attempt would
+    // reset the very state that records it.
+    void run({ fountain: repaired, title: title ?? "Untitled" });
+    setPdfRepairTried(true);
+    setPdfRepairNoop(false);
+  }, [fountain, title, onRepairDraft, run]);
 
   // Finding #3 (2026-09-12): publish `run` to the host so ScriptIDE's
   // "Coverage outdated -> Re-run coverage" banner issues the SAME request this
@@ -654,12 +746,54 @@ export default function CoverageSummary({
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--sm-stamp)]" aria-hidden="true" />
               <div className="min-w-0">
-                <p className="sm-title">Coverage failed</p>
+                {/* Finding #15 (2026-09-12): a non-screenplay paste is not a
+                    FAILURE — the request succeeded and the answer is "this text
+                    isn't a screenplay" (server/routes/scriptide.ts returns 200
+                    for exactly that reason). The full ScriptDoctorPanel has
+                    always drawn that as its own "Not a screenplay" card; this
+                    compact card — the surface a first-time visitor actually
+                    lands on — called it "Coverage failed" and printed only the
+                    server's `reason`, dropping the `hint` that says what a
+                    scene heading looks like. */}
+                <p className="sm-title">{formatHint ? "Not a screenplay" : "Coverage failed"}</p>
                 <p className="sm-sub mt-1">{error}</p>
+                {formatHint && (
+                  <p
+                    className="mt-2 font-[family-name:var(--sm-font-mono)] text-[11px] leading-snug text-[var(--sm-ink-mute)]"
+                    data-format-hint
+                  >
+                    {formatHint}
+                  </p>
+                )}
+                {/* Finding #15: the honest outcome of a repair attempt. Neither
+                    branch claims the repair worked — that is the server's answer
+                    to the repaired bytes, which arrives as a fresh run. */}
+                {formatHint && pdfRepairNoop && (
+                  <p className="mt-2 font-[family-name:var(--sm-font-mono)] text-[11px] leading-snug text-[var(--sm-ink-mute)]">
+                    Nothing to re-space — this text is not double-spaced, so a PDF
+                    repair would submit the same lines. It has no INT./EXT. scene
+                    headings to find.
+                  </p>
+                )}
+                {formatHint && pdfRepairTried && !pdfRepairNoop && (
+                  <p className="mt-2 font-[family-name:var(--sm-font-mono)] text-[11px] leading-snug text-[var(--sm-ink-mute)]">
+                    Re-spaced the paste and ran it again — still no scene headings.
+                    Add one, such as INT. KITCHEN - DAY, and run coverage.
+                  </p>
+                )}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button type="button" onClick={() => void run()} className="sm-btn sm-btn--ink">
                     Retry
                   </button>
+                  {/* Finding #15's third affordance. Offered only for a
+                      format refusal (where it is the relevant action) and only
+                      until it has been tried once — after that the card states
+                      what it found instead of re-offering the same button. */}
+                  {formatHint && !pdfRepairTried && (
+                    <button type="button" onClick={tryPdfRepair} className="sm-btn">
+                      Paste from PDF?
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() =>

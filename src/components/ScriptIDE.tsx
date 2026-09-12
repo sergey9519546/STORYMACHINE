@@ -3741,6 +3741,12 @@ export default function ScriptIDE({
               getDraftGeneration={getDraftGeneration}
               onFreshReport={() => setCoverageStale(false)}
               onRegisterRun={registerCoverageRun}
+              /* Finding #15: installs the writer's OWN draft, re-spaced by the
+                 existing screenplay normaliser — not the sample, so it does not
+                 go through the sample-install handler above (which sets the
+                 title page to the sample's title). The stale flag is left to the
+                 run that follows: onFreshReport clears it when that run lands. */
+              onRepairDraft={(text) => installDraft(text)}
               onReportComputed={setCoverageReport}
               onStatusChange={(status) => {
                 // Round-2 review fix (2026-09-05): a sample-flagged run that
