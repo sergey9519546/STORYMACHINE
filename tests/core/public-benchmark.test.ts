@@ -30,8 +30,10 @@
 //      readable at all: see below.
 //
 // ── The measurement floors are near chance, and the messages below say so ──
-// Measured on this tree 2026-09-06, matched-pair (PRIMARY) / all-pairs:
-// shuffle-drop 0.5313 / 0.5586; climax-relocate 0.4219 / 0.4673. All four of
+// Measured on this tree 2026-09-12, matched-pair (PRIMARY) / all-pairs:
+// shuffle-drop 0.5313 / 0.5586 (unchanged from 2026-09-06); climax-relocate
+// 0.4063 / 0.4443 (was 0.4219 / 0.4673 — the relocation now actually moves the
+// final scene to position one; adversarial finding 12). All four of
 // those 95% intervals contain 0.5. These floors are a ratchet against getting
 // WORSE at something the engine is already bad at on this corpus — the
 // current truth, not a target, and a future change that raises one has to
@@ -313,19 +315,19 @@ describe('public benchmark — the pre-registered split', () => {
 });
 
 describe('public benchmark — the three degradations', () => {
-  it('CLIMAX_RELOCATE\'s N is a third frozen — 11 exact ties, from 10 scripts pinned at health 76.0', () => {
+  it('CLIMAX_RELOCATE\'s N is a third frozen — 10 exact ties, 9 of them scripts pinned at health 76.0', () => {
     // Round-2 review finding 6.7. Ten of the 32 intact scripts sit at exactly
-    // health 76.0 (density penalty at its 10-point cap plus a 14.0 scarcity
+    // health 76.0 (a saturated density penalty at 10.0 plus a 14.0 scarcity
     // term). Relocating a scene inside a script that is already pinned cannot
-    // move it, so 11 of 32 pairs are EXACT ties contributing 0.5 apiece by
-    // construction. That is why this channel's interval is narrower than
-    // shuffle-drop's — pinning, not precision — and the number is asserted so
-    // the reason cannot quietly stop being true while the interval keeps
-    // looking tight.
+    // move it, so 10 of 32 pairs are EXACT ties contributing 0.5 apiece by
+    // construction — 11 until the 2026-09-12 position-one fix, which unfroze one
+    // pair. That is why this channel's interval is narrower than shuffle-drop's
+    // — pinning, not precision — and the number is asserted so the reason cannot
+    // quietly stop being true while the interval keeps looking tight.
     const pinnedAt76 = result.scripts.filter((s) => s.health === 76.0).length;
     assert.ok(
       climaxRelocate.tied >= 8,
-      `only ${climaxRelocate.tied} of ${climaxRelocate.n} CLIMAX_RELOCATE pairs are exact ties (was 11). If the `
+      `only ${climaxRelocate.tied} of ${climaxRelocate.n} CLIMAX_RELOCATE pairs are exact ties (was 10). If the `
       + 'density cap stopped pinning scripts, that is a real scoring change and the interval means something '
       + 'different now — re-read the doc\'s tie discussion before trusting the AUC.',
     );
@@ -460,7 +462,7 @@ describe('public benchmark — the ratchet (six floors: three degradations x two
             + 'degradation still produces damaged text at all before reading anything into the two '
             + 'measurement channels.'
           : 'READ THIS BEFORE RAISING THE FLOOR. The measurement channels were 0.5313/0.5586 '
-            + '(shuffle-drop) and 0.4219/0.4673 (climax-relocate) when these floors were set, and all '
+            + '(shuffle-drop) and 0.4063/0.4443 (climax-relocate) when these floors were set, and all '
             + 'four of those 95% intervals contain 0.5. These are NOT good scores — they are the current '
             + 'truth, ratcheted so they cannot quietly get worse. They are also not the AUC-24 >= 0.622 '
             + 'ratchet and must never be compared to it: different corpus, different script length, '

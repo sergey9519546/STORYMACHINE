@@ -64,6 +64,8 @@ import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts
 import {
   PUBLIC_FLOORS,
   PUBLIC_FLOOR_MARGIN,
+  assertDegradationChangedText,
+  assertFinalSceneIsFirst,
   computeAuc,
   degradationSeed,
   shuffleDropDegrade,
@@ -278,7 +280,19 @@ export const PUBLIC_LOCK_COMMAND = 'npm run benchmark:public -- --lock';
  * is order-sensitivity. It is expected to be near chance, and is:
  * doctor.ts:2100 records act-swap AUC 0.48 -> 0.62 on the private corpus, the
  * P1 baseline reports CLIMAX_RELOCATE 0.523 on its 153-script test partition,
- * and this corpus gives 0.4673.
+ * and this corpus gives 0.4443.
+ *
+ * THAT SENTENCE WAS FALSE UNTIL 2026-09-12. `degradeClimaxRelocate` spliced the
+ * popped final scene in at index 1 — position TWO — so the original OPENING, the
+ * script's most load-bearing position, stayed exactly where it was, while this
+ * file's label, its `recipe` string, the measurement doc and the brain gate note
+ * all said "position 1" (docs/audits/2026-09-12-adversarial/engine-logic.md
+ * finding 12). Nothing asserted the claim, so nothing caught it. The code is now
+ * what the documents describe, `assertFinalSceneIsFirst` checks it on every run,
+ * and the two ORDER floors were re-locked from the corrected manipulation:
+ * matched-pair 0.4219 -> 0.4063, all-pairs 0.4673 -> 0.4443. The corrected
+ * version is the STRONGER manipulation and the engine reads it slightly WORSE,
+ * which is the direction an order-blind score predicts.
  */
 export interface Degradation {
   id: string;
@@ -300,7 +314,7 @@ export interface Degradation {
 /**
  * WHY THERE IS A THIRD DEGRADATION, AND WHY IT IS NOT EVIDENCE.
  *
- * The two measurement channels both read chance (0.5586 and 0.4673, both 95%
+ * The two measurement channels both read chance (0.5586 and 0.4443, both 95%
  * intervals containing 0.5, both mean gaps running the wrong way). A reader
  * given only those two numbers cannot tell **"the score is blind to
  * mechanical damage"** from **"this harness never worked"** — and every null
@@ -342,27 +356,60 @@ export const PUBLIC_CONTROL_RATIONALE =
   + 'cannot be dismissed as a broken harness — the instrument separates intact from damaged on '
   + '32 of 32 scripts here, so those readings are the score\'s, not the harness\'s.';
 
+/**
+ * EVERY `apply` BELOW ASSERTS THAT IT CHANGED THE TEXT (2026-09-12, finding 12).
+ *
+ * `measurePublicBenchmark` skipped a script only when `apply` returned `null`;
+ * nothing checked `degraded !== text`. A recipe that silently no-opped therefore
+ * scored a script against an identical copy of itself, and the resulting EXACT
+ * TIE was counted as a legitimate observation contributing 0.5 — the one value
+ * indistinguishable from "the engine read this pair and could not separate it".
+ * That was reachable: before this change `shuffleDropDegrade` split on
+ * `INT.`/`EXT.` only, so a script headed with `EST.`, `I/E.`, `INT./EXT.` or
+ * forced `.HEADING` lines came back untouched.
+ *
+ * `null` (cannot degrade — too few scenes) and a no-op (could degrade and
+ * didn't) are now different outcomes: the first is a named skip, the second is
+ * an error that stops the run. `assertDegradationChangedText` /
+ * `assertFinalSceneIsFirst` live in scripts/lib/auc.ts next to the recipe, and
+ * the same guards are applied by scripts/lock-auc24.mjs and
+ * tests/core/real-script-corpus.test.ts — every call site that turns a
+ * degradation into an observation.
+ */
 export const PUBLIC_DEGRADATIONS: readonly Degradation[] = [
   {
     id: 'SHUFFLE_DROP',
     label: 'shuffle scenes AND drop every third (the AUC-24 recipe)',
     sceneCountPreserving: false,
     recipe:
-      'seeded Fisher-Yates shuffle of all INT./EXT. scenes, then drop every third scene of '
-      + 'the shuffled order (index % 3 === 2); any pre-first-slugline head is preserved verbatim',
+      'seeded Fisher-Yates shuffle of all scenes — segmented by the doctor\'s own heading grammar '
+      + '(scripts/lib/scene-segments.ts; INT./EXT./EST./I/E./INT./EXT. and forced .HEADING lines), '
+      + 'not the INT./EXT.-only split used before 2026-09-12 — then drop every third scene of the '
+      + 'shuffled order (index % 3 === 2); any pre-first-heading head is preserved verbatim',
     source: 'scripts/lib/auc.ts shuffleDropDegrade (imported verbatim — the AUC-24 ratchet\'s own recipe)',
     role: 'measurement',
-    apply: (s) => shuffleDropDegrade(s.text, s.file),
+    apply: (s) => assertDegradationChangedText(
+      'SHUFFLE_DROP', s.file, s.text, shuffleDropDegrade(s.text, s.file),
+    ),
     seedFor: (s) => degradationSeed(s.file),
   },
   {
     id: 'CLIMAX_RELOCATE',
     label: 'move the final scene to position 1 (scene count preserved)',
     sceneCountPreserving: true,
-    recipe: 'pop the last scene and splice it in at index 1; preamble and every scene body unchanged',
+    recipe:
+      'pop the last scene and put it FIRST — position one, as every document describing this '
+      + 'degradation has always said; it spliced at index 1 (position TWO, leaving the original '
+      + 'opening in place) until 2026-09-12. Head and every scene body unchanged',
     source: 'scripts/lib/rebuild-experiment-lib.mjs degradeClimaxRelocate (imported verbatim)',
     role: 'measurement',
-    apply: (s) => degradeClimaxRelocate(s.text) as string | null,
+    apply: (s) => {
+      const degraded = degradeClimaxRelocate(s.text) as string | null;
+      if (degraded === null) return null;
+      return assertFinalSceneIsFirst(
+        s.file, s.text, assertDegradationChangedText('CLIMAX_RELOCATE', s.file, s.text, degraded),
+      );
+    },
     seedFor: () => null,
   },
   {
@@ -374,7 +421,18 @@ export const PUBLIC_DEGRADATIONS: readonly Degradation[] = [
       + '"Hello."; scene headings, action and scene count are untouched',
     source: 'scripts/lib/rebuild-experiment-lib.mjs degradeDialogueFlatten (imported verbatim)',
     role: 'control',
-    apply: (s) => degradeDialogueFlatten(s.text) as string | null,
+    apply: (s) => {
+      const degraded = degradeDialogueFlatten(s.text) as string | null;
+      if (degraded === null) return null;
+      // NOTE: this recipe normalises its input first, so `degraded !== text`
+      // holds for all 32 scripts whether or not a line was flattened
+      // (normalizeScreenplay changes the bytes of all 32 and the health of
+      // none — measured, 2026-09-12 audit's "what I could not break" §4). The
+      // guard is kept anyway: it is the one that would fire if a future
+      // normaliser became a no-op AND the script had no dialogue, which is
+      // exactly the silent-tie case.
+      return assertDegradationChangedText('DIALOGUE_FLATTEN', s.file, s.text, degraded);
+    },
     seedFor: () => null,
   },
 ];
@@ -740,18 +798,20 @@ export const PUBLIC_BENCHMARK_LIMITS = [
   '    SCORE being blind, not the instrument being broken — the one hypothesis a benchmark',
   '    with only null readings can never rule out.',
   '',
-  'WHAT IT SAYS TODAY (2026-09-06, this tree; matched-pair is the primary statistic)',
+  'WHAT IT SAYS TODAY (2026-09-12, this tree; matched-pair is the primary statistic)',
   '  * Shuffle-drop 0.5313 matched-pair [0.3750, 0.6875] / 0.5586 all-pairs [0.4219, 0.6973].',
-  '    Climax-relocate 0.4219 [0.2813, 0.5625] / 0.4673 [0.4014, 0.5264]. ALL FOUR intervals',
+  '    Climax-relocate 0.4063 [0.2656, 0.5469] / 0.4443 [0.3662, 0.5112]. ALL FOUR intervals',
   '    contain 0.5: on this corpus the doctor does not reliably prefer an intact script to a',
   '    mechanically damaged copy of itself. Control: 1.0000 / 0.9473.',
   '',
   'WHAT IT CANNOT SHOW',
   '  * A moving reading on a third of the CLIMAX_RELOCATE sample. Ten of the 32 scripts sit',
-  '    pinned at exactly health 76.0 (density penalty at its 10-point cap plus a 14.0 scarcity',
-  '    term), so 11 of 32 pairs are EXACT ties that contribute 0.5 apiece by construction. That',
-  '    channel\'s point estimate rests on 21 movable scripts, and its narrower interval reflects',
-  '    pinning, not precision. Do not read it as the more precise of the two.',
+  '    pinned at exactly health 76.0 (a saturated density penalty at 10.0 plus a 14.0 scarcity',
+  '    term), so 10 of 32 pairs are EXACT ties that contribute 0.5 apiece by construction (9 of',
+  '    those 10 are the pinned scripts; it was 11 ties of 32, 10 of them pinned, before the',
+  '    2026-09-12 position-one fix). That channel\'s point estimate rests on 22 movable scripts,',
+  '    and its narrower interval reflects pinning, not precision. Do not read it as the more',
+  '    precise of the two.',
   '  * A held-out result. The split is PRE-REGISTERED AND REPORTED, not used for evaluation:',
   '    every floor was locked from all 32 scripts, the five holdout files included, so no',
   '    held-out evaluation has taken place and that holdout is already spent against these',

@@ -22,11 +22,14 @@ import {
   AUC24_DEGRADATION_ID,
   AUC24_FLOOR,
   AUC24_SUBSET,
+  assertDegradationChangedText,
+  assertFinalSceneIsFirst,
   aucFromTable,
   computeAuc,
   degradationSeed,
   shuffleDropDegrade,
 } from '../../scripts/lib/auc.ts';
+import { countFountainScenes, segmentFountainScenes } from '../../scripts/lib/scene-segments.ts';
 import { makePrng, seedFromString, shuffle } from '../../server/nvm/repro/seed.ts';
 
 /**
@@ -122,7 +125,19 @@ describe('computeAuc — byte-identical to the pre-extraction inline implementat
   });
 });
 
-describe('shuffleDropDegrade — byte-identical to the pre-extraction inline recipe', () => {
+describe('shuffleDropDegrade — byte-identical to the pre-extraction inline recipe ON INT./EXT.-ONLY SCRIPTS', () => {
+  // SCOPE NARROWED, DELIBERATELY, 2026-09-12. This block's oracle IS the old
+  // INT./EXT.-only split. The recipe's segmentation changed that day to the
+  // doctor's own heading grammar (adversarial review finding 12:
+  // `EST.`, `I/E.`, `INT./EXT.` and forced `.HEADING` lines were invisible, and
+  // on a mixed-heading script the degradation was a NO-OP). So the oracle and
+  // the recipe still agree on every script whose headings are plain
+  // `INT.`/`EXT.` at column 0 — which is all 300 random scripts below, all 32
+  // committed public-benchmark scripts, and the corpus this oracle was written
+  // for — and they must NOT agree on a script using any other heading form.
+  // Both directions are asserted: the agreement below, and the disagreement in
+  // the next describe block. Keeping only the first would quietly re-narrow the
+  // recipe to the old grammar.
   /**
    * The recipe as it stood inline in tests/core/real-script-corpus.test.ts's
    * `measure()` helper before the extraction, copied character-for-character:
@@ -220,6 +235,12 @@ describe('shuffleDropDegrade — the recipe as a pure function', () => {
   });
 
   it('a script with no sluglines survives the recipe without throwing', () => {
+    // The recipe stays TOTAL: a no-heading script comes back unchanged rather
+    // than throwing. That return value is a no-op, and a no-op IS an error — but
+    // it is the MEASUREMENT's error to raise, not the recipe's, because the
+    // recipe has to stay a pure total function for the oracle above to mean
+    // anything. assertDegradationChangedText is what turns this into a failure
+    // at every call site that counts an observation; see the block below.
     assert.equal(shuffleDropDegrade('just prose, no scene headings\n', 'k'), 'just prose, no scene headings\n');
   });
 
@@ -240,5 +261,125 @@ describe('AUC-24 constants', () => {
     // A floor at or below 0.5 would assert nothing (0.5 is a coin flip); a
     // floor of 1.0 could never hold. Both are ways a ratchet quietly dies.
     assert.ok(AUC24_FLOOR > 0.5 && AUC24_FLOOR < 1, `AUC24_FLOOR ${AUC24_FLOOR} is not a meaningful ratchet`);
+  });
+});
+
+// ── The segmenter change, and the guards that make a no-op an error ────────
+// docs/audits/2026-09-12-adversarial/engine-logic.md finding 12. Two separate
+// defects, two separate blocks, each shown to FAIL on the unfixed input first.
+describe('shuffleDropDegrade — the segmentation change is real, not cosmetic', () => {
+  /**
+   * Five scenes, none of whose headings the old INT./EXT.-only split could see
+   * AT ALL: `EST.`, `I/E.` and a forced `.HEADING`. The doctor reads all five.
+   *
+   * `INT./EXT.` is deliberately absent: it begins with the literal `INT.`, so the
+   * old split DID see it — as a scene boundary in the wrong place, merging
+   * whatever preceded it into the head. That is mis-segmentation, a different and
+   * quieter failure than blindness, and mixing the two into one fixture would
+   * make this block's no-op claim depend on which one happened to dominate.
+   * The full heading grammar is covered in tests/core/scene-segments.test.ts.
+   */
+  const MIXED = [
+    'Title: Mixed\n\n',
+    'EST. THE TOWN - DAWN\n\nRooftops.\n\n',
+    'I/E. TRUCK - CONTINUOUS\n\nShe drives.\n\n',
+    'EST. THE HARBOUR - DUSK\n\nCranes.\n\n',
+    '.THE LONG WAY ROUND\n\nA forced heading, no INT or EXT in it.\n\n',
+    'I/E. FERRY - NIGHT\n\nSpray across the rail.\n\n',
+  ].join('');
+
+  /** The pre-2026-09-12 recipe, verbatim. */
+  function oldRecipe(t: string, f: string): string {
+    const parts = t.split(/^(?=INT\.|EXT\.)/mi);
+    const head = /^(INT\.|EXT\.)/i.test(parts[0]) ? '' : parts.shift() ?? '';
+    const scenes = parts.filter((x) => /^(INT\.|EXT\.)/i.test(x));
+    const rng = makePrng(seedFromString(`degrade:${f}`));
+    return head + shuffle(rng, scenes).filter((_, i) => i % 3 !== 2).join('');
+  }
+
+  it('THE OLD RECIPE WAS A NO-OP on a mixed-heading script — reproduced here', () => {
+    // The bug, before the fix. One `EXT.` heading, so the old split saw a single
+    // scene, kept it (index 0 survives `% 3 !== 2`), and returned its input.
+    // Every such script in the real AUC-24 corpus contributed an exact tie.
+    assert.equal(
+      oldRecipe(MIXED, 'mixed.fountain'),
+      MIXED,
+      'the old split no longer no-ops here, so this block no longer reproduces the defect it guards',
+    );
+    // And it saw no scenes at all, which is the mechanism.
+    assert.equal(MIXED.split(/^(?=INT\.|EXT\.)/mi).filter((x) => /^(INT\.|EXT\.)/i.test(x)).length, 0);
+  });
+
+  it('the new recipe degrades it — strictly fewer scenes, and different bytes', () => {
+    const out = shuffleDropDegrade(MIXED, 'mixed.fountain');
+    assert.notEqual(out, MIXED);
+    assert.ok(
+      countFountainScenes(out) < countFountainScenes(MIXED),
+      `drop-every-third left ${countFountainScenes(out)} of ${countFountainScenes(MIXED)} scenes`,
+    );
+    // Five headings, one dropped (index 2 of the shuffled order) -> 4 kept.
+    assert.equal(countFountainScenes(MIXED), 5);
+    assert.equal(countFountainScenes(out), 4);
+    // The head is still preserved verbatim, and surviving scenes are verbatim.
+    assert.ok(out.startsWith('Title: Mixed\n\n'));
+    const sourceScenes = new Set(segmentFountainScenes(MIXED).scenes);
+    for (const scene of segmentFountainScenes(out).scenes) {
+      assert.ok(sourceScenes.has(scene), `the degraded output invented a scene: ${JSON.stringify(scene)}`);
+    }
+  });
+
+  it('records the new segmentation in the degradation id and recipe text', () => {
+    // A table locked under the old recipe must never be compared to a new
+    // measurement, and the artifact is self-describing, so the id carries it.
+    assert.equal(AUC24_DEGRADATION_ID, 'shuffle-drop/v2');
+    assert.match(AUC24_DEGRADATION.recipe, /scene-segments\.ts/);
+    assert.match(AUC24_DEGRADATION.recipe, /NOT the INT\.\/EXT\.-only split/);
+  });
+});
+
+describe('assertDegradationChangedText / assertFinalSceneIsFirst', () => {
+  const THREE = 'INT. A - DAY\n\nX.\n\nINT. B - DAY\n\nY.\n\nINT. C - DAY\n\nZ.\n';
+
+  it('passes a real degradation through untouched', () => {
+    const degraded = shuffleDropDegrade(THREE, 'k');
+    assert.equal(assertDegradationChangedText('SHUFFLE_DROP', 'k', THREE, degraded), degraded);
+  });
+
+  it('THROWS on a no-op, and says why a tie is not a measurement', () => {
+    assert.throws(
+      () => assertDegradationChangedText('SHUFFLE_DROP', 'k.fountain', THREE, THREE),
+      (err: Error) => {
+        assert.match(err.message, /produced its input unchanged on k\.fountain/);
+        assert.match(err.message, /HARNESS FAULT/);
+        assert.match(err.message, /counted as 0\.5/);
+        return true;
+      },
+    );
+  });
+
+  it('accepts a relocation that puts the final scene FIRST', () => {
+    const { head, scenes } = segmentFountainScenes(THREE);
+    const relocated = head + [scenes[2], scenes[0], scenes[1]].join('');
+    assert.equal(assertFinalSceneIsFirst('k', THREE, relocated), relocated);
+  });
+
+  it('THROWS on the position-TWO relocation this lane fixed', () => {
+    // The exact output of the old `scenes.splice(1, 0, last)`: the original
+    // opening stays first. Every document said position one; nothing checked.
+    const { head, scenes } = segmentFountainScenes(THREE);
+    const positionTwo = head + [scenes[0], scenes[2], scenes[1]].join('');
+    assert.throws(
+      () => assertFinalSceneIsFirst('k.fountain', THREE, positionTwo),
+      /did not put the final scene first on k\.fountain/,
+    );
+  });
+
+  it('THROWS when a scene-count-preserving relocation changed the count', () => {
+    const { head, scenes } = segmentFountainScenes(THREE);
+    const dropped = head + [scenes[2], scenes[0]].join('');
+    assert.throws(
+      () => assertFinalSceneIsFirst('k.fountain', THREE, dropped),
+      /changed the scene count on k\.fountain \(3 -> 2\)/,
+    );
   });
 });

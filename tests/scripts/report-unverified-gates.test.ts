@@ -41,9 +41,10 @@ const SCRIPT = path.join(REPO_ROOT, 'scripts/report-unverified-gates.mjs');
  *
  * 2026-09-12: the reporter now runs each verified suite TWICE (plain, then with
  * one floor raised — finding 7's mutation check), so this one invocation costs
- * ~10s and the whole file costs ~20s, measured. The only other real spawns are
- * the two the gutted-suite case needs, and they are memoised; the genuine-suite
- * case reads this same output rather than paying for a third pair.
+ * ~11.5s and the whole file costs 22.0-22.5s, measured. The only other real
+ * spawns are the two the gutted-suite case needs, and they are memoised; the
+ * genuine-suite case reads this same output rather than paying for a third
+ * pair.
  */
 const REPORTER_OUTPUT = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
 

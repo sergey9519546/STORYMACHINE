@@ -5,18 +5,22 @@
 // ── RUNTIME (2026-09-12, stated because it changed AGAIN) ──────────────────
 // This script used to be instant: it stat()ed a few files and printed. On
 // 2026-09-06 it began RUNNING each VERIFIED gate's suite and reading the exit
-// code, which cost 5.8-6.4s (measured then, three consecutive runs; 4.9-5.1s
-// on the 2026-09-12 sandbox). As of 2026-09-12 it runs each verified suite
-// TWICE — once as itself, once with one floor constant raised above its
-// measured value, requiring the second run to FAIL on that floor (adversarial
-// review finding 7: exit 0 does not distinguish a live assertion from a gutted
-// one). So `npm run gates` now costs about 9.9-10.3s — measured over three
-// consecutive runs on the 2026-09-12 sandbox, against 4.9-5.1s for the
-// single-run version on the same machine — essentially all of it
+// code, which cost 5.8-6.4s (measured then, three consecutive runs). As of
+// 2026-09-12 it runs each verified suite TWICE — once as itself, once with one
+// floor constant raised above its measured value, requiring the second run to
+// FAIL on that floor (adversarial review finding 7: exit 0 does not distinguish
+// a live assertion from a gutted one).
+//
+// MEASURED, back to back on one machine, three consecutive runs each: the
+// single-run reporter at main@59bbaf55 costs 5.86-6.51s and this one costs
+// 11.47-11.68s. Essentially all of it is
 // tests/core/public-benchmark.test.ts's 128 doctor runs and three bootstraps,
-// paid twice. The CI step is `if: always()` and unchanged otherwise; the cost
-// is flagged here rather than left for someone to discover in a build-time
-// graph, and it scales with however many verified gates get added later.
+// paid twice (one suite run is 5.92-6.15s on the same machine). Measure the
+// pair side by side if you re-measure: sandbox load moved the absolute numbers
+// by 20% within one session, and the ~1.9x RATIO is the part that is about this
+// change. The CI step is `if: always()` and unchanged otherwise; the cost is
+// flagged here rather than left for someone to discover in a build-time graph,
+// and it scales with however many verified gates get added later.
 //
 // WHY THIS EXISTS. `npm test` reporting "0 failures" reads as "everything is
 // verified." It is not. Several suites skip silently when their input is
@@ -249,9 +253,10 @@ export const GATES = [
  * is `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR`, the PRIMARY paired floor of the first
  * degradation — see `chooseFloorToRaise`.
  *
- * Running the suite twice costs about 9.9-10.3s in total (see the RUNTIME note
- * at the top of this file). It is worth it here because this section makes a
- * positive claim; the rest of the file only reports gaps.
+ * Running the suite twice costs about 11.5s in total, against 5.9-6.5s for the
+ * single-run version on the same machine (see the RUNTIME note at the top of
+ * this file). It is worth it here because this section makes a positive claim;
+ * the rest of the file only reports gaps.
  *
  * The runner is injectable so the tests can drive every outcome without
  * spawning anything.
@@ -296,9 +301,10 @@ export const VERIFIED_GATES = [
       + 'real distributable prose is a reviewable numeric diff.',
     doesNotProve:
       'Nothing about the AUC-24 >= 0.622 ratchet above — different corpus, different script '
-      + 'length, different denominator. And it is not a good result: measured 2026-09-06, both '
+      + 'length, different denominator. And it is not a good result: measured 2026-09-12, both '
       + 'MEASUREMENT channels are near chance (shuffle-drop 0.5313 matched-pair / 0.5586 '
-      + 'all-pairs; climax-relocate 0.4219 / 0.4673) and all four 95% intervals contain 0.5. The '
+      + 'all-pairs; climax-relocate 0.4063 / 0.4443, re-locked 2026-09-12 from a corrected '
+      + 'position-one relocation) and all four 95% intervals contain 0.5. The '
       + 'control reads 1.0000 / 0.9473 but proves only that the instrument works — the engine '
       + 'ships a deduction built for that exact manipulation. Floors are those values minus a '
       + '0.02 margin, so the engine cannot get WORSE unnoticed. They are the current truth, not '

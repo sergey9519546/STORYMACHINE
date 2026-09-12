@@ -55,6 +55,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-12 Adversarial Review",
+      "path": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
       "type": "branch",
       "title": "Branch — Advice-Rule-Fixes",
@@ -817,6 +823,50 @@
       "to": "docs/brain/Patterns.md"
     },
     {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-07 Innovation Batch.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-06 Mistake Search.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
       "from": "docs/brain/Branches/Branch - Advice Rule Fixes.md",
       "to": "docs/brain/Measurements/Measurement - DETECTOR_DEFECTS_2026-08-03.md"
     },
@@ -962,6 +1012,14 @@
     },
     {
       "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
@@ -998,11 +1056,27 @@
     },
     {
       "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
       "to": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md"
     },
     {
       "from": "docs/brain/Gates/Gate - Public Benchmark.md",
       "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Public Benchmark.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
     },
     {
       "from": "docs/brain/Gates/Gate - Public Benchmark.md",

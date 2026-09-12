@@ -2154,3 +2154,106 @@ that nobody mistakes one for the other.
   its output, and I did **not** run `npm run measure-real` — the private corpus
   is not present in this environment, and no AUC-24 value is claimed anywhere
   in this entry.
+
+### 2026-09-12 — PUBLIC BENCHMARK RE-LOCK after an INSTRUMENT fix: `CLIMAX_RELOCATE` now moves the final scene to position ONE, and the scene segmenter is the doctor's own (PUBLIC-CORPUS — not an AUC-24 receipt, no real-corpus measurement was run, and no scoring-path file was touched)
+
+- **Date:** 2026-09-12
+- **Git SHA:** measured on `lane/instrument-integrity`, branched from
+  `main @ 59bbaf55` — a real commit in this repository.
+- **Why this entry exists even though nothing scoring-related changed.** Two of
+  the six floor constants in `scripts/lib/auc.ts` moved, and **a floor that
+  falls is the one movement this machinery is most easily defeated by.** So the
+  movement is recorded here with its cause and its direction, next to the
+  evidence that the engine did not change. `scripts/check-scoring-receipt.mjs`
+  does **not** require an entry for this range (it reports "no scoring-path
+  files changed"); this is filed because a reader of the `auc.ts` diff is owed
+  it, not because a gate demanded it.
+- **Commands (all run in this worktree; anyone can re-run them with no corpus,
+  no key and no env var):**
+  ```
+  npm run benchmark:public
+  npm run benchmark:public -- --json
+  npm run benchmark:public -- --lock
+  node scripts/check-scoring-receipt.mjs 59bbaf55..HEAD
+  node scripts/check-doctor-output-identity.mjs --compare <before> <after>
+  npm run gates
+  ```
+- **Measured AUC-24:** **not applicable, and deliberately left blank.** No
+  real-corpus measurement was run for this range and none is claimed. The
+  private corpus does not exist in this environment. **See the warning at the
+  end of this entry: the AUC-24 recipe's segmentation changed, so the last
+  recorded 0.731 is not comparable to what the owner's next lock will produce.**
+- **What was wrong with the instrument** (`docs/audits/2026-09-12-adversarial/engine-logic.md`
+  finding 12, reproduced):
+  1. `CLIMAX_RELOCATE` did `scenes.splice(1, 0, last)` — **position TWO**, so
+     the script's original opening stayed in place — while its own label, its
+     `recipe` string, `PUBLIC_BENCHMARK_2026-09-06.md` §3 and the brain gate
+     note all said "position 1". The covering test asserted the buggy order, so
+     nothing caught it.
+  2. Nothing asserted `degraded !== text`. A silently no-opping recipe scored a
+     script against an identical copy of itself and the **exact tie counted as
+     0.5** — indistinguishable from a pair the engine could not separate.
+  3. `shuffleDropDegrade` split scenes on `INT.`/`EXT.` only, so `EST.`,
+     `I/E.`, `INT./EXT.` and forced `.HEADING` lines were invisible.
+- **Measured public AUCs after the fix (N = 32; matched-pair is PRIMARY; seeded
+  2000-resample percentile bootstrap, seed 42). Before → after:**
+  - `SHUFFLE_DROP` — matched-pair **0.5313 → 0.5313**, all-pairs
+    **0.5586 → 0.5586**. **UNCHANGED**, because the new segmentation produces
+    byte-identical output on all 32 of these scripts (measured: 0 of 32 differ;
+    every heading here is a plain `INT.`/`EXT.` at column 0). Floors unchanged
+    at 0.5113 / 0.5386.
+  - `CLIMAX_RELOCATE` — matched-pair **0.4219 → 0.4063** [0.2813, 0.5625] →
+    [0.2656, 0.5469]; all-pairs **0.4673 → 0.4443** [0.4014, 0.5264] →
+    [0.3662, 0.5112]; mean gap **−1.46 → −1.23**; ordered/inverted/tied
+    **8/13/11 → 8/14/10**. Floors re-locked **0.4019 → 0.3863** and
+    **0.4473 → 0.4243**.
+  - `DIALOGUE_FLATTEN` (control) — **1.0000 / 0.9473, unchanged**, 32/0/0.
+    Floors unchanged at 0.98 / 0.9273.
+  - **Attribution, measured separately before the re-lock:** the lossless
+    reassembly alone would have RAISED both order statistics (0.4375 / 0.4736);
+    correcting the position then lowered them past the starting point. So the
+    net fall is the **position fix**, and it is the expected direction: the
+    corrected manipulation is stronger and the engine reads it slightly worse.
+- **THE SCORE DID NOT MOVE. Three checks, not an assertion:**
+  - `node scripts/check-scoring-receipt.mjs 59bbaf55..HEAD` → **"no
+    scoring-path files changed. OK."**
+  - `scripts/check-doctor-output-identity.mjs --compare` against a
+    `git archive 59bbaf55` baseline → **"OUTPUT IDENTITY: PASS — all 45 reports
+    are byte-identical (analyzedAt excluded)."**
+  - `npm run benchmark:public -- --lock` produced **no diff** in
+    `tests/fixtures/public-corpus-manifest.json` or
+    `tests/fixtures/public-benchmark-split.json`: every intact `sceneCount`,
+    `words`, `health` and `verdict` is exactly what it was. Only two of six
+    floor constants changed.
+- **Corpus fingerprint:** unchanged — the same 32 `.fountain` files, the same
+  committed sha256s, the same 27/5 pre-registered split. **The split is still
+  reported, NOT used for held-out evaluation:** the re-locked floors were
+  computed from all 32 scripts, holdout included.
+- **WARNING FOR THE AUC-24 LOCK — the recipe's segmentation changed.**
+  `shuffleDropDegrade` is byte-for-byte the AUC-24 recipe, so
+  `npm run lock-auc24` will now measure a differently-segmented degradation on
+  the owner's corpus. Nothing was invalidated, because
+  `tests/fixtures/auc24-table.json` has never existed. But **the last recorded
+  AUC-24, 0.731 (§2.1, 2026-07-11), was measured on the OLD recipe, and the
+  owner's next lock must run on the new one — its number will be the first
+  AUC-24 figure this segmentation has ever produced and is not comparable to
+  0.731.** `AUC24_FLOOR` is deliberately untouched at 0.622, and
+  `AUC24_DEGRADATION_ID` is bumped to `shuffle-drop/v2` so an old-recipe table
+  can never be silently compared to a new measurement.
+- **Gate cost also changed in this range, and it is recorded because the
+  2026-09-06 change was.** `scripts/report-unverified-gates.mjs` now runs each
+  verified suite TWICE (the second run with one floor raised above its own
+  measurement, requiring a named failure — adversarial finding 7), so
+  `npm run gates` costs **11.47–11.68 s** against **5.86–6.51 s** for the
+  single-run reporter at `main @ 59bbaf55`, three consecutive runs each measured
+  back to back on the same machine (one suite run is 5.92–6.15 s there, so the
+  cost is the suite, paid twice). Sandbox load moved the absolute figures by 20%
+  within one session; the ~1.9x ratio is the part attributable to the change.
+- **Runner attestation:** none is owed. Every figure above reproduces from
+  committed text with `npm run benchmark:public` on any machine, and
+  `tests/core/public-benchmark.test.ts` recomputes all six AUCs and re-checks
+  all 32 manifest rows on every CI run with no env var. For the record I ran
+  each command listed above in this worktree and read its output, and I did
+  **not** run `npm run measure-real` — the private corpus is not present here
+  and no AUC-24 value is claimed anywhere in this entry. Full method and both
+  decomposition tables: `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §11.

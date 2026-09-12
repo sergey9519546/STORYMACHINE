@@ -61,6 +61,11 @@ import { computeQuestionLatencyDeduction } from '../../server/nvm/analyze/questi
 import { detectReversals } from '../../server/nvm/analyze/reversal-detection.ts';
 import { computeD2AgencyDelta } from '../../server/nvm/analyze/agency-signal.ts';
 import { detectTruthContradictions } from '../../server/nvm/analyze/truth-extraction.ts';
+import {
+  reassembleFountainScenes,
+  sceneHeadingLineIndices,
+  segmentFountainScenes,
+} from './scene-segments.ts';
 
 // ───────────────────────────────────────────────────────────────────────────
 // Seeded RNG + AUC (ported verbatim — see provenance block above)
@@ -115,21 +120,48 @@ export function bootstrapCi(pairs, iterations = BOOTSTRAP_DEFAULT, seed = 42) {
 // Degradations (ported verbatim — see provenance block above)
 // ───────────────────────────────────────────────────────────────────────────
 
-const HEADING_RE = /^(INT\.|EXT\.|EST\.|INT\/EXT\.)/;
-const DOT_RE = /^\./;
+// ── ONE SEGMENTER, AND ONE MORE RECIPE CHANGE TO WRITE DOWN (2026-09-12) ───
+// This file used to carry its own scene segmenter — HEADING_RE matching
+// `INT.|EXT.|EST.|INT/EXT.` plus a leading dot, a `{preamble, scenes:
+// [{heading, body}]}` view, and a `reassemble` that joined lines with '\n'. That
+// was the THIRD notion of "a scene" in the harnesses and it agreed with neither
+// the doctor's nor `scripts/lib/auc.ts`'s
+// (docs/audits/2026-09-12-adversarial/engine-logic.md finding 12): it missed
+// `I/E.` and `INT./EXT.`, and its line-join reassembly rewrote CRLF and could
+// drop a trailing newline, so a "scene count preserving" degradation did not
+// return its input's own bytes inside its scenes.
+//
+// The segmentation now comes from scripts/lib/scene-segments.ts, which reads the
+// DOCTOR'S OWN heading classification off `parseFountain`. `segmentScenes` and
+// `reassemble` are kept, with the same shapes and the same round-trip property,
+// because callers and tests use them as the heading view — they are rebuilt on
+// the shared boundary list instead of carrying a second grammar.
+//
+// WHAT THIS CHANGES FOR THE MEASURE-AUC-SPLIT LINEAGE. `degradeShuffle` and
+// `degradeMidpointDrop` are the recipes behind
+// docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md (SCENE_SHUFFLE test
+// 0.734, MIDPOINT_DROP test 0.766, on a 153-script hash-locked partition of the
+// local-only 761-script corpus). Those figures were measured with the OLD
+// segmenter. They are a dated record and are not edited — but a RERUN of
+// `scripts/rebuild-experiment.mjs`, or of that baseline, now segments
+// differently, sees headings the old split walked past, and is therefore not
+// directly comparable to them. That is the same disclosure
+// `scripts/lib/auc.ts`'s header makes about AUC-24, for the same reason.
+//
+// `degradeDialogueFlatten` never used the segmenter and is unchanged.
 
+/** The heading view, for callers and tests that want slugs rather than slices.
+ *  Shape unchanged; grammar is now the parser's, via scene-segments.ts.
+ *  `reassemble(preamble, scenes)` still round-trips `segmentScenes(text)`. */
 export function segmentScenes(text) {
   const lines = text.split(/\r?\n/);
-  const scenes = []; let cur = null; const preamble = [];
-  for (const line of lines) {
-    const t = line.trim();
-    if (HEADING_RE.test(t) || DOT_RE.test(t)) {
-      if (cur) scenes.push(cur);
-      cur = { heading: line, body: [] };
-    } else if (cur) cur.body.push(line);
-    else preamble.push(line);
-  }
-  if (cur) scenes.push(cur);
+  const headings = sceneHeadingLineIndices(text);
+  if (headings.length === 0) return { preamble: lines, scenes: [] };
+  const preamble = lines.slice(0, headings[0]);
+  const scenes = headings.map((start, i) => ({
+    heading: lines[start],
+    body: lines.slice(start + 1, i + 1 < headings.length ? headings[i + 1] : lines.length),
+  }));
   return { preamble, scenes };
 }
 
@@ -140,29 +172,47 @@ export function reassemble(preamble, scenes) {
 }
 
 /** Seed 42, identical Fisher-Yates direction to measure-auc-split.mjs — the
- *  same script always produces the same shuffle. */
+ *  same script always produces the same shuffle. Scene slices are verbatim, so
+ *  only ORDER changes. */
 export function degradeShuffle(text) {
-  const { preamble, scenes } = segmentScenes(text);
+  const { head, scenes } = segmentFountainScenes(text);
   if (scenes.length < 3) return null;
   const rng = mulberry32(42);
   const sh = scenes.slice();
   for (let i = sh.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [sh[i], sh[j]] = [sh[j], sh[i]]; }
-  return reassemble(preamble, sh);
+  return reassembleFountainScenes(head, sh);
 }
 
 export function degradeMidpointDrop(text) {
-  const { preamble, scenes } = segmentScenes(text);
+  const { head, scenes } = segmentFountainScenes(text);
   const n = scenes.length;
   if (n < 5) return null;
-  return reassemble(preamble, scenes.slice(0, Math.floor(n * 0.4)).concat(scenes.slice(Math.floor(n * 0.6))));
+  return reassembleFountainScenes(
+    head,
+    scenes.slice(0, Math.floor(n * 0.4)).concat(scenes.slice(Math.floor(n * 0.6))),
+  );
 }
 
+/**
+ * Move the final scene to POSITION ONE — the first scene of the degraded
+ * script — preserving the scene count and every scene's bytes.
+ *
+ * FIXED 2026-09-12 (finding 12). This function spliced the popped last scene in
+ * at index 1, i.e. position TWO, while `scripts/lib/public-benchmark.ts`, its
+ * own `recipe` string, docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md §3 and
+ * docs/brain/Gates/Gate - Public Benchmark.md all said "move the final scene to
+ * position 1". It therefore left the script's most load-bearing position — its
+ * opening — intact, a materially weaker manipulation than the one every document
+ * claimed, and nothing asserted the claim. `assertFinalSceneIsFirst` in
+ * scripts/lib/auc.ts is now applied at the measurement call site, so the
+ * property is checked on every run instead of described.
+ */
 export function degradeClimaxRelocate(text) {
-  const { preamble, scenes } = segmentScenes(text);
+  const { head, scenes } = segmentFountainScenes(text);
   if (scenes.length < 3) return null;
-  const last = scenes.pop();
-  scenes.splice(1, 0, last);
-  return reassemble(preamble, scenes);
+  const reordered = scenes.slice();
+  reordered.unshift(reordered.pop());
+  return reassembleFountainScenes(head, reordered);
 }
 
 export function degradeDialogueFlatten(text) {

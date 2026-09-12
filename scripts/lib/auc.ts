@@ -32,9 +32,39 @@
 // delivered and tested on synthetic data (tests/core/auc.test.ts); only the
 // owner's one local run is outstanding.
 //
+// ── THE AUC-24 RECIPE'S SCENE SEGMENTATION CHANGED ON 2026-09-12 ──────────
+// `shuffleDropDegrade` below is byte-for-byte the AUC-24 recipe. Until
+// 2026-09-12 it split scenes on `/^(?=INT\.|EXT\.)/mi` and therefore could not
+// see `EST.`, `I/E.`, `INT./EXT.` or Fountain forced `.HEADING` lines — all
+// standard, and the AUC-24 corpus is real screenplays, which use them
+// (docs/audits/2026-09-12-adversarial/engine-logic.md finding 12). It now
+// segments with the DOCTOR'S OWN heading grammar via
+// scripts/lib/scene-segments.ts.
+//
+// What that means for the lock, stated here because it is the first thing a
+// reader of this file needs to know:
+//
+//   * THE LAST MEASURED AUC-24, 0.731, WAS MEASURED ON THE OLD RECIPE
+//     (2026-07-11, docs/p1-benchmark/MEASUREMENT_RECEIPTS.md §2.1). It is not
+//     comparable to a run of the new one.
+//   * NOTHING WAS INVALIDATED, because `tests/fixtures/auc24-table.json` has
+//     never existed (see the STATUS block below). The owner's
+//     `npm run lock-auc24` must simply run on the NEW recipe; its number is the
+//     first AUC-24 figure this segmentation has ever produced.
+//   * `AUC24_FLOOR` IS UNTOUCHED at 0.622. Moving a floor is a measurement's
+//     job, and a recipe that degrades strictly more aggressively is exactly the
+//     case where guessing a new floor would be a guess wearing a gate's clothes.
+//   * `AUC24_DEGRADATION_ID` is bumped to `shuffle-drop/v2`, so a table
+//     produced by the old recipe can never be compared to a new measurement.
+//   * On the 32 committed public-benchmark scripts the new segmentation produces
+//     BYTE-IDENTICAL output (measured: 0 of 32 differ), so neither SHUFFLE_DROP
+//     floor below moved. The same statement is in CLAUDE.md's "Which floor,
+//     exactly" section and docs/brain/Gates/Gate - AUC-24 Ratchet.md.
+//
 // PURITY: nothing here reads the filesystem, the environment, or the clock.
 
 import { makePrng, seedFromString, shuffle } from '../../server/nvm/repro/seed.ts';
+import { reassembleFountainScenes, segmentFountainScenes } from './scene-segments.ts';
 
 /** The 24-script subset is `MANIFEST.slice(0, SUBSET)` — the manifest's array
  *  ORDER selects which scripts the floor is measured over. See
@@ -111,7 +141,12 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  *    moves `scarcityPenalty = 140/sceneCount` (doctor.ts:465-467) directly.
  *  - CLIMAX_RELOCATE preserves scene count exactly (measured: mean scarcity
  *    delta 0.000 over all 32 scripts), so that term cancels and what is left
- *    is order-sensitivity alone.
+ *    is order-sensitivity alone. Since 2026-09-12 it moves the final scene to
+ *    POSITION ONE, as every document describing it always said; until then it
+ *    spliced at index 1 — position TWO — leaving the script's opening intact,
+ *    and nothing asserted otherwise (finding 12). The assertion now exists
+ *    (`assertFinalSceneIsFirst`), and the two ORDER floors below were re-locked
+ *    from the corrected, stronger manipulation.
  *  - DIALOGUE_FLATTEN is a POSITIVE CONTROL, not a finding. Both measurement
  *    channels read chance; without a manipulation the score demonstrably DOES
  *    detect, a reader cannot tell "the score is blind to mechanical damage"
@@ -123,15 +158,31 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  *    on the instrument rather than evidence about the score.
  *
  * THE TWO MEASUREMENT CHANNELS ARE NEAR CHANCE, AND THAT IS THE CURRENT
- * TRUTH, NOT A TARGET. Measured on this tree, 2026-09-06 — shuffle-drop
- * 0.5586 all-pairs / 0.5313 matched-pair; climax-relocate 0.4673 / 0.4219.
- * Every one of those four intervals contains 0.5. On this corpus the doctor
- * does not reliably prefer an intact script to a mechanically damaged copy of
- * itself under either recipe. A floor at a near-chance measurement is a
- * ratchet against getting WORSE at something the engine is already bad at,
- * which is the only honest thing to assert. Raising any of them is a
- * measurement's job, never an edit's. (The control's floors are high because
- * the control works: 0.9473 all-pairs / 1.0000 matched-pair.)
+ * TRUTH, NOT A TARGET. Measured on this tree, 2026-09-12 (the instrument-fix
+ * re-lock; the 2026-09-06 figures it replaced are in parentheses) — shuffle-drop
+ * 0.5586 all-pairs / 0.5313 matched-pair, UNCHANGED, because the segmenter
+ * change produces byte-identical output on all 32 of these scripts;
+ * climax-relocate 0.4443 (was 0.4673) / 0.4063 (was 0.4219), because the
+ * relocation now actually moves the final scene to position one. Every one of
+ * those four intervals contains 0.5. On this corpus the doctor does not
+ * reliably prefer an intact script to a mechanically damaged copy of itself
+ * under either recipe — and under the CORRECTED, stronger order manipulation it
+ * prefers the damaged copy slightly more often than before (inverted pairs
+ * 13 -> 14 of 32). A floor at a near-chance measurement is a ratchet against
+ * getting WORSE at something the engine is already bad at, which is the only
+ * honest thing to assert. Raising any of them is a measurement's job, never an
+ * edit's. (The control's floors are high because the control works: 0.9473
+ * all-pairs / 1.0000 matched-pair, unchanged.)
+ *
+ * THE SCORE DID NOT MOVE WHEN THESE TWO FLOORS DID. Nothing on the scoring path
+ * was touched by the 2026-09-12 change — `node scripts/check-scoring-receipt.mjs`
+ * reports "no scoring-path files changed", the doctor output-identity harness is
+ * 45/45 byte-identical, and `tests/fixtures/public-corpus-manifest.json` (32 rows
+ * of intact sceneCount/words/health/verdict) re-locked to exactly its previous
+ * bytes. The two ORDER floors moved because the INSTRUMENT changed, not the
+ * engine: a degradation that leaves the opening in place is a weaker
+ * manipulation than one that replaces it. Full before/after in
+ * docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md §11.
  *
  * THE PREDICTION THIS REFUTED, kept because it is the useful part. The
  * scene-count-artifact argument (doctor.ts:2092-2093 — scarcity AUC 0.938,
@@ -165,8 +216,8 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  */
 export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5113;
 export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.5386;
-export const PUBLIC_ORDER_PAIRED_FLOOR = 0.4019;
-export const PUBLIC_ORDER_FLOOR = 0.4473;
+export const PUBLIC_ORDER_PAIRED_FLOOR = 0.3863;
+export const PUBLIC_ORDER_FLOOR = 0.4243;
 export const PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR = 0.98;
 export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.9273;
 
@@ -218,17 +269,25 @@ export const PUBLIC_FLOORS = [
 /** Identifies the exact degradation the committed table was produced by. Bump
  *  the version if the recipe, the PRNG, or the seed template ever changes —
  *  a table produced by a different recipe is not comparable, and the
- *  table-driven test refuses it. */
-export const AUC24_DEGRADATION_ID = 'shuffle-drop/v1';
+ *  table-driven test refuses it.
+ *
+ *  BUMPED TO v2 ON 2026-09-12: the scene SEGMENTATION changed from an
+ *  `INT.`/`EXT.`-only split to the doctor's own heading grammar
+ *  (scripts/lib/scene-segments.ts) — see `shuffleDropDegrade`'s header. No
+ *  table existed at v1, so nothing was invalidated; the bump is what stops a
+ *  v1 table from ever being compared to a v2 measurement. */
+export const AUC24_DEGRADATION_ID = 'shuffle-drop/v2';
 
 /** Human-readable description of `AUC24_DEGRADATION_ID`, embedded in the
  *  committed table so the artifact is self-describing. */
 export const AUC24_DEGRADATION = {
   id: AUC24_DEGRADATION_ID,
   recipe:
-    'seeded Fisher-Yates shuffle of all INT./EXT. scenes, then drop every third '
-    + 'scene of the shuffled order (index % 3 === 2); any pre-first-slugline head '
-    + 'is preserved verbatim at the top',
+    'seeded Fisher-Yates shuffle of all scenes — segmented by the doctor\'s own heading grammar '
+    + '(scripts/lib/scene-segments.ts over src/lib/fountain.ts\'s parseFountain: INT./EXT./EST./'
+    + 'I/E./INT./EXT. and forced .HEADING lines, boneyard excluded), NOT the INT./EXT.-only split '
+    + 'used before 2026-09-12 — then drop every third scene of the shuffled order '
+    + '(index % 3 === 2); any pre-first-heading head is preserved verbatim at the top',
   seedTemplate: 'seedFromString("degrade:" + <manifest entry.file>)',
   prng: 'mulberry32 (makePrng) + djb2 (seedFromString), server/nvm/repro/seed.ts',
   subsetSize: AUC24_SUBSET,
@@ -282,13 +341,126 @@ export function degradationSeed(seedKey: string): number {
  * value — the seed is derived from it, so a de-identification rename of that
  * field CHANGES the degradation and invalidates the committed table (which is
  * why the table records the seed integer and the recipe version).
+ *
+ * ── THE SEGMENTATION CHANGED ON 2026-09-12. READ THIS BEFORE LOCKING. ─────
+ * Until then this function split on `/^(?=INT\.|EXT\.)/mi` and nothing else,
+ * which means `EST.`, `I/E.`, `INT./EXT.` and Fountain forced headings
+ * (a leading `.`) were INVISIBLE to it — all four are standard, and the AUC-24
+ * corpus is real screenplays, which use them. Every such script silently
+ * contributed a weaker degradation, or none at all: on a synthetic
+ * mixed-heading script the old split saw 2 scenes where the doctor saw 5 and
+ * the "degradation" returned its input unchanged
+ * (docs/audits/2026-09-12-adversarial/engine-logic.md finding 12).
+ *
+ * It now segments with `scripts/lib/scene-segments.ts`, which reads the
+ * DOCTOR'S OWN heading classification off `parseFountain`. Consequences, stated
+ * rather than left to be discovered:
+ *
+ *   * On the 32 committed public-benchmark scripts the output is BYTE-IDENTICAL
+ *     to the old recipe's (measured 2026-09-12: 0 of 32 differ), because all
+ *     their headings are plain `INT.`/`EXT.` at column 0. So the public
+ *     benchmark's two SHUFFLE_DROP floors did not move, and the fact that they
+ *     did not is evidence the change is the narrow one claimed.
+ *   * On the real AUC-24 corpus the output CAN differ, and where it differs the
+ *     new recipe degrades MORE (it sees scenes the old one walked past).
+ *   * The last recorded AUC-24 receipt, 0.731 (2026-07-11,
+ *     docs/p1-benchmark/MEASUREMENT_RECEIPTS.md §2.1), was measured on the OLD
+ *     recipe. `npm run lock-auc24` must be run on the NEW one before its number
+ *     is compared to anything. Nothing was invalidated by this change because
+ *     `tests/fixtures/auc24-table.json` does not exist yet — the table has never
+ *     been locked — but a 0.731-vs-new comparison is a recipe change away from
+ *     meaningless. AUC24_FLOOR was deliberately NOT touched here: raising or
+ *     lowering a floor is a measurement's job.
+ *   * `AUC24_DEGRADATION_ID` / `AUC24_DEGRADATION.recipe` below record the new
+ *     segmentation, so a table produced by the old recipe is refused by
+ *     `tests/core/auc24-table.test.ts` rather than silently compared.
+ *
+ * WHAT DID NOT CHANGE: the shuffle (seeded Fisher-Yates, `makePrng` +
+ * `seedFromString("degrade:" + key)`), the drop rule (`index % 3 === 2`), the
+ * head preservation, and the fact that every surviving scene is byte-identical
+ * to its source. Only the answer to "where does a scene begin" moved.
+ *
+ * It stays a TOTAL function — a script with no headings comes back unchanged
+ * rather than throwing, which `tests/core/auc.test.ts` pins. A no-op IS an
+ * error, but it is the measurement's error to raise, not the recipe's: see
+ * `assertDegradationChangedText`, which every call site that counts an
+ * observation applies. Throwing here instead would make the recipe partial on a
+ * legal input and break the byte-for-byte oracle that keeps it comparable.
  */
 export function shuffleDropDegrade(text: string, seedKey: string): string {
-  const parts = text.split(/^(?=INT\.|EXT\.)/mi);
-  const head = /^(INT\.|EXT\.)/i.test(parts[0]) ? '' : parts.shift() ?? '';
-  const scenes = parts.filter((x) => /^(INT\.|EXT\.)/i.test(x));
+  const { head, scenes } = segmentFountainScenes(text);
   const rng = makePrng(degradationSeed(seedKey));
-  return head + shuffle(rng, scenes).filter((_, i) => i % 3 !== 2).join('');
+  return reassembleFountainScenes(head, shuffle(rng, scenes).filter((_, i) => i % 3 !== 2));
+}
+
+/**
+ * A degradation that produced its own input is an ERROR, never a 0.5 tie.
+ *
+ * WHY THIS IS A FUNCTION AND NOT AN `if` INSIDE EACH RECIPE (2026-09-12,
+ * finding 12). `measurePublicBenchmark` skipped a script only when `apply`
+ * returned `null`; nothing asserted `degraded !== text`. A recipe that silently
+ * no-opped therefore scored a script against an identical copy of itself, and
+ * the tie was counted as a legitimate observation contributing exactly 0.5 —
+ * the one value that cannot be distinguished from "the engine read this pair and
+ * could not separate it". That is a harness fault wearing a finding's clothes.
+ *
+ * Every call site that turns a degradation into an OBSERVATION applies this:
+ * `scripts/lib/public-benchmark.ts`'s three `apply` functions,
+ * `scripts/lock-auc24.mjs`, and `tests/core/real-script-corpus.test.ts`. The
+ * recipes themselves stay total (see `shuffleDropDegrade` above).
+ *
+ * @throws when `degraded` is identical to `text`, naming the script.
+ */
+export function assertDegradationChangedText(
+  degradationId: string,
+  scriptLabel: string,
+  text: string,
+  degraded: string,
+): string {
+  if (degraded !== text) return degraded;
+  throw new Error(
+    `${degradationId} produced its input unchanged on ${scriptLabel}. A no-op degradation is a `
+    + 'HARNESS FAULT, not a measurement: scoring a script against an identical copy of itself '
+    + 'yields an exact tie, which is counted as 0.5 and is indistinguishable from "the engine '
+    + 'could not separate this pair". Either the segmenter does not recognise this script\'s '
+    + 'scene headings (scripts/lib/scene-segments.ts reads the doctor\'s own grammar — if it '
+    + 'sees no scenes here, neither does the doctor), or the recipe has no effect at this length '
+    + 'and the script must be SKIPPED by name rather than silently tied.',
+  );
+}
+
+/**
+ * CLIMAX_RELOCATE's defining property, asserted rather than assumed.
+ *
+ * The degradation is documented everywhere as "move the final scene to position
+ * 1", and until 2026-09-12 it spliced at index 1 — position TWO — leaving the
+ * script's most load-bearing position, its opening, intact
+ * (finding 12). Nothing checked. This is the check: after the degradation the
+ * FIRST scene must be the intact script's LAST, and the scene count must be
+ * unchanged.
+ *
+ * @throws when the relocation did not land the final scene first.
+ */
+export function assertFinalSceneIsFirst(scriptLabel: string, text: string, degraded: string): string {
+  const before = segmentFountainScenes(text).scenes;
+  const after = segmentFountainScenes(degraded).scenes;
+  if (after.length !== before.length) {
+    throw new Error(
+      `CLIMAX_RELOCATE changed the scene count on ${scriptLabel} (${before.length} -> ${after.length}). `
+      + 'This degradation exists to isolate order-sensitivity from the 140/sceneCount scarcity '
+      + 'term; if it moves the count it measures the same artifact as SHUFFLE_DROP.',
+    );
+  }
+  if (before.length > 0 && after[0] !== before[before.length - 1]) {
+    throw new Error(
+      `CLIMAX_RELOCATE did not put the final scene first on ${scriptLabel}. Every document `
+      + 'describing this degradation says "move the final scene to position 1"; a relocation that '
+      + 'leaves the original opening in place is a materially weaker manipulation than the one '
+      + 'claimed, and that discrepancy went unnoticed from the day it was written until '
+      + '2026-09-12 because nothing asserted it.',
+    );
+  }
+  return degraded;
 }
 
 /** One committed row: hashes and numbers only — never text, never a title. */

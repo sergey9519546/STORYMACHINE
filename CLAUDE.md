@@ -160,6 +160,22 @@ committed yet, and until it is, that test skips and
 2026-10-01). Both the floor and the degradation recipe now live in
 `scripts/lib/auc.ts`; edit the constant there, not a literal in a test.
 
+**THE RECIPE'S SCENE SEGMENTATION CHANGED ON 2026-09-12, AND THE 0.731 WAS
+MEASURED ON THE OLD ONE.** `shuffleDropDegrade` used to split scenes on
+`/^(?=INT\.|EXT\.)/mi` and so could not see `EST.`, `I/E.`, `INT./EXT.` or
+Fountain forced `.HEADING` lines — all standard, and this corpus is real
+screenplays, which use them; on a mixed-heading script the "degradation" returned
+its input unchanged (adversarial finding 12). It now segments with the doctor's
+own heading grammar (`scripts/lib/scene-segments.ts`). Nothing was invalidated,
+because `tests/fixtures/auc24-table.json` has never existed — but **the owner's
+`npm run lock-auc24` must run on the NEW recipe, and its number is the first
+AUC-24 figure this segmentation has ever produced; do not compare it to 0.731.**
+`AUC24_FLOOR` is deliberately untouched at 0.622 (moving a floor is a
+measurement's job), and `AUC24_DEGRADATION_ID` is bumped to `shuffle-drop/v2` so
+an old-recipe table can never be compared to a new measurement. On the 32
+committed public-benchmark scripts the new segmentation produces byte-identical
+output, which is why neither shuffle-drop floor below moved.
+
 It is NOT comparable to the 761-script P1 baseline
 (`docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`), which reports
 SCENE_SHUFFLE (test 0.734) and MIDPOINT_DROP (test 0.766) as SEPARATE
@@ -182,17 +198,29 @@ the two in 7 of the 8 cells measured:
 | channel | matched-pair (PRIMARY) | floor | all-pairs | floor |
 |---|---|---|---|---|
 | shuffle-drop (scene count changes) | 0.5313 | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` 0.5113 | 0.5586 | `PUBLIC_SHUFFLE_DROP_FLOOR` 0.5386 |
-| climax-relocate (scene count preserved) | 0.4219 | `PUBLIC_ORDER_PAIRED_FLOOR` 0.4019 | 0.4673 | `PUBLIC_ORDER_FLOOR` 0.4473 |
+| climax-relocate (scene count preserved) | 0.4063 | `PUBLIC_ORDER_PAIRED_FLOOR` 0.3863 | 0.4443 | `PUBLIC_ORDER_FLOOR` 0.4243 |
 
-Floors are those measured values minus a 0.02 margin. **All four intervals
-contain 0.5** ([0.3750, 0.6875] / [0.4219, 0.6973]; [0.2813, 0.5625] /
-[0.4014, 0.5264]) — on 9-14-scene distributable prose the doctor does not
+Floors are those measured values minus a 0.02 margin. The climax-relocate row
+was **re-locked on 2026-09-12** after that degradation was corrected to move the
+final scene to position ONE — it spliced at position two, leaving the script's
+opening intact, while every document said position one (adversarial finding 12):
+paired 0.4219 -> 0.4063 (floor 0.4019 -> 0.3863), all-pairs 0.4673 -> 0.4443
+(floor 0.4473 -> 0.4243). **The score did not move**: nothing on the scoring path
+was touched, the output-identity harness is 45/45 byte-identical, and the 32-row
+manifest re-locked to its previous bytes. The INSTRUMENT got stronger and the
+engine reads it slightly worse (inverted pairs 13 -> 14 of 32). The shuffle-drop
+row did not move at all, because the segmenter fix in the same change produces
+byte-identical output on these 32 scripts. **All four intervals
+contain 0.5** ([0.3750, 0.6875] / [0.4219, 0.6973]; [0.2656, 0.5469] /
+[0.3662, 0.5112]) — on 9-14-scene distributable prose the doctor does not
 reliably prefer an intact script to a mechanically damaged copy of itself, and
 these floors ratchet that so it cannot get quietly worse. They are the current
 truth, not a target; raise any of them only from a rerun. Two readings that
 must not be taken for precision: 10 of the 32 scripts sit pinned at health
-76.0 on the density cap, so **11 of 32 climax-relocate pairs are exact ties**
-and that channel's narrower interval is pinning, not precision; and the
+76.0 on the saturated density term, so **10 of 32 climax-relocate pairs are
+exact ties** (9 of the 10 are those pinned scripts; it was 11 ties before the
+position-one fix) and that channel's narrower interval is pinning, not
+precision; and the
 pre-registered split is **reported, not used** — all six floors were locked
 from all 32 scripts, holdout included, so no held-out evaluation has happened.
 
@@ -223,8 +251,9 @@ once as itself, once with one floor raised above its own measured value,
 requiring that second run to FAIL on that floor by name, because exit 0 alone
 was satisfied by a suite whose assertions had been replaced with
 `Number.isFinite` (2026-09-12 adversarial finding 7) — so that command costs
-~10 s (measured 9.9–10.3 s, against 4.9–5.1 s for the single-run version on the
-same machine) rather than being instant.
+~11.5 s (measured 11.47–11.68 s, against 5.86–6.51 s for the single-run version,
+both three consecutive runs back to back on the same machine) rather than being
+instant.
 Re-lock only after a scoring change you intended, and read the
 `auc.ts` diff: a re-lock after an unintended regression silently lowers the
 ratchet. Full method, per-script pairs, the control table and the three-branch

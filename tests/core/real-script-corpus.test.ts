@@ -51,6 +51,7 @@ import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 import {
   AUC24_FLOOR,
   AUC24_SUBSET,
+  assertDegradationChangedText,
   computeAuc,
   shuffleDropDegrade,
 } from '../../scripts/lib/auc.ts';
@@ -176,7 +177,14 @@ describe('real-script corpus — structural-degradation AUC', { skip: SKIP_REASO
     for (const f of files) {
       const t = readFileSync(path.join(CORPUS_DIR, f), 'utf8');
       goods.push((await runScriptDoctor(t)).health);
-      bads.push((await runScriptDoctor(shuffleDropDegrade(t, f))).health);
+      // A no-op degradation is an ERROR, not a 0.5 tie (2026-09-12 adversarial
+      // review finding 12). The recipe's segmenter was INT./EXT.-only until
+      // then, so a real screenplay headed with `EST.`, `I/E.`, `INT./EXT.` or
+      // forced `.HEADING` lines contributed an exact tie to this very AUC while
+      // looking like a measured pair. This corpus is real screenplays; the guard
+      // belongs here more than anywhere.
+      const degradedText = assertDegradationChangedText('SHUFFLE_DROP', f, t, shuffleDropDegrade(t, f));
+      bads.push((await runScriptDoctor(degradedText)).health);
     }
     return { auc: computeAuc(goods, bads), goods, bads };
   }

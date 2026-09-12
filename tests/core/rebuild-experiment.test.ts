@@ -117,11 +117,39 @@ describe('rebuild-experiment — degradations are deterministic under seed', () 
     ]);
   });
 
-  it('CLIMAX_RELOCATE moves the final scene to index 1 and keeps the count', () => {
+  it('CLIMAX_RELOCATE moves the final scene to POSITION ONE and keeps the count', () => {
+    // FIXED 2026-09-12 (adversarial review finding 12). This assertion used to
+    // read "moves the final scene to index 1" and expected
+    // [ONE, SIX, TWO, ...] — position TWO, with the original opening left in
+    // place — while the degradation's own label, its `recipe` string,
+    // docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md §3 and
+    // docs/brain/Gates/Gate - Public Benchmark.md all said "position 1". The
+    // test encoded the bug, which is why nothing caught it. The documents were
+    // right and the code is now what they describe.
     const relocated = degradeClimaxRelocate(FIXTURE) as string;
     assert.deepEqual(headingsOf(relocated), [
-      'INT. ONE - DAY', 'INT. SIX - DAY', 'INT. TWO - DAY', 'INT. THREE - DAY', 'INT. FOUR - DAY', 'INT. FIVE - DAY',
+      'INT. SIX - DAY', 'INT. ONE - DAY', 'INT. TWO - DAY', 'INT. THREE - DAY', 'INT. FOUR - DAY', 'INT. FIVE - DAY',
     ]);
+    // Stated as the property rather than as a list, so a future reshuffle of the
+    // fixture cannot make this pass for the wrong reason.
+    const before = headingsOf(FIXTURE);
+    const after = headingsOf(relocated);
+    assert.equal(after[0], before[before.length - 1], 'the final scene must be FIRST after relocation');
+    assert.equal(after.length, before.length, 'the scene count must be preserved');
+    assert.deepEqual([...after].sort(), [...before].sort(), 'the scene multiset must be preserved');
+  });
+
+  it('every degradation changes the text it was given — a no-op is an error, not a tie', () => {
+    // Finding 12's other half: nothing asserted `degraded !== text`, so a recipe
+    // that silently no-opped produced an EXACT TIE counted as a legitimate 0.5
+    // observation. The guards live in scripts/lib/auc.ts
+    // (assertDegradationChangedText / assertFinalSceneIsFirst) and are applied at
+    // every measurement call site; this is the property they enforce.
+    for (const d of DEGRADATIONS) {
+      const out = d.fn(FIXTURE) as string | null;
+      assert.ok(out !== null, `${d.id} returned null on a 6-scene fixture`);
+      assert.notEqual(out, FIXTURE, `${d.id} produced its input unchanged`);
+    }
   });
 
   it('DIALOGUE_FLATTEN replaces dialogue with "Hello." and leaves action alone', () => {

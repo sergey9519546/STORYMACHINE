@@ -67,6 +67,7 @@ import {
   AUC24_LOCK_COMMAND,
   AUC24_SUBSET,
   AUC24_TABLE_PATH,
+  assertDegradationChangedText,
   computeAuc,
   degradationSeed,
   shuffleDropDegrade,
@@ -160,7 +161,16 @@ export async function lockAuc24(opts) {
       hashDrift.push(`  ${label} -> local ${(intact.contentHash ?? '').slice(0, 8)}`);
       continue;
     }
-    const degraded = await runScriptDoctor(shuffleDropDegrade(text, entry.file));
+    // A no-op degradation is an ERROR, not a 0.5 tie (2026-09-12, adversarial
+    // review finding 12). Before the segmenter fix a script headed with `EST.`,
+    // `I/E.`, `INT./EXT.` or forced `.HEADING` lines came back from the recipe
+    // unchanged, and its intact-vs-"degraded" pair went into the AUC as an exact
+    // tie — worth 0.5, and indistinguishable from a pair the engine genuinely
+    // could not separate. Refuse to lock a table containing one.
+    const degradedText = assertDegradationChangedText(
+      AUC24_DEGRADATION.id, label, text, shuffleDropDegrade(text, entry.file),
+    );
+    const degraded = await runScriptDoctor(degradedText);
     rows.push({
       manifestIndex: i,
       contentHash: entry.contentHash,

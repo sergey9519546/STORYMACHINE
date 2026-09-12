@@ -127,6 +127,14 @@ as one.
 
 ## 3. The three degradations, and why there are three
 
+> **Two of these recipes changed on 2026-09-12 and §11 records it.**
+> `CLIMAX_RELOCATE` moved the final scene to position TWO, not one, so this
+> table's "move the final scene to position 1" was false when written; and
+> `SHUFFLE_DROP` segmented scenes on `INT.`/`EXT.` only. Both are fixed, the two
+> ORDER floors were re-locked, and every before/after number is in §11. The
+> table below describes the recipes as they behaved for the 2026-09-06 run this
+> document reports.
+
 | | (a) `SHUFFLE_DROP` | (b) `CLIMAX_RELOCATE` | (c) `DIALOGUE_FLATTEN` |
 |---|---|---|---|
 | role | measurement | measurement | **POSITIVE CONTROL** |
@@ -612,12 +620,18 @@ The reporter now runs each verified suite **twice** — once as itself, once wit
 one floor constant raised above its own measured value (in memory, via
 `scripts/lib/raise-auc-floor-hook.mjs`; never on disk) — and requires the second
 run to fail on that floor *by name*. Measured on the 2026-09-12 sandbox, three
-consecutive runs each: **4.9–5.1 s** before the change, **9.9–10.3 s** after.
-`tests/scripts/report-unverified-gates.test.ts` went from ~6 s to **20.1 s**: one
-hoisted reporter invocation (~10 s) plus two memoised spawns of the committed
-gutted fixture (`tests/fixtures/gate-liveness/gutted-public-benchmark-suite.ts`),
-with the genuine-suite case reading the hoisted output instead of paying for a
-third pair. The numbers in this paragraph and in that script's header are the
+consecutive runs each, measured back to back on one machine: **5.86–6.51 s** for
+the single-run reporter at `main @ 59bbaf55` and **11.47–11.68 s** for this one
+(one suite run is 5.92–6.15 s on the same machine, so the cost is simply the
+suite, paid twice). Sandbox load moved the absolute numbers by 20% inside this one
+session — measure the pair side by side if you re-measure; the ~1.9x RATIO is the
+part that is about this change.
+`tests/scripts/report-unverified-gates.test.ts` went from ~6 s to **22.0–22.5 s**:
+one hoisted reporter invocation (~11.5 s) plus two memoised spawns of the
+committed gutted fixture
+(`tests/fixtures/gate-liveness/gutted-public-benchmark-suite.ts`), with the
+genuine-suite case reading the hoisted output instead of paying for a third
+pair. The numbers in this paragraph and in that script's header are the
 same measurement; the 2026-09-06 cost change above was recorded the same way and
 is kept rather than overwritten.
 
@@ -661,3 +675,160 @@ the logistic's 10-point ceiling absorbs most of that; R5 removes the ceiling.
 The result is not a new inversion — `main`'s own mean gap is already −1.93 with
 15 of 32 inverted — it is the same inversion unmasked and amplified: 29 of 32
 inverted, mean gap −15.78.
+
+---
+
+## 11. Re-lock, 2026-09-12 — an INSTRUMENT change, not a scoring change
+
+Everything above §11 is the 2026-09-06 run and is left as written: it is the
+record of what was measured that day, with the degradation as it then behaved.
+This section records what changed on 2026-09-12, why, and every number that
+moved. It is the second entry in this document's history of cost and floor
+changes, and it is recorded the same way the first one was.
+
+### 11.1 What was wrong with the instrument
+
+`docs/audits/2026-09-12-adversarial/engine-logic.md` finding 12, reproduced and
+confirmed:
+
+1. **`CLIMAX_RELOCATE` moved the final scene to position TWO, not one.**
+   `scripts/lib/rebuild-experiment-lib.mjs` did `scenes.pop()` then
+   `scenes.splice(1, 0, last)`. Index 1 is the second slot, so the script's
+   ORIGINAL OPENING — its most load-bearing position — stayed exactly where it
+   was. Meanwhile this document's §3 table, the degradation's `label`, its
+   `recipe` string and `docs/brain/Gates/Gate - Public Benchmark.md` all said
+   "move the final scene to position 1". The test that covered it
+   (`tests/core/rebuild-experiment.test.ts`) asserted `[ONE, SIX, TWO, …]` —
+   it encoded the bug, which is why nothing caught it.
+2. **No degradation asserted that it changed its input.**
+   `measurePublicBenchmark` skipped a script only when `apply` returned `null`.
+   A recipe that silently no-opped scored a script against an identical copy of
+   itself, and the resulting EXACT TIE was counted as a legitimate observation
+   worth 0.5 — the one value indistinguishable from "the engine read this pair
+   and could not separate it".
+3. **`shuffleDropDegrade` — byte-for-byte the AUC-24 recipe — split scenes on
+   `INT.`/`EXT.` only** (`/^(?=INT\.|EXT\.)/mi`), so `EST.`, `I/E.`,
+   `INT./EXT.` and Fountain forced `.HEADING` lines were invisible to it. On a
+   synthetic mixed-heading script the three segmenters then in play saw 2, 4 and
+   5 scenes (harness, rebuild-experiment-lib, doctor) and the degradation was a
+   **no-op**. On the 32 committed scripts all three agreed, so the defect was
+   latent here; the AUC-24 corpus is real screenplays and uses all four forms.
+
+### 11.2 What was built
+
+* **One segmenter**, `scripts/lib/scene-segments.ts`, whose grammar is not a
+  fourth opinion: it reads the doctor's own `scene_heading` classification off
+  `src/lib/fountain.ts`'s `parseFountain`. Its slices are verbatim, so
+  `head + scenes.join('') === text` and every surviving scene is byte-identical
+  to its source. `tests/core/scene-segments.test.ts` asserts it agrees with
+  `analyzeFountainText(...).sceneCount` on **all 32 committed scripts** and on a
+  synthetic script using every heading form the parser recognises — and asserts
+  that the old `INT.`/`EXT.`-only split UNDERCOUNTS that script, so the change
+  cannot be cosmetic. `scripts/lib/auc.ts` and
+  `scripts/lib/rebuild-experiment-lib.mjs` both use it; neither carries a
+  heading regex any more.
+* **Assertions at every point a degradation becomes an observation.**
+  `assertDegradationChangedText` (a no-op is an error, never a tie) and
+  `assertFinalSceneIsFirst` (the final scene IS first, and the scene count is
+  unchanged) live in `scripts/lib/auc.ts` and are applied by
+  `scripts/lib/public-benchmark.ts`'s three `apply` functions,
+  `scripts/lock-auc24.mjs`, and `tests/core/real-script-corpus.test.ts`. The
+  recipes themselves stay total pure functions, because
+  `tests/core/auc.test.ts`'s byte-for-byte oracle depends on that.
+* **`CLIMAX_RELOCATE` now relocates to position one**, as documented.
+
+### 11.3 Every number that moved
+
+Measured with `npm run benchmark:public` on this tree, before and after, N=32,
+2000-resample bootstrap at seed 42 both times.
+
+| | statistic | 2026-09-06 | 2026-09-12 | floor before | floor after |
+|---|---|---|---|---|---|
+| `SHUFFLE_DROP` | matched-pair (PRIMARY) | 0.5313 | **0.5313** | 0.5113 | 0.5113 |
+| `SHUFFLE_DROP` | all-pairs | 0.5586 | **0.5586** | 0.5386 | 0.5386 |
+| `CLIMAX_RELOCATE` | matched-pair (PRIMARY) | 0.4219 | **0.4063** | 0.4019 | **0.3863** |
+| `CLIMAX_RELOCATE` | all-pairs | 0.4673 | **0.4443** | 0.4473 | **0.4243** |
+| `DIALOGUE_FLATTEN` (control) | matched-pair | 1.0000 | **1.0000** | 0.98 | 0.98 |
+| `DIALOGUE_FLATTEN` (control) | all-pairs | 0.9473 | **0.9473** | 0.9273 | 0.9273 |
+
+| `CLIMAX_RELOCATE`, other statistics | 2026-09-06 | 2026-09-12 |
+|---|---|---|
+| 95% CI, matched-pair | [0.2813, 0.5625] | [0.2656, 0.5469] |
+| 95% CI, all-pairs | [0.4014, 0.5264] | [0.3662, 0.5112] |
+| ordered / inverted / tied | 8 / 13 / 11 | 8 / 14 / **10** |
+| mean health gap (intact − degraded) | −1.46 | **−1.23** |
+| scripts pinned at health 76.0 | 10 | 10 (unchanged) |
+| ties that are pinned scripts | 10 of 11 | **9 of 10** |
+
+**Why `SHUFFLE_DROP` did not move at all.** The new segmentation produces
+**byte-identical output on all 32 scripts** (measured: 0 of 32 differ) because
+every heading in this corpus is a plain `INT.`/`EXT.` at column 0. That is the
+evidence the segmenter change is the narrow one claimed rather than a rewrite of
+the degradation: the channel whose recipe changed and whose text did not, did
+not move.
+
+**Why `CLIMAX_RELOCATE` moved.** Two contributions, measured separately before
+the re-lock:
+
+| variant | matched-pair | all-pairs | ordered/inverted/tied |
+|---|---|---|---|
+| old (line-join reassembly, position two) | 0.4219 | 0.4673 | 8 / 13 / 11 |
+| new segmenter + reassembly, still position two | 0.4375 | 0.4736 | 9 / 13 / 10 |
+| new segmenter + **position one** (shipped) | **0.4063** | **0.4443** | 8 / 14 / 10 |
+
+So the lossless reassembly alone would have RAISED both statistics (+0.0156 /
++0.0063); correcting the position then lowered them past where they started
+(−0.0156 / −0.0230 net against 2026-09-06). **The corrected manipulation is the
+stronger one and the engine reads it slightly worse** — inverted pairs 13 → 14
+of 32 — which is the direction an order-blind score predicts. It is not evidence
+of a regression; it is a more honest reading of the same engine.
+
+### 11.4 Receipt-style note: the score did not move, the instrument did
+
+This is the statement a reader of the floor diff needs, and it is checkable three
+ways rather than asserted:
+
+* **No scoring-path file was touched.**
+  `node scripts/check-scoring-receipt.mjs 59bbaf55..HEAD` ends with
+  *"no scoring-path files changed. OK."* — so no measurement receipt is required
+  or implied, and none was added to `MEASUREMENT_RECEIPTS.md` as though a scoring
+  change had been measured.
+* **Doctor output identity is 45/45 byte-identical.**
+  `scripts/check-doctor-output-identity.mjs --compare` over the full fixture set
+  (20 `data/screenplays` + 20 calibration samples + the P0 sample + the
+  nonlinear/synthetic fixtures) against a `git archive 59bbaf55` baseline:
+  *"OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt
+  excluded)."*
+* **The 32-row manifest re-locked to its previous bytes.**
+  `npm run benchmark:public -- --lock` produced **no diff** in
+  `tests/fixtures/public-corpus-manifest.json` or
+  `tests/fixtures/public-benchmark-split.json` — every intact `sceneCount`,
+  `words`, `health` and `verdict` is exactly what it was. Only two of the six
+  floor constants in `scripts/lib/auc.ts` changed.
+
+**Which direction, and by how much:** the two ORDER floors fell, by **0.0156**
+(matched-pair, 0.4019 → 0.3863) and **0.0230** (all-pairs, 0.4473 → 0.4243),
+because the **degradation got STRONGER**, not because the score got worse. The
+four other floors are unchanged. A floor that falls is the one movement this
+machinery is most easily defeated by, so the decomposition in §11.3 exists to
+show exactly which edit moved which number.
+
+### 11.5 What this does to the AUC-24 lock
+
+`shuffleDropDegrade` is byte-for-byte the AUC-24 recipe, so changing its
+segmenter changes what `npm run lock-auc24` will measure on the owner's corpus.
+
+* **Nothing was invalidated.** `tests/fixtures/auc24-table.json` has never
+  existed — the table has not been locked even once (§ this document's §9 gate
+  row, and `scripts/report-unverified-gates.mjs`'s `expires: 2026-10-01`).
+* **The last recorded AUC-24, 0.731, was measured on the OLD recipe**
+  (2026-07-11, `MEASUREMENT_RECEIPTS.md` §2.1). The owner's lock must run on the
+  new one, and **its number is the first AUC-24 figure this segmentation has ever
+  produced — it is not comparable to 0.731.**
+* **`AUC24_FLOOR` is deliberately untouched at 0.622.** Moving a floor is a
+  measurement's job.
+* `AUC24_DEGRADATION_ID` is bumped to `shuffle-drop/v2`, so an old-recipe table
+  can never be silently compared to a new measurement.
+
+The same four statements are in `scripts/lib/auc.ts`'s header, `CLAUDE.md`'s
+"Which floor, exactly" section, and `docs/brain/Gates/Gate - AUC-24 Ratchet.md`.

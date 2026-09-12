@@ -1,7 +1,7 @@
 ---
 type: gate
-updated: 2026-09-05
-sources: [CLAUDE.md, tests/core/real-script-corpus.test.ts, tests/core/auc24-table.test.ts, scripts/lib/auc.ts, tests/fixtures/real-corpus-manifest.json]
+updated: 2026-09-12
+sources: [CLAUDE.md, tests/core/real-script-corpus.test.ts, tests/core/auc24-table.test.ts, scripts/lib/auc.ts, scripts/lib/scene-segments.ts, tests/fixtures/real-corpus-manifest.json]
 status: active
 ---
 
@@ -22,6 +22,32 @@ table of 24 intact/degraded health pairs (`tests/fixtures/auc24-table.json`)
 owner's machine). Both the floor value and the degradation recipe live in
 `scripts/lib/auc.ts` — edit the constant there, never a literal in a test.
 
+**THE RECIPE'S SCENE SEGMENTATION CHANGED ON 2026-09-12, AND THE 0.731 WAS
+MEASURED ON THE OLD ONE.** `shuffleDropDegrade` split scenes on
+`/^(?=INT\.|EXT\.)/mi` until then, so `EST.`, `I/E.`, `INT./EXT.` and Fountain
+forced `.HEADING` lines were invisible to it — all four are standard and this
+corpus is real screenplays, which use them. Every such script contributed a
+weaker degradation, or none: on a mixed-heading script the recipe returned its
+input unchanged, and that no-op went into the AUC as an exact tie worth 0.5
+([[Audit - 2026-09-12 Adversarial Review]] finding 12). It now segments with the
+doctor's own heading grammar (`scripts/lib/scene-segments.ts`), and a no-op is an
+error rather than a tie. Consequences:
+
+* **Nothing was invalidated**, because `tests/fixtures/auc24-table.json` has
+  never existed — the table has not been locked even once.
+* **The owner's `npm run lock-auc24` must run on the NEW recipe.** Its number
+  will be the first AUC-24 figure this segmentation has ever produced. **Do not
+  compare it to 0.731**, which is a different recipe's measurement.
+* **`AUC24_FLOOR` is untouched at 0.622.** Moving a floor is a measurement's
+  job, and a recipe that degrades strictly more aggressively is exactly where a
+  guessed floor would be a guess wearing a gate's clothes.
+* `AUC24_DEGRADATION_ID` is bumped to `shuffle-drop/v2`, so an old-recipe table
+  can never be compared to a new measurement —
+  `tests/core/auc24-table.test.ts` refuses it.
+* On the 32 committed scripts of [[Gate - Public Benchmark]] the new
+  segmentation produces byte-identical output (0 of 32 differ), which is why
+  neither shuffle-drop floor there moved.
+
 **Command:** `REAL_SCRIPT_CORPUS_DIR=<corpus> npm test` (live);
 `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run lock-auc24` (produces the
 committed table); `npm test` alone runs the table-based assertion once
@@ -34,7 +60,9 @@ tracked by [[Gate - Receipt Gate]]'s reporting sibling,
 `expires: 2026-10-01`, blocking after that date — see
 [[Decision 5 - Every Reported Unverified Gate Gets an Expiry]]).
 
-**What it cannot catch:** this is **not** the same statistic as the 761-script
+**What it cannot catch:** a no-op degradation used to be invisible here and is
+not any more, but the floor's VALUE is still unverifiable in CI. Also: this is
+**not** the same statistic as the 761-script
 P1 baseline (SCENE_SHUFFLE 0.734, MIDPOINT_DROP 0.766, separately, against a
 ≥0.80 gate on a 153-script test partition) — different corpus, different
 degradation, different denominator; see
