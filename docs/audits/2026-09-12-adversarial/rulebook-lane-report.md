@@ -361,3 +361,83 @@ No browser battery (no browser-facing surface touched this round either).
 Final round-2 tip: `d43022fe10c5950b4fea205219be82fa38042e59`, confirmed
 identical on `origin/lane/rulebook-and-guard-bound`
 (`git ls-remote origin lane/rulebook-and-guard-bound`), worktree clean.
+
+## Round 3
+
+**Verdict addressed: REVISE, one item** (plus one non-blocking header
+correction requested alongside it). Review:
+`docs/audits/2026-09-12-adversarial/rulebook-review.md` "## Round 2"
+(committed on `main`). The round-2 BLOCKER was confirmed discharged: the
+reviewer independently measured three shapes at weight ≈675,000
+(few-big cast=44: 6.9-7.5s; a 100×66-word mid shape: 9.0-9.9s; uniform-min
+N=150, the maximum: 13.4-15.2s), confirmed N=151 REJECTED, confirmed all
+62 bound-rejections unchanged and bypass B's margin at 2.844x, and
+confirmed identity 45/45 with `GIT_SHA` pinned. Rebased tip before round
+3: `df5cde59` (on `main`, patch identical to round 2's `d43022fe`).
+Round-3 tip: `547d630b`.
+
+**Item 9 (BLOCKER) — the `ms < 20_000` form was the exact one this repo
+already retired for flaking.** `tests/core/doctor-analysis-budget.test.ts`'s
+own header records the history: a wall-clock assertion on an 8.5s-standalone
+fixture tripped at 18,512ms and 21,624ms under a parallel `npm test` — a
+2.5x load inflation. This lane's N=150 fixture costs 13.4-15.2s standalone
+on the reviewer's box (12.1-14.3s on this lane's own box across two
+rounds), so the same inflation clears any wall-only ceiling this test could
+set, and 20,000ms was additionally looser than the 15s design target via a
+bare literal decoupled from `DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS`.
+
+Fixed by using that file's own two-part form verbatim: CPU time
+(`process.cpuUsage`, immune to a busy box since `npm test` runs each file
+in its own process) asserted under HALF the budget — the exact quantity
+the bound's 2x-headroom design target is about — and wall clock asserted
+under the FULL budget, both derived from `DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS`
+rather than a literal. Verified this form actually catches what it claims
+to (LANE_STANDARD §3, fail-first): at round 1's admitted worst case
+(N=223, the 223-speaker document round 1 wrongly accepted), measured CPU
+is **29,034ms** — comfortably over the new 15,000ms half-budget assertion
+— while N=150 (this bound) passes both parts cleanly.
+
+**Item 10 (non-blocking, requested alongside item 9) — header item (b)'s
+cross-shape comparator didn't reproduce and its conclusion was right for
+the wrong reason.** The comment cited "probe-cast cast=45, weight
+681,750" converging with the uniform-min cost at that weight. On the
+COMMITTED generator (`tests/security/…:2963`'s `buildProbeCastFeature`),
+cast 45 weighs **686,340** and is itself REJECTED by this very bound — not
+a document the guard admits, so citing it proved nothing about what the
+bound lets through. Measured the real largest-admitted few-big comparator
+(cast 44, weight 672,408): 6.9-7.5s (reproduced on this lane's own box:
+6,864-6,963ms). The true spread at this weight is **~1.9x** (6.9-7.5s vs
+13.4-15.2s), WIDER than the 1.7x the round-1 reviewer measured at 1.5M —
+the opposite of the deleted "converge" claim. Replaced the comparator and
+its numbers, and removed the false convergence conclusion: the bound is
+safe because it is derived directly from the worst-case shape, not because
+shapes converge at a lower weight.
+
+**Item 12 (non-blocking, one-line, rides along)** — "the framing below is
+corrected to say so" was wrong twice: the `MAX_FOUNTAIN_FREQUENT_CUE_LINES`
+comment it referred to is ABOVE this bound's comment, not below, and it
+was never edited. Restated accurately: the contradiction is gone because
+this bound's VALUE was lowered to something the existing framing is true
+of, not because the neighbouring comment changed. Item 11 (a one-line note
+that the suite now carries a real ~14-20s cost) and item 8 (one more copy
+of `dsWrapped`) were left as the reviewer's own verdict already accepted
+them — not part of this round's two named items, and the reviewer
+explicitly called both "non-blocking" / "declined, reasonably".
+
+**Gates, round 3 (foreground, exit codes):**
+
+| Gate | Result |
+|---|---|
+| `tests/security/fountain-shape-guard-cue-parity.test.ts` | 657/657 pass, exit 0 |
+| `node scripts/check-scoring-receipt.mjs 9cd1805c..HEAD` | "no scoring-path files changed. OK." exit 0 |
+| Output identity, `GIT_SHA` pinned equal, no `--ignore-keys` | "OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded)." exit 0 |
+| `npx tsc --noEmit` (lint) | 0 errors, exit 0 |
+| `npm run check-no-console` | "305 file(s) ... OK." exit 0 |
+| `npm run check-docs` | "No AI writing patterns detected." exit 0 |
+| `npm run honesty-audit` | "scanned 459 files ... clean." exit 0 |
+| `npm run check-brain` / `npm run brain` | "OK. 105 notes, 383 links, graph is fresh." exit 0, no diff produced (no brain notes touched this round) |
+
+No full `npm test` this round per the coordinator (merge gates run
+separately). Final round-3 tip: `547d630bb2dad834b43b6624b3c24e8e446cc4d9`,
+confirmed identical on `origin/lane/rulebook-and-guard-bound`, worktree
+clean.
