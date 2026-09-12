@@ -210,10 +210,26 @@ describe('the reference bounds are stated once per page, not twice', () => {
       const tierBlock = doc.slice(0, tierEnd);
       assert.equal(tierBlock.split(referenceBoundsLine()).length - 1, 1,
         `${label}: the tier states the bounds once`);
-      // Twice in the whole document: the tier, and the how-to-read caveat. The
-      // committed goldens carried it THREE times before this round.
-      assert.equal(doc.split(referenceBoundsLine()).length - 1, 2,
-        `${label}: the whole letter states the bounds exactly twice`);
+      // Twice in the letter's PROSE: the tier, and the how-to-read caveat. The
+      // committed goldens carried it three times before the 2026-09-11 round.
+      //
+      // 2026-09-12: the verify footer adds a third occurrence, and it is NOT a
+      // third statement of the fact — it is the `Reference bounds:` CLAIM ROW
+      // (server/lib/artifact-claims.ts), the machine-readable value a verifier
+      // reads back and recomputes. The claim block exists to restate every value
+      // the document states; the render-a-fact-once rule is about the prose a
+      // producer reads. So the count is asserted separately on each side of the
+      // footer boundary, which still fails if a third PROSE copy appears.
+      const footerStart = doc.indexOf('Script-text hash (SHA-256):');
+      assert.ok(footerStart > 0, `${label}: the letter must carry its verify footer`);
+      const prose = doc.slice(0, footerStart);
+      const footer = doc.slice(footerStart);
+      assert.equal(prose.split(referenceBoundsLine()).length - 1, 2,
+        `${label}: the letter's prose states the bounds exactly twice`);
+      assert.equal(footer.split(referenceBoundsLine()).length - 1, 1,
+        `${label}: the verify block publishes the bounds exactly once, as a claim`);
+      assert.match(footer, new RegExp(`^Reference bounds: ${referenceBoundsLine()}$`, 'm'),
+        `${label}: the footer occurrence is the claim row, not prose`);
     }
   });
 });

@@ -330,6 +330,21 @@ export default function VerifyReport() {
               If either differs but the content and score still match, that&rsquo;s reported separately
               below as an engine-version notice, not a failed verification.
             </p>
+            {/* 2026-09-12 (BUG-1): this form checks the values a recipient types in, and
+                nothing else — it never sees the document. The reader summary page at the
+                top of an exported report states more than these fields: a scene count, a
+                word count, a page estimate, a priorities count, a percentile reading, the
+                reference bounds and a page number per finding. The offline command reads
+                the whole file and checks all of them, plus the page against its own verify
+                block. Saying so here is the alternative to a form that silently checks
+                less than the tool can. */}
+            <p className="sm-slug">
+              This form checks the values you type in. The reader summary page of an exported
+              report also states a scene count, a word count, a page estimate, a priorities
+              count, a percentile reading, the reference bounds and a page number per finding
+              &mdash; <code>npm run verify-report</code> reads the whole file and checks those
+              too, against the report&rsquo;s own verify block.
+            </p>
           </div>
         </section>
 
