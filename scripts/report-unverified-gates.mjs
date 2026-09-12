@@ -2,17 +2,21 @@
 // Reports which verification gates did NOT actually run — and blocks once a
 // reported gap has been open past its expiry.
 //
-// ── RUNTIME (2026-09-06 round 2, stated because it changed) ────────────────
-// This script used to be instant: it stat()ed a few files and printed. It now
-// also RUNS each VERIFIED gate's suite and reads the exit code (see the
-// VERIFIED_GATES block below for why a row that claims "this was measured"
-// has to check the measurement). That makes `npm run gates` cost about
-// 5.8-6.4s on this machine — measured over three consecutive runs — instead
-// of a fraction of a second, essentially all of it
-// tests/core/public-benchmark.test.ts's 128 doctor runs and three bootstraps.
-// The CI step is `if: always()` and unchanged otherwise; the cost is flagged
-// here rather than left for someone to discover in a build-time graph, and it
-// scales with however many verified gates get added later.
+// ── RUNTIME (2026-09-12, stated because it changed AGAIN) ──────────────────
+// This script used to be instant: it stat()ed a few files and printed. On
+// 2026-09-06 it began RUNNING each VERIFIED gate's suite and reading the exit
+// code, which cost 5.8-6.4s (measured then, three consecutive runs; 4.9-5.1s
+// on the 2026-09-12 sandbox). As of 2026-09-12 it runs each verified suite
+// TWICE — once as itself, once with one floor constant raised above its
+// measured value, requiring the second run to FAIL on that floor (adversarial
+// review finding 7: exit 0 does not distinguish a live assertion from a gutted
+// one). So `npm run gates` now costs about 9.9-10.3s — measured over three
+// consecutive runs on the 2026-09-12 sandbox, against 4.9-5.1s for the
+// single-run version on the same machine — essentially all of it
+// tests/core/public-benchmark.test.ts's 128 doctor runs and three bootstraps,
+// paid twice. The CI step is `if: always()` and unchanged otherwise; the cost
+// is flagged here rather than left for someone to discover in a build-time
+// graph, and it scales with however many verified gates get added later.
 //
 // WHY THIS EXISTS. `npm test` reporting "0 failures" reads as "everything is
 // verified." It is not. Several suites skip silently when their input is
@@ -60,11 +64,14 @@
 // missing.
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/** The in-memory floor-raising hook the mutation check loads. See its header. */
+const RAISE_FLOOR_HOOK = path.join(REPO_ROOT, 'scripts/lib/raise-auc-floor-hook.mjs');
 
 /**
  * One verification gate. Exactly one of `env`/`file` says what makes it run;
@@ -186,13 +193,17 @@ export const GATES = [
  * above — it reports that a gate RAN, not that one didn't — so it is rendered
  * in its own section rather than smuggled into a report about gaps.
  *
- * A verified gate is CHECKED, not asserted, and — since 2026-09-06 round 2 —
- * checked on all three of the things that have to be true for the row to be
- * honest:
+ * A verified gate is CHECKED, not asserted, and — since 2026-09-12 — checked
+ * on all FIVE of the things that have to be true for the row to be honest:
  *
  *   1. its INPUT exists (the fixture the suite measures against),
- *   2. its SUITE exists, and
- *   3. its suite PASSES — this script runs it and reads the exit code.
+ *   2. its SUITE exists,
+ *   3. its suite PASSES — this script runs it and reads the exit code,
+ *   4. its suite REPORTS every floor it claims to guard, with a measured value
+ *      at or above each — parsed out of the suite's own stdout, and
+ *   5. its floor assertions are LIVE — the suite is run a second time with one
+ *      floor constant raised above its measured value and must FAIL on that
+ *      constant by name.
  *
  * (1) alone was the round-1 shape and it was not enough. The independent
  * review deleted `tests/core/public-benchmark.test.ts` and ran `npm run
@@ -202,11 +213,47 @@ export const GATES = [
  * likelier deletion of the two — a fixture reads as load-bearing, a test file
  * reads as something you can comment out when it is in the way.
  *
- * Running the suite costs ~4.6s and is the only check that survives "the file
- * is still there but its assertions were gutted". It is worth it here because
- * this section makes a positive claim; the rest of the file only reports gaps.
+ * (3) WAS CLAIMED TO CLOSE THE REST AND DID NOT. This block used to say
+ * running the suite "is the only check that survives 'the file is still there
+ * but its assertions were gutted'". The 2026-09-12 adversarial review
+ * (docs/audits/2026-09-12-adversarial/engine-logic.md finding 7) falsified that
+ * sentence by doing it: it replaced the suite with one that keeps the filename,
+ * keeps every `describe`/`it` title, runs the real 32-script measurement, and
+ * asserts `Number.isFinite(d.aucPaired)` instead of `d.aucPaired >= floor`.
+ * `node scripts/report-unverified-gates.mjs` printed
+ * `[RAN] tests/core/public-benchmark.test.ts` and exited 0, with
+ * `scripts/lib/auc.ts` untouched so the diff looked innocent. An exit code
+ * cannot tell "asserted and held" from "asserted nothing".
  *
- * The runner is injectable so the tests can drive all four outcomes without
+ * (4) and (5) are the finding's own two mechanisms, both corpus-free, and they
+ * are complementary rather than alternative:
+ *
+ *   * (4) catches a suite that stopped REPORTING what it guards. It reads the
+ *     `FLOOR <CONSTANT> measured=… floor=… verdict=…` lines the suite prints
+ *     and requires one per `PUBLIC_*_FLOOR` constant found in
+ *     `scripts/lib/auc.ts` — the source of truth, so a suite cannot shorten the
+ *     list it is checked against. A gutted suite that kept the print passes
+ *     this one, which is exactly why (5) exists.
+ *   * (5) catches a suite that stopped ASSERTING. It is the genuine liveness
+ *     check: `scripts/lib/raise-auc-floor-hook.mjs` presents `auc.ts` to a
+ *     second child process with one floor raised (in memory — never on disk;
+ *     see that file's header), and the run must produce
+ *     `not ok … clears <CONSTANT> = <raised>`. A non-zero exit is NOT accepted
+ *     as proof, because under the hook the suite's on-disk-vs-imported shape
+ *     assertions fail too; only an assertion that compares the measurement to
+ *     that constant can name it in a failure.
+ *
+ * WHICH CONSTANT GETS RAISED is decided deterministically and from the SOURCE,
+ * never from the suite's output: the first `PUBLIC_*_FLOOR` in `auc.ts`'s own
+ * textual order whose reported measurement leaves room to raise it. Today that
+ * is `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR`, the PRIMARY paired floor of the first
+ * degradation — see `chooseFloorToRaise`.
+ *
+ * Running the suite twice costs about 9.9-10.3s in total (see the RUNTIME note
+ * at the top of this file). It is worth it here because this section makes a
+ * positive claim; the rest of the file only reports gaps.
+ *
+ * The runner is injectable so the tests can drive every outcome without
  * spawning anything.
  *
  * @typedef {object} VerifiedGate
@@ -215,6 +262,15 @@ export const GATES = [
  * @property {string} command    how a reader reproduces the number outside CI.
  * @property {string} proves     what actually gets checked on every run.
  * @property {string} doesNotProve  the claim a reader might wrongly take from it.
+ * @property {string} [floorSource]  repo-relative module whose `export const <NAME>_FLOOR = <number>;`
+ *   lines are the floors this gate's suite must report and assert. Present means checks (4) and (5)
+ *   apply; absent means the row is only checked three ways, and the gate list's test requires the
+ *   public-benchmark row to carry it.
+ * @property {string} [floorPrefix]  only floors whose identifier starts with this are this gate's.
+ *   `scripts/lib/auc.ts` also holds `AUC24_FLOOR`, which belongs to a suite that SKIPS in CI for
+ *   want of the local-only corpus — it is the gap the UNVERIFIED section above reports by name, and
+ *   requiring the always-on public benchmark to report it would make this row claim the AUC-24
+ *   ratchet is verified here. It is not, and no prefix-less list may imply otherwise.
  */
 
 /** @type {VerifiedGate[]} */
@@ -222,6 +278,8 @@ export const VERIFIED_GATES = [
   {
     suite: 'tests/core/public-benchmark.test.ts',
     file: 'tests/fixtures/public-corpus-manifest.json',
+    floorSource: 'scripts/lib/auc.ts',
+    floorPrefix: 'PUBLIC_',
     command: 'npm run benchmark:public',
     proves:
       'Degradation discrimination on the 32 DISTRIBUTABLE screenplays (20 CC0 in '
@@ -245,7 +303,11 @@ export const VERIFIED_GATES = [
       + 'ships a deduction built for that exact manipulation. Floors are those values minus a '
       + '0.02 margin, so the engine cannot get WORSE unnoticed. They are the current truth, not '
       + 'a target. The split is reported, NOT used for held-out evaluation: the floors were '
-      + 'locked from all 32 scripts, holdout included.',
+      + 'locked from all 32 scripts, holdout included.\n'
+      + '     AND NOT that the floors are WELL CHOSEN. Checks (4) and (5) prove the suite reports '
+      + 'and actually asserts every floor in scripts/lib/auc.ts — not that any floor is at a '
+      + 'defensible value. A floor re-locked downward after an unintended regression still passes '
+      + 'every check here; reading the `auc.ts` diff is still the reviewer\'s job.',
   },
 ];
 
@@ -338,34 +400,225 @@ export function render({ skipped, ran, expired }) {
 }
 
 /**
- * Actually run a verified gate's suite and report whether it passed. The
- * default runner; injectable via `opts.runSuite` so tests need not spawn.
+ * Actually run a verified gate's suite, capturing its output so the floor
+ * report can be parsed out of it. The default runner; injectable via
+ * `opts.runSuite` so tests need not spawn.
+ *
+ * `raise` makes this the MUTATION run: the child loads
+ * scripts/lib/raise-auc-floor-hook.mjs, which rewrites one floor constant in
+ * memory as scripts/lib/auc.ts is imported. Nothing on disk changes — see that
+ * file's header for why that matters.
  *
  * @param {string} suitePath absolute path to the suite file
- * @returns {boolean} true iff the suite exited 0
+ * @param {{ raise?: { constant: string, value: number } }} [opts]
+ * @returns {{ ok: boolean, output: string }} exit status and stdout+stderr
  */
-export function runSuiteDefault(suitePath) {
-  const result = spawnSync(process.execPath, ['--experimental-strip-types', suitePath], {
+export function runSuiteDefault(suitePath, { raise } = {}) {
+  const args = ['--experimental-strip-types'];
+  const env = { ...process.env };
+  if (raise) {
+    args.push('--import', pathToFileURL(RAISE_FLOOR_HOOK).href);
+    env.AUC_FLOOR_MUTATION_CONSTANT = raise.constant;
+    env.AUC_FLOOR_MUTATION_VALUE = String(raise.value);
+  }
+  args.push(suitePath);
+  const result = spawnSync(process.execPath, args, {
     encoding: 'utf8',
-    stdio: 'ignore',
     timeout: 300_000,
+    cwd: REPO_ROOT,
+    env,
   });
-  return result.status === 0;
+  return { ok: result.status === 0, output: `${result.stdout ?? ''}${result.stderr ?? ''}` };
 }
 
-/** The four states a verified row can be in. Only `ran` is a claim. */
-export const VERIFIED_STATES = ['ran', 'missing-input', 'missing-suite', 'failing'];
+/** The six states a verified row can be in. Only `ran` is a claim. */
+export const VERIFIED_STATES = [
+  'ran', 'missing-input', 'missing-suite', 'failing', 'unreported-floors', 'mutation-survived',
+];
+
+/**
+ * Every `export const <NAME>_FLOOR = <number>;` in a floor module, in the
+ * file's own textual order. The SOURCE of the list a suite is checked against —
+ * read here rather than taken from the suite's output, so a suite cannot
+ * shorten the list of floors it is held to by printing fewer lines.
+ *
+ * The shape is the same single-line shape
+ * `npm run benchmark:public -- --lock` rewrites and
+ * tests/core/public-benchmark.test.ts already asserts, so a refactor that
+ * breaks one breaks both rather than quietly narrowing this check.
+ *
+ * @param {string} source
+ * @returns {{ constant: string, value: number }[]}
+ */
+export function parseFloorConstants(source, prefix = '') {
+  const out = [];
+  const re = /^export const ([A-Z][A-Z0-9_]*_FLOOR) = (-?[0-9.]+);$/gm;
+  for (let m = re.exec(source); m !== null; m = re.exec(source)) {
+    if (!m[1].startsWith(prefix)) continue;
+    out.push({ constant: m[1], value: Number(m[2]) });
+  }
+  return out;
+}
+
+/**
+ * The `FLOOR <CONSTANT> measured=<n> floor=<n> verdict=<PASS|FAIL>` lines a
+ * verified suite prints. One entry per match, in output order.
+ *
+ * @param {string} output
+ * @returns {{ constant: string, measured: number, floor: number, verdict: string }[]}
+ */
+export function parseFloorReport(output) {
+  const out = [];
+  const re = /^\s*FLOOR ([A-Z][A-Z0-9_]*) measured=(-?[0-9.]+) floor=(-?[0-9.]+) verdict=(PASS|FAIL)/gm;
+  for (let m = re.exec(output); m !== null; m = re.exec(output)) {
+    out.push({ constant: m[1], measured: Number(m[2]), floor: Number(m[3]), verdict: m[4] });
+  }
+  return out;
+}
+
+/**
+ * Check (4): the suite reported every floor the source declares, at the same
+ * value, with a measurement at or above it.
+ *
+ * @param {{ constant: string, value: number }[]} declared
+ * @param {{ constant: string, measured: number, floor: number, verdict: string }[]} reported
+ * @returns {string[]} one complaint per problem; empty means the report is whole
+ */
+export function floorReportProblems(declared, reported) {
+  const problems = [];
+  if (declared.length === 0) {
+    return ['the floor module declares no `export const <NAME>_FLOOR = <number>;` line at all'];
+  }
+  for (const { constant, value } of declared) {
+    const rows = reported.filter((r) => r.constant === constant);
+    if (rows.length === 0) {
+      problems.push(`${constant}: the suite printed no FLOOR line for it`);
+      continue;
+    }
+    if (rows.length > 1) {
+      problems.push(`${constant}: the suite printed ${rows.length} FLOOR lines for it`);
+      continue;
+    }
+    const [row] = rows;
+    if (row.floor !== value) {
+      problems.push(`${constant}: suite reported floor=${row.floor}, source says ${value}`);
+    }
+    if (!(row.measured >= row.floor)) {
+      problems.push(`${constant}: reported measured=${row.measured} is below floor=${row.floor}`);
+    }
+    if (row.verdict !== 'PASS') {
+      problems.push(`${constant}: the suite's own verdict for it is ${row.verdict}`);
+    }
+  }
+  return problems;
+}
+
+/** How far above its measured value a floor is raised for the mutation run.
+ *  Large enough that no rounding can leave it at or below the measurement,
+ *  small enough to stay a value somebody could plausibly have typed. */
+export const FLOOR_RAISE_DELTA = 0.05;
+
+/** A raised floor is still clamped below 1, the maximum an AUC can take. */
+const FLOOR_RAISE_CEILING = 0.9999;
+
+/**
+ * Check (5)'s first half: WHICH floor to raise. Deterministic and derived from
+ * the source's own order, not from the suite's output — the first declared
+ * floor whose reported measurement leaves room to raise it above itself. On
+ * scripts/lib/auc.ts that is PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR, the PRIMARY
+ * paired floor of the first degradation.
+ *
+ * A floor whose measurement is already pinned at 1.0000 (the positive control's
+ * matched-pair statistic is) cannot be raised above it inside the range an AUC
+ * can occupy, so it is skipped rather than raised to an impossible value that
+ * a sanity assertion could fail on for the wrong reason.
+ *
+ * @param {{ constant: string, value: number }[]} declared
+ * @param {{ constant: string, measured: number }[]} reported
+ * @returns {{ constant: string, value: number, measured: number } | null}
+ */
+export function chooseFloorToRaise(declared, reported) {
+  for (const { constant } of declared) {
+    const row = reported.find((r) => r.constant === constant);
+    if (!row) continue;
+    const raised = Math.round(Math.min(row.measured + FLOOR_RAISE_DELTA, FLOOR_RAISE_CEILING) * 1e4) / 1e4;
+    if (raised > row.measured) return { constant, value: raised, measured: row.measured };
+  }
+  return null;
+}
+
+/**
+ * Check (5)'s second half: did the mutated run FAIL on that constant, by name?
+ *
+ * A non-zero exit is not enough. Under the hook the suite's imported floors and
+ * the on-disk literals disagree, so its `--lock`-shape assertions fail too; a
+ * gutted suite that kept those assertions would exit non-zero while asserting
+ * nothing about the measurement. The proof is the floor assertion's own title,
+ * which is generated from the constant and the (raised) value.
+ *
+ * @param {string} output  the mutated run's stdout+stderr
+ * @param {{ constant: string, value: number }} raise
+ * @returns {boolean}
+ */
+export function mutationWasCaught(output, raise) {
+  const escaped = `${raise.value}`.replace(/\./g, '\\.');
+  return new RegExp(`not ok [^\\n]*clears ${raise.constant} = ${escaped}`).test(output);
+}
 
 /**
  * @param {VerifiedGate} g
- * @param {{ env?: Record<string, string | undefined>, root?: string, runSuite?: (p: string) => boolean }} [opts]
- * @returns {'ran' | 'missing-input' | 'missing-suite' | 'failing'}
+ * @param {{ env?: Record<string, string | undefined>, root?: string, runSuite?: (p: string, o?: object) => { ok: boolean, output: string } }} [opts]
+ * @returns {{ state: string, detail: string }}
  */
-export function verifiedGateState(g, { env = process.env, root = REPO_ROOT, runSuite = runSuiteDefault } = {}) {
-  if (!gateRan(g, { env, root })) return 'missing-input';
+export function verifiedGateOutcome(g, { env = process.env, root = REPO_ROOT, runSuite = runSuiteDefault } = {}) {
+  if (!gateRan(g, { env, root })) return { state: 'missing-input', detail: g.file };
   const suitePath = path.join(root, g.suite);
-  if (!existsSync(suitePath)) return 'missing-suite';
-  return runSuite(suitePath) ? 'ran' : 'failing';
+  if (!existsSync(suitePath)) return { state: 'missing-suite', detail: g.suite };
+
+  const first = runSuite(suitePath);
+  if (!first.ok) return { state: 'failing', detail: g.suite };
+  if (!g.floorSource) return { state: 'ran', detail: '' };
+
+  let source;
+  try {
+    source = readFileSync(path.join(root, g.floorSource), 'utf8');
+  } catch {
+    return { state: 'unreported-floors', detail: `${g.floorSource} is unreadable, so no floor list exists to check against` };
+  }
+  const declared = parseFloorConstants(source, g.floorPrefix ?? '');
+  const reported = parseFloorReport(first.output);
+  const problems = floorReportProblems(declared, reported);
+  if (problems.length > 0) return { state: 'unreported-floors', detail: problems.join('; ') };
+
+  const raise = chooseFloorToRaise(declared, reported);
+  if (raise === null) {
+    return {
+      state: 'unreported-floors',
+      detail: 'no declared floor has a measurement that can be raised above itself, so the '
+        + 'mutation check has nothing to move',
+    };
+  }
+  const mutated = runSuite(suitePath, { raise: { constant: raise.constant, value: raise.value } });
+  if (!mutationWasCaught(mutated.output, raise)) {
+    return {
+      state: 'mutation-survived',
+      detail: `${raise.constant} was raised from ${raise.measured} (its own measurement) to `
+        + `${raise.value} and the suite did not fail on it`
+        + (mutated.ok ? ' — the mutated run exited 0' : ' — the mutated run failed, but never on that floor'),
+    };
+  }
+  return { state: 'ran', detail: `mutation check: ${raise.constant} raised to ${raise.value} -> suite FAILED, as it must` };
+}
+
+/**
+ * Backwards-compatible view of {@link verifiedGateOutcome} — the state alone.
+ *
+ * @param {VerifiedGate} g
+ * @param {object} [opts]
+ * @returns {string}
+ */
+export function verifiedGateState(g, opts = {}) {
+  return verifiedGateOutcome(g, opts).state;
 }
 
 /** Why each non-`ran` state is not a claim, rendered next to the row. */
@@ -373,24 +626,33 @@ const VERIFIED_STATE_REASON = {
   'missing-input': 'its input file is gone. This row can no longer verify itself.',
   'missing-suite': 'THE SUITE THAT DOES THE MEASURING IS GONE. The row would otherwise still say RAN.',
   failing: 'the suite ran and FAILED. Whatever it protects is not holding right now.',
+  'unreported-floors':
+    'the suite PASSED but did not report every floor it guards, at the value the source declares. '
+    + 'A suite that no longer names its own floors cannot be read as having checked them.',
+  'mutation-survived':
+    'THE SUITE PASSED AND ITS FLOOR ASSERTIONS ARE NOT LIVE. Run a second time with one floor '
+    + 'raised above its own measurement, it did not fail on that floor — so it would also pass '
+    + 'with the floors deleted. This is finding 7 of the 2026-09-12 adversarial review, caught.',
 };
 
 /**
  * Which verified gates can still verify themselves.
  *
  * @param {VerifiedGate[]} [gates]
- * @param {{ env?: Record<string, string | undefined>, root?: string, runSuite?: (p: string) => boolean }} [opts]
- * @returns {{ present: VerifiedGate[], absent: VerifiedGate[], states: Map<VerifiedGate, string>, exitCode: number }}
+ * @param {{ env?: Record<string, string | undefined>, root?: string, runSuite?: (p: string, o?: object) => { ok: boolean, output: string } }} [opts]
+ * @returns {{ present: VerifiedGate[], absent: VerifiedGate[], states: Map<VerifiedGate, string>, details: Map<VerifiedGate, string>, exitCode: number }}
  */
 export function evaluateVerified(gates = VERIFIED_GATES, opts = {}) {
-  const states = new Map(gates.map((g) => [g, verifiedGateState(g, opts)]));
+  const outcomes = new Map(gates.map((g) => [g, verifiedGateOutcome(g, opts)]));
+  const states = new Map(gates.map((g) => [g, outcomes.get(g).state]));
+  const details = new Map(gates.map((g) => [g, outcomes.get(g).detail]));
   const present = gates.filter((g) => states.get(g) === 'ran');
   const absent = gates.filter((g) => states.get(g) !== 'ran');
-  return { present, absent, states, exitCode: absent.length > 0 ? 1 : 0 };
+  return { present, absent, states, details, exitCode: absent.length > 0 ? 1 : 0 };
 }
 
-/** @param {{ present: VerifiedGate[], absent: VerifiedGate[], states?: Map<VerifiedGate, string> }} result */
-export function renderVerified({ present, absent, states }) {
+/** @param {{ present: VerifiedGate[], absent: VerifiedGate[], states?: Map<VerifiedGate, string>, details?: Map<VerifiedGate, string> }} result */
+export function renderVerified({ present, absent, states, details }) {
   if (present.length === 0 && absent.length === 0) return '';
   const lines = [
     '='.repeat(72),
@@ -398,15 +660,21 @@ export function renderVerified({ present, absent, states }) {
     '='.repeat(72),
     'These are the checks the report above is NOT about. Listed so "not mentioned',
     'as a gap" and "actually measured" stop looking the same. Each row is checked',
-    'three ways: its input exists, its suite exists, and its suite passes here.',
+    'five ways: its input exists, its suite exists, its suite passes here, its',
+    'suite REPORTS every floor it guards, and — run again with one floor raised',
+    'above its own measurement — its suite FAILS on that floor. Exit 0 alone was',
+    'satisfied by a suite whose assertions had been replaced by Number.isFinite.',
     '',
   ];
   for (const g of [...present, ...absent]) {
     const state = states?.get(g) ?? (present.includes(g) ? 'ran' : 'missing-input');
+    const detail = details?.get(g) ?? '';
     lines.push(`  [${state === 'ran' ? 'RAN' : 'ABSENT'}] ${g.suite}`);
     if (state !== 'ran') lines.push(`     WHY:       ${VERIFIED_STATE_REASON[state] ?? state}`);
+    if (state !== 'ran' && detail) lines.push(`     DETAIL:    ${detail}`);
     lines.push(`     input:     ${g.file}`);
     lines.push(`     suite:     ${g.suite}${state === 'ran' ? ' — run by this script, exit 0' : ''}`);
+    if (g.floorSource) lines.push(`     floors:    ${g.floorSource}${state === 'ran' && detail ? ` — ${detail}` : ''}`);
     lines.push(`     reproduce: ${g.command}`);
     lines.push(`     proves:    ${g.proves}`);
     lines.push(`     but not:   ${g.doesNotProve}`);
@@ -417,8 +685,9 @@ export function renderVerified({ present, absent, states }) {
       '-'.repeat(72),
       `${absent.length} verified gate(s) can no longer verify themselves. This step is`,
       'failing on purpose: a row claiming something is measured, next to a missing',
-      'input, a missing suite, or a failing one, is the false assurance this whole',
-      'script exists to prevent.',
+      'input, a missing suite, a failing one, one that no longer reports its own',
+      'floors, or one whose floor assertions survive being raised above their own',
+      'measurement, is the false assurance this whole script exists to prevent.',
       '-'.repeat(72),
     );
   }

@@ -218,8 +218,14 @@ re-locks the manifest, the split **and all six floor constants** in
 constant it writes no floor at all and **exits 1**, naming the fixtures it had
 already written. It does NOT rewrite prose, and the suite fails until the
 narrative in `auc.ts` and the numbers in the doc match the run. Note that
-`npm run gates` now runs this benchmark's suite to verify its own claim, so
-that command costs ~6 s rather than being instant. Re-lock only after a scoring change you intended, and read the
+`npm run gates` now runs this benchmark's suite TWICE to verify its own claim —
+once as itself, once with one floor raised above its own measured value,
+requiring that second run to FAIL on that floor by name, because exit 0 alone
+was satisfied by a suite whose assertions had been replaced with
+`Number.isFinite` (2026-09-12 adversarial finding 7) — so that command costs
+~10 s (measured 9.9–10.3 s, against 4.9–5.1 s for the single-run version on the
+same machine) rather than being instant.
+Re-lock only after a scoring change you intended, and read the
 `auc.ts` diff: a re-lock after an unintended regression silently lowers the
 ratchet. Full method, per-script pairs, the control table and the three-branch
 comparison (pinned to SHAs) in

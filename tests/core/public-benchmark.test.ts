@@ -127,6 +127,41 @@ process.stdout.write(
   + '\n',
 );
 
+/**
+ * MACHINE-READABLE FLOOR LIVENESS, one line per floor constant.
+ *
+ * WHY (2026-09-12, adversarial review finding 7). `npm run gates` printed
+ * `[RAN] tests/core/public-benchmark.test.ts` on the strength of this suite
+ * exiting 0 — and a suite whose six floor assertions have been replaced by
+ * `Number.isFinite(...)` also exits 0. The reporter no longer reads only the
+ * exit code: it PARSES these lines (the finding's option (a)) and requires one
+ * per `PUBLIC_*_FLOOR` constant it finds in `scripts/lib/auc.ts`, carrying the
+ * same floor value and a measured value at or above it. Keep the shape
+ * `FLOOR <CONSTANT> measured=<n> floor=<n> verdict=PASS|FAIL primary=yes|no`
+ * on ONE line — `scripts/report-unverified-gates.mjs` matches exactly that, and
+ * `tests/scripts/report-unverified-gates.test.ts` fails if the two drift.
+ *
+ * Reporting a number is not asserting it, and this block alone would be
+ * satisfied by a suite that prints and asserts nothing. The liveness half is
+ * the finding's option (b): the reporter re-runs this suite with one floor
+ * constant raised above its measured value and requires the matching
+ * `not ok … clears <CONSTANT> = <raised>` line. That is why the floor
+ * assertions below build their titles from `floor.constant` and `floor.value`
+ * instead of hardcoding either — the title is the liveness signal.
+ */
+process.stdout.write(
+  '\nFLOOR LIVENESS (parsed by scripts/report-unverified-gates.mjs — one line per floor constant)\n'
+  + PUBLIC_FLOORS
+    .map((floor) => {
+      const d = byId.get(floor.degradation)!;
+      const measured = floor.statistic === 'paired' ? d.aucPaired : d.aucAllPairs;
+      return `  FLOOR ${floor.constant} measured=${measured.toFixed(4)} floor=${floor.value} `
+        + `verdict=${measured >= floor.value ? 'PASS' : 'FAIL'} primary=${floor.primary ? 'yes' : 'no'}`;
+    })
+    .join('\n')
+  + '\n',
+);
+
 describe('public benchmark — the corpus is the one CI can actually read', () => {
   it(`holds exactly ${PUBLIC_CORPUS_SIZE} distributable .fountain files from two declared sets`, () => {
     const scripts = listPublicCorpus();

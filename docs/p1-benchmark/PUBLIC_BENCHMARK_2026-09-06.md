@@ -603,6 +603,24 @@ same cost once (6.09 s): its five separate invocations of the reporter were
 hoisted to one shared call, because six copies of the same string are not worth
 six suite runs.
 
+**`npm run gates` got slower AGAIN on 2026-09-12, for the same kind of reason.**
+The adversarial review's finding 7 showed that running the suite and reading its
+exit code does not survive "the file is still there but its assertions were
+gutted": a suite that keeps every title, runs the real 32-script measurement and
+asserts `Number.isFinite(auc)` exits 0, and the reporter printed `[RAN]` for it.
+The reporter now runs each verified suite **twice** — once as itself, once with
+one floor constant raised above its own measured value (in memory, via
+`scripts/lib/raise-auc-floor-hook.mjs`; never on disk) — and requires the second
+run to fail on that floor *by name*. Measured on the 2026-09-12 sandbox, three
+consecutive runs each: **4.9–5.1 s** before the change, **9.9–10.3 s** after.
+`tests/scripts/report-unverified-gates.test.ts` went from ~6 s to **20.1 s**: one
+hoisted reporter invocation (~10 s) plus two memoised spawns of the committed
+gutted fixture (`tests/fixtures/gate-liveness/gutted-public-benchmark-suite.ts`),
+with the genuine-suite case reading the hoisted output instead of paying for a
+third pair. The numbers in this paragraph and in that script's header are the
+same measurement; the 2026-09-06 cost change above was recorded the same way and
+is kept rather than overwritten.
+
 ---
 
 ## 10. For the scoring lane, not this one: the density term rewards deletion
