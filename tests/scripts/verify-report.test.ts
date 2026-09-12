@@ -286,12 +286,34 @@ describe('scripts/verify-report.mjs — offline CLI', async () => {
       assert.match(stdout, /NOT VERIFIED — claim unreadable: health\./);
     });
 
-    it('letter: "6.5.0" in place of the headline health number -> exit 1, "claim unreadable: health"', () => {
+    // 2026-09-12: the letter now publishes a machine-readable claim block of its
+    // own (`Health: 76.3`, `Scenes: 13`, …), so its HEADLINE is no longer the
+    // claim — it is a second rendering, cross-checked against the block. An
+    // unreadable headline is therefore caught one step EARLIER and more precisely
+    // (the document cannot be compared with itself) rather than as an unreadable
+    // claim. The guarantee the 2026-09-06 finding installed is unchanged and is
+    // asserted directly, at the block, by the case below this one.
+    it('letter: "6.5.0" in place of the headline health number -> exit 1, the unreadable rendering is named', () => {
       const original = readFileSync(letterMdPath, 'utf8');
       const healthMatch = original.match(/Health\s+([\d.]+)\/100/);
       assert.ok(healthMatch, 'sanity: fixture letter must publish a headline Health figure');
       const tampered = original.replace(`Health ${healthMatch![1]}/100`, 'Health 6.5.0/100');
       const tamperedPath = path.join(dir, 'attack-nan-letter.md');
+      writeFileSync(tamperedPath, tampered);
+
+      const { status, stdout } = runCli([tamperedPath, scriptPath]);
+      assert.equal(status, 1, stdout);
+      assert.match(stdout, /the headline health figure does not state a readable health/);
+      assert.doesNotMatch(stdout, /^VERIFIED/m);
+      assert.doesNotMatch(stdout, /NaN/, 'an unreadable figure must be named as unreadable, not printed as NaN');
+    });
+
+    it('letter: "6.5.0" in the CLAIM ROW itself -> exit 1, "claim unreadable: health" (the 2026-09-06 guarantee, at the block)', () => {
+      const original = readFileSync(letterMdPath, 'utf8');
+      const rowMatch = original.match(/^Health: ([\d.]+)$/m);
+      assert.ok(rowMatch, 'sanity: the letter must publish a Health claim row (2026-09-12)');
+      const tampered = original.replace(`Health: ${rowMatch![1]}`, 'Health: 6.5.0');
+      const tamperedPath = path.join(dir, 'attack-nan-letter-row.md');
       writeFileSync(tamperedPath, tampered);
 
       const { status, stdout } = runCli([tamperedPath, scriptPath]);
@@ -395,7 +417,13 @@ describe('scripts/verify-report.mjs — offline CLI', async () => {
       const { status, stdout } = runCli([tamperedPath, scriptPath]);
       assert.equal(status, 1, stdout);
       assert.match(stdout, /authentic: no — the visible report disagrees with its own verify block/);
-      assert.match(stdout, /the summary sentence says health = /);
+      // 2026-09-12: the disagreement is now named against the HEADLINE, because the
+      // letter publishes its own claim row for health and the headline is a second
+      // rendering of it. Before that the headline WAS the claim, so the only other
+      // rendering that could contradict it was the plainSummary sentence. Either
+      // way the forgery fails with the contradicting rendering named — which is
+      // what this case exists to prove.
+      assert.match(stdout, /the headline health figure says health = /);
       assert.doesNotMatch(stdout, /^VERIFIED/m);
     });
   });
