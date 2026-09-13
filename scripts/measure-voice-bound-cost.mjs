@@ -57,7 +57,7 @@
 // USAGE
 //   node --experimental-strip-types scripts/measure-voice-bound-cost.mjs
 //   node --experimental-strip-types scripts/measure-voice-bound-cost.mjs \
-//        --uniform-min=100,120,140 --probe-cast=20,40 --repeats=3 \
+//        --uniform-min=150 --max-admitted=60,80 --probe-cast=20,40 --repeats=3 \
 //        --conditions=idle,loaded --json=tests/fixtures/voice-bound-derivation.json
 //   --json=-  prints the lock file to stdout instead of writing it (how the
 //             runner's table gets out of a CI log and into the repository).
@@ -81,12 +81,14 @@ const REPO_ROOT = path.resolve(path.dirname(HERE), '..');
  *  ensembles the bound must keep accepting (finding 10's own targets, the
  *  largest few-big cast the 2026-09-12 bound admitted at 44, and the 60 it
  *  newly rejected). */
-const DEFAULT_UNIFORM_MIN = [60, 80, 90, 100, 110, 120, 130, 140, 150, 160];
-const DEFAULT_PROBE_CAST = [20, 30, 40, 44, 60];
+const DEFAULT_UNIFORM_MIN = [120, 140, 150, 160];
+const DEFAULT_MAX_ADMITTED = [40, 50, 60, 70, 80, 90, 100, 120];
+const DEFAULT_PROBE_CAST = [20, 30, 40];
 
 function parseArgs(argv) {
   const opts = {
     uniformMin: DEFAULT_UNIFORM_MIN,
+    maxAdmitted: DEFAULT_MAX_ADMITTED,
     probeCast: DEFAULT_PROBE_CAST,
     repeats: 2,
     conditions: ['idle', 'loaded'],
@@ -98,6 +100,7 @@ function parseArgs(argv) {
     const list = () => (rawValue ?? '').split(',').map((v) => Number(v.trim())).filter((n) => Number.isFinite(n) && n > 0);
     switch (key) {
       case 'uniform-min': opts.uniformMin = list(); break;
+      case 'max-admitted': opts.maxAdmitted = list(); break;
       case 'probe-cast': opts.probeCast = list(); break;
       case 'repeats': opts.repeats = Math.max(1, Number(rawValue) || 1); break;
       case 'conditions': opts.conditions = (rawValue ?? '').split(',').map((c) => c.trim()).filter(Boolean); break;
@@ -123,12 +126,19 @@ async function runChildMeasurement(spec) {
   const build = VOICE_BOUND_SHAPES[shape];
   if (!build) throw new Error(`unknown shape "${shape}"`);
   const { runScriptDoctor } = await import('../server/nvm/analyze/doctor.ts');
-  const { fountainShapeRejectionReason, guardEligibleVoiceWordCounts } = await import('../server/lib/validation.ts');
+  const { fountainShapeRejectionReason, realVoiceWordCountsForMeasurement, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT } =
+    await import('../server/lib/validation.ts');
 
-  const text = build(n);
-  const eligible = guardEligibleVoiceWordCounts(text);
-  const pooledWords = [...eligible.values()].reduce((a, b) => a + b, 0);
-  const distinct = eligible.size;
+  // The max-admitted shape is defined RELATIVE to the weight bound (it carries
+  // as many words as that bound still allows at this cast), so the builder is
+  // handed the live constant rather than a copy.
+  const text = build(n, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT);
+  // The guard's OWN counts, from the production path — not a second
+  // implementation, and not the retired legacy view, which disagrees with
+  // production on documents this sweep deliberately builds.
+  const eligible = realVoiceWordCountsForMeasurement(text);
+  const pooledWords = [...eligible.values()].filter((w) => w > 0).reduce((a, b) => a + b, 0);
+  const distinct = [...eligible.values()].filter((w) => w > 0).length;
   const reason = fountainShapeRejectionReason(text);
 
   const cpuStart = process.cpuUsage();
@@ -197,6 +207,7 @@ async function sweep(opts, condition, log) {
   }
   try {
     const specs = [
+      ...opts.maxAdmitted.map((n) => `max-admitted:${n}`),
       ...opts.uniformMin.map((n) => `uniform-min:${n}`),
       ...opts.probeCast.map((n) => `probe-cast:${n}`),
     ];
@@ -284,11 +295,11 @@ async function main() {
     lines.push('');
     const d = deriveCast(byCondition[condition], DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS);
     lines.push(
-      d.derivedN === null
-        ? `Derivation (${condition}): NO swept cast clears ${d.ceilingMs} ms (half-budget less a ${(d.marginFraction * 100).toFixed(0)}% margin) — sweep lower.`
-        : `Derivation (${condition}): largest uniform-min cast whose worst CPU sample stays at or under `
+      d.derivedCast === null
+        ? `Derivation (${condition}): NO swept ${d.shape} cast clears ${d.ceilingMs} ms (half-budget less a ${(d.marginFraction * 100).toFixed(0)}% margin) — sweep lower.`
+        : `Derivation (${condition}): largest ${d.shape} cast whose worst CPU sample stays at or under `
           + `${d.ceilingMs} ms (half-budget ${d.targetMs} ms less a ${(d.marginFraction * 100).toFixed(0)}% margin) is `
-          + `**N = ${d.derivedN}** at ${d.derivedCpuMsMax} ms -> weight **${d.derivedWeight.toLocaleString('en-US')}** (= ${d.derivedN}² x 30).`,
+          + `**${d.derivedCast}** at ${d.derivedCpuMsMax} ms — the value MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT takes.`,
     );
     lines.push('');
   }

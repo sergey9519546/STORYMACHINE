@@ -1875,6 +1875,26 @@ function realVoiceEligibleWeightRejectionReason(text: string, cueLineOccurrences
   return null;
 }
 
+/** MEASUREMENT-ONLY view of the production character -> word map
+ *  (buildRealVoiceWordCounts above), for scripts/measure-voice-bound-cost.mjs
+ *  and the tests that read its table.
+ *
+ *  WHY THIS EXISTS RATHER THAN THE EXPORT NEXT DOOR. The calibration sweep has
+ *  to report the distinct count and pooled word total that the guard ACTUALLY
+ *  decides on, and `guardEligibleVoiceWordCounts` above is the RETIRED legacy
+ *  approximation, kept only so the round-7 equivalence proof has a real
+ *  implementation to compare against. The two disagree on documents the sweep
+ *  deliberately builds — measured 2026-09-13 on a 20-speaker document carrying
+ *  1,686 words each, where the legacy walk reports 600 words per speaker and
+ *  the real parse reports the full count — so a sweep reading the legacy view
+ *  would print weights the guard never computed. Exported from the production
+ *  path, so there is no third copy of this walk anywhere.
+ *
+ *  Not part of any route's behaviour; nothing in server/** calls it. */
+export function realVoiceWordCountsForMeasurement(text: string): Map<string, number> {
+  return buildRealVoiceWordCounts(parseFountain(normalizeScreenplay(text)));
+}
+
 /** z.string().min(1).max(MAX_FOUNTAIN_CHARS) plus the pathological-shape guard
  *  above — shared by every route that hands raw Fountain text to the
  *  analyzer. `min`/`max` mirror the exact bounds each call site used before

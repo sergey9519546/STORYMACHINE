@@ -51,15 +51,67 @@ const DLG_PROBE = 'this is ordinary lowercase dialogue here.';
  * Weight at cast N is exactly N x (N x 30) = 30N².
  */
 export function buildUniformMin(cast: number): string {
+  return buildUniformCast(cast, 30);
+}
+
+/**
+ * The uniform shape at an arbitrary words-per-speaker: `cast` distinct
+ * speakers, each with exactly `wordsPerSpeaker` real words (a multiple of 6,
+ * the paragraph's word count; at least 30, the eligibility floor). Weight is
+ * cast x (cast x wordsPerSpeaker).
+ *
+ * buildUniformMin is this at the floor, and is byte-identical to the generator
+ * the 2026-09-12 derivation used — verified at eleven casts before the two were
+ * merged into one.
+ */
+export function buildUniformCast(cast: number, wordsPerSpeaker: number): string {
+  const paragraphs = Math.round(wordsPerSpeaker / 6);
+  if (paragraphs * 6 !== wordsPerSpeaker) {
+    throw new Error(`wordsPerSpeaker must be a multiple of 6 (the paragraph length), got ${wordsPerSpeaker}`);
+  }
+  if (wordsPerSpeaker < 30) {
+    throw new Error(`wordsPerSpeaker must clear the 30-word eligibility floor, got ${wordsPerSpeaker}`);
+  }
   let t = '', occ = 0, scene = 0;
   while (occ < cast) {
     t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
     for (let i = 0; i < 40 && occ < cast; i++, occ++) {
       t += `CHARACTER${occ}\n\n`;
-      for (let p = 0; p < 5; p++) t += `${DLG_UNIFORM}\n\n`;
+      for (let p = 0; p < paragraphs; p++) t += `${DLG_UNIFORM}\n\n`;
     }
   }
   return t;
+}
+
+/**
+ * The largest words-per-speaker a uniform cast of this size can carry while
+ * still clearing a weight bound — floor(bound / cast²), rounded DOWN to a whole
+ * paragraph, never below the 30-word eligibility floor.
+ */
+export function maxAdmittedWordsPerSpeaker(cast: number, weightBound: number): number {
+  const ceiling = Math.floor(weightBound / (cast * cast));
+  return Math.max(30, Math.floor(ceiling / 6) * 6);
+}
+
+/**
+ * THE WORST SHAPE A WEIGHT BOUND ACTUALLY ADMITS at a given distinct count:
+ * `cast` speakers, each carrying as many words as the bound still allows.
+ *
+ * WHY THIS SHAPE AND NOT uniform-min. A scalar weight bound of W is two
+ * constraints in one, and uniform-min only tests the first. Fixing the cast at
+ * `cast`, the guard admits any per-speaker word count up to W / cast² — at the
+ * 2026-09-12 bound of 675,000 a 60-speaker document may carry 186 words each
+ * (11,160 pooled words), not the 30 that uniform-min gives it. Deriving a cap
+ * on the distinct count from uniform-min would therefore measure a document
+ * three times lighter than the one the pair of bounds lets through, which is
+ * the exact class of mistake round 1 of the 2026-09-12 derivation made in the
+ * other direction (it measured the cheap few-big shape and missed uniform-min).
+ *
+ * Note that this shape degenerates to uniform-min once cast² x 30 reaches the
+ * bound — at that point the weight bound allows nothing above the floor.
+ */
+export function buildMaxAdmitted(cast: number, weightBound: number): string {
+  return buildUniformCast(cast, maxAdmittedWordsPerSpeaker(cast, weightBound));
 }
 
 /** The uniform-min shape's voice-eligible weight at a given cast — the closed
@@ -108,8 +160,14 @@ export function buildProbeCastFeature(cast: number, totalDialogueWords = 15_150)
 /** The two shapes by name, so a calibration run, a workflow argument and a
  *  fixture row all spell them the same way. */
 export const VOICE_BOUND_SHAPES = {
-  'uniform-min': buildUniformMin,
-  'probe-cast': buildProbeCastFeature,
+  /** Every speaker at the 30-word eligibility floor — the shape the 2026-09-12
+   *  derivation used, kept so its numbers stay comparable. */
+  'uniform-min': (cast: number, _weightBound: number) => buildUniformMin(cast),
+  /** Every speaker at the 30-word floor, padded to the heaviest document the
+   *  weight bound still admits at this cast — the real worst case. */
+  'max-admitted': (cast: number, weightBound: number) => buildMaxAdmitted(cast, weightBound),
+  /** A realistic feature-scale ensemble. */
+  'probe-cast': (cast: number, _weightBound: number) => buildProbeCastFeature(cast),
 } as const;
 
 export type VoiceBoundShapeName = keyof typeof VOICE_BOUND_SHAPES;
@@ -148,41 +206,50 @@ export interface VoiceBoundRow {
  */
 export const DERIVATION_MARGIN_FRACTION = 0.15;
 
+/** The shape the cast cap is derived from: the heaviest document the weight
+ *  bound still admits at each cast. See buildMaxAdmitted for why not
+ *  uniform-min. */
+export const DERIVATION_SHAPE: VoiceBoundShapeName = 'max-admitted';
+
 export interface VoiceBoundDerivation {
+  readonly shape: VoiceBoundShapeName;
   readonly targetMs: number;
   readonly ceilingMs: number;
   readonly marginFraction: number;
-  readonly derivedN: number | null;
-  readonly derivedWeight: number | null;
+  /** The largest cast whose worst measured cost clears the ceiling — the value
+   *  MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT takes. */
+  readonly derivedCast: number | null;
   readonly derivedCpuMsMax: number | null;
 }
 
 /**
- * The largest swept uniform-min cast whose WORST observed CPU sample stays at
- * or under (half the analysis budget, less the margin) — and every smaller
- * swept cast must clear it too, so one noisy-low sample above a noisy-high one
- * can never promote a cast. Worst sample, not median: the assertion this bound
- * is answerable to runs once per CI run and fails on a single bad sample.
+ * The largest swept cast of the derivation shape whose WORST observed CPU
+ * sample stays at or under (half the analysis budget, less the margin) — and
+ * every smaller swept cast must clear it too, so one noisy-low sample above a
+ * noisy-high one can never promote a cast. Worst sample, not median: the
+ * assertion this bound is answerable to runs once per CI run and fails on a
+ * single bad sample.
  */
 export function deriveCast(
   rows: readonly VoiceBoundRow[],
   budgetMs: number,
   marginFraction: number = DERIVATION_MARGIN_FRACTION,
+  shape: VoiceBoundShapeName = DERIVATION_SHAPE,
 ): VoiceBoundDerivation {
   const targetMs = budgetMs / 2;
   const ceilingMs = Math.floor(targetMs * (1 - marginFraction));
-  const uniform = rows.filter((r) => r.shape === 'uniform-min').slice().sort((a, b) => a.n - b.n);
+  const swept = rows.filter((r) => r.shape === shape).slice().sort((a, b) => a.n - b.n);
   let derived: VoiceBoundRow | null = null;
-  for (const row of uniform) {
+  for (const row of swept) {
     if (row.cpuMsMax <= ceilingMs) derived = row;
-    else break; // cost is monotone in N by construction — stop at the first failure
+    else break; // cost is monotone in cast for this shape — stop at the first failure
   }
   return {
+    shape,
     targetMs,
     ceilingMs,
     marginFraction,
-    derivedN: derived ? derived.n : null,
-    derivedWeight: derived ? uniformMinWeight(derived.n) : null,
+    derivedCast: derived ? derived.n : null,
     derivedCpuMsMax: derived ? derived.cpuMsMax : null,
   };
 }
