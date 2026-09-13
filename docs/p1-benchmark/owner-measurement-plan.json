@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "updated": "2026-09-13",
+  "$comment": [
+    "THE RECORD OF THE OWNER'S MEASUREMENT ORDER. `npm run owner:measure` reads",
+    "its plan from THIS FILE, never from a list hardcoded in a script, and",
+    "tests/scripts/owner-measure-plan.test.ts fails if the table in",
+    "docs/brain/Owner/Owner - R5 Measurement and Merge.md disagrees with it.",
+    "The note explains WHY each branch sits where it sits; this file is the",
+    "machine-readable half of the same statement. Edit both or neither.",
+    "",
+    "TIPS ARE PINNED ON PURPOSE. The pre-flight compares every `tip` below",
+    "against `refs/remotes/<remote>/<branch>` and STOPS on a mismatch: a moved",
+    "tip means this record (and the note it is checked against) is stale, and",
+    "measuring a branch nobody wrote down is how a number ends up attached to",
+    "the wrong tree. The fix is to re-read the branch, update this file and the",
+    "note together, and re-run — never to loosen the check.",
+    "",
+    "SHORT SHAS IN THE NOTE, FULL SHAS HERE. The note's table quotes 8",
+    "characters because that is what a person reads; the test requires each",
+    "note SHA to be a prefix of the full SHA here."
+  ],
+  "note": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+  "remote": "origin",
+  "baseline": {
+    "ref": "main",
+    "reason": "Measure main FIRST, on today's recipe. Every branch number below is read against this one, and the last recorded AUC-24 (0.731, 2026-07-11) CANNOT serve as that reference: it was measured on the pre-2026-09-12 scene segmentation (AUC24_DEGRADATION_ID is now shuffle-drop/v2). A branch-vs-0.731 comparison is a recipe change away from meaningless; a branch-vs-main comparison taken in the same session is not."
+  },
+  "steps": [
+    {
+      "id": "feature-length-defects",
+      "branch": "scoring/feature-length-defects",
+      "tip": "bcc96f85154418ec181fce4de3df0f33ce392bef",
+      "base": "ad3f6fa770a18e7950e6031023c0fa3e9c0ed2e9",
+      "when": "always",
+      "gate": "accept-reject",
+      "reason": "Measure this one FIRST. It and scoring/feature-length-saturation-only are ALTERNATIVES, not a stack: R5 replaces the density denominator wordCount^0.7 with (sceneCount*30)^0.7 and measured paired shuffle-drop 0.0938 on the public benchmark — worse than doing nothing — while this branch measures 0.8750 on the same benchmark. They collide on one function (densityPenalty), which is why the saturation half is landable alone. Everything after this step depends on whether this one is accepted.",
+      "receiptRanges": [
+        "ad3f6fa770a18e7950e6031023c0fa3e9c0ed2e9..HEAD"
+      ],
+      "probe": {
+        "base": "ad3f6fa770a18e7950e6031023c0fa3e9c0ed2e9",
+        "sourceRef": "4cf5b2f3c3bb61dafdb5afc2ac59a2c0ad674db0",
+        "reason": "scripts/probe-corpus-shape.ts does not exist on this branch or at its base — it was written on scoring/adversarial-2026-09-12. The adversarial copy imports only runScriptDoctor and analyzeFountainText, both of which exist on both trees, so it can be copied across and run on either."
+      }
+    },
+    {
+      "id": "adversarial-stack",
+      "branch": "scoring/renderer-residuals",
+      "tip": "a4df0c49f24e356e45677f0550972f6bf589917a",
+      "base": "8aa1f69605134caae6749a6dc63ccb006c5c410c",
+      "when": "if-accepted:feature-length-defects",
+      "gate": "report",
+      "stack": [
+        {
+          "branch": "scoring/adversarial-2026-09-12",
+          "tip": "4cf5b2f3c3bb61dafdb5afc2ac59a2c0ad674db0"
+        },
+        {
+          "branch": "scoring/forced-cue",
+          "tip": "089bec91d41adcf214dbc0388c5ef3edbc4769f9"
+        },
+        {
+          "branch": "scoring/renderer-residuals",
+          "tip": "a4df0c49f24e356e45677f0550972f6bf589917a"
+        }
+      ],
+      "reason": "One measurement, not three: scoring/forced-cue is stacked on scoring/adversarial-2026-09-12 and scoring/renderer-residuals on scoring/forced-cue, so checking out the last tip gets all three. Measured only if the first step is accepted. Read the probe's @cue and >tr columns before the AUC — both changes are invisible in this repository (0 of 32 committed scripts carry a line beginning @ or >) and the private corpus is the only place they show.",
+      "receiptRanges": [
+        "089bec91d41adcf214dbc0388c5ef3edbc4769f9..HEAD",
+        "8aa1f69605134caae6749a6dc63ccb006c5c410c..HEAD"
+      ],
+      "probe": {
+        "base": "4cf5b2f3c3bb61dafdb5afc2ac59a2c0ad674db0",
+        "sourceRef": null,
+        "reason": "The tip tree carries its own scripts/probe-corpus-shape.ts, with the >tr column. The BASE tree (the adversarial tip) carries its own older copy, with @cue but not >tr, and that is the copy to run there: the tip's copy imports FORCED_TRANSITION_MARKER from src/lib/fountain.ts, which the base tree does not export — the export IS the change. On the base tree the >tr column is zero by construction."
+      },
+      "caveat": "This stack carries the first branch's 1,500,000 voice-eligible-weight bound. It must not land before main's 675,000 re-derivation is applied on the merged tree with the analyzer cap in place."
+    },
+    {
+      "id": "feature-length-saturation-only",
+      "branch": "scoring/feature-length-saturation-only",
+      "tip": "efd1a463014d2974931ebc6d5bf60f1eed447878",
+      "base": "ad3f6fa770a18e7950e6031023c0fa3e9c0ed2e9",
+      "when": "if-rejected:feature-length-defects",
+      "gate": "accept-reject",
+      "reason": "The saturation half alone (scarcityPenalty saturates at 12 scenes, nothing else changes). Measured only if the first step is rejected — it is the fallback, not the next item.",
+      "receiptRanges": [
+        "ad3f6fa770a18e7950e6031023c0fa3e9c0ed2e9..HEAD"
+      ],
+      "probe": {
+        "base": "ad3f6fa770a18e7950e6031023c0fa3e9c0ed2e9",
+        "sourceRef": "4cf5b2f3c3bb61dafdb5afc2ac59a2c0ad674db0",
+        "reason": "Same as the first step: the probe script does not exist on this branch or at its base, and the adversarial copy runs on both."
+      }
+    },
+    {
+      "id": "stacked-r5-plus-advice",
+      "branch": "scoring/stacked-r5-plus-advice",
+      "tip": "408166ae8f4b69a032dce42aba10ae35981b7f74",
+      "base": "2bfcbf9d22b230620bda999220a3dfcd69265858",
+      "when": "manual",
+      "gate": "report",
+      "reason": "The R5 alternative, third in the note's order. It CONTAINS scoring/r5-verbosity-bias and scoring/advice-rule-fixes as unsquashed ancestors, so measuring and merging it subsumes both. Not scheduled automatically: the note's decision tree reaches it only after the first two steps have been read.",
+      "receiptRanges": [
+        "2bfcbf9d22b230620bda999220a3dfcd69265858..HEAD"
+      ],
+      "probe": null
+    },
+    {
+      "id": "r5-verbosity-bias",
+      "branch": "scoring/r5-verbosity-bias",
+      "tip": "52bf410a38898555ab2fdd240fc99494dfd63917",
+      "base": "2bfcbf9d22b230620bda999220a3dfcd69265858",
+      "when": "manual",
+      "gate": "report",
+      "reason": "R5 alone. Subsumed by the stack above; measured separately only if the stack is rejected and this half is being reconsidered on its own.",
+      "receiptRanges": [
+        "2bfcbf9d22b230620bda999220a3dfcd69265858..HEAD"
+      ],
+      "probe": null
+    },
+    {
+      "id": "advice-rule-fixes",
+      "branch": "scoring/advice-rule-fixes",
+      "tip": "a1cf76771bcf26bcad58cb0516e58d57f5d33c50",
+      "base": "2bfcbf9d22b230620bda999220a3dfcd69265858",
+      "when": "manual",
+      "gate": "report",
+      "reason": "The advice half alone. Subsumed by the stack above; same condition as the row before it.",
+      "receiptRanges": [
+        "2bfcbf9d22b230620bda999220a3dfcd69265858..HEAD"
+      ],
+      "probe": null
+    }
+  ],
+  "lock": {
+    "command": "npm run lock-auc24",
+    "artifact": "tests/fixtures/auc24-table.json",
+    "reason": "The deadline is the TABLE, not the branches: tests/core/auc24-table.test.ts skips until tests/fixtures/auc24-table.json is committed, and scripts/report-unverified-gates.mjs blocks CI on it from 2026-10-01. If every branch is rejected, the last step still runs — on main."
+  }
+}

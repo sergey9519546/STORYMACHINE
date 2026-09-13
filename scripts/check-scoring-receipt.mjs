@@ -833,4 +833,14 @@ const invokedDirectly = Boolean(process.argv[1])
   && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 if (invokedDirectly) main();
 
-export { resolveDefaultRange, classify, getChangedFiles, RECEIPT_PATH };
+// ENTRY_HEADING_RE, PENDING_PHRASES and pendingReason are exported for ONE
+// caller: scripts/lib/receipt-conversion.mjs, the mechanical three-scan
+// conversion `npm run owner:measure` applies to a PENDING entry after a real
+// corpus run. That converter has to know exactly what this file calls an
+// entry, exactly which four phrases scan two looks for, and exactly what
+// scan three reports — and a second copy of any of the three would be a copy
+// that drifts. The conversion re-tenses the phrases rather than deleting
+// them, so the list travels as data, never as prose inside a receipt entry
+// (a quoted copy of it INSIDE an entry would hold that entry pending on its
+// own, which is why the ledger deliberately does not spell them out).
+export { resolveDefaultRange, classify, getChangedFiles, RECEIPT_PATH, ENTRY_HEADING_RE, PENDING_PHRASES, pendingReason };

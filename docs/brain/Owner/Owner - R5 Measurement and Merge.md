@@ -1,7 +1,7 @@
 ---
 type: owner
-updated: 2026-09-06
-sources: [docs/PATH_TO_EXCELLENCE.md, docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md]
+updated: 2026-09-13
+sources: [docs/p1-benchmark/owner-measurement-plan.json, scripts/owner-measure.mjs, docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, docs/PATH_TO_EXCELLENCE.md, docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md]
 status: active
 ---
 
@@ -13,88 +13,148 @@ change whose costs are written down and whose benefit is not yet measured on
 real writing. The corpus cannot reach CI, so [[Gate - Receipt Gate]] can only
 check that a human ran the measurement, never that the number is real.
 
-**What changed 2026-09-06:** the manual merge this note used to ask for has
-been done. Both branches were rebased onto `main` @ `2bfcbf9d`, renamed, and
-pushed; the stacked tree exists, builds, and passes every gate that can run
-without a corpus. There is now ONE branch to measure, not two plus a merge.
-
-**The command:**
+## The command
 
 ```
-git fetch origin
-git checkout scoring/stacked-r5-plus-advice
-REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real
-REAL_SCRIPT_CORPUS_DIR=<corpus> npm run lock-auc24
-# then re-lock the 72-row tests/fixtures/real-corpus-manifest.json in place
+REAL_SCRIPT_CORPUS_DIR=<corpus> npm run owner:measure
 ```
 
-The variable is repeated on purpose. An inline assignment applies to one
-command only, so a bare `npm run lock-auc24` on the next line runs with it
-unset and the script refuses: `[FATAL] REAL_SCRIPT_CORPUS_DIR is not set —
-refusing to run. … Nothing was written.` [[Owner - Lock AUC24 Table]] writes it
-the same way.
+One command. It reads the ORDER from
+`docs/p1-benchmark/owner-measurement-plan.json` — the machine-readable half of
+the table below, which `tests/scripts/owner-measure-plan.test.ts` fails if the
+two disagree — prints the plan and the reason for every step, runs the
+pre-flight, measures `main` first and then each eligible branch in a **detached
+worktree** so your checkout is never touched, converts each branch's PENDING
+receipt entries by the three-scan recipe, asks accept/reject after the first
+branch's number, re-locks the 72-row manifest only on acceptance, and locks
+`tests/fixtures/auc24-table.json` at the end.
 
-The two commands fail differently, which is worth knowing before reading the
-output. `lock-auc24` refuses loudly and exits 1; `measure-real` prints
+```
+npm run owner:measure -- --plan       # print the plan and the reasons, do nothing
+npm run owner:measure -- --dry-run    # run it all; print every edit as a diff; write nothing
+npm run owner:measure -- --push       # also push the conversion commit (OFF by default)
+```
+
+`--push` is off on purpose: read the diff first. Everything below is WHY the
+command does what it does — the traps are all still here, they are just no
+longer a procedure you have to execute by hand.
+
+## Why the variable is on the same line
+
+An inline assignment applies to ONE command only. A bare `npm run lock-auc24`
+on the next line runs with it unset, and that script refuses:
+`[FATAL] REAL_SCRIPT_CORPUS_DIR is not set — refusing to run. … Nothing was
+written.` [[Owner - Lock AUC24 Table]] writes it the same way.
+
+**And the two underlying commands fail DIFFERENTLY**, which is the trap:
+`lock-auc24` refuses loudly and exits 1; `measure-real` prints
 `[SKIP] REAL_SCRIPT_CORPUS_DIR not set` and **exits 0**. So a mistyped variable
-on the first line looks like success and scrolls past, and the hard refusal
-that follows names a different command. If the first line prints that SKIP
-banner, it measured nothing — fix the variable and run it again before going
-any further. (The asymmetry belongs to those scripts, not to this note.)
+looks like success and scrolls past, and the hard refusal that follows names a
+different command. `owner:measure` treats that SKIP banner as a FAILURE
+whatever the exit code says (`parseMeasureReal`), and refuses before anything
+runs if the variable is unset at all. The asymmetry still belongs to those two
+scripts; it can no longer cost you an afternoon.
 
-Before hand-editing the manifest, read
-`tests/fixtures/real-corpus-manifest.README.md`: there is no automated re-lock
-command, and that file is where the constraint lives that its array order is
-load-bearing and must never be sorted.
+## The pre-flight, and the one thing it cannot check today
 
-**Then close the receipt gate, which takes a specific edit.** Appending a
-measured entry beside the PENDING ones does NOT work, and neither does the
-remedy string the gate itself prints ("append a superseding measured entry",
-`scripts/check-scoring-receipt.mjs:573-575`).
-`checkReceiptForRange` (`:650-673`) extracts EVERY entry the range adds and
-validates each one; `ok` is `problems.length === 0`, so one surviving PENDING
-entry fails the whole range no matter what sits next to it. Verified by running
-the gate's own exported `extractEntries`/`validateEntry` over this branch's
-three entries: as shipped, 3 entries, 3 problems; with a well-formed measured
-entry appended, 4 entries, still 3 problems.
+[[Gate - Corpus Layout Verification]] (`npm run verify:corpus-layout --
+--corpus-dir=<corpus>`) is the pre-flight [[Owner - Run Measure Real]] names,
+and `owner:measure` runs it for you. **It cannot pass on this repository as
+committed** (measured 2026-09-13): that script assumes the MIGRATED corpus
+schema, and `scripts/output/corpus-split.json` is still the pre-migration
+761-script P1 split — no `id`, no `contentHash` per row — so its check 2 fails
+and it exits 1 before reaching any check that speaks about the 72-row AUC-24
+corpus. `classifyLayout` in `scripts/owner-measure.mjs` treats a failure whose
+only failing checks are the migrated-schema ones as the KNOWN pre-migration
+state and continues; any other failing check stops the run. Standing in its
+place is a check that does speak about this corpus: every row of
+`tests/fixtures/real-corpus-manifest.json` must resolve to a file in the corpus
+dir, reported by content-hash prefix and never by title.
 
-What closes it is **rewriting each of the three entries in place** so the range
-adds measured entries and no pending one.
+The pre-flight also requires a clean working tree, fetches the remote, refuses
+if your checkout is standing on a branch the run commits to, and **verifies
+every recorded branch tip against the remote, stopping with the diff if one has
+moved**. The record is the authority: a moved tip means the note and the plan
+are stale, and measuring a tree nobody wrote down is how a number ends up
+attached to the wrong branch. (That guard earned its place immediately — on
+2026-09-13 this note's table said `scoring/renderer-residuals` was at
+`56b96765`; the branch was at `a4df0c49`, one review commit later.)
 
-`pendingReason` runs **three** scans, and all three have to come back clean.
-Steps 1, 5 and 6 below are those scans; steps 2-4 are the content the receipt
-owes once the run exists.
+## Nothing that indexes the corpus goes into the repository
 
-1. **Scan one — the `###` heading.** Drop `PENDING` from it and name what was
-   measured instead.
-2. Replace `**Measured AUC-24:** **PENDING** — not measured…` with the number
-   the run produced.
-3. Replace `**Corpus fingerprint:** none. No corpus was read.` with the real
-   fingerprint.
-4. Rewrite the `**Runner attestation:**` so it says in the first person that
-   the run happened.
-5. **Scan two — the four phrases, anywhere in the entry body.** Remove every
-   phrase in `PENDING_PHRASES` (`:487-492`) — "has not been run", "was not
-   run", "not yet measured", "pending owner measurement". The 2026-09-06
-   addenda inside these entries contain several of them; leaving one behind
-   keeps the entry pending even after the heading is fixed. `\bPENDING\b` is
-   whole-word and case-insensitive, so "appending" is safe and "Pending" is
-   not.
-6. **Scan three — the VALUE of every required field.** `pendingReason` also
-   tests the bare word against the value of each `REQUIRED_FIELDS` entry
-   (`:505-512`) — Command, Corpus fingerprint, Runner attestation, and Git SHA
-   or Baseline used — and a value runs from its own `- **` line all the way to
-   the next `- **` bullet (`fieldValueByPattern`, `:455-464`). That window is
-   large: it can cross a `####` addendum heading and swallow prose that looks
-   like it belongs to a later section. Two of the three entries currently carry
-   the bare word inside a Runner-attestation value — as the honest pending
-   marker they are meant to carry until the measurement exists — so this scan
-   has real work to do on every one of them, **at conversion time, not
-   before**: those markers stay exactly where they are until the corpus run has
-   happened, and come out as part of the same edit that fills in the AUC-24
-   number.
+The probe's CSV and `measure-real`'s log both begin every row with a corpus
+file path, and on the private corpus those paths are the TITLES of real
+screenplays — collectively the corpus's index, which this repository has never
+published. `owner:measure` writes them to a local directory OUTSIDE the
+repository (`$XDG_STATE_HOME/storymachine/owner-measure/<date>/`, else
+`~/.storymachine/owner-measure/<date>/`; it refuses a path inside the repo),
+prints only parsed aggregates, and passes everything it does print through a
+redaction that replaces the corpus dir with `<corpus>`. Keep those files where
+they land. The numbers and the fingerprint are what travel — the same shape
+this repository already commits in `tests/fixtures/real-corpus-manifest.json`.
 
-Step 6 is not theoretical, and it is not a stacked-branch quirk. Measured in a
+## The manifest re-lock
+
+`tests/fixtures/real-corpus-manifest.README.md` is where the constraint lives
+that the array **order is load-bearing**: `tests/core/real-script-corpus.test.ts`
+measures the AUC-24 floor over `MANIFEST.slice(0, 24)`, so sorting or
+regrouping the array keeps the assertion passing while silently changing what
+it asserts. That README also said there is no automated re-lock command. There
+is now — `scripts/lib/manifest-relock.mjs`, which maps the array in place,
+one-to-one, by index, and whose `assertOrderPreserved` REFUSES a re-ordered
+result (shown failing on a re-sorted array before it is shown passing). It
+moves `health`, `verdict` and `sceneCount` only; a row whose local bytes no
+longer hash to its locked `contentHash` is a different script, and the re-lock
+stops rather than quietly moving the floor's subset onto text nobody reviewed.
+
+**The re-lock runs only on ACCEPTANCE**, never merely because a measurement
+happened.
+
+## The receipt conversion: three scans, and why only all three close it
+
+Appending a measured entry beside the PENDING ones does NOT work, and neither
+does the remedy string the gate itself prints ("append a superseding measured
+entry", `scripts/check-scoring-receipt.mjs:573-575`). `checkReceiptForRange`
+extracts EVERY entry the range adds and validates each one; `ok` is
+`problems.length === 0`, so one surviving PENDING entry fails the whole range no
+matter what sits next to it. Verified by running the gate's own exported
+`extractEntries`/`validateEntry` over one branch's three entries: as shipped, 3
+entries, 3 problems; with a well-formed measured entry appended, 4 entries,
+still 3 problems.
+
+What closes it is **rewriting each entry in place**, which is what
+`scripts/lib/receipt-conversion.mjs` does. `pendingReason` runs **three** scans
+and all three have to come back clean:
+
+1. **Scan one — the `###` heading.** The PENDING parenthetical is replaced by
+   what was measured. A bare `PENDING` left outside any parenthetical is
+   refused rather than guessed at: a heading is the one line a reader trusts.
+2. **The content the receipt owes** — the AUC-24 number, the corpus
+   fingerprint, the exact command, the git SHA, and a first-person runner
+   attestation carrying the login, hostname and date **from the environment,
+   never invented**.
+3. **Scan two — the four phrases, anywhere in the entry body.** The gate
+   compiles each phrase with `\s+` between its words, so a phrase still matches
+   when a line wrap falls inside it — "has" at the end of one line and "not
+   been run" at the start of the next is a hit, and a search that only looks
+   within single lines will miss it. That is measured, not predicted. The
+   converter imports the phrase list from the gate (one definition, no drift)
+   and **re-tenses rather than deletes**: "had not been run as of filing" is
+   true before and after the measurement, where a deletion would leave a
+   sentence saying something else. Every converted entry gains one banner line
+   saying its body is the entry AS FILED with its pre-measurement tense
+   corrected, and naming the commit where the original bytes still are.
+4. **Scan three — the VALUE of every required field.** `pendingReason` also
+   tests the bare word against the value of each `REQUIRED_FIELDS` entry —
+   Command, Corpus fingerprint, Runner attestation, and Git SHA or Baseline
+   used — and a value runs from its own `- **` line all the way to the next
+   `- **` bullet (`fieldValueByPattern`). That window is large: it can cross a
+   `####` addendum heading and swallow prose that looks like it belongs to a
+   later section. So the REWRITE replaces a field's own paragraph (replacing
+   the whole window would delete the entry's body) and the VERIFICATION uses
+   the gate's own wider window.
+
+Step 4 is not theoretical, and it is not a stacked-branch quirk. Measured in a
 throwaway clone, by applying this recipe mechanically to each branch's ledger
 and running the real CLI (`node scripts/check-scoring-receipt.mjs main..HEAD`):
 
@@ -108,37 +168,36 @@ In every case the surviving failure names the same thing — `the **Runner
 attestation** field contains "PENDING"` — because each entry's attestation ends
 by explaining that its own heading says so, and on the advice entry the field
 value runs on past the end of the entry's bullets into the `####` addendum
-heading. A separate instance, the stacked entry's `Baseline used` describing its
-merge resolution in prose, has been reworded at the source so it is clean before
-you touch it; the scan stays in the recipe because the attestation instances
-cannot be reworded — they are the honest marker, and they have to survive until
-the measurement exists.
+heading. Those markers are the honest pending marker, and they come out as part
+of the same edit that fills in the AUC-24 number, never before it.
 
-Two traps worth knowing before doing that edit. Each space in those four
-patterns is compiled to `\s+`, so a phrase still matches when a line wrap falls
-inside it — "has" at the end of one line and "not been run" at the start of the
-next is a hit, and a search that only looks within single lines will miss it.
-That is measured, not predicted: it is why this file spells the four phrases
-out and the receipt ledger deliberately does not. This note is not a file the
-gate reads; a quoted copy of the list inside a receipt entry would hold that
-entry pending on its own.
+**This note is not a file the gate reads.** A quoted copy of the four phrases
+inside a receipt entry would hold that entry pending on its own, which is why
+the ledger deliberately does not spell them out and why the converter carries
+them as data.
 
-Same rewrite verified on a scratch copy: with all three converted this way, the
-gate's validator reports 3 entries and 0 problems. Do not close it by editing
-only a heading — that is the one route the entry text itself forbids.
+After the rewrite, `owner:measure` verifies with the gate's own exported
+functions (`addedReceiptLines` against the working tree, then
+`extractEntries`/`validateEntry`) and requires **0 problems**; it then commits
+and runs the real CLI on every recorded range as the final check. On any
+surviving problem it prints the entry and the scan that failed and **commits
+nothing**.
 
-**The branches, all pushed, all PENDING:**
+## The branches, and the order
 
 | branch | tip | what it is |
 | --- | --- | --- |
-| `scoring/feature-length-defects` | `bcc96f85` | **measure this one FIRST** — [[Branch - Feature-Length Defects]] |
-| `scoring/adversarial-2026-09-12` | `4cf5b2f3` | **stacks on the first; measure it right after, if the first is accepted** — [[Branch - Adversarial 2026-09-12]], READY-FOR-OWNER after four review rounds. Run `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run --silent probe-corpus-shape -- --csv` on this tree and on a pre-branch checkout (copy the script across) BEFORE reading AUC-24: it splits the corpus by document shape and prints word counts, health, verdict and severity mix per script — the corpus-visible change with the largest expected effect is the pipeline seam, which reaches exactly the double-spaced scraped-PDF shape. Its output is a local artifact (the paths are the corpus's index): never paste it. Known: it carries the first branch's 1,500,000 voice bound, which must not land before main's 675,000 re-derivation is applied on the merged tree with the analyzer cap in place. |
-| `scoring/forced-cue` | `089bec91` | **stacks on the adversarial branch; measure it right after, if that one is accepted** — [[Branch - Forced Cue]]: Fountain's `@` cue honoured at the parser seam and in every renderer; the probe's `@cue` column says which drafts it touches. |
-| `scoring/renderer-residuals` | `56b96765` | **stacks on forced-cue; measure it LAST of the three, if that one is accepted — checking out this tip gets all three, and its receipt range is `089bec91..HEAD`** — [[Branch - Renderer Residuals]]: `>` forced transitions typed at the parser seam and printed as transitions by every renderer, `>text<` centering read as a structural line, the `@`-out-of-position decision written down; the probe's `>tr` column says which drafts it touches (0 of 32 committed). Neither this branch nor forced-cue moves a public-benchmark floor or any committed fixture's report. |
-| `scoring/feature-length-saturation-only` | `efd1a463` | **second, only if the first is rejected** — [[Branch - Feature-Length Saturation Only]], the saturation half alone |
+| `scoring/feature-length-defects` | `bcc96f85` | **measured FIRST** — [[Branch - Feature-Length Defects]] |
+| `scoring/adversarial-2026-09-12` | `4cf5b2f3` | first of the stack — [[Branch - Adversarial 2026-09-12]], READY-FOR-OWNER after four review rounds |
+| `scoring/forced-cue` | `089bec91` | stacked on it — [[Branch - Forced Cue]]: Fountain's `@` cue honoured at the parser seam and in every renderer; the probe's `@cue` column says which drafts it touches |
+| `scoring/renderer-residuals` | `a4df0c49` | stacked on forced-cue and the tip the run measures — checking it out gets all three, and its own receipt range is `089bec91..HEAD` — [[Branch - Renderer Residuals]]: `>` forced transitions typed at the parser seam and printed as transitions by every renderer, `>text<` centering read as a structural line, the `@`-out-of-position decision written down; the probe's `>tr` column says which drafts it touches (0 of 32 committed) |
+| `scoring/feature-length-saturation-only` | `efd1a463` | **only if the first is rejected** — [[Branch - Feature-Length Saturation Only]], the saturation half alone |
 | `scoring/stacked-r5-plus-advice` | `408166ae` | third — [[Branch - Stacked R5 plus Advice]] |
 | `scoring/r5-verbosity-bias` | `52bf410a` | [[Branch - R5 Verbosity Bias]] alone |
 | `scoring/advice-rule-fixes` | `a1cf7677` | [[Branch - Advice Rule Fixes]] alone |
+
+The three R5 rows are reached with `--only=<step id>`, not automatically: the
+decision tree gets there only after the first two steps have been read.
 
 **THE ORDER CHANGED 2026-09-07 (corrected 2026-09-11), and the two heads are
 ALTERNATIVES, not a stack.** `scoring/feature-length-defects` attacks the same
@@ -157,29 +216,63 @@ going from +0.586 to exactly 0.000 for every script of about 22 scenes or more
 is what the run tests) live in the fuller version of this note ON THE BRANCH
 (`docs/brain/Owner/Owner - R5 Measurement and Merge.md` at `bcc96f85`) and in
 the branch's `docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md` §8.2a. Read
-that section before deciding. The recipe above applies unchanged to every
-branch in the table.
+that section before answering the accept/reject prompt.
 
-The stack CONTAINS both singles as unsquashed ancestors, so merging it subsumes
-them and the other two need not be merged separately. Whichever lands last needs
-one `npm run brain` afterwards — all three branches and the docs branch
-regenerated `brain.graph.json`/`GRAPH.md` independently — and
+**One stated caveat travels with the stack**, and `owner:measure` prints it at
+the point it applies: it carries the first branch's 1,500,000 voice-eligible
+bound, which must not land before main's 675,000 re-derivation is applied on
+the merged tree with the analyzer cap in place.
+
+The stack CONTAINS both R5 singles as unsquashed ancestors, so merging it
+subsumes them and the other two need not be merged separately. Whichever lands
+last needs one `npm run brain` afterwards — all three branches and the docs
+branch regenerated `brain.graph.json`/`GRAPH.md` independently — and
 `docs/brain/Measurements Index.md`'s `## docs/scoring (N)` count needs the
 arithmetic fixed by hand, because each side increments it.
 
-**What to expect, so a fall in AUC-24 is read correctly.** These branches move
-scores hard: 45 of 45 in-repo reports change on the stack, health RMS 19.02,
-27 of 45 verdicts flip, and the calibration corpus's strong-versus-troubled
-gap halves (25.32 to 12.54) while still ordering 5 of 5. On the twelve in-repo
-blind fixtures the stack orders 4 of 6 matched pairs against `main`'s 1 of 6 —
-but that rise is R5 removing a saturating clamp and exposing the raw
-weighted-issue ordering, which is close to a coin flip on that corpus, so it
-is not evidence the score got better at judging craft. Treat any fall in
-AUC-24 as a real finding about these changes and do not answer it by moving
-the floor in `scripts/lib/auc.ts`; see [[Gate - AUC-24 Ratchet]].
+## Read the probe before the AUC
+
+`npm run --silent probe-corpus-shape -- --csv` splits the corpus by document
+shape and prints word counts, health, verdict and severity mix per script, plus
+the `@cue` and `>tr` columns. `owner:measure` runs it on the branch tree AND on
+the pre-branch base and writes both CSVs to the local output directory.
+
+**Copying the script across does not always work, and the run says so rather
+than failing.** `scripts/probe-corpus-shape.ts` does not exist on `main` or on
+`scoring/feature-length-defects` — it was written on the adversarial branch,
+whose copy imports only `runScriptDoctor` and `analyzeFountainText` and so runs
+anywhere. But the `scoring/forced-cue` copy imports `FORCED_CUE_MARKER` and the
+`scoring/renderer-residuals` copy also `FORCED_TRANSITION_MARKER`, symbols the
+base trees do not export — **because those exports ARE the change**. So each
+side runs the newest copy its own tree can load, and on a base tree the new
+column is zero by construction.
+
+The corpus-visible change with the largest expected effect on the stack is the
+pipeline seam, which reaches exactly the double-spaced scraped-PDF shape; that
+is what the probe's split is for.
+
+## What to expect, so a fall in AUC-24 is read correctly
+
+These branches move scores hard: 45 of 45 in-repo reports change on the stack,
+health RMS 19.02, 27 of 45 verdicts flip, and the calibration corpus's
+strong-versus-troubled gap halves (25.32 to 12.54) while still ordering 5 of 5.
+On the twelve in-repo blind fixtures the stack orders 4 of 6 matched pairs
+against `main`'s 1 of 6 — but that rise is R5 removing a saturating clamp and
+exposing the raw weighted-issue ordering, which is close to a coin flip on that
+corpus, so it is not evidence the score got better at judging craft. Treat any
+fall in AUC-24 as a real finding about these changes and do not answer it by
+moving the floor in `scripts/lib/auc.ts`; see [[Gate - AUC-24 Ratchet]].
+
+**And do not compare any of these numbers to 0.731.** That figure was measured
+on 2026-07-11 against the PRE-2026-09-12 scene segmentation;
+`AUC24_DEGRADATION_ID` is now `shuffle-drop/v2`. This is exactly why the run
+measures `main` first: the comparison a decision needs is branch-vs-main on the
+SAME recipe in the SAME session, and `owner:measure` prints it that way.
 
 ## Sources
 
-- `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` — the three PENDING entries and the 2026-09-06 addenda
+- `docs/p1-benchmark/owner-measurement-plan.json` — the order, machine-readable
+- `scripts/owner-measure.mjs` — the command this note explains
+- `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` — the PENDING entries and the 2026-09-06 addenda
 - `docs/PATH_TO_EXCELLENCE.md` "What only the owner can do now"
 - `docs/p1-benchmark/BLIND_PAIRS_ON_BRANCHES_2026-09-04.md`

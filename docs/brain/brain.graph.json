@@ -1720,6 +1720,10 @@
     },
     {
       "from": "docs/brain/Owner/Owner - Lock AUC24 Table.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Lock AUC24 Table.md",
       "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
     },
     {
@@ -1741,6 +1745,14 @@
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "to": "docs/brain/Owner/Owner - Lock AUC24 Table.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Gates/Gate - Corpus Layout Verification.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Owner/Owner - Run Measure Real.md"
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
@@ -1780,15 +1792,19 @@
     },
     {
       "from": "docs/brain/Owner/Owner - Run Measure Real.md",
-      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
-    },
-    {
-      "from": "docs/brain/Owner/Owner - Run Measure Real.md",
       "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
     {
       "from": "docs/brain/Owner/Owner - Run Measure Real.md",
+      "to": "docs/brain/Owner/Owner - Lock AUC24 Table.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Run Measure Real.md",
       "to": "docs/brain/Gates/Gate - Corpus Layout Verification.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Run Measure Real.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
     {
       "from": "docs/brain/Patterns.md",

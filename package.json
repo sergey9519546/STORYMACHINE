@@ -22,6 +22,7 @@
     "measure-real": "node --experimental-strip-types scripts/measure-real-script-discrimination.ts",
     "benchmark:public": "node --experimental-strip-types scripts/benchmark-public.ts",
     "lock-auc24": "node --experimental-strip-types scripts/lock-auc24.mjs",
+    "owner:measure": "node --experimental-strip-types scripts/owner-measure.mjs",
     "honesty-audit": "node scripts/honesty-audit.mjs",
     "discharge-obligations": "node scripts/discharge-obligations.mjs",
     "check-scoring-receipt": "node scripts/check-scoring-receipt.mjs",
