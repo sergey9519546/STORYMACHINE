@@ -59,6 +59,8 @@
 //   node --experimental-strip-types scripts/measure-voice-bound-cost.mjs \
 //        --uniform-min=100,120,140 --probe-cast=20,40 --repeats=3 \
 //        --conditions=idle,loaded --json=tests/fixtures/voice-bound-derivation.json
+//   --json=-  prints the lock file to stdout instead of writing it (how the
+//             runner's table gets out of a CI log and into the repository).
 //
 // This script has no side effects beyond stdout unless --json is passed, and it
 // is not scoring-path: it only generates text and times an existing analyzer.
@@ -203,8 +205,18 @@ async function sweep(opts, condition, log) {
       const samples = [];
       for (let r = 0; r < opts.repeats; r++) samples.push(await measureOnce(spec));
       const first = samples[0];
+      // Deliberately NOT `...first`: the per-measurement `cpuMs`/`wallMs` of an
+      // arbitrary sample next to the aggregates invites reading the wrong
+      // number. Only the shape's identity is carried over; the timings are the
+      // full sample list plus its median and max.
       rows.push({
-        ...first,
+        shape: first.shape,
+        n: first.n,
+        bytes: first.bytes,
+        distinct: first.distinct,
+        pooledWords: first.pooledWords,
+        weight: first.weight,
+        guard: first.guard,
         condition,
         repeats: samples.length,
         cpuMsSamples: samples.map((s) => s.cpuMs),
@@ -298,15 +310,26 @@ async function main() {
       conditions: Object.fromEntries(
         Object.entries(byCondition).map(([c, rows]) => [
           c,
-          rows.map(({ guardReason: _ignored, ...row }) => row),
+          rows.map((row) => row),
         ]),
       ),
       derivation: deriveCast(byCondition[primary], DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS),
     };
-    const out = path.resolve(REPO_ROOT, opts.json);
-    mkdirSync(path.dirname(out), { recursive: true });
-    writeFileSync(out, `${JSON.stringify(payload, null, 2)}\n`);
-    log(`wrote ${path.relative(REPO_ROOT, out)}`);
+    const serialized = `${JSON.stringify(payload, null, 2)}\n`;
+    if (opts.json === '-') {
+      // `--json=-` prints the lock file to stdout instead of writing it. This
+      // is how a runner's table reaches the repository: the sandbox that edits
+      // the bound cannot run on a GitHub runner, and this workflow uploads no
+      // artifacts, so the lock file has to be copyable verbatim out of the log.
+      process.stdout.write('\n```json\n');
+      process.stdout.write(serialized);
+      process.stdout.write('```\n');
+    } else {
+      const out = path.resolve(REPO_ROOT, opts.json);
+      mkdirSync(path.dirname(out), { recursive: true });
+      writeFileSync(out, serialized);
+      log(`wrote ${path.relative(REPO_ROOT, out)}`);
+    }
   }
 }
 
