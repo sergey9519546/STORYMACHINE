@@ -19,7 +19,9 @@ name: Calibrate voice bound
 # No artifacts are uploaded and nothing is written back to the repository: the
 # payloads are synthetic generated Fountain (scripts/lib/voice-bound.ts), carry
 # no corpus text, and the whole result is a table of numbers that belongs in the
-# log and in a reviewed commit, not in an artifact nobody reads.
+# log and in a reviewed commit, not in an artifact nobody reads. `--json=-`
+# prints tests/fixtures/voice-bound-derivation.json's exact contents into the
+# log, so locking the runner's table is a copy, not a transcription.
 
 # TWO TRIGGERS, AND WHY THE SECOND ONE EXISTS. `workflow_dispatch` is the
 # intended form. GitHub, however, only offers a workflow_dispatch workflow for
@@ -100,4 +102,5 @@ jobs:
             "--probe-cast=$PROBE_CAST" \
             "--repeats=$REPEATS" \
             "--conditions=$CONDITIONS" \
+            --json=- \
             | tee -a "$GITHUB_STEP_SUMMARY"
