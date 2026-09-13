@@ -315,10 +315,13 @@ No full `npm test` — per the cost rule for this round.
 
 ## Tip
 
-`<ROUND2_TIP_SHA>` — pushed to `origin/lane/ci-concurrency`. This value is
-filled in by a small trailing commit once this one's own SHA is known
-(`git rev-parse HEAD`), the same "last commit points at the commit a
-reviewer should read" pattern `lane/voice-bound-ci-derivation` used for the
-identical problem — see that lane's `026c0948`. Both commits are pushed
-together, so §7's "push after every commit" is met with the one push this
-round's brief asked for.
+`bfcaac4456d67b0f4d493c61c77afc787b81be2c` — the last substantive commit of
+this round (items 1-6 in `8507e1e3`, item 7 in `bfcaac44` itself), and the
+one a reviewer should read. This report's own Tip line names it via a small
+trailing commit once `bfcaac44`'s SHA was known (`git rev-parse HEAD`), the
+same "last commit points at the commit a reviewer should read" pattern
+`lane/voice-bound-ci-derivation` used for the identical problem — see that
+lane's `026c0948`. All of round 2's commits (`8507e1e3`, `bfcaac44`, and this
+trailing one) are pushed together in the one push this round's brief asked
+for — `git log --oneline main..HEAD` after the push is the full, authoritative
+list, this line just saves a reviewer that lookup.
