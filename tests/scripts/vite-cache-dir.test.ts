@@ -505,6 +505,69 @@ describe('the wiring, not just the helper', () => {
     }
   });
 
+  it('two allocations attach exactly one SIGTERM listener — and a mutant that skips the has(signal) guard attaches two (review round 1, finding 4)', async () => {
+    // vite-cache-dir.mjs's own comment promises "no duplicate listeners, no
+    // MaxListeners warning" from tracking `installedSignalHandlers` per
+    // signal rather than by one process-wide flag. Measured but unpinned
+    // until now. Two directions, same shape as "the lock state machine"
+    // above: the real module, then a MUTANT with exactly the guard at the
+    // `has(signal)` check removed, which must produce the OPPOSITE count.
+    const before = process.listenerCount('SIGTERM');
+    const a = allocateViteCacheSlot({ repoRoot: path.join(tmpdir(), `vite-cache-listeners-real-1-${process.pid}`), env: {} });
+    const b = allocateViteCacheSlot({ repoRoot: path.join(tmpdir(), `vite-cache-listeners-real-2-${process.pid}`), env: {} });
+    try {
+      // Whatever the count was before (an earlier test in this file may
+      // already have installed the real module's own handler — it is
+      // process-wide and, correctly, never removed except by actually
+      // firing), TWO MORE allocations must not add a SECOND listener.
+      assert.equal(
+        process.listenerCount('SIGTERM'),
+        Math.max(before, 1),
+        'a second (and third) allocation must not attach a second SIGTERM listener',
+      );
+    } finally {
+      a.release();
+      b.release();
+    }
+
+    const { mod, cleanup } = await loadMutant(
+      'if (installedSignalHandlers.has(signal)) continue; // still attached from an earlier allocation',
+      'if (false) continue; // still attached from an earlier allocation',
+    );
+    const exitHookSignals = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+    const listenersBefore = new Map<typeof exitHookSignals[number], readonly NodeJS.SignalsListener[]>(
+      exitHookSignals.map(signal => [signal, process.listeners(signal).slice() as NodeJS.SignalsListener[]]),
+    );
+    try {
+      const beforeMutant = process.listenerCount('SIGTERM');
+      const c = mod.allocateViteCacheSlot({ repoRoot: path.join(tmpdir(), `vite-cache-listeners-mutant-1-${process.pid}`), env: {} });
+      const d = mod.allocateViteCacheSlot({ repoRoot: path.join(tmpdir(), `vite-cache-listeners-mutant-2-${process.pid}`), env: {} });
+      try {
+        assert.equal(
+          process.listenerCount('SIGTERM'),
+          beforeMutant + 2,
+          'with the has(signal) guard removed, two allocations must attach TWO SIGTERM listeners — if this cannot fail, it is not measuring the guard',
+        );
+      } finally {
+        c.release();
+        d.release();
+      }
+    } finally {
+      // Remove exactly the listeners the mutant added (by identity, against
+      // the snapshot taken before it ran), for every signal the loop covers —
+      // not only SIGTERM — so this test leaves the process exactly as it
+      // found it rather than leaking duplicate handlers into the rest of the
+      // suite.
+      for (const signal of exitHookSignals) {
+        const before = listenersBefore.get(signal) ?? [];
+        for (const listener of process.listeners(signal) as NodeJS.SignalsListener[]) {
+          if (!before.includes(listener)) process.off(signal, listener);
+        }
+      }
+      cleanup();
+    }
+  });
+
   it('the cache directory is not a dist/ build input', () => {
     // `distStaleness` picks up root-level build config BY PATTERN, so an
     // in-repo cache would have been one regex edit from making every browser
@@ -569,13 +632,12 @@ describe('shutdown()\'s graceMs=0 callers — the comment above releaseViteCache
     return out;
   }
 
-  /** Repo-relative, posix-spelled paths of every `scripts/**\/*.mjs` file
-   *  containing a `shutdown({ … })` call with no `graceMs` in the object
-   *  literal — every call site is a single-line, unnested object literal
-   *  today (verified by hand across all eight call sites), which is what
-   *  makes a `[^}]*` scan safe rather than a full parse. */
-  function zeroGraceShutdownCallers(): string[] {
-    const hits: string[] = [];
+  /** Every `shutdown({ … })` call SITE under `scripts/`, excluding the file
+   *  that DEFINES `shutdown()` (see below) — one entry per call, not per
+   *  file, so a file with more than one call site (there are two, below) is
+   *  counted honestly instead of folded into one. */
+  function allShutdownCallSites(): Array<{ file: string; call: string }> {
+    const hits: Array<{ file: string; call: string }> = [];
     for (const file of mjsFilesUnder(path.join(REPO, 'scripts'))) {
       // scripts/lib/browser-verify.mjs DEFINES shutdown() — it is not a
       // caller, but its own doc comments quote example calls (e.g. "`shutdown
@@ -586,9 +648,31 @@ describe('shutdown()\'s graceMs=0 callers — the comment above releaseViteCache
       if (path.relative(REPO, file).split(path.sep).join('/') === 'scripts/lib/browser-verify.mjs') continue;
       const source = readFileSync(file, 'utf8');
       const calls = source.match(/shutdown\(\{[^}]*\}\)/g) ?? [];
-      if (calls.some(call => !/graceMs/.test(call))) {
-        hits.push(path.relative(REPO, file).split(path.sep).join('/'));
-      }
+      for (const call of calls) hits.push({ file: path.relative(REPO, file).split(path.sep).join('/'), call });
+    }
+    return hits;
+  }
+
+  /** Repo-relative, posix-spelled paths of every `scripts/**\/*.mjs` FILE
+   *  containing at least one `shutdown({ … })` call with no `graceMs` in the
+   *  object literal — a FILE count, not a call-site count:
+   *  `verify-production-build.mjs` has two `shutdown()` call sites (one for
+   *  its dev instance, one for production) but only the dev one is
+   *  `graceMs=0`, and the file still counts once here, which is what "four
+   *  callers" in the comment beside `releaseViteCacheSlot()` means. Assumes
+   *  every call site is a single-line, unnested object literal — pinned as a
+   *  COUNT below (review round 1, finding 3: "verified by hand" rotted into
+   *  a wrong hand count), not asserted here by hand again — which is what
+   *  makes a `[^}]*` scan safe rather than a full parse. */
+  function zeroGraceShutdownCallers(): string[] {
+    const byFile = new Map<string, string[]>();
+    for (const { file, call } of allShutdownCallSites()) {
+      if (!byFile.has(file)) byFile.set(file, []);
+      byFile.get(file)!.push(call);
+    }
+    const hits: string[] = [];
+    for (const [file, calls] of byFile) {
+      if (calls.some(call => !/graceMs/.test(call))) hits.push(file);
     }
     return hits.sort();
   }
@@ -606,6 +690,25 @@ describe('shutdown()\'s graceMs=0 callers — the comment above releaseViteCache
       ],
       'a new graceMs=0 caller (or a removed one) must also update the comment beside releaseViteCacheSlot() in scripts/lib/browser-verify.mjs',
     );
+  });
+
+  it('pins the call-SITE count too, not just the graceMs=0 file count (review round 1, finding 3)', () => {
+    // A comment above zeroGraceShutdownCallers() used to say "verified by
+    // hand across all eight call sites" — there are actually eleven call
+    // sites, in eight files (smoke-p0-live-flow.mjs alone has three;
+    // verify-production-build.mjs has two). The property the scan relies on
+    // (every call site is a single-line, unnested object literal) held for
+    // all eleven; only the hand count of call sites was wrong. Derived here
+    // instead of typed into a comment, so it cannot rot the same way again.
+    const sites = allShutdownCallSites();
+    const files = new Set(sites.map(s => s.file));
+    assert.equal(sites.length, 11, `expected 11 shutdown() call sites under scripts/ (excluding browser-verify.mjs), found ${sites.length}: ${JSON.stringify(sites.map(s => s.call))}`);
+    assert.equal(files.size, 8, `expected those call sites to live in 8 files, found ${files.size}: ${JSON.stringify([...files].sort())}`);
+    for (const { file, call } of sites) {
+      // The property the `[^}]*` scan actually depends on: no embedded
+      // newline in the call (a single-line, unnested object literal).
+      assert.ok(!call.includes('\n'), `${file}: ${JSON.stringify(call)} must be a single-line call for the [^}]* scan to be safe`);
+    }
   });
 
   it('verify-production-build.mjs\'s dev-instance teardown really does call shutdown() now, not an inline kill', () => {

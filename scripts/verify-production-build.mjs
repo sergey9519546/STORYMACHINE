@@ -505,15 +505,34 @@ try {
     // Through shutdown() rather than an inline kill — this boot went through
     // bootKeylessServer() same as any other, so it holds a Vite cache slot
     // (browser-verify.mjs's allocateViteCacheSlot) that only shutdown()
-    // releases. An inline `devProc.kill()` here (what this line used to be)
-    // left that slot held until the whole gate process exited: harmless
-    // (vite-cache-dir.mjs's exit hook frees it then), but it meant section 6's
-    // production boot below always took a SECOND slot instead of reusing this
-    // one's warm cache the moment this section was done with it — review
-    // observation (a). shutdown() also waits for devProc to actually exit
-    // before freeing the slot (see its own comment) rather than after only
-    // the signal, which the SIGTERM/sleep/SIGKILL sequence here approximated
-    // by luck, not by the same mechanism every other suite relies on.
+    // releases. An inline SIGTERM-then-sleep-then-SIGKILL sequence
+    // (what this line used to be) left that slot held until the whole gate
+    // process exited — review observation (a). That is NOT, as an earlier
+    // version of this comment claimed, a cost to section 6's production boot
+    // below: that boot happens BEFORE this one (section 1, `bootProduction()`),
+    // never calls `allocateViteCacheSlot()`, and runs with
+    // `NODE_ENV=production`, where `server/app.ts` never starts Vite — there
+    // was no warm cache for it to fail to reuse
+    // (vitecache-notes-review.md round 1, finding 1). The real cost is to a
+    // CONCURRENT gate, which now gets this slot back for section 6's ~14 s
+    // Chromium journey instead of being pushed to the next one. shutdown()
+    // also waits for devProc to actually exit before freeing the slot (see
+    // its own comment) rather than after only the signal, which the
+    // SIGTERM/sleep/SIGKILL sequence here approximated by luck.
+    //
+    // TRADE-OFF, chosen deliberately (vitecache-notes-review.md round 1,
+    // finding 2): the old sequence escalated to SIGKILL after 400 ms if the
+    // process ignored SIGTERM. `shutdown()` at its `graceMs = 0` default
+    // sends one SIGTERM and only WAITS (up to SERVER_EXIT_WAIT_MS = 5000 ms)
+    // — it does not escalate. Kept at `graceMs = 0` rather than passed
+    // `graceMs: 400` for two reasons: it matches how the other three
+    // `graceMs = 0` callers tear down the same kind of dev server (one
+    // implementation of "how a dev boot dies", not a fourth variant), and it
+    // is what makes the `graceMs = 0` comment's "four callers" in
+    // browser-verify.mjs literally true rather than three-plus-a-different-path.
+    // The cost: a `server.ts` dev boot that hangs on SIGTERM (it has not, in
+    // any run of this suite) now waits the full 5 s instead of being
+    // force-killed at 400 ms before this `finally` block returns.
     if (devProc) await shutdown({ serverProc: devProc });
   }
 

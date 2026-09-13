@@ -45,11 +45,23 @@ boots the dev instance through `bootKeylessServer()`
 and attaches `serverProc.releaseViteCacheSlot = cache.release` — the SAME
 per-boot allocation every other `bootKeylessServer()` caller gets. The inline
 kill at the old `:505` never called that release function, so the slot sat
-held until the whole gate process exited (harmless — `vite-cache-dir.mjs`'s
-exit hook frees it then — but it meant section 6's separate production boot,
-a few lines later in the same file, always took a SECOND slot instead of
-reusing this one's now-idle, warm cache the moment section 5 was done with
-it). **Real, if low-severity, defect — fixed.**
+held until the whole gate process exited (`vite-cache-dir.mjs`'s exit hook
+frees it then, so nothing leaked forever). **Real, if low-severity, defect —
+fixed.**
+
+> **Corrected in round 2** (`docs/audits/2026-09-12-adversarial/
+> vitecache-notes-review.md`, blocking finding 1): the paragraph above used
+> to go on to say the un-released slot "meant section 6's separate production
+> boot, a few lines later in the same file, always took a SECOND slot instead
+> of reusing this one's now-idle, warm cache." **That is false.** Three
+> independent reasons, all in the file this report is about: the production
+> boot happens BEFORE the dev one (section 1, `bootProduction()` at `:243`,
+> not after it); `bootProduction()` (`:210-237`) spawns `tsx` directly and
+> never calls `allocateViteCacheSlot()` at all (the file's own header says so
+> — "WHY IT IS NOT `bootKeylessServer()`"); and that boot runs with
+> `NODE_ENV=production`, where `server/app.ts` never starts Vite, so there was
+> no warm cache for it to fail to reuse regardless. See §4 (Round 2) for what
+> replaced it, in the code and in this report.
 
 **Fix — `scripts/verify-production-build.mjs:505-517`:** the inline
 kill/sleep/SIGKILL sequence is replaced with
@@ -264,4 +276,75 @@ Nothing else was postponed. Scoring-path files were not touched
 
 ---
 
-Tip: `e5c42d7fcc1eb3e24cd01d4d26dc9e236b8f21cb`
+## 4. Round 2 (`b10b6de5` review — REVISE)
+
+Source: `docs/audits/2026-09-12-adversarial/vitecache-notes-review.md`,
+round 1 (`c33cbf13`). Items 2 and 3 of the original brief were confirmed
+clean; four findings on item 1's write-up and two small test issues. All
+four addressed, one commit (`git log --oneline main..HEAD` above).
+
+| # | finding | disposition | file:line |
+|---|---|---|---|
+| 1 (blocking) | the recorded cost of the old inline teardown ("section 6's production boot always took a SECOND slot") is false — that boot runs BEFORE the dev one, never allocates a slot, and never starts Vite | **fixed** — the false sentence removed from both comments and this report (§1 above), replaced with the true cost: a CONCURRENT gate is who actually benefits, for the ~14 s of section 6's Chromium journey, plus `shutdown()`'s wait-for-actual-death behavior | `scripts/lib/browser-verify.mjs:1263-1277`, `scripts/verify-production-build.mjs:505-521`, this report §1 |
+| 2 | the port to `shutdown()` silently drops the old SIGKILL escalation at 400 ms | **decided and written down**: kept `graceMs = 0` (matches the other three dev-server teardowns; is what makes the comment's "four callers" literally true), with the trade-off spelled out at the call site — a dev boot that ignores SIGTERM now waits the full 5 s (`SERVER_EXIT_WAIT_MS`) instead of being force-killed at 400 ms | `scripts/verify-production-build.mjs:523-536` |
+| 3 | "verified by hand across all eight call sites" is itself a wrong hand count — there are 11 call sites in 8 files | **fixed, and derived rather than re-typed by hand**: the doc comment now says "eight files, eleven call sites" and cites the finding; a new test computes both numbers from the same walk the scan itself uses and asserts them (11 sites, 8 files, plus the single-line property the scan depends on, per site) | `tests/scripts/vite-cache-dir.test.ts` (comment above `zeroGraceShutdownCallers`), `:695-712` ("pins the call-SITE count" test) |
+| 4 | "no duplicate listeners, no MaxListeners warning" is measured but unpinned | **fixed** — a new test allocates twice against the real module (asserts the SIGTERM listener count does not grow past 1) and twice against a mutant with the `has(signal)` guard removed (asserts it grows by exactly 2), cleaning up exactly the listeners the mutant added afterward so the process is left as it was found | `tests/scripts/vite-cache-dir.test.ts:508-565` |
+
+**Fail-first for finding 4**, shown by breaking the REAL module's guard
+(not just the mutant copy) and re-running the whole file:
+
+```
+$ sed -i "s/if (installedSignalHandlers.has(signal)) continue; .*/if (false) continue; \/\/ …/" vite-cache-dir.mjs
+$ node --experimental-strip-types tests/scripts/vite-cache-dir.test.ts
+not ok — a second (and third) allocation must not attach a second SIGTERM listener
+  14 !== 12
+```
+
+(The numbers are 12/14, not 1/2, because by that point in the file several
+earlier tests had already allocated slots through the real, statically
+imported module — with the guard broken, EVERY allocation across the whole
+run adds another listener, which is a stronger demonstration of the defect
+than a freshly-isolated count would have been.) Restoring the guard returns
+the file to 27/27.
+
+**Item 1's comment fix, verified not to collide with an unrelated pin:** the
+first draft of the corrected comment in `verify-production-build.mjs` used
+the literal text `` devProc.kill('SIGTERM') `` inside its own explanatory
+prose, which made
+`tests/scripts/vite-cache-dir.test.ts`'s "not an inline kill" assertion
+(added in round 1) go red — a genuine near-miss, caught by running the
+touched test file rather than assumed clean. Reworded to
+"an inline SIGTERM-then-sleep-then-SIGKILL sequence" (no literal call
+syntax) and the suite returned to green.
+
+### Round 2 gates
+
+| gate | result | exit |
+|---|---|---|
+| `tests/scripts/vite-cache-dir.test.ts` (touched) | 27/27 | 0 |
+| `tests/core/docker-context.test.ts` (unaffected, re-checked) | 7/7 | 0 |
+| `npm run lint` | clean (two TS overload errors from the new listener-cleanup code, fixed) | 0 |
+| `check-no-console` | 307 files, clean | 0 |
+| `check-docs` | clean | 0 |
+| `honesty-audit` | 465 files + 499 markdown files + 115 claims-register rows, clean | 0 |
+| `check-scoring-receipt main..HEAD` | no scoring-path change | 0 |
+| `npm run verify:production` (ONE run) | 71/71 assertions | 0 |
+
+Per the cost rule for a revision this size, the full `npm test` was NOT
+re-run (round 1 already ran it clean on a superset of this tree; nothing in
+round 2 touches scoring paths or any surface the full suite alone would
+catch that the targeted gates above do not).
+
+### What was left undone, and why
+
+Nothing narrowed or skipped. One judgment call, recorded: item 2 could have
+gone either way (`graceMs = 0` or `graceMs: 400`); `graceMs = 0` was kept for
+the two reasons in the table above, and the round 1 report's own framing
+("shutdown() also waits for devProc to actually exit… rather than the
+sleep-based approximation," §1) already implied this choice without stating
+the SIGKILL-escalation cost it carries — that omission is what round 2's
+finding 2 named, and it is now explicit at the call site and here.
+
+---
+
+Tip: `<pending round-2 commit>`

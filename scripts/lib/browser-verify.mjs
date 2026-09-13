@@ -1257,12 +1257,24 @@ export async function shutdown({ browser, serverProc, graceMs = 0 } = {}) {
   // and never called this function at all, so this comment's claim of "four"
   // was actually three — review round 2, observation (a)
   // (docs/audits/2026-09-12-adversarial/vitecache-review.md). The inline path
-  // also never freed this boot's cache slot, only the exit hook in
-  // ../../vite-cache-dir.mjs did (harmless — the slot was freed at process
-  // exit either way — but it meant that suite's own second, PRODUCTION boot
-  // always took a second slot instead of reusing this one's warm cache).
-  // Routed through here instead, "four" is now literally true rather than a
-  // count that happened to read right.
+  // also never freed this boot's cache slot; only the exit hook in
+  // ../../vite-cache-dir.mjs did, at gate-process exit.
+  //
+  // CORRECTED (vitecache-notes-review.md round 1, finding 1): an earlier
+  // version of this note claimed that cost this SUITE'S OWN production
+  // boot a warm cache. That is false — this suite's production instance
+  // boots BEFORE the dev one (section 1, `bootProduction()`), never calls
+  // `allocateViteCacheSlot()` at all (that function spawns `tsx` directly —
+  // see this file's own header, "WHY IT IS NOT bootKeylessServer()"), and
+  // runs with `NODE_ENV=production`, where `server/app.ts` never starts
+  // Vite. There was no warm cache for it to fail to reuse. The real cost of
+  // holding the slot until process exit falls on a CONCURRENT gate — another
+  // worktree, or a second gate against this repo — which wants a pooled slot
+  // during this suite's ~14 s section-6 Chromium journey and gets pushed to
+  // slot N+1 instead of reusing this now-idle one. Routed through here
+  // instead, "four" is now literally true rather than a count that happened
+  // to read right, and the release happens at the end of section 5 — freeing
+  // it for that concurrent gate — rather than at process exit.
   //
   // Outside the try so a kill that throws (a process that already exited)
   // cannot skip it, and bounded so a child that never dies delays teardown by
