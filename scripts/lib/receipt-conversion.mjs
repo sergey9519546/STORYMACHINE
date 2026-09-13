@@ -256,12 +256,19 @@ function fieldBody(label, facts) {
           : [`Act-swap, the second recipe \`npm run measure-real\` prints: ${facts.actSwapAuc.toFixed(3)}.`]),
       ]);
     case 'Corpus fingerprint':
+      // THE `sha256:` PREFIX IS LOad-BEARING. The gate reads a whole backticked
+      // span of 7-40 hex digits as a CITED GIT OBJECT and fails the entry when
+      // it does not resolve — the check that exposed the 2026-08-08
+      // fabrication. A bare 16-hex fingerprint in backticks trips it, which the
+      // end-to-end fixture caught: two "cites git object … which does not exist"
+      // problems on an otherwise clean conversion. Prefixed, the span is not
+      // all-hex and the scan correctly ignores it.
       return bullet([
         `${facts.corpusScriptCount} eligible scripts; manifest`,
-        `\`tests/fixtures/real-corpus-manifest.json\` ${facts.manifestScriptCount} entries, sha256`,
-        `\`${facts.manifestHash.slice(0, 16)}\`; corpus identity (sha256 over the manifest's content`,
-        `hashes, in committed array order) \`${facts.corpusFingerprint.slice(0, 16)}\`; AUC subset =`,
-        `entries 0..${facts.subsetSize - 1} in that order. No title, no filename, no line of text.`,
+        `\`tests/fixtures/real-corpus-manifest.json\` ${facts.manifestScriptCount} entries,`,
+        `\`sha256:${facts.manifestHash.slice(0, 16)}\`; corpus identity (sha256 over the manifest's`,
+        `content hashes, in committed array order) \`sha256:${facts.corpusFingerprint.slice(0, 16)}\`;`,
+        `AUC subset = entries 0..${facts.subsetSize - 1} in that order. No title, no filename, no text.`,
       ]);
     case 'Git SHA':
       return bullet([

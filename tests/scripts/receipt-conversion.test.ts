@@ -22,7 +22,9 @@ import { PENDING_PHRASES, extractEntries, pendingReason, validateEntry } from '.
 const FACTS = {
   date: '2026-09-13',
   branch: 'scoring/example',
-  filedAtSha: 'a'.repeat(40),
+  // A real-shaped SHA (it carries digits): the gate ignores an all-letter
+  // "hex" span, so an a-repeat fixture would hide the cited-object scan.
+  filedAtSha: 'a4df0c49f24e356e45677f0550972f6bf589917a',
   runner: 'owner@workstation',
   auc24: 0.7083,
   actSwapAuc: 0.8125,
@@ -56,7 +58,7 @@ const SCAN_TWO = `### 2026-09-08 — EXAMPLE TWO: another scoring change (ledger
 
 - **Command:** \`npm run benchmark:public\`.
 - **Corpus fingerprint:** none for AUC-24.
-- **Git SHA:** \`${'a'.repeat(40)}\`.
+- **Git SHA:** \`${'a4df0c49f24e356e45677f0550972f6bf589917a'}\`.
 - **Runner attestation:** I ran the public benchmark myself.
 
 **What the owner still owes.** The AUC-24 for this range has
@@ -70,7 +72,7 @@ const SCAN_THREE = `### 2026-09-09 — EXAMPLE THREE: a third scoring change (le
 
 - **Command:** \`npm run benchmark:public\`.
 - **Corpus fingerprint:** none for AUC-24.
-- **Git SHA:** \`${'a'.repeat(40)}\`.
+- **Git SHA:** \`${'a4df0c49f24e356e45677f0550972f6bf589917a'}\`.
 - **Runner attestation:** I ran the public benchmark myself, in the foreground.
 
   This entry's own heading says PENDING, and that is the honest marker until
@@ -145,6 +147,22 @@ describe('after the conversion, all three come back clean', () => {
     const { text } = convert(SCAN_ONE);
     assert.match(text, /Same recipe, same corpus, main in the same run: \*\*0\.6875\*\*/);
     assert.match(text, /NOT comparable to the 0\.731/);
+  });
+
+  it('cites no git object it cannot resolve — the fingerprint is not a SHA', () => {
+    // The gate reads every whole backticked span of 7-40 hex digits as a CITED
+    // GIT OBJECT (the check that exposed the 2026-08-08 fabrication), so a bare
+    // hex fingerprint in backticks fails the entry. Caught by the end-to-end
+    // fixture, pinned here: the ONLY object this conversion cites is the tip it
+    // was measured on.
+    const { text } = convert(SCAN_ONE);
+    const entry = entryOf(text);
+    const cited = new Set<string>();
+    for (const line of [entry.heading, ...entry.lines]) {
+      for (const m of line.matchAll(/`([0-9a-f]{7,40})`/g)) if (/[0-9]/.test(m[1])) cited.add(m[1]);
+    }
+    assert.deepEqual([...cited].sort(), [FACTS.filedAtSha, FACTS.filedAtSha.slice(0, 8)].sort());
+    assert.match(text, /`sha256:/, 'a hash that is not a git object must say what it is');
   });
 
   it('the entry says, in its own text, that its body is the entry AS FILED', () => {

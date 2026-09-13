@@ -356,6 +356,7 @@ export function classifyLayout(status, checks) {
 // ---------------------------------------------------------------------------
 
 const SCORER = path.join(SCRIPT_DIR, 'lib', 'score-corpus-rows.mjs');
+const VERIFIER = path.join(SCRIPT_DIR, 'lib', 'verify-receipt-range.mjs');
 
 function scoreManifestRows(tree, corpusDir, manifestPath, outFile) {
   const res = run(process.execPath, [
@@ -390,6 +391,18 @@ function addWorktree(repoRoot, dir, ref) {
   return dir;
 }
 
+/** A worktree plus, in fixture mode, the throwaway manifest every tool on that
+ *  tree reads. The baseline tree needs it as much as a branch tree does: a
+ *  fixture run whose baseline scored against the REAL 72-row manifest would
+ *  measure nothing at all (none of those rows resolve in the fixture corpus). */
+function newTree(ctx, dir, ref) {
+  addWorktree(ctx.repoRoot, dir, ref);
+  if (ctx.fixtureManifest) {
+    writeFileSync(path.join(dir, MANIFEST_PATH), serializeManifest(ctx.fixtureManifest), 'utf8');
+  }
+  return dir;
+}
+
 function removeWorktree(repoRoot, dir) {
   try {
     rmSync(path.join(dir, 'node_modules'), { force: true });
@@ -415,11 +428,15 @@ async function buildPublicFixtureCorpus(tree, outDir) {
   const scripts = listPublicCorpus(tree);
   const corpusDir = path.join(outDir, 'fixture-corpus');
   mkdirSync(corpusDir, { recursive: true });
+  // `file` is the repo-relative path; the fixture corpus is flat, so each one
+  // lands under a name derived from it (the same shape a de-identified corpus
+  // has: an opaque flat filename, one per script).
+  const flatName = (s) => `${s.file.replace(/\.fountain$/, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '')}.fountain`;
   for (const s of scripts) {
-    copyFileSync(path.join(tree, s.relPath), path.join(corpusDir, `${s.id}.fountain`));
+    copyFileSync(path.join(tree, s.file), path.join(corpusDir, flatName(s)));
   }
   const rowsFile = path.join(outDir, 'fixture-corpus-rows.json');
-  const stub = scripts.map((s) => ({ name: s.id, file: `${s.id}.fountain`, contentHash: '', health: 0, verdict: '', sceneCount: 0 }));
+  const stub = scripts.map((s) => ({ name: flatName(s), file: flatName(s), contentHash: '', health: 0, verdict: '', sceneCount: 0 }));
   const stubPath = path.join(outDir, 'fixture-manifest-stub.json');
   writeFileSync(stubPath, `${JSON.stringify(stub, null, 2)}\n`, 'utf8');
   const rows = scoreManifestRows(tree, corpusDir, stubPath, rowsFile);
@@ -543,9 +560,30 @@ function runProbe(ctx, { which, at, sourceRef, label }) {
 // The receipt conversion, on one branch
 // ---------------------------------------------------------------------------
 
+/** Ask the measured tree's own gate what a range contains. Returns the parsed
+ *  `{ entries, headings, problems }`. */
+function inspectRange(ctx, tree, base) {
+  const res = run(process.execPath, [VERIFIER, `--tree=${tree}`, `--base=${base}`], { cwd: tree });
+  if (res.status !== 0) {
+    throw new Refusal(
+      `could not read range ${base.slice(0, 8)}..HEAD with the gate's own functions.`,
+      [redact(res.stderr.trim(), ctx.corpusDir)],
+    );
+  }
+  return JSON.parse(res.stdout.trim().split('\n').pop());
+}
+
 async function convertAndCommit(ctx, step, tree, measurement, baseline) {
   const receiptFile = path.join(tree, RECEIPT_PATH);
   const before = readFileSync(receiptFile, 'utf8');
+  // The entries this RANGE adds — the only ones the conversion may touch. See
+  // scripts/lib/receipt-conversion.mjs's `only`.
+  const inRange = new Set();
+  for (const range of step.receiptRanges) {
+    for (const heading of inspectRange(ctx, tree, range.replace(/\.\.HEAD$/, '')).headings) {
+      inRange.add(heading);
+    }
+  }
   const fingerprint = corpusFingerprint(readFileSync(path.join(tree, MANIFEST_PATH)));
   const facts = {
     date: ctx.date,
@@ -562,7 +600,10 @@ async function convertAndCommit(ctx, step, tree, measurement, baseline) {
     floor: AUC24_FLOOR,
     ...fingerprint,
   };
-  const result = convertPendingEntries(before, facts);
+  const result = convertPendingEntries(before, facts, { only: inRange });
+  if (result.outOfScope.length > 0) {
+    console.log(`  receipt         : ${result.outOfScope.length} pending-looking entr${result.outOfScope.length === 1 ? 'y' : 'ies'} outside this range left untouched (merged history the CLI never validates)`);
+  }
   if (result.converted.length === 0) {
     console.log('  receipt         : no PENDING entry in this tree — nothing to convert');
     return { committed: false, converted: [] };
@@ -570,28 +611,38 @@ async function convertAndCommit(ctx, step, tree, measurement, baseline) {
   console.log(`  receipt         : ${result.converted.length} PENDING entr${result.converted.length === 1 ? 'y' : 'ies'} converted by the three-scan recipe`);
 
   writeFileSync(receiptFile, result.text, 'utf8');
-  // Verification one: the gate's OWN exported functions over the real diff.
-  // `addedReceiptLines(<base>)` with a single ref diffs the base commit
-  // against the WORKING TREE, so this is the same shape the CLI will see
-  // after the commit — the same method the owner note used to measure that
-  // scans one and two alone leave the entry pending.
-  const gate = await import(pathToFileURL(path.join(tree, 'scripts/check-scoring-receipt.mjs')).href);
+  // Verification one: the gate's OWN exported functions over the real diff,
+  // run BY THE MEASURED TREE (see scripts/lib/verify-receipt-range.mjs for why
+  // that is a separate process and not an import).
   for (const range of step.receiptRanges) {
     const base = range.replace(/\.\.HEAD$/, '');
-    const added = gate.addedReceiptLines.call(null, base);
-    const entries = gate.extractEntries(added);
-    const problems = [];
-    for (const entry of entries) {
-      for (const p of gate.validateEntry(entry, { objectExists: () => true })) problems.push(`${entry.heading}\n      ${p}`);
+    let entries; let problems;
+    try {
+      ({ entries, problems } = inspectRange(ctx, tree, base));
+    } catch (err) {
+      writeFileSync(receiptFile, before, 'utf8');
+      throw err;
     }
     if (problems.length > 0) {
       writeFileSync(receiptFile, before, 'utf8');
       throw new Refusal(
         `the conversion left ${problems.length} problem(s) on range ${base.slice(0, 8)}..HEAD — nothing was committed.`,
-        problems,
+        [...problems, '', 'The three scans are in docs/brain/Owner/Owner - R5 Measurement and Merge.md.'],
       );
     }
-    console.log(`  verified        : ${base.slice(0, 8)}..HEAD — ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}, 0 problems (gate's own validateEntry)`);
+    if (entries === 0) {
+      // A verification that saw NO entries verified nothing. The first version
+      // of this check imported the gate into this process, where `ROOT` is the
+      // orchestrator's cwd, and cheerfully printed "0 entries, 0 problems" for
+      // a conversion it had never looked at.
+      writeFileSync(receiptFile, before, 'utf8');
+      throw new Refusal(
+        `range ${base.slice(0, 8)}..HEAD adds no receipt entry at all — refusing to treat that as a pass.`,
+        ['The conversion rewrote an entry, so the range must show one. Either the range is wrong',
+          'in the plan record, or the entry this run converted is not one this range adds.'],
+      );
+    }
+    console.log(`  verified        : ${base.slice(0, 8)}..HEAD — ${entries} entr${entries === 1 ? 'y' : 'ies'}, 0 problems (gate's own validateEntry)`);
   }
 
   if (ctx.dryRun) {
@@ -800,7 +851,7 @@ async function main(argv) {
   console.log(`BASELINE — ${plan.baseline.ref}`);
   console.log('─'.repeat(78));
   console.log(wrap(plan.baseline.reason, 78, '  ').join('\n'));
-  const baselineTree = addWorktree(repoRoot, path.join(ctx.treesDir, 'baseline'), `${ctx.remote}/${plan.baseline.ref}`);
+  const baselineTree = newTree(ctx, path.join(ctx.treesDir, 'baseline'), `${ctx.remote}/${plan.baseline.ref}`);
   let baseline;
   try {
     baseline = await measureTree(ctx, { label: 'baseline', ref: `${ctx.remote}/${plan.baseline.ref}`, tree: baselineTree, probe: null });
@@ -826,11 +877,8 @@ async function main(argv) {
     console.log(wrap(step.reason, 78, '  ').join('\n'));
     if (step.caveat) console.log(wrap(`CAVEAT: ${step.caveat}`, 78, '  ').join('\n'));
 
-    const tree = addWorktree(repoRoot, path.join(ctx.treesDir, step.id), step.tip);
+    const tree = newTree(ctx, path.join(ctx.treesDir, step.id), step.tip);
     try {
-      if (ctx.fixtureManifest) {
-        writeFileSync(path.join(tree, MANIFEST_PATH), serializeManifest(ctx.fixtureManifest), 'utf8');
-      }
       const measurement = await measureTree(ctx, { label: step.id, ref: step.tip, tree, probe: step.probe });
       results.push({ step, measurement });
 
@@ -886,7 +934,7 @@ async function main(argv) {
   console.log(`LOCK — ${plan.lock.artifact} on ${lockLabel}`);
   console.log('─'.repeat(78));
   console.log(wrap(plan.lock.reason, 78, '  ').join('\n'));
-  const lockTree = accepted ? accepted.tree : addWorktree(repoRoot, path.join(ctx.treesDir, 'lock'), lockRef);
+  const lockTree = accepted ? accepted.tree : newTree(ctx, path.join(ctx.treesDir, 'lock'), lockRef);
   try {
     lockAuc24Step(ctx, lockTree, lockLabel, accepted);
   } finally {
@@ -923,7 +971,11 @@ function relockStep(ctx, step, tree) {
  *  worktree, then run the REAL CLI as the final check. */
 function commitOnBranch(ctx, step, tree, measurement, decision) {
   const changed = git(tree, ['status', '--porcelain=v1']).split('\n').filter((l) => l.trim() !== '');
-  const unexpected = changed.filter((l) => ![RECEIPT_PATH, MANIFEST_PATH].some((p) => l.endsWith(p)));
+  // `node_modules` is the symlink `newTree` adds so the tree's own tools can
+  // run; it is this script's doing, not a change to the branch.
+  const unexpected = changed.filter(
+    (l) => !l.endsWith('node_modules') && ![RECEIPT_PATH, MANIFEST_PATH].some((p) => l.endsWith(p)),
+  );
   if (unexpected.length > 0) {
     throw new Refusal(
       'the measured worktree has changes this run did not make — refusing to commit.',
