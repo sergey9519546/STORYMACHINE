@@ -195,16 +195,33 @@ export interface VoiceBoundRow {
 }
 
 /**
- * The safety margin the derivation holds back from the half-budget target.
+ * The safety margin the derivation holds back from the half-budget target —
+ * ZERO, and the reason is a measurement, not an oversight.
  *
- * Not decoration. The 2026-09-12 derivation chose N=150 (12.1 s) over N=160
- * (14.3 s) precisely because 0.7 s of headroom under a 15 s target is inside
- * this measurement's own run-to-run spread — it said so, but the margin lived
- * only in that prose judgement, so nothing recomputed it later. 15% of the
- * target (2,250 ms at the current budget) is wider than the spread seen in
- * every sweep recorded so far, on either machine, in either load condition.
+ * A margin exists to cover the gap between the condition a bound is DERIVED in
+ * and the condition it is ENFORCED in. Here the derivation is already the
+ * harsher of the two, deliberately: the calibration's `loaded` sweep saturates
+ * every remaining core with CPU-bound siblings, while the assertion actually
+ * runs inside `npm test`, whose sibling processes spend real time on startup,
+ * I/O and short files. Measured on ubuntu-latest at the same shape on the same
+ * day (2026-09-13): uniform-min N=150 cost 24,052 ms of CPU under the
+ * saturating proxy (run 34739790205) and 21,133 ms inside the real `npm test`
+ * (run 34739080950) — the proxy is 13.8% more expensive. Deriving at the
+ * half-budget under the proxy therefore leaves about 13% of headroom under the
+ * condition that is enforced, without inventing a number.
+ *
+ * Stacking a second, chosen margin on top of that measured one is not free, and
+ * the same tables say what it would cost: a REALISTIC 40-character feature
+ * (the committed probe-cast generator, ~15,240 pooled dialogue words) costs
+ * 12,057 ms under the proxy — 80% of the half-budget on its own, with nothing
+ * pathological about it. A 15% margin would put the cast cap at 40, one
+ * character above the largest ensemble this project has promised to keep
+ * serving, and the next ordinary ensemble drama would be refused a score to buy
+ * headroom for an assertion. The analyzer's baseline cost on a feature-length
+ * document, not the voice pass, is what fills most of that budget on this
+ * machine; a cast bound cannot buy margin against it, and should not try.
  */
-export const DERIVATION_MARGIN_FRACTION = 0.15;
+export const DERIVATION_MARGIN_FRACTION = 0;
 
 /** The shape the cast cap is derived from: the heaviest document the weight
  *  bound still admits at each cast. See buildMaxAdmitted for why not

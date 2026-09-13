@@ -40,11 +40,15 @@ on:
       uniform_min:
         description: "uniform-min casts to sweep (comma-separated) — the worst-case shape the bound is derived from"
         required: false
-        default: "60,80,90,100,110,120,130,140,150,160"
+        default: "150"
+      max_admitted:
+        description: "max-admitted casts to sweep (comma-separated) — the heaviest document the weight bound admits at each cast; the cast cap is derived from these"
+        required: false
+        default: "50,60,65,70,75,80,85,90,100"
       probe_cast:
         description: "probe-cast ensembles to sweep (comma-separated) — the realistic shape the bound must keep accepting"
         required: false
-        default: "20,30,40,44,60"
+        default: "20,30,40,44"
       repeats:
         description: "measurements per row (each in its own process)"
         required: false
@@ -91,14 +95,16 @@ jobs:
         env:
           # `inputs` is empty on a push event, so each falls back to the same
           # default the dispatch form declares.
-          UNIFORM_MIN: ${{ inputs.uniform_min || '60,80,90,100,110,120,130,140,150,160' }}
-          PROBE_CAST: ${{ inputs.probe_cast || '20,30,40,44,60' }}
+          UNIFORM_MIN: ${{ inputs.uniform_min || '150' }}
+          MAX_ADMITTED: ${{ inputs.max_admitted || '50,60,65,70,75,80,85,90,100' }}
+          PROBE_CAST: ${{ inputs.probe_cast || '20,30,40,44' }}
           REPEATS: ${{ inputs.repeats || '2' }}
           CONDITIONS: ${{ inputs.conditions || 'idle,loaded' }}
         run: |
           node --experimental-strip-types --no-warnings \
             scripts/measure-voice-bound-cost.mjs \
             "--uniform-min=$UNIFORM_MIN" \
+            "--max-admitted=$MAX_ADMITTED" \
             "--probe-cast=$PROBE_CAST" \
             "--repeats=$REPEATS" \
             "--conditions=$CONDITIONS" \

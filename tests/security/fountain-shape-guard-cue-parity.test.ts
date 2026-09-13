@@ -103,6 +103,8 @@ import {
   MAX_FOUNTAIN_BONEYARD_CUE_WEIGHT,
   MAX_FOUNTAIN_BONEYARD_FREQUENT_CUE_LINES,
   MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+  MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT,
+  realVoiceWordCountsForMeasurement,
   guardVoiceWordCounts,
   guardEligibleVoiceWordCounts,
   isSceneSegmentHeading,
@@ -125,8 +127,10 @@ import { ANALYZER_SCENE_CEILING } from '../../server/nvm/analyze/fountain-analyz
 // versions at every cast this file uses before the move.
 import {
   buildUniformMin,
+  buildMaxAdmitted,
   buildProbeCastFeature,
   uniformMinWeight,
+  maxAdmittedWordsPerSpeaker,
 } from '../../scripts/lib/voice-bound.ts';
 import { machineFingerprint, formatMachineFingerprint } from '../../scripts/lib/machine-fingerprint.ts';
 
@@ -3012,59 +3016,78 @@ describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — reali
     assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
   });
 
-  // The worst-case shape this bound is actually derived from (brief item 1):
-  // N distinct speakers, each at EXACTLY VOICE_ELIGIBLE_MIN_WORDS=30 real
-  // words — the thinnest, most O(distinct²)-expensive shape a given weight
-  // can buy, since distinct <= sqrt(weight / 30) once every speaker must
-  // clear the floor. Matches the round-1 reviewer's own "uniform-min"
-  // methodology exactly (verified: this generator's weight/chars at N=223
-  // reproduce the reviewer's reported 1,491,870 / 50,172 exactly).
+  // ── The worst shape the guard admits, and the cast bound derived from it ──
   //
-  // 2026-09-13: the boundary cast is DERIVED FROM THE CONSTANT rather than
-  // written out as a literal, so a re-derivation of the bound moves this
-  // boundary and its N+1 twin with it and the three can never disagree. What
-  // ties the constant itself to a real measurement is
-  // tests/core/voice-bound-derivation.test.ts, which re-derives it from the
-  // committed calibration table (tests/fixtures/voice-bound-derivation.json).
-  const BOUNDARY_CAST = Math.round(Math.sqrt(MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT / 30));
+  // 2026-09-12 derived MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT from the uniform-min
+  // shape (every speaker at the 30-word floor, maximizing the O(distinct²) pair
+  // count for a given weight) and pinned the boundary at N=150/151. 2026-09-13
+  // found two things wrong with that, neither of them the value:
+  //
+  //  1. The cost assertion below is enforced on a GitHub Actions runner, and
+  //     the derivation was measured on an unnamed developer box about 1.7x
+  //     faster under load. The runner measured the N=150 shape at 19,713 ms and
+  //     21,133 ms of CPU against the 15,000 ms half-budget target (runs
+  //     34736306670 / 34739080950, both ubuntu-latest).
+  //  2. Fixing the cast at d, a weight bound of W admits up to W / d² words per
+  //     speaker — 186 at d=60, not 30 — so uniform-min is not the heaviest
+  //     document the bound admits at any cast below the top. The heaviest is
+  //     scripts/lib/voice-bound.ts's `max-admitted` shape.
+  //
+  // The fix is NOT a smaller weight bound: the realistic ensembles this bound
+  // exists to serve weigh 457,200 (30-cast) and 609,600 (40-cast) here, so any
+  // weight bound the runner can carry rejects an ordinary 40-character feature
+  // and reopens adversarial finding 10. It is a SECOND bound,
+  // MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT, on the quantity that actually drives
+  // the cost — the eligible cast count — derived on the runner itself
+  // (.github/workflows/calibrate-voice-bound.yml) against the max-admitted
+  // shape, and tied to that measurement by
+  // tests/core/voice-bound-derivation.test.ts. It removes nothing: the weight
+  // bound is untouched and evaluated first, so every payload it rejected is
+  // still rejected with the same message.
+  const BOUNDARY_CAST = MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT;
 
-  it(`the bound is exactly a uniform-min weight (N=${BOUNDARY_CAST} at the 30-word eligibility floor), so the boundary below is the real boundary`, () => {
-    assert.equal(
-      uniformMinWeight(BOUNDARY_CAST),
-      MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
-      `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT (${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT}) must be 30N² for a whole N — the derivation is "the largest uniform-min cast whose cost clears the target", so a value between two casts would admit a cast whose cost was never measured`,
+  it(`the cast bound (${MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT}) is the binding constraint on the expensive shape — the weight bound alone would admit a cast of ${Math.floor(Math.sqrt(MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT / 30))}`, () => {
+    const castTheWeightBoundAdmits = Math.floor(Math.sqrt(MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT / 30));
+    assert.ok(
+      MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT < castTheWeightBoundAdmits,
+      `the cast bound (${MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT}) must sit BELOW the cast the weight bound admits on its own (${castTheWeightBoundAdmits}) — otherwise it is decorative and the 2026-09-13 runner regression is back`,
     );
   });
 
-  it(`the uniform-min N=${BOUNDARY_CAST} boundary (weight exactly ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT}) is ACCEPTED, and its measured runScriptDoctor cost stays inside the budget`, async (t) => {
+  it(`the max-admitted N=${BOUNDARY_CAST} boundary — the heaviest document BOTH bounds admit — is ACCEPTED, and its measured runScriptDoctor cost stays inside the budget`, async (t) => {
     const { runScriptDoctor } = await import('../../server/nvm/analyze/doctor.ts');
     const { DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS } = await import('../../server/lib/doctor-budget.ts');
-    const text = buildUniformMin(BOUNDARY_CAST);
+    const text = buildMaxAdmitted(BOUNDARY_CAST, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT);
     const reason = fountainShapeRejectionReason(text);
-    assert.equal(reason, null, `expected the N=${BOUNDARY_CAST} uniform-min boundary to be accepted, got: ${reason}`);
+    assert.equal(reason, null, `expected the max-admitted N=${BOUNDARY_CAST} boundary to be accepted, got: ${reason}`);
     // This is the actual analysis, not just the guard — the whole point of
-    // this bound is that the guard's ACCEPT decisions stay cheap. Round-2
+    // these bounds is that the guard's ACCEPT decisions stay cheap. Round-2
     // review round 2, item 9: a plain wall-clock ceiling is the EXACT form
     // tests/core/doctor-analysis-budget.test.ts already retired for flaking
     // (its own header: 18,512ms / 21,624ms under a parallel `npm test` on an
-    // 8.5s-standalone fixture — 2.5x load inflation). Use that file's two-part
-    // form verbatim, derived from DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS instead of
-    // a bare literal: CPU time against HALF the budget — the exact quantity
-    // the bound's own 2x-headroom design target is about — and wall clock
-    // against the FULL budget, the literal product guarantee.
+    // 8.5s-standalone fixture). Use that file's two-part form verbatim, derived
+    // from DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS instead of a bare literal: CPU
+    // against HALF the budget — the exact quantity the 2x-headroom design
+    // target is about — and wall clock against the FULL budget, the literal
+    // product guarantee.
     //
-    // 2026-09-13: the form is unchanged and deliberately NOT loosened — what
-    // changed is the machine the bound is derived on. CPU is not as
-    // load-immune as round 2 assumed (`npm test` runs each file in its own
-    // process, but those processes share a memory system and, on a 4-vCPU
-    // runner, SMT siblings), and the first real Actions run since 2026-09-02
-    // measured 19,713ms of CPU here against the 15,000ms half-budget. The
-    // answer was to re-derive the bound on the slowest machine that enforces
-    // it, not to widen the fraction, add a CI skip, or drop to wall-only. So
-    // that the next failure does not need a second archaeology pass, both
-    // messages below now name the machine, and the measurement is emitted as
-    // a TAP diagnostic on PASS too — every CI run leaves the number in the
-    // log, whether or not anything went wrong.
+    // 2026-09-13: the form is unchanged and deliberately NOT loosened — no
+    // larger fraction, no wall-only check, no CI skip, no flaky marker. What
+    // changed is the machine the bound is derived on. CPU is not as load-immune
+    // as round 2 assumed (`npm test` runs each file in its own process, but
+    // those processes share a memory system and, on a 4-vCPU runner, SMT
+    // siblings), so the derivation now measures under that same company. Both
+    // messages name the machine, and the measurement is emitted as a TAP
+    // diagnostic on PASS too, so every CI log carries the number.
+    //
+    // What this does NOT claim: that every document the analyzer accepts costs
+    // less than this. A 400-scene document with a genuine one-line walk-on is
+    // ineligible for the voice pass, is accepted by both bounds, and measures
+    // ~12-14s on a developer box — see MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's
+    // "RESIDUAL accepted worst case" note. That cost belongs to the analyzer's
+    // own advertised capacity and to DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS's hard
+    // stop, not to these bounds; this test is about the worst shape the
+    // ELIGIBLE path admits.
     const cpuStart = process.cpuUsage();
     const wallStart = Date.now();
     await runScriptDoctor(text);
@@ -3073,29 +3096,62 @@ describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — reali
     const cpuMs = (cpu.user + cpu.system) / 1000;
     const machine = formatMachineFingerprint(machineFingerprint());
     t.diagnostic(
-      `voice-bound worst-case cost: N=${BOUNDARY_CAST} (weight ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT}) `
+      `voice-bound worst-case cost: max-admitted N=${BOUNDARY_CAST} `
+      + `(${maxAdmittedWordsPerSpeaker(BOUNDARY_CAST, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT)} words/speaker) `
       + `cpu ${Math.round(cpuMs)}ms (${((cpuMs / (DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS / 2)) * 100).toFixed(0)}% of the `
       + `${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS / 2}ms half-budget target), wall ${wallMs}ms — ${machine}`,
     );
     assert.ok(
       cpuMs < DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS / 2,
-      `expected the N=${BOUNDARY_CAST} worst-case accepted shape to cost under half the ${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms analysis budget of CPU, used ${Math.round(cpuMs)}ms — the bound's 2x-headroom derivation no longer holds on this machine: ${machine}. Re-derive with \`npm run measure-voice-bound\` on THIS machine (and .github/workflows/calibrate-voice-bound.yml for the runner), then re-lock tests/fixtures/voice-bound-derivation.json — do not raise the fraction`,
+      `expected the max-admitted N=${BOUNDARY_CAST} worst-case accepted shape to cost under half the ${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms analysis budget of CPU, used ${Math.round(cpuMs)}ms — the bound's 2x-headroom derivation no longer holds on this machine: ${machine}. Re-derive with \`npm run measure-voice-bound\` on THIS machine (and .github/workflows/calibrate-voice-bound.yml for the runner), then re-lock tests/fixtures/voice-bound-derivation.json — do not raise the fraction`,
     );
     assert.ok(
       wallMs < DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS,
-      `expected the N=${BOUNDARY_CAST} worst-case accepted shape to finish under the ${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms analysis budget, took ${Math.round(wallMs)}ms wall on ${machine}`,
+      `expected the max-admitted N=${BOUNDARY_CAST} worst-case accepted shape to finish under the ${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms analysis budget, took ${Math.round(wallMs)}ms wall on ${machine}`,
     );
   });
 
-  it(`the uniform-min N=${BOUNDARY_CAST + 1} boundary (one speaker over — weight ${uniformMinWeight(BOUNDARY_CAST + 1)}) is REJECTED`, () => {
-    const text = buildUniformMin(BOUNDARY_CAST + 1);
-    assert.ok(
-      uniformMinWeight(BOUNDARY_CAST + 1) > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
-      'sanity: one speaker past the boundary must weigh more than the bound',
-    );
+  it(`the max-admitted N=${BOUNDARY_CAST + 1} boundary (one speaker over) is REJECTED by the cast bound`, () => {
+    const text = buildMaxAdmitted(BOUNDARY_CAST + 1, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT);
     const reason = fountainShapeRejectionReason(text);
-    assert.ok(reason, `expected N=${BOUNDARY_CAST + 1} (one speaker past the boundary) to be rejected`);
+    assert.ok(reason, `expected max-admitted N=${BOUNDARY_CAST + 1} (one speaker past the cast bound) to be rejected`);
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT/);
+  });
+
+  // The 2026-09-12 boundary, restated honestly: the uniform-min N=150 document
+  // that sat exactly ON the weight bound and was ACCEPTED then is REJECTED now.
+  // That is the narrowing this lane makes, and it is the whole point — that
+  // document cost 21,133ms of CPU on the machine that gates this repository.
+  it('the uniform-min N=150 shape the 2026-09-12 derivation admitted (weight exactly 675,000) is now REJECTED by the cast bound — the narrowing, stated rather than hidden', () => {
+    const text = buildUniformMin(150);
+    assert.equal(uniformMinWeight(150), MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT, 'sanity: this document still sits exactly on the weight bound');
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected the old N=150 boundary document to be rejected under the cast bound');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT/);
+  });
+
+  it('the uniform-min N=151 shape is still REJECTED, and still by the WEIGHT bound — the cast bound is checked second so no pinned rejection changed its message', () => {
+    const text = buildUniformMin(151);
+    assert.equal(uniformMinWeight(151), 684_030);
+    const reason = fountainShapeRejectionReason(text);
+    assert.ok(reason, 'expected N=151 (one speaker past the weight boundary) to be rejected');
     assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
+
+  // The cast bound must stay ABOVE every realistic ensemble this file pins as
+  // accepted, computed from those fixtures' own eligible cast counts rather
+  // than from the literal 40 — so a future re-derivation that would start
+  // rejecting an ordinary feature fails here instead of in a writer's browser.
+  it('the cast bound stays above the largest realistic ensemble this file pins as ACCEPTED', () => {
+    const counts = [15, 20, 30, 40].map((cast) => {
+      const eligible = [...realVoiceWordCountsForMeasurement(buildProbeCastFeature(cast)).values()].filter((w) => w > 0);
+      return { cast, distinct: eligible.length };
+    });
+    const largest = Math.max(...counts.map((c) => c.distinct));
+    assert.ok(
+      MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT > largest,
+      `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT (${MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT}) must stay strictly above the largest realistic ensemble pinned as accepted here (${largest} eligible speakers, from ${JSON.stringify(counts)}) — a bound at or below it rejects an ordinary feature, which is adversarial finding 10 all over again`,
+    );
   });
 
   // Brief item (b)/(c)/(d): the lightest payload this file's own DoS/bypass
