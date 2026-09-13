@@ -1264,10 +1264,11 @@ export async function shutdown({ browser, serverProc, graceMs = 0 } = {}) {
   // version of this note claimed that cost this SUITE'S OWN production
   // boot a warm cache. That is false — this suite's production instance
   // boots BEFORE the dev one (section 1, `bootProduction()`), never calls
-  // `allocateViteCacheSlot()` at all (that function spawns `tsx` directly —
-  // see this file's own header, "WHY IT IS NOT bootKeylessServer()"), and
-  // runs with `NODE_ENV=production`, where `server/app.ts` never starts
-  // Vite. There was no warm cache for it to fail to reuse. The real cost of
+  // `allocateViteCacheSlot()` at all (`bootProduction()` spawns `tsx`
+  // directly — see verify-production-build.mjs:23, "WHY IT IS NOT
+  // bootKeylessServer()"), and runs with `NODE_ENV=production`, where
+  // `server/app.ts` never starts Vite. There was no warm cache for it to
+  // fail to reuse. The real cost of
   // holding the slot until process exit falls on a CONCURRENT gate — another
   // worktree, or a second gate against this repo — which wants a pooled slot
   // during this suite's ~14 s section-6 Chromium journey and gets pushed to
