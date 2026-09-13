@@ -327,3 +327,156 @@ None of these touches the core change, which is correct, well-evidenced, and
 driven clean through all four renderers, the analysis seam and the FDX round
 trip. Items 1-2 are why this is REVISE rather than MERGE: the brief's item C is
 reported as done and is not.
+
+---
+
+# Round 2 — reviewed SHA `56b96765`
+
+Warm re-check of my six round-1 items against `git diff 0944b4f9..56b96765`
+(lane standard §6: the same reviewer, the same items, no fresh read and no
+battery re-run). Last code commit `93af2377`; four commits in the round.
+
+| # | round-1 item | lane's disposition | my verdict |
+|---|---|---|---|
+| 1 | centering eaten at the analysis seam | FIXED | **FIXED — reproduced** |
+| 2 | centered lost through the FDX round trip | PINNED + item C narrowed | **ACCEPTED** |
+| 3 | mixed-case forced transition prints different text per renderer | FIXED | **FIXED — reproduced** |
+| 4 | `pdf-import.ts`'s false round-trip claim | FIXED | **FIXED — reproduced** |
+| 5 | `canonical-fountain.ts` untested | DONE, new suite | **DONE — fail-first reproduced by me** |
+| 6 | receipt over-lists scoring-path files | FIXED | **FIXED — matches the gate's own output** |
+
+## What I ran
+
+**Item 1.** My own round-1 probe, unchanged, on the new tree:
+
+```
+doc: INT. OFFICE - DAY / Mary closes the file. / She looks up at the window. /
+     >SMASH TO BLACK. / EXT. STREET - NIGHT / Rain falls hard. / >THE END<
+page: …, action:"Rain falls hard.", centered:">THE END<"
+seam: …, action:"Rain falls hard.", centered:">THE END<"     ← was action:"Rain falls hard. >THE END<"
+```
+
+The split is closed, and closed the right way: `isCenteredLine` is exported from
+`src/lib/fountain.ts` and the parser branch, `isForcedTransitionLine`, the
+normaliser, `isCharacterCue` and `canonical-fountain.ts` all ask it — one
+definition, no sixth spelling. I also checked the regression this kind of fix
+invites, since the new normaliser branch does `flush(); mode = 'none'`: a
+`>text<` line **inside a speech** must not become a structural break, because
+the parser keeps it in the dialogue block. It does not — packed and
+double-spaced shapes both keep `dialogue`, matching the page. And the seam
+emits the line **verbatim, not uppercased**, which is right: `centered` carries
+no uppercase flag in the layout SPEC.
+
+**Item 3.** The spec's own example through all four, on `56b96765`:
+
+```
+layout  x=439.2  "BURN TO WHITE."      PDF  (BURN TO WHITE.) Tj
+DOCX    <w:pStyle w:val="Transition"/> "BURN TO WHITE."   (uppercase flag added)
+FDX     <Text>Burn to White.</Text>
+```
+
+The rule the lane wrote down — the three surfaces that draw a PAGE apply the
+element's uppercase convention, `fdx.ts` stores the writer's bytes because Final
+Draft holds an element TYPE and applies its own display rules — is the right
+resolution, better than the byte-equality I half-implied in round 1. It is also
+consistent with what `fdx.ts` already does for scene headings and cues (verified:
+a forced lowercase heading exports as `a forced lowercase heading`), so the fix
+removes an inconsistency rather than adding a special case. The `@McCLANE` twin
+is named as out of scope with the reason (reachable on the base). Accepted.
+
+**Item 4.** `formatTransitionLine` via the exported `isInferredTransitionLine`:
+
+```
+THE END.       -> "> THE END."      scene_heading,action,transition
+TIME CUT:      -> "> TIME CUT:"     scene_heading,action,transition
+INTERCUT WITH: -> "> INTERCUT WITH:"  scene_heading,action,transition
+CUT TO: / FADE OUT. / SMASH TO:  -> unchanged bytes, still transition
+```
+
+The wider recognition set now round-trips, the shared set emits byte-identically
+(so no existing import moves), and the `:`-appending mutation of the FDX
+importer was deliberately NOT copied — `THE END.` stays `THE END.`, which is the
+right call and is argued at the site.
+
+**Item 5.** I built a `git archive 089bec91` export, copied in the new
+`server/nvm/analyze/canonical-fountain.test.ts` alone, and ran it there:
+**1 pass / 4 fail**, against **5 pass / 0 fail** on `56b96765`. Fail-first
+confirmed independently, not taken from the report.
+
+**Item 6.** `node scripts/check-scoring-receipt.mjs 089bec91..HEAD` → exit 1,
+`2 scoring-path file(s) changed: screenplay-normalizer.ts, fountain.ts`; the
+receipt now says "names TWO files" and lists exactly those, and the range still
+gains exactly **one** `###` entry, PENDING.
+
+**Regression check after three more scoring-path moves.** `npm run
+benchmark:public`: shuffle-drop **0.8438 / 0.7896**, climax-relocate **0.5938 /
+0.5234**, control **1.0000 / 0.9814** — all six digits and all four intervals
+unchanged from round 1. `parse-format-invariance` + `fdx-import`: **88 pass, 0
+fail**. New suites `canonical-fountain` + `pdf-import`: **25 pass, 0 fail**.
+`check-brain` fresh (105 notes, 391 links); `brain-coverage` 7/7.
+
+## Item 2 on its merits: is "Final Draft has no Centered paragraph type" true?
+
+Yes. FDX stores `<Paragraph Type="…">` over the standard element set (Scene
+Heading, Action, Character, Parenthetical, Dialogue, Transition, Shot, General
+…); there is no `Centered` member, and centering is expressed as a paragraph
+property — `<Paragraph Type="Action" Alignment="Center">` — which is exactly the
+remedy the lane names. So `centered → 'Action'` is not a lazy mapping, it is the
+only *type* available, and the lost information is the alignment attribute.
+
+**Pinning is acceptable here**, for three reasons, and I say so as the reviewer
+who raised it. The loss is pre-existing and outside this lane's subject (it is
+not a marker defect — `renderableText` strips `>`/`<` correctly on the way out);
+the fix spans both an exporter and an importer (`buildParagraphs`, the entry
+shape, the importer's paragraph reader) on a surface this scoring lane has no
+measurement for; and what I actually asked for in round 1 — "add it to the
+round-trip fixture as an expected-loss assertion, if not fixing, and to §9, so
+item C is reported as narrowed rather than done" — is precisely what was done,
+with the mechanism, the remedy and a "do not relax this" instruction in the
+test. Brief item C now reads NARROWED in §1 and §9. The fix is cheap enough that
+it should be someone's next lane; it is not a merge blocker.
+
+## The push-back on the three spellings
+
+**Sound, and I accept it.** I checked the two heuristics the lane declined to
+fold: `screenplay-normalizer.ts:35/57` and `canonical-fountain.ts:53/69` really
+do differ from the parser in two clauses — a `length <= 20` bound and
+`/[A-Z]\s*TO:\s*$/` (a suffix match) against the parser's anchored
+`/^[A-Z ]+ TO:$/`. They are recognisers for scraped, packed and double-spaced
+imports, not restatements of the parse grammar, and folding them in would make
+the repair passes blind to shapes they exist to repair. That is a real
+distinction and the lane is right to name them in §9 instead of unifying them.
+`fdx-import.ts`'s pair is the genuine third copy, correctly deferred: folding it
+needs the `withColon` mutation untangled first.
+
+One correction to that bullet, non-blocking. §9 says round 2 "folded the
+parser's and `server/lib/pdf-import.ts`'s onto one exported
+`isInferredTransitionLine`". Only the EMISSION half was folded:
+`pdf-import.ts:119-120` still declares `AUTO_DETECTED_TRANSITION_RE` and
+`GENERIC_TRANSITION_RE`, byte-identical to the parser's, and uses them at line
+663 — three lines above the call to the imported test at 677. So that file now
+holds two answers to the same question. The recognition line is exactly
+`isInferredTransitionLine(upper) || OTHER_TRANSITION_RE.test(upper)` (the
+function has already guaranteed `upper === text`, which is the parser's own
+uppercase clause), so it is a one-line change; the count in §9 is off by one
+until it is made. It does not affect behaviour and does not block.
+
+---
+
+VERDICT: MERGE
+
+All six round-1 items are addressed and independently reproduced here: the seam
+now agrees with the page on centering, the four renderers now answer the case
+question by a written rule rather than by accident, the PDF importer's
+round-trip claim is true, `canonical-fountain.ts` has a suite that fails 4 of 5
+on the base, and the receipt says what the gate says. No floor moved, no digit
+moved, `auc.ts` and both benchmark fixtures remain byte-identical to `089bec91`,
+and the range still carries exactly one PENDING receipt — the intended state for
+an owner-gated scoring branch. Ready for the owner's `npm run measure-real`,
+measured LAST in the stack (`4cf5b2f3` → `089bec91` → this tip), per
+[[Owner - R5 Measurement and Merge]].
+
+Two things for whoever picks up the next lane, neither blocking: fold
+`pdf-import.ts`'s remaining recognition pair into `isInferredTransitionLine`
+(one line, and it makes §9's count true), and close the centered FDX round trip
+by emitting and reading `Alignment="Center"`.
