@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { RELATIVE_IMPORT_RE, buildTimeImports } from '../../scripts/lib/build-time-imports.mjs';
 
 const root = path.resolve(import.meta.dirname, '../..');
 const file = path.join(root, '.dockerignore');
@@ -98,55 +99,14 @@ function isExcluded(patterns: string[], candidate: string): boolean {
 // `[UNRESOLVED_IMPORT] Could not resolve './scripts/lib/vite-cache-dir.mjs'`.
 // A test that cannot catch the bug proves nothing.
 //
-// So the config's own relative-import graph is walked here. The next
-// build-time import into `vite.config.ts` is caught by this file instead of
-// being rediscovered in a release — the class, not the instance.
-const RELATIVE_IMPORT_RE = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)['"](\.[^'"]*)['"]/g;
-
-/** Extensions tried, in order, for a specifier that does not name a real file. */
-const RESOLUTION_SUFFIXES = ['', '.mjs', '.js', '.mts', '.ts', '.cjs', '.json', '/index.mjs', '/index.js', '/index.ts'];
-
-/**
- * Resolve one relative specifier against `fromFile`, repository-relative and
- * posix-spelled, or null when nothing on disk answers to it (a specifier that
- * resolves to nothing cannot be a context requirement).
- */
-function resolveRelative(baseDir: string, specifier: string, repoRoot: string): string | null {
-  for (const suffix of RESOLUTION_SUFFIXES) {
-    const candidate = path.resolve(baseDir, specifier + suffix);
-    if (!fs.existsSync(candidate) || !fs.statSync(candidate).isFile()) continue;
-    return path.relative(repoRoot, candidate).split(path.sep).join('/');
-  }
-  return null;
-}
-
-/**
- * Every file `entryRelative` reaches through relative imports, transitively.
- * Repository-relative, posix, entry excluded, cycle-safe.
- */
-function buildTimeImports(repoRoot: string, entryRelative: string): string[] {
-  const found = new Set<string>();
-  const seen = new Set<string>();
-  const queue = [entryRelative];
-
-  while (queue.length > 0) {
-    const current = queue.shift() as string;
-    if (seen.has(current)) continue;
-    seen.add(current);
-    const absolute = path.join(repoRoot, current);
-    if (!fs.existsSync(absolute)) continue;
-    const source = fs.readFileSync(absolute, 'utf8');
-    for (const match of source.matchAll(RELATIVE_IMPORT_RE)) {
-      const resolved = resolveRelative(path.dirname(absolute), match[1], repoRoot);
-      if (resolved === null || resolved === entryRelative) continue;
-      found.add(resolved);
-      queue.push(resolved);
-    }
-  }
-
-  return [...found].sort();
-}
-
+// So the config's own relative-import graph is walked here — by
+// `scripts/lib/build-time-imports.mjs`, not a local copy. That module also
+// backs `distStaleness()`'s build-input list (`scripts/lib/browser-verify.mjs`,
+// review round 2 observation (b)): one walker, so this policy and the
+// dist-staleness policy can never learn about `vite.config.ts`'s imports at
+// different times. The next build-time import into `vite.config.ts` is caught
+// by this file instead of being rediscovered in a release — the class, not
+// the instance.
 const viteConfigImports = buildTimeImports(root, 'vite.config.ts');
 
 const requiredContextPaths = [

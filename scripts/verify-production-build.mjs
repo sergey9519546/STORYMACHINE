@@ -502,7 +502,19 @@ try {
       record('dev-vs-prod', 'analyzedAt really was present and excluded (not accidentally identical because both are missing it)', typeof prodJson.analyzedAt === 'number' && typeof devJson.analyzedAt === 'number');
     }
   } finally {
-    if (devProc) { try { devProc.kill('SIGTERM'); await sleep(400); if (!devProc.killed) devProc.kill('SIGKILL'); } catch { /* already gone */ } }
+    // Through shutdown() rather than an inline kill — this boot went through
+    // bootKeylessServer() same as any other, so it holds a Vite cache slot
+    // (browser-verify.mjs's allocateViteCacheSlot) that only shutdown()
+    // releases. An inline `devProc.kill()` here (what this line used to be)
+    // left that slot held until the whole gate process exited: harmless
+    // (vite-cache-dir.mjs's exit hook frees it then), but it meant section 6's
+    // production boot below always took a SECOND slot instead of reusing this
+    // one's warm cache the moment this section was done with it — review
+    // observation (a). shutdown() also waits for devProc to actually exit
+    // before freeing the slot (see its own comment) rather than after only
+    // the signal, which the SIGTERM/sleep/SIGKILL sequence here approximated
+    // by luck, not by the same mechanism every other suite relies on.
+    if (devProc) await shutdown({ serverProc: devProc });
   }
 
   // ═════════════════════════════════════════════════════════════════════

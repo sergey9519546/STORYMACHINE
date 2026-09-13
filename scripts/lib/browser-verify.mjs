@@ -34,6 +34,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { assertKeylessAiConfig, keylessBrowserServerEnv } from './keyless-browser-certification.mjs';
 import { VITE_CACHE_DIR_ENV, allocateViteCacheSlot } from '../../vite-cache-dir.mjs';
+import { buildTimeImports } from './build-time-imports.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHARED TIMING POLICY — the fix for "passed alone, flaked under load."
@@ -412,6 +413,18 @@ export const SERVE_BUILT_DIST = 'built-dist';
 //                   tsconfig.json; Tailwind 4 is configured in CSS under src/)
 //                   is covered the day someone adds one, not the day someone
 //                   remembers this list
+//   vite.config.ts's own relative imports (e.g. `vite-cache-dir.mjs`) —
+//                   walked transitively by `buildTimeImports()`
+//                   (scripts/lib/build-time-imports.mjs), not listed, so a
+//                   future import into the config joins this list the same
+//                   way it already joins `tests/core/docker-context.test.ts`'s
+//                   Docker-context requirement (review round 2, observation
+//                   (b): before this, editing `vite-cache-dir.mjs` after a
+//                   build left `distStaleness()` saying "current" — the file
+//                   changes `cacheDir`, not `dist/`'s bytes, today, but a
+//                   staleness rule that cannot see a whole class of the
+//                   config's own inputs is a rule waiting to be wrong once,
+//                   not a rule that is provably right)
 //
 // What is OUT, and why:
 //   server/**       the server runs from source under tsx in every mode, so a
@@ -481,6 +494,12 @@ export function distStaleness({ repo } = {}) {
   const inputs = [...DIST_BUILD_INPUTS];
   for (const entry of readdirSync(cwd)) {
     if (DIST_BUILD_CONFIG_RE.test(entry) && !inputs.includes(entry)) inputs.push(entry);
+  }
+  // vite.config.ts's own relative imports are build inputs too — see the
+  // comment on DIST_BUILD_INPUTS above. A fixture repo with no vite.config.ts
+  // yields [] here, same as any other missing input.
+  for (const imported of buildTimeImports(cwd, 'vite.config.ts')) {
+    if (!inputs.includes(imported)) inputs.push(imported);
   }
   for (const input of inputs) {
     const hit = newestMtime(path.join(cwd, input));
@@ -1227,11 +1246,23 @@ export async function shutdown({ browser, serverProc, graceMs = 0 } = {}) {
   // would hand slot N to a second boot while the first server was still
   // running `vite.close()` — possibly mid-rename of `deps_temp_<hash>` onto
   // `deps/`. That is a smaller copy of the defect this whole change exists to
-  // close, and it is reachable at the `graceMs = 0` default that four suites
-  // use (`verify:ui-polish`, `verify:local-safety-net`,
-  // `verify:command-palette`, and `verify:production`'s dev instance). The
-  // `graceMs > 0` callers were incidentally covered by their own sleep; that
-  // was luck, not a mechanism.
+  // close, and it is reachable at the `graceMs = 0` default that four callers
+  // use: `verify:ui-polish`, `verify:local-safety-net`, `verify:command-palette`,
+  // and `verify:production`'s dev instance (verify-production-build.mjs's
+  // section 5 teardown). The `graceMs > 0` callers were incidentally covered
+  // by their own sleep; that was luck, not a mechanism.
+  //
+  // The fourth entry is true only as of 2026-09-13: until then that dev
+  // instance tore itself down inline (`kill('SIGTERM')` / sleep / `SIGKILL`)
+  // and never called this function at all, so this comment's claim of "four"
+  // was actually three — review round 2, observation (a)
+  // (docs/audits/2026-09-12-adversarial/vitecache-review.md). The inline path
+  // also never freed this boot's cache slot, only the exit hook in
+  // ../../vite-cache-dir.mjs did (harmless — the slot was freed at process
+  // exit either way — but it meant that suite's own second, PRODUCTION boot
+  // always took a second slot instead of reusing this one's warm cache).
+  // Routed through here instead, "four" is now literally true rather than a
+  // count that happened to read right.
   //
   // Outside the try so a kill that throws (a process that already exited)
   // cannot skip it, and bounded so a child that never dies delays teardown by

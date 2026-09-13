@@ -26,10 +26,11 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import {
   VITE_CACHE_DIR_ENV,
@@ -421,6 +422,89 @@ describe('the wiring, not just the helper', () => {
     }
   });
 
+  it('re-installs a signal handler that already fired once, for a process that legitimately keeps allocating', async () => {
+    // The gap this closes (2026-09-13 review round 2, observation (c)):
+    // installExitHooks() used to run at most once for the whole process. A
+    // holder with its own non-exiting SIGTERM handler survives the first
+    // SIGTERM (this module's handler releases slot 0's lock and removes
+    // itself); if it legitimately allocates a SECOND slot afterward, a second
+    // SIGTERM found no handler left here, and that slot's lock survived it —
+    // measured directly before this test existed. Per-signal re-install
+    // (installedSignalHandlers) closes it: the handler is re-attached on the
+    // very next allocateViteCacheSlot() call, so the second slot is covered
+    // by the second SIGTERM too.
+    const repoRoot = path.join(tmpdir(), `vite-cache-refires-${process.pid}`);
+    const base = repoCacheBase({ repoRoot });
+    rmSync(base, { recursive: true, force: true });
+    const dir = mkdtempSync(path.join(tmpdir(), 'vite-cache-refires-'));
+    let child: ReturnType<typeof spawn> | undefined;
+    try {
+      const holder = path.join(dir, 'holder.mjs');
+      writeFileSync(
+        holder,
+        `import { allocateViteCacheSlot } from ${JSON.stringify(pathToFileURL(path.join(REPO, 'vite-cache-dir.mjs')).href)};\n`
+          + `const repoRoot = ${JSON.stringify(repoRoot)};\n`
+          + 'const first = allocateViteCacheSlot({ repoRoot, env: {} });\n'
+          + "process.stdout.write(JSON.stringify({ event: 'first', slot: first.slot }) + '\\n');\n"
+          // A legitimate non-exiting SIGTERM handler — this is the case a
+          // dying gate does NOT model, and the one this test exists for.
+          + "process.on('SIGTERM', () => {});\n"
+          + "process.stdin.on('data', (chunk) => {\n"
+          + "  if (chunk.toString().trim() !== 'allocate-second') return;\n"
+          + '  const second = allocateViteCacheSlot({ repoRoot, env: {} });\n'
+          + "  process.stdout.write(JSON.stringify({ event: 'second', slot: second.slot }) + '\\n');\n"
+          + '});\n'
+          + 'setInterval(() => {}, 1000);\n',
+      );
+
+      child = spawn(process.execPath, [holder], { stdio: ['pipe', 'pipe', 'inherit'] });
+      let buf = '';
+      const events: Array<{ event: string; slot: number }> = [];
+      child.stdout!.on('data', (d) => {
+        buf += d.toString();
+        let nl;
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, nl);
+          buf = buf.slice(nl + 1);
+          if (line.trim()) events.push(JSON.parse(line));
+        }
+      });
+      const waitFor = async (predicate: () => boolean, timeoutMs = 10000) => {
+        const start = Date.now();
+        while (!predicate()) {
+          if (Date.now() - start > timeoutMs) throw new Error('timed out waiting for condition');
+          await sleep(20);
+        }
+      };
+
+      await waitFor(() => events.some(e => e.event === 'first'));
+      const firstSlot = events.find(e => e.event === 'first')!.slot;
+      const firstLock = path.join(base, `slot-${firstSlot}.lock`);
+      assert.ok(existsSync(firstLock), 'the first slot must be locked while the holder is alive');
+
+      child.kill('SIGTERM'); // signal #1 — caught, released, self-removed; the holder's own handler keeps it alive
+      await waitFor(() => !existsSync(firstLock));
+
+      child.stdin!.write('allocate-second\n'); // a legitimate allocation AFTER the first signal
+      await waitFor(() => events.some(e => e.event === 'second'));
+      const secondSlot = events.find(e => e.event === 'second')!.slot;
+      const secondLock = path.join(base, `slot-${secondSlot}.lock`);
+      assert.ok(existsSync(secondLock), 'the second allocation must be locked');
+      // The pool always scans from slot 0, so releasing the first slot before
+      // allocating again reclaims slot 0 itself — same slot number, a fresh
+      // lock. That is fine: what this test pins is the SIGNAL coverage, not
+      // which slot index gets reused.
+
+      child.kill('SIGTERM'); // signal #2 — must be covered too, now that the handler re-installs
+      await waitFor(() => !existsSync(secondLock));
+      assert.ok(!existsSync(secondLock), 'FIXED: a second SIGTERM after a legitimate second allocation must release that slot too');
+    } finally {
+      if (child && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
   it('the cache directory is not a dist/ build input', () => {
     // `distStaleness` picks up root-level build config BY PATTERN, so an
     // in-repo cache would have been one regex edit from making every browser
@@ -454,5 +538,93 @@ describe('the wiring, not just the helper', () => {
     assert.ok(existsSync(path.join(REPO, 'scripts/verify-vite-cache-isolation.mjs')));
     assert.ok(existsSync(path.join(REPO, 'scripts/lib/vite-dev-probe.mjs')));
     assert.match(read('package.json'), /"verify:vite-cache": "node scripts\/verify-vite-cache-isolation\.mjs"/);
+  });
+});
+
+describe('shutdown()\'s graceMs=0 callers — the comment above releaseViteCacheSlot() names them', () => {
+  // The comment beside `try { serverProc?.releaseViteCacheSlot?.(); }` in
+  // browser-verify.mjs names, by hand, every `shutdown()` caller that relies
+  // on the `graceMs = 0` default rather than its own sleep to cover the
+  // "release after the signal, not after the death" window. On 2026-09-13 it
+  // named FOUR and the tree actually had THREE:
+  // `verify-production-build.mjs`'s dev-instance teardown tore itself down
+  // inline (`devProc.kill('SIGTERM')` / sleep / `SIGKILL`) and never called
+  // `shutdown()` at all — review round 2, observation (a)
+  // (docs/audits/2026-09-12-adversarial/vitecache-review.md). Fixed by
+  // routing that teardown through `shutdown()`, which makes the comment's
+  // "four" literally true; this pins it so a fifth caller, or a dropped one,
+  // reds this test instead of rotting the comment again.
+
+  /** Every `.mjs` file under `scripts/`, recursively — where a `shutdown()`
+   *  call could live. Matches the "walk scripts/" shape `tests/core/
+   *  docker-context.test.ts`'s `buildTimeImports` uses for the same reason:
+   *  a hand-maintained file list is exactly what rotted last time. */
+  function mjsFilesUnder(dir: string): string[] {
+    const out: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) out.push(...mjsFilesUnder(full));
+      else if (entry.name.endsWith('.mjs')) out.push(full);
+    }
+    return out;
+  }
+
+  /** Repo-relative, posix-spelled paths of every `scripts/**\/*.mjs` file
+   *  containing a `shutdown({ … })` call with no `graceMs` in the object
+   *  literal — every call site is a single-line, unnested object literal
+   *  today (verified by hand across all eight call sites), which is what
+   *  makes a `[^}]*` scan safe rather than a full parse. */
+  function zeroGraceShutdownCallers(): string[] {
+    const hits: string[] = [];
+    for (const file of mjsFilesUnder(path.join(REPO, 'scripts'))) {
+      // scripts/lib/browser-verify.mjs DEFINES shutdown() — it is not a
+      // caller, but its own doc comments quote example calls (e.g. "`shutdown
+      // ({ serverProc })` frees the slot…"), and a plain source scan cannot
+      // tell prose from code. Excluding the one file that both defines the
+      // function and is the only place such a quoting comment could plausibly
+      // live is cheaper and just as sound as a comment-aware parser here.
+      if (path.relative(REPO, file).split(path.sep).join('/') === 'scripts/lib/browser-verify.mjs') continue;
+      const source = readFileSync(file, 'utf8');
+      const calls = source.match(/shutdown\(\{[^}]*\}\)/g) ?? [];
+      if (calls.some(call => !/graceMs/.test(call))) {
+        hits.push(path.relative(REPO, file).split(path.sep).join('/'));
+      }
+    }
+    return hits.sort();
+  }
+
+  it('is exactly the four files the comment names — a count that can fail', () => {
+    const callers = zeroGraceShutdownCallers();
+    assert.equal(callers.length, 4, `expected 4 graceMs=0 shutdown() callers under scripts/, found ${callers.length}: ${JSON.stringify(callers)}`);
+    assert.deepEqual(
+      callers,
+      [
+        'scripts/verify-e4-local-safety-net.mjs',
+        'scripts/verify-e5-command-palette.mjs',
+        'scripts/verify-production-build.mjs',
+        'scripts/verify-ui-polish-affordances.mjs',
+      ],
+      'a new graceMs=0 caller (or a removed one) must also update the comment beside releaseViteCacheSlot() in scripts/lib/browser-verify.mjs',
+    );
+  });
+
+  it('verify-production-build.mjs\'s dev-instance teardown really does call shutdown() now, not an inline kill', () => {
+    const source = read('scripts/verify-production-build.mjs');
+    assert.ok(
+      /if \(devProc\) await shutdown\(\{ serverProc: devProc \}\);/.test(source),
+      'the dev-instance teardown must route through shutdown() so it releases its Vite cache slot correctly instead of leaking it until process exit',
+    );
+    assert.ok(
+      !/devProc\.kill\('SIGTERM'\)/.test(source),
+      'the old inline SIGTERM/sleep/SIGKILL teardown must be gone, not left beside the new one',
+    );
+  });
+
+  it('the comment names all four callers by their npm script name', () => {
+    const comment = read('scripts/lib/browser-verify.mjs');
+    for (const name of ['verify:ui-polish', 'verify:local-safety-net', 'verify:command-palette', 'verify:production']) {
+      assert.ok(comment.includes(name), `the graceMs=0 comment must still name ${name}`);
+    }
+    assert.ok(/verify:production.{0,40}dev instance/s.test(comment), 'the comment must still call out the verify:production dev instance specifically, not the whole suite');
   });
 });

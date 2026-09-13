@@ -227,12 +227,46 @@ function claimLock(lockPath) {
 // So a slot is never held forever by a dead process, and after this change it
 // is usually not even held briefly. What neither mechanism covers is a lock
 // this process cannot parse — see `lockHolderAlive`.
+//
+// ── RE-INSTALLING AFTER A SIGNAL FIRES (2026-09-13, review round 2,
+//    observation (c)) ─────────────────────────────────────────────────────
+//
+// Each handler below removes ITSELF once it runs (`process.off(signal,
+// handler)`), because a listener left attached after re-raising the signal
+// would receive its own re-raise. The first version of this file tracked
+// "installed" as one boolean for the whole process, set once and never
+// cleared, so that self-removal was permanent: a gate with its OWN SIGTERM
+// handler that does not exit (the `own-handler` variant the test below
+// drives) survives the first SIGTERM, is then free to allocate a SECOND
+// slot — a real, legitimate case, not a hypothetical — and a second SIGTERM
+// found no handler here at all. Measured: the second slot's lock file
+// survived a second `kill -TERM` untouched. That is not a leak (mechanism 2
+// still reclaims it once the process actually dies, the same backstop that
+// already covers SIGKILL), but it is a hole in mechanism 1 for a case
+// mechanism 1 exists to cover.
+//
+// So "installed" is tracked PER SIGNAL (`installedSignalHandlers`, signal
+// name -> its handler), not by one flag for the whole process:
+// `installExitHooks()` runs on every `allocateViteCacheSlot()` call and
+// re-attaches exactly the signals whose handler most recently fired and
+// removed itself, leaving signals that have not fired yet untouched (no
+// duplicate listeners, no MaxListeners warning). A process that keeps
+// legitimately running and keeps allocating slots stays covered across as
+// many signals of the same kind as it survives, not only the first.
 
 /** Release callbacks for every slot this process currently holds. */
 const heldSlots = new Set();
 
-/** Installed at most once, and only once a slot has actually been taken. */
-let exitHooksInstalled = false;
+/** Whether `process.once('exit', releaseHeldSlots)` is attached. The `'exit'`
+ *  event fires at most once per process, so — unlike the per-signal handlers
+ *  below — this needs no re-install: once attached it covers every normal
+ *  return and uncaught throw for the rest of the process's life. */
+let exitHookInstalled = false;
+
+/** Signal name -> the handler currently attached for it, or absent when none
+ *  is (never installed yet, or installed and already fired once). Per
+ *  signal, not one flag for the whole process — see the note above. */
+const installedSignalHandlers = new Map();
 
 function releaseHeldSlots() {
   for (const release of [...heldSlots]) {
@@ -241,18 +275,24 @@ function releaseHeldSlots() {
 }
 
 function installExitHooks() {
-  if (exitHooksInstalled) return;
-  exitHooksInstalled = true;
-  process.once('exit', releaseHeldSlots);
+  if (!exitHookInstalled) {
+    exitHookInstalled = true;
+    process.once('exit', releaseHeldSlots);
+  }
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+    if (installedSignalHandlers.has(signal)) continue; // still attached from an earlier allocation
     const handler = () => {
       releaseHeldSlots();
       process.off(signal, handler);
+      installedSignalHandlers.delete(signal); // re-installed on the NEXT allocateViteCacheSlot(), if any
       // Nobody else is listening, so Node's default disposition (terminate)
       // is what the sender expected: restore it by re-raising. If another
-      // listener exists, it owns the shutdown and we stay out of its way.
+      // listener exists, it owns the shutdown and we stay out of its way —
+      // and the process may go on to allocate again, which is exactly the
+      // case this re-install exists for.
       if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
     };
+    installedSignalHandlers.set(signal, handler);
     process.on(signal, handler);
   }
 }
