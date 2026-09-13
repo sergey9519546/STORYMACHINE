@@ -402,6 +402,80 @@ function buildMessages(
   return msgs;
 }
 
+// ── Non-retryable upstream errors (story-bench lane, 2026-09-13) ───────────
+// Measured against https://integrate.api.nvidia.com/v1 on 2026-09-13: asking for
+// a model the account cannot serve answers 404 with
+//   {"status":404,"title":"Not Found","detail":"Function '<uuid>': Not found for
+//    account '<acct>'"}
+// and a retired one answers 410 {"title":"Gone","detail":"The model '<id>' has
+// reached its end of life ..."}. NEITHER body names the model in a form a reader
+// can act on — the 404 names an opaque function UUID — so the adapter names it.
+//
+// Both are permanent for the request as issued: no amount of retrying makes an
+// unavailable model available. server/engine/ai.ts's isTransient() does not
+// match a bare 404/410 today, so this class is belt-and-braces rather than the
+// only guard — but it is the guard that survives someone widening isTransient(),
+// and `nonRetryable` is what withRetry() reads. 401/403 join them: a rejected
+// credential is not a transient condition either.
+export class OpenAICompatUnavailableError extends Error {
+  readonly nonRetryable = true;
+  readonly status: number;
+  readonly model: string;
+  constructor(status: number, model: string, detail: string) {
+    super(
+      `OpenAI-compat model "${model}" is not available from this endpoint `
+      + `(HTTP ${status}). Upstream said: ${detail || '(no detail)'}`,
+    );
+    this.name = 'OpenAICompatUnavailableError';
+    this.status = status;
+    this.model = model;
+  }
+}
+
+/** HTTP statuses that mean "this request can never succeed as issued". */
+function isPermanentModelFailure(status: number): boolean {
+  return status === 400 || status === 401 || status === 403 || status === 404 || status === 410;
+}
+
+// ── /models reachability probe ───────────────────────────────────────
+// `npm run story:bench -- --check` calls this before spending a single
+// generation: it lists which of the CONFIGURED models the endpoint admits to
+// serving, so a run does not discover a dead model 40 LLM calls in. It goes
+// through fetchOpenAICompat for the same SSRF/redirect/DNS-pin policy every
+// other call gets, and it NEVER returns or logs the key.
+export interface ModelProbeResult {
+  ok: boolean;
+  status: number;
+  /** Model ids the endpoint lists. Empty when the probe failed. */
+  ids: string[];
+  /** Short failure description — never contains the Authorization header. */
+  error?: string;
+}
+
+export async function probeOpenAICompatModels(
+  cfg: { baseURL: string; apiKey: string },
+  signal?: AbortSignal,
+): Promise<ModelProbeResult> {
+  try {
+    const res = await fetchOpenAICompat(`${cfg.baseURL}/models`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${cfg.apiKey}` },
+      signal,
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      return { ok: false, status: res.status, ids: [], error: body.slice(0, 300) };
+    }
+    const data = await res.json() as { data?: Array<{ id?: unknown }> };
+    const ids = (data.data ?? [])
+      .map(m => (typeof m?.id === 'string' ? m.id : null))
+      .filter((id): id is string => id !== null);
+    return { ok: true, status: res.status, ids };
+  } catch (err) {
+    return { ok: false, status: 0, ids: [], error: (err as Error).message };
+  }
+}
+
 // ── LLM adapter ──────────────────────────────────────────────────────────────
 // Uses params.model as the model name — set AI_MODEL / AI_FAST_MODEL so that
 // getModel() returns the right OpenAI-compat model name at call sites.
@@ -433,6 +507,22 @@ export function makeOpenAICompatLLMProvider(cfg: {
         body.temperature = params.config.temperature;
       }
 
+      // OUTPUT BUDGET. Until 2026-09-13 this adapter dropped maxOutputTokens on
+      // the floor, so every caller got whatever the endpoint's own default was.
+      // That silently broke the one caller that computes a real budget:
+      // server/nvm/revision/rewrite-llm.ts sizes maxOutputTokens to
+      // 8_192–32_768 precisely so a full screenplay comes back whole, then hands
+      // the result to evaluateRewrite(), which REJECTS a truncated rewrite and
+      // keeps the unchanged draft. Dropping the field turned "rewrite the
+      // script" into "return the unchanged script" on any endpoint whose
+      // default completion cap is smaller than the draft — a silent quality
+      // loss that looked like a working pipeline. Forwarded as `max_tokens`,
+      // the field every OpenAI-dialect endpoint reads.
+      const maxOut = params.config?.maxOutputTokens;
+      if (typeof maxOut === 'number' && Number.isFinite(maxOut) && maxOut > 0) {
+        body.max_tokens = Math.floor(maxOut);
+      }
+
       const res = await fetchOpenAICompat(`${cfg.baseURL}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -449,16 +539,63 @@ export function makeOpenAICompatLLMProvider(cfg: {
 
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
+        if (isPermanentModelFailure(res.status)) {
+          // Named, non-retryable, and the MODEL is in the message — a retry
+          // storm against a model this account cannot serve is three times the
+          // latency for the same answer, and the upstream body does not name it.
+          throw new OpenAICompatUnavailableError(
+            res.status,
+            String(params.model ?? '(unset)'),
+            errText.slice(0, 300),
+          );
+        }
         throw new Error(`OpenAI-compat LLM error ${res.status}: ${errText}`);
       }
 
       const data = await res.json() as {
-        choices?: Array<{ message?: { content?: string } }>;
+        choices?: Array<{
+          message?: { content?: string | null; reasoning_content?: string | null };
+          finish_reason?: string;
+        }>;
         usage?: { prompt_tokens?: number; completion_tokens?: number };
       };
 
+      const choice = data.choices?.[0];
+      const rawContent = choice?.message?.content;
+      const reasoning = choice?.message?.reasoning_content;
+      // EMPTY COMPLETION, NOT SUCCESS. Reasoning models on this dialect answer
+      // with `content: null` and the whole completion in `reasoning_content`
+      // (measured 2026-09-13 on integrate.api.nvidia.com), or spend the entire
+      // max_tokens thinking and stop with finish_reason 'length'. `null ?? ''`
+      // already produced '' — but silently, so a caller saw an empty string with
+      // no way to tell an empty completion from a model that never emitted one.
+      // The log line is the difference; the text stays '' so every existing
+      // caller's own empty-output guard still fires.
+      const text = typeof rawContent === 'string' ? rawContent : '';
+      if (text.length === 0) {
+        logger.warn('openai_compat_empty_completion', {
+          model: String(params.model ?? '(unset)'),
+          contentWasNull: rawContent === null,
+          reasoningContentChars: typeof reasoning === 'string' ? reasoning.length : 0,
+          finishReason: choice?.finish_reason ?? '(none)',
+          completionTokens: data.usage?.completion_tokens ?? 0,
+        });
+      }
+
+      // RESPONSE SHAPE. Callers in this repository read BOTH shapes: the engine
+      // seam's own helpers read `.text`, while server/nvm/revision/rewrite-llm.ts
+      // and server/nvm/generate/llm-generator.ts read the @google/genai shape
+      // (`candidates[0].content.parts[0].text`, plus `finishReason`, which
+      // evaluateRewrite() uses to tell a truncated rewrite from a complete one).
+      // Emitting only `.text` made both of those read `undefined` and fall back —
+      // the generative half of the product was inert on every openai-compat
+      // endpoint. Both shapes are populated from the one upstream answer.
       return {
-        text: data.choices?.[0]?.message?.content ?? '',
+        text,
+        candidates: [{
+          content: { role: 'model', parts: [{ text }] },
+          finishReason: choice?.finish_reason,
+        }],
         usageMetadata: {
           promptTokenCount:     data.usage?.prompt_tokens     ?? 0,
           candidatesTokenCount: data.usage?.completion_tokens ?? 0,
