@@ -91,6 +91,12 @@
       "path": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
     },
     {
+      "id": "docs/brain/Branches/Branch - Renderer Residuals.md",
+      "type": "branch",
+      "title": "Branch — `scoring/renderer-residuals`",
+      "path": "docs/brain/Branches/Branch - Renderer Residuals.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md",
       "type": "branch",
       "title": "Branch — Stacked (R5 + Advice-Rule-Fixes)",
@@ -987,6 +993,18 @@
       "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
     },
     {
+      "from": "docs/brain/Branches/Branch - Renderer Residuals.md",
+      "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Renderer Residuals.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Renderer Residuals.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
       "from": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md",
       "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
     },
@@ -1681,6 +1699,14 @@
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Branches/Branch - Renderer Residuals.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Branches/Branch - Renderer Residuals.md"
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",

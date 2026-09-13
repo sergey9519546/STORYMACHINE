@@ -1,0 +1,97 @@
+---
+type: branch
+updated: 2026-09-13
+status: pending-owner-measurement
+sources: [docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, docs/audits/2026-09-12-adversarial/residuals-lane-report.md, docs/audits/2026-09-12-adversarial/forcedcue-lane-report.md, src/lib/fountain.ts]
+---
+
+# Branch — `scoring/renderer-residuals`
+
+The last item in the owner's measurement order, and the smallest. It closes the
+two residuals `forcedcue-lane-report.md` §6.7 named with their mechanism and
+deliberately did not fix, and it is **stacked on `scoring/forced-cue`** @
+`089bec91`, which is itself stacked on [[Branch - Adversarial 2026-09-12]] @
+`4cf5b2f3`. Measure the stacked tip; see
+[[Owner - R5 Measurement and Merge]] for where it sits in the order.
+
+**There is no `Branch - Forced Cue` note in this vault.** That lane did not add
+one, so the link that would sit here does not exist and is not invented. What
+stands in its place is
+`docs/audits/2026-09-12-adversarial/forcedcue-lane-report.md`, committed on that
+branch and listed above as a source. Its review (`forcedcue-review.md`) is on
+`main`, not on this stack, so it is deliberately not listed: a `sources:` path
+that does not resolve on the branch it is written on is what
+`tests/core/brain-coverage.test.ts` check (g) exists to catch.
+
+## What the two residuals were
+
+**One was a defect.** `parseFountain` had no forced-transition branch, so a `>`
+line was typed `action`. The analysis seam stripped the marker anyway —
+`stripForcedMarkers`' `>` entry carried `parserTypes: false` precisely because
+the parser did not read it — while all four exporters printed `>CUT TO:`
+verbatim at the action indent. One line, two answers: the analyzer/renderer
+split the forced-cue work exists to close, in its last instance on this stack.
+A CUSTOM transition was worse. `>SMASH TO BLACK.` is a transition no inferred
+rule in this parser reaches, so the seam's re-parse check refused the strip and
+the line stayed ACTION PROSE carrying a literal `>` into every rule lexicon and
+word count — which is the case the marker exists for.
+
+**The other was a decision, and is now written down.** An `@` line that is not
+in cue position stays `action` and its marker prints. Fountain's §Character
+defines the element as "any line entirely in uppercase, with one empty line
+before it, and without an empty line after it"; the forcing marker overrides the
+UPPERCASE test — the one a caseless script or a mixed-case surname cannot pass,
+and the reason the marker exists — not the two POSITION requirements. On such a
+line the `@` is not a marker at all but a character the writer typed, and
+printing it is correct. There is no analyzer/renderer split to close, and the
+analysis seam had already reached the same conclusion in code
+(`parserTypes: true`). The statement lives beside `FORCED_CUE_MARKER` in
+`src/lib/fountain.ts` and both directions are pinned.
+
+## What it does
+
+1. `isForcedTransitionLine` is THE definition of the marker — the marker, a
+   non-empty body, and not the `>text<` centering shape. The parser's branch,
+   `stripForcedMarkers`' `>` entry and BOTH `isTransition` heuristics
+   (`screenplay-normalizer.ts`, `canonical-fountain.ts`) ask it instead of
+   spelling it again.
+2. `renderableText` strips the marker once, so layout, PDF, FDX and DOCX all
+   stop printing it and the line is right-aligned like any transition.
+3. The `>` entry moves from `parserTypes: false` to `true`, which is what stops
+   a `>` opening a line inside a speech from being touched at all.
+4. `server/lib/fdx-import.ts`'s claim that a custom transition "survives the
+   round trip instead of silently becoming a plain action line" **was false** —
+   the marker that function adds to rescue the line was what condemned it. It
+   is true now, and asserted in both directions.
+5. `npm run probe-corpus-shape` gains a **`>tr`** column beside `@cue`: the
+   count of transition blocks the parser typed FROM the marker, which is the
+   whole answer for this change on any corpus.
+
+## The cost
+
+**No floor moves and none was moved.** All six public-benchmark statistics are
+identical to the digit on this tree and on a `git archive 089bec91` export —
+shuffle-drop 0.8438 / 0.7896, climax-relocate 0.5938 / 0.5234, control
+1.0000 / 0.9814. The control was checked deliberately, because a change to
+transition or character typing is the kind that could move it. `AUC24_FLOOR`
+untouched; `--lock` never run. See [[Gate - Public Benchmark]].
+
+**Nothing in the repository moves.** Output identity is 45/45 byte-identical
+with `GIT_SHA` pinned, and re-scoring all 32 committed scripts on both trees
+gives 0 of 32 differing surfaces — because no committed fixture contains a line
+beginning `>` or `@`, which is also why nothing here could have caught the
+defect.
+
+**What it costs a draft that USES the marker**, measured with the same bytes on
+both trees — one `>SMASH TO BLACK.` inserted before each script's last scene
+heading: 8 of 32 reports differ between the two engines, mean health delta over
+all 32 **+0.028**, largest **+3.1**, largest the other way **-1.5**, zero
+verdict flips and zero scene-count changes. The direction is not uniformly
+favourable, which is what a correctness fix looks like.
+
+## Receipt
+
+One PENDING entry, 2026-09-13 "RENDERER RESIDUALS", in
+`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`.
+`node scripts/check-scoring-receipt.mjs 089bec91..HEAD` exits 1 naming exactly
+it, which is the intended state.

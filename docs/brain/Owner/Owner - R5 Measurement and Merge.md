@@ -168,6 +168,18 @@ only a heading — that is the one route the entry text itself forbids.
 | `scoring/stacked-r5-plus-advice` | `408166ae` | [[Branch - Stacked R5 plus Advice]] |
 | `scoring/r5-verbosity-bias` | `52bf410a` | [[Branch - R5 Verbosity Bias]] alone |
 | `scoring/advice-rule-fixes` | `a1cf7677` | [[Branch - Advice Rule Fixes]] alone |
+| `scoring/renderer-residuals` | see the branch note | **LAST — stacked on `scoring/forced-cue` @ `089bec91`, itself stacked on the first row @ `4cf5b2f3`; measure this tip and the two below it come with it** — [[Branch - Renderer Residuals]] |
+
+**What changed 2026-09-13:** the stack on the first row grew two more commits'
+worth of branches. `scoring/forced-cue` sits on `scoring/adversarial-2026-09-12`
+@ `4cf5b2f3`, and `scoring/renderer-residuals` sits on it @ `089bec91`. They are
+one lineage, not three alternatives: checking out the last row gets all three,
+and its `check-scoring-receipt` range is `089bec91..HEAD`. Neither moves a
+public-benchmark floor and neither moves any committed fixture's report — see
+[[Branch - Renderer Residuals]] for the numbers and for the one column (`>tr`)
+to read on the private corpus before any AUC. `scoring/forced-cue` has no note
+in this vault; its record is
+`docs/audits/2026-09-12-adversarial/forcedcue-lane-report.md`.
 
 **THE ORDER CHANGED 2026-09-07, and the two heads are ALTERNATIVES, not a
 stack.** `scoring/feature-length-defects` branches from `main` independently of
