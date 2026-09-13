@@ -188,6 +188,35 @@ export const FORCED_CUE_MARKER = '@';
 //     declare and stripping the marker would leave an empty line, so the
 //     character stays what the writer typed. This mirrors the forced cue's
 //     `cueLine !== ''` guard.
+//
+// ── WHAT CASE A FORCED TRANSITION PRINTS IN (2026-09-13, round 2) ──────────
+// The marker makes a mixed-case transition reachable for the first time — the
+// spec's own forcing example is `> Burn to White.`, and an INFERRED transition
+// is uppercase by its own grammar, so before this branch no transition could
+// carry lower case. The round-1 review found the four exporters answering
+// differently: layout and PDF `BURN TO WHITE.`, FDX and DOCX `Burn to White.`.
+//
+// THE RULE, and it is not "they must all print the same bytes":
+//   * The three renderers that draw a PAGE — src/lib/screenplay-layout.ts, the
+//     PDF writer that draws from it, and src/lib/docx.ts — apply the element's
+//     own uppercase convention, the same one they already apply to scene
+//     headings, character cues, shots and sections. All three now print
+//     `BURN TO WHITE.`; DOCX was simply missing the flag its table gives the
+//     other four, which is fixed there.
+//   * src/lib/fdx.ts is NOT a page. Final Draft stores an ELEMENT TYPE plus the
+//     writer's text and applies its own display rules, so this exporter
+//     uppercases nothing — not a heading, not a cue — and server/lib/
+//     fdx-import.ts is what uppercases on the way back IN. Preserving the bytes
+//     is also what the spec asks for in the one place it speaks to this: a
+//     forced Character keeps its mixed case.
+// So three surfaces print one thing and the interchange format stores another,
+// on purpose, and all four are pinned in
+// tests/core/parse-format-invariance.test.ts.
+//
+// THE SAME SPLIT ALREADY EXISTS FOR `@McCLANE` (layout/PDF/DOCX `MCCLANE`, FDX
+// `McCLANE`) and predates this branch. It is named here rather than fixed: the
+// cue case is reachable on the base, so changing it is a change to shipped
+// output with no measurement in this lane.
 export const FORCED_TRANSITION_MARKER = '>';
 
 /** True when `trimmed` (an already-trimmed line) is Fountain's FORCED

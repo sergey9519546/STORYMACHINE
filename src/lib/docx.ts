@@ -38,7 +38,15 @@ const STYLES: Partial<Record<FountainBlockType, DocxStyle>> = {
   parenthetical: { styleId: 'Parenthetical', name: 'Parenthetical', leftIndent: ind(3.1), rightIndent: TW(8.5 - 1 - 5.5) },
   dialogue:      { styleId: 'Dialogue',      name: 'Dialogue',     leftIndent: ind(2.5), rightIndent: TW(8.5 - 1 - 6.0) },
   dual_dialogue: { styleId: 'Character',     name: 'Character',    leftIndent: ind(3.7), uppercase: true, spaceBefore: 240 },
-  transition:    { styleId: 'Transition',   name: 'Transition',   leftIndent: ind(1.5), alignment: 'right', spaceBefore: 240 },
+  // `uppercase: true` added 2026-09-13. It was missing where scene_heading,
+  // character, dual_dialogue, shot and section all have it, and the gap was
+  // unreachable until src/lib/fountain.ts learned the forced transition: an
+  // INFERRED transition is uppercase by its own grammar, so no transition could
+  // carry lower case. The spec's own forcing example, `> Burn to White.`, made
+  // it observable — this file printed "Burn to White." where the layout and the
+  // PDF printed "BURN TO WHITE.". See FORCED_TRANSITION_MARKER in
+  // src/lib/fountain.ts for the rule the four exporters follow.
+  transition:    { styleId: 'Transition',   name: 'Transition',   leftIndent: ind(1.5), uppercase: true, alignment: 'right', spaceBefore: 240 },
   shot:          { styleId: 'Action',       name: 'Action',       leftIndent: ind(1.5), uppercase: true, spaceBefore: 240 },
   centered:      { styleId: 'Centered',     name: 'Centered',     leftIndent: ind(1.5), alignment: 'center' },
   lyrics:        { styleId: 'Dialogue',     name: 'Dialogue',     leftIndent: ind(2.5) },

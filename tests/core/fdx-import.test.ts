@@ -173,6 +173,40 @@ describe('fdxToFountain — round trip through the Fountain→FDX exporter', () 
       'no renderable text may carry a marker on either side of the trip');
   });
 
+  it('KNOWN LOSS: centered text does NOT survive Fountain -> FDX -> Fountain', () => {
+    // ROUND 2, review finding 1b. The brief asked for "centered stays
+    // centered" as a round-trip fixture; it does not, and the round-1 report
+    // did not say so. It is pinned here rather than silently absent.
+    //
+    // THE MECHANISM, so it is not rediscovered as news: `src/lib/fdx.ts` maps
+    // `centered -> 'Action'` (FDX_TYPE), because Final Draft has no Centered
+    // PARAGRAPH TYPE — it expresses centering as an alignment property on an
+    // Action paragraph (`<Paragraph Type="Action" Alignment="Center">`). So the
+    // element leaves as Action with the markers already stripped by
+    // `renderableText`, and nothing on the way back can know it was centered.
+    //
+    // NOT FIXED HERE, deliberately. The fix is to emit and read that alignment
+    // attribute, which changes `buildParagraphs`, the exporter's entry shape and
+    // the importer's paragraph reader — an exports change, on a surface this
+    // scoring lane has no measurement for. Named in the lane report's §9.
+    const SOURCE = 'INT. OFFICE - DAY\n\nMary closes the file.\n\n>THE END<\n';
+    const elements = (t: string) => parseFountain(t).filter((b) => b.type !== 'empty')
+      .map((b) => `${b.type}:${renderableText(b)}`);
+
+    assert.deepEqual(elements(SOURCE), ['scene_heading:INT. OFFICE - DAY', 'action:Mary closes the file.', 'centered:THE END'],
+      'the page centers it — that is the half that works, and the half the round-1 tests asserted');
+
+    const { fountain: after } = fdxToFountain(fountainToFdx(SOURCE, 'Centered'));
+    assert.deepEqual(elements(after), ['scene_heading:INT. OFFICE - DAY', 'action:Mary closes the file.', 'action:THE END'],
+      'the centering is lost and the line comes back as ACTION. If this ever reads `centered:THE END`, the '
+      + 'loss has been fixed — delete this test and add the round trip to the one above it. Do not relax it.',
+    );
+    // The words survive and no marker is invented, which is the weaker property
+    // that DOES hold and is worth keeping asserted.
+    assert.match(after, /^THE END$/m, 'the text must survive even though the element does not');
+    assert.equal(after.includes('>'), false, 'and no marker may reappear');
+  });
+
   it('KNOWN, and not a marker defect: the importer appends ":" to a transition that lacks one', () => {
     // formatTransition (server/lib/fdx-import.ts) reads the spec's "ending in
     // TO:" as a requirement to ENFORCE, so a Final Draft transition that does

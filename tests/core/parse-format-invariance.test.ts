@@ -694,6 +694,49 @@ describe('a forced transition `>` is a transition everywhere (renderer residuals
     assert.ok(shown.includes('SMASH TO BLACK.'), 'the PDF must still draw the transition itself');
   });
 
+  it('a MIXED-CASE forced transition prints one thing from the three page renderers and its own bytes from FDX', async () => {
+    // ROUND 2, review finding 2. The marker makes a mixed-case transition
+    // reachable for the first time — the spec's own forcing example is
+    // `> Burn to White.`, and an inferred transition is uppercase by its own
+    // grammar — and the four exporters answered differently: layout/PDF
+    // `BURN TO WHITE.`, FDX/DOCX `Burn to White.`. The rule now written beside
+    // FORCED_TRANSITION_MARKER is pinned here, all four, in one test.
+    const { layoutScreenplay } = await import('../../src/lib/screenplay-layout.ts');
+    const { fountainToFdx } = await import('../../src/lib/fdx.ts');
+    const { fountainToDocx } = await import('../../src/lib/docx.ts');
+    const { fountainToPdf } = await import('../../src/lib/pdf.ts');
+    const latin1 = (b: Uint8Array) => { let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return s; };
+    const DOC = 'INT. OFFICE - DAY\n\nMary closes the file.\n\n> Burn to White.\n\nEXT. STREET - DAY\n\nRain.\n';
+
+    // The three that draw a PAGE apply the element's uppercase convention —
+    // the same one they already apply to headings, cues, shots and sections.
+    assert.ok(
+      layoutScreenplay(DOC).flatMap((p) => p.lines.map((l) => l.text)).includes('BURN TO WHITE.'),
+      'the layout must uppercase a forced transition as it does every other uppercase element',
+    );
+    assert.ok(
+      [...latin1(fountainToPdf(DOC, 'Case')).matchAll(/\((.*?)\) Tj/g)].map((m) => m[1]).includes('BURN TO WHITE.'),
+      'the PDF draws from the layout and must agree with it',
+    );
+    assert.ok(
+      latin1(fountainToDocx(DOC, 'Case')).includes('<w:t xml:space="preserve">BURN TO WHITE.</w:t>'),
+      'DOCX renders a page too. Its Transition style was missing the `uppercase` flag its table gives '
+      + 'scene_heading, character, dual_dialogue, shot and section, and nothing could reach the gap until '
+      + 'the parser learned `>`',
+    );
+    // FDX is NOT a page: it stores the element type plus the writer's bytes,
+    // uppercases nothing anywhere, and server/lib/fdx-import.ts is what
+    // uppercases on the way back in. Asserted as the deliberate difference it
+    // is, so a future "make them all agree" change has to read this first.
+    const fdx = fountainToFdx(DOC, 'Case');
+    assert.ok(
+      /<Paragraph Type="Transition">\s*<Text>Burn to White\.<\/Text>/.test(fdx),
+      'the FDX export must preserve the writer\'s case — Final Draft applies its own display rules to an '
+      + 'element it already knows the type of',
+    );
+    assert.equal(fdx.includes('BURN TO WHITE.'), false, 'and must not uppercase it');
+  });
+
   it('the three shapes that are NOT a forced transition keep the character they typed', () => {
     // `>text<` is §Centered Text and claims the same first character.
     assert.equal(types('INT. A - DAY\n\nMary closes the file.\n\n> THE END <\n'), 'scene_heading,action,centered',
