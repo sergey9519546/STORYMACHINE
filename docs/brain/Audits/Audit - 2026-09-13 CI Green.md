@@ -1,7 +1,7 @@
 ---
 type: audit
 updated: 2026-09-13
-sources: [docs/audits/2026-09-13-ci-green/voice-bound-lane-report.md, server/lib/validation.ts, tests/fixtures/voice-bound-derivation.json, docs/LANE_STANDARD.md]
+sources: [docs/audits/2026-09-13-ci-green/voice-bound-lane-report.md, server/lib/validation.ts, tests/fixtures/voice-bound-derivation.json, docs/LANE_STANDARD.md, docs/audits/2026-09-13-ci-green/ci-concurrency-lane-report.md, .github/workflows/ci.yml, .github/workflows/security.yml, .github/workflows/release.yml, tests/core/ci-gates-intact.test.ts]
 status: active
 ---
 
@@ -13,6 +13,8 @@ reviews for the batch that followed the first real GitHub Actions runs on
 and one review file per lane (`*-lane-report.md`, `*-review.md`), each
 review written into the repository before its verdict per
 `docs/LANE_STANDARD.md` §7.
+
+## Lane: voice-bound-ci-derivation
 
 **What it is:** CI had not actually run for ten days. When it did, the test
 job was red on exactly one subtest — the cost assertion behind
@@ -52,9 +54,51 @@ on a feature-length document, which no cast bound can buy margin against.
 [[Audit - 2026-09-12 Adversarial Review]] (the round that derived the bound
 this one re-derived), [[Patterns]].
 
+## Lane: ci-concurrency
+
+**What it is:** with Actions actually running, `docs/LANE_STANDARD.md` §7's
+"push after every commit" rule collided with `.github/workflows/ci.yml`
+having no `concurrency` group: three quick pushes to one lane branch started
+three full CI runs in parallel (measured on `lane/voice-bound-ci-derivation`,
+runs 34741882322 / 34741923678 / 34741928418, all in progress at once at
+06:05-06:06 UTC for a commit range whose last two commits touched only a
+report's Tip line). The fix is a `concurrency` group on `ci.yml` and
+`security.yml`, keyed on `${{ github.workflow }}-${{ github.ref }}`, with
+`cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` — a later push
+to the same branch cancels its own earlier in-flight run, but `main`'s runs
+are never cancelled (CLAUDE.md cites main's own run record) and neither is
+`release.yml`'s tag/dispatch-triggered publish (cancelling a Docker push
+mid-flight is worse than a rare duplicate run — see that file's own new
+comment for why it was deliberately left without a group).
+
+**What it did not do:** it did not add a `paths-ignore` filter to skip
+docs-only commits. `ci.yml`'s test job runs `check-docs`, `honesty-audit`,
+`check-brain`, and the claims-register tests as part of the SAME job a
+docs-only change can break (a stale brain export, a broken wikilink, an
+overclaim string); skipping the job by path would skip the one job that
+gates those. The comment saying so is in `ci.yml` itself, next to the
+trigger block, so a future edit does not "optimize" this away.
+
+**Proof the new test can fail:** `tests/core/ci-gates-intact.test.ts` gained
+two assertions per workflow (group exists and is keyed correctly; cancel-in-
+progress is the ref-conditioned expression) and both were shown red against
+the unmodified `ci.yml`/`security.yml` before the fix (4 of 34 subtests
+failing), then green after it (34/34) — see the lane report for the exact
+counts.
+
+**Related:** [[Patterns]] ("a gate that can be silently disabled by the thing
+it gates is not a gate" — the same principle extended here to a workflow
+property rather than a step), `docs/LANE_STANDARD.md` §7,
+`tests/core/ci-gates-intact.test.ts`.
+
 ## Sources
 
 - `docs/audits/2026-09-13-ci-green/voice-bound-lane-report.md`
-- `server/lib/validation.ts` (`MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`)
+- `server/lib/validation.ts`
 - `tests/fixtures/voice-bound-derivation.json`
-- `docs/LANE_STANDARD.md` §7
+- `docs/LANE_STANDARD.md`
+- `docs/audits/2026-09-13-ci-green/ci-concurrency-lane-report.md`
+- `.github/workflows/ci.yml`
+- `.github/workflows/security.yml`
+- `.github/workflows/release.yml`
+- `tests/core/ci-gates-intact.test.ts`

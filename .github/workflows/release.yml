@@ -35,6 +35,19 @@ on:
       - "v*"
   workflow_dispatch: {}
 
+# DELIBERATELY NO `concurrency:` group here, unlike ci.yml and security.yml
+# (2026-09-13 lane/ci-concurrency): the lane-branch pattern those groups fix —
+# several quick pushes to the SAME ref, each starting a full parallel run,
+# cancelling the stale ones is free because their conclusion is never cited —
+# does not apply to this trigger. A `v*` tag is pushed once per release and a
+# `workflow_dispatch` run publishes to a shared, versioned registry tag;
+# `cancel-in-progress` on either could interrupt the `publish` job mid Docker
+# push and leave a half-built or missing image for a version tag someone may
+# already be depending on, which is a worse failure than the wasted minutes a
+# rare duplicate run would cost. If a real need for one shows up (e.g. two
+# workflow_dispatch runs of the exact same ref), the right shape is a group
+# WITHOUT cancel-in-progress (queue, don't kill), not the ci.yml expression.
+#
 # Workflow-level permissions are the FLOOR every job inherits, so the registry
 # write token must not live here: `packages: write` at this level meant the
 # `test` job held a GHCR push credential while running `npm ci` — a malicious

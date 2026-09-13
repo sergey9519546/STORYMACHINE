@@ -104,7 +104,11 @@ follow from that, each already cheap:
    main, and runs `git push -u origin lane/<name>` after EVERY commit. A
    commit that exists only in a worktree is not work that exists. The
    orchestrator still merges only `--ff-only` and only on MERGE; the
-   branch is deleted from origin after the merge.
+   branch is deleted from origin after the merge. Since 2026-09-13
+   `.github/workflows/ci.yml` and `security.yml` carry a `concurrency` group
+   keyed on the ref that cancels a branch's own superseded run (never
+   main's), so pushing after every commit costs one CI run in flight per
+   branch, not one run per commit left running to completion.
 2. A reviewer writes its review INTO the repository —
    `docs/audits/<date>-<batch>/<lane>-review.md`, scratch paths replaced by
    `<session scratch>` — before returning its verdict, and the orchestrator

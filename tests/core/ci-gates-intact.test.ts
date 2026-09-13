@@ -36,6 +36,26 @@ const securityYml = path.join(root, '.github/workflows/security.yml');
 const ciYml = path.join(root, '.github/workflows/ci.yml');
 const releaseYml = path.join(root, '.github/workflows/release.yml');
 
+/**
+ * Extract the YAML block for a workflow-level `concurrency:` key (the block
+ * at column 0, not a job-level one nested under a job — e.g. edge.yml's
+ * `publish-edge` job has its own indented `concurrency:` a reader should not
+ * mistake for this one). Returns null if no top-level key by that name exists.
+ */
+function topLevelConcurrencyBlock(source: string): string | null {
+  const lines = source.split('\n');
+  const startIdx = lines.findIndex((l) => l === 'concurrency:');
+  if (startIdx === -1) return null;
+  const out = [lines[startIdx]];
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === '') { out.push(line); continue; }
+    if (line.search(/\S/) === 0) break; // dedent back to another top-level key
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
 /** Every `- name: …` step in a workflow, in file order. */
 function stepNames(source: string): string[] {
   return source
@@ -260,6 +280,44 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
       + 'repository default, which can be a read/write GITHUB_TOKEN held by every step including `npm ci`.',
     );
   });
+
+  // 2026-09-13: a lane pushing three docs-only commits in one minute started
+  // three full CI runs (test job ~7 min + browser job ~5 min each, all
+  // in-progress at once) because ci.yml had no concurrency group at all — see
+  // lane/voice-bound-ci-derivation's 06:05-06:06 UTC runs 34741882322 /
+  // 34741923678 / 34741928418. A workflow-level group keyed on the ref makes
+  // a later push cancel its own branch's in-flight run instead of running
+  // beside it; main is excluded because its run record must never be
+  // interrupted (CLAUDE.md cites main's runs specifically).
+  for (const [file, src] of [['ci.yml', ci], ['security.yml', security]] as const) {
+    it(`${file} declares a workflow-level concurrency group keyed on the workflow and ref`, () => {
+      const block = topLevelConcurrencyBlock(src);
+      assert.ok(
+        block,
+        `${file} must declare a top-level \`concurrency:\` group — without one, repeated pushes to the `
+        + 'same branch (or a superseded PR head) run fully in parallel instead of the later one replacing '
+        + 'the earlier',
+      );
+      assert.match(
+        block!,
+        /group:\s*\$\{\{\s*github\.workflow\s*\}\}-\$\{\{\s*github\.ref\s*\}\}/,
+        `${file}'s concurrency group must be keyed on \`github.workflow\`-\`github.ref\`, matching per `
+        + 'workflow and per branch/PR-head rather than colliding across unrelated refs',
+      );
+    });
+
+    it(`${file} cancels superseded runs everywhere EXCEPT main`, () => {
+      const block = topLevelConcurrencyBlock(src);
+      assert.ok(block, `${file} must declare a top-level \`concurrency:\` group`);
+      assert.match(
+        block!,
+        /cancel-in-progress:\s*\$\{\{\s*github\.ref\s*!=\s*'refs\/heads\/main'\s*\}\}/,
+        `${file}'s \`cancel-in-progress\` must be the expression \`\${{ github.ref != 'refs/heads/main' }}\` `
+        + '— true for a lane/PR ref (safe to cancel a superseded run) and false for refs/heads/main '
+        + "(main's run record must never be cancelled, per CLAUDE.md)",
+      );
+    });
+  }
 
   it('release.yml keeps the registry write token out of the test job', () => {
     // Workflow-level `packages: write` is inherited by EVERY job, so the test
