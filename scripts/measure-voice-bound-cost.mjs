@@ -266,13 +266,27 @@ async function main() {
   }
   if (opts.child !== null) return runChildMeasurement(opts.child);
   if (opts.lockFrom) {
-    // Re-indent a lock file copied out of a CI log. Pure formatting: it parses
-    // the file and writes the same object back with two-space indentation, so a
-    // copied line becomes a reviewable diff.
+    // Normalize a lock file copied out of a CI log: re-indent it, and recompute
+    // the `derivation` block and `marginFraction` from the MEASURED ROWS with
+    // this tree's current rule.
+    //
+    // The rows are the measurement and are never touched. The derivation block
+    // is arithmetic over them, produced by the same `deriveCast` the fixture
+    // test re-runs — so a rule change (a different margin, a different shape)
+    // re-derives from the committed measurements instead of needing a fresh
+    // half-hour of runner time, and the file stays self-consistent. If the rows
+    // themselves are stale, that is what the machine and date stamps are for.
     const target = path.resolve(REPO_ROOT, opts.lockFrom);
     const parsed = JSON.parse(readFileSync(target, 'utf8'));
+    const rows = parsed.conditions?.[parsed.primaryCondition] ?? [];
+    parsed.marginFraction = DERIVATION_MARGIN_FRACTION;
+    parsed.derivation = deriveCast(rows, parsed.budgetMs, DERIVATION_MARGIN_FRACTION);
     writeFileSync(target, `${JSON.stringify(parsed, null, 2)}\n`);
-    process.stderr.write(`re-indented ${path.relative(REPO_ROOT, target)}\n`);
+    process.stderr.write(
+      `normalized ${path.relative(REPO_ROOT, target)} — derived cast `
+      + `${parsed.derivation.derivedCast} at ${parsed.derivation.derivedCpuMsMax}ms `
+      + `against a ${parsed.derivation.ceilingMs}ms ceiling\n`,
+    );
     return;
   }
 

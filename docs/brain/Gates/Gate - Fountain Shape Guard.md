@@ -1,7 +1,7 @@
 ---
 type: gate
-updated: 2026-09-12
-sources: [server/lib/validation.ts, tests/security/fountain-shape-guard-cue-parity.test.ts, tests/routes/fountain-shape-guard-cue-bypass.test.ts]
+updated: 2026-09-13
+sources: [server/lib/validation.ts, tests/security/fountain-shape-guard-cue-parity.test.ts, tests/routes/fountain-shape-guard-cue-bypass.test.ts, tests/core/voice-bound-derivation.test.ts, tests/fixtures/voice-bound-derivation.json]
 status: active
 ---
 
@@ -18,7 +18,8 @@ scoring-path: `server/lib/validation.ts` sits outside
 [[Gate - Pure-Core Boundary]]), so a bound change here needs no
 [[Gate - Receipt Gate]] entry.
 
-**The bound this note tracks: `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`.**
+**The bounds this note tracks: `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` and, since
+2026-09-13, `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` beside it.**
 Rejects once every distinct speaking character clears
 `VOICE_ELIGIBLE_MIN_WORDS` (30 — the one condition under which
 `voice-delta.ts`'s O(distinct²) Burrows's-Delta pass actually runs) AND
@@ -69,14 +70,56 @@ O(distinct²) pair count capped (scoring-path, the scoring lane's item), not
 a further raise of this bound. Bypass B's margin widened from 1.28x to
 2.84x.
 
+**2026-09-13 — the second bound, derived on the machine that enforces it.**
+The first real Actions run since 2026-09-02 failed the cost assertion above:
+the worst shape 675,000 admits (uniform-min N=150) cost **19,713 ms** and, on
+a re-run, **21,133 ms** of CPU on `ubuntu-latest` against the 15,000 ms
+half-budget target. The round-2 derivation was sound in method and silent
+about its machine ("this box", "the reviewer's box"); the machine that
+enforces it is the runner, which is about 1.7x slower under the parallel
+`npm test` the assertion runs inside. Re-deriving the WEIGHT bound downward
+does not work and the arithmetic says so before any measurement: the
+realistic ensembles this bound exists to serve weigh 457,200 (30-cast) and
+609,600 (40-cast), so any weight bound the runner can carry rejects an
+ordinary 40-character feature and reopens the finding-10 regression. The fix
+is a SECOND bound on the quantity that actually drives the cost —
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` = **80**, the eligible cast
+count — derived on `ubuntu-latest` by
+`.github/workflows/calibrate-voice-bound.yml` against the heaviest document
+the weight bound still admits at each cast (`max-admitted`: d speakers each
+carrying floor(675,000 / d²) words, which at d=60 is 186 words, not the 30
+`uniform-min` gives it). It REMOVES NOTHING: the weight bound is untouched
+and evaluated FIRST, so every pinned DoS/bypass payload keeps the message it
+has always had, and the cast bound only turns ACCEPTs into REJECTs — the
+121-150-speaker shapes that weighed under 675,000 and cost 15,460-24,052 ms
+on the runner. The table is committed at
+`tests/fixtures/voice-bound-derivation.json` and
+`tests/core/voice-bound-derivation.test.ts` re-derives the constant from it
+on every CI run, so the constant cannot be edited without a fresh
+measurement. Reproduce with `npm run measure-voice-bound`.
+
+**What 2026-09-13 could NOT establish.** That the half-budget CPU target is
+a statement about this guard at all on that machine. A legitimate,
+accepted 40-character feature costs **12,057 ms** there under the
+calibration's load proxy — 80% of the ceiling on its own. Most of that
+budget is the analyzer's baseline cost on a feature-length document, which
+no cast bound can buy margin against. See [[Audit - 2026-09-13 CI Green]].
+
 **Command:**
 `node --experimental-strip-types tests/security/fountain-shape-guard-cue-parity.test.ts`
-(part of `npm test`) — 657 cases after round 2, all of rounds 2-7's pinned
-decisions unchanged; the "finding 10" describe block asserts the
-N=150/N=151 uniform-min boundary directly (150 ACCEPTED with its measured
-`runScriptDoctor` cost under margin, 151 REJECTED), 20/30/40-cast ACCEPTED,
-60-cast REJECTED, and that the bound stays strictly below bypass B's
-weight (computed from its own generator, not a literal).
+(part of `npm test`) — 662 cases after the 2026-09-13 cast bound, all of
+rounds 2-7's pinned decisions unchanged; the "finding 10" describe block
+asserts the max-admitted N=80/N=81 boundary directly
+(80 ACCEPTED with its measured `runScriptDoctor` cost under half the
+budget of CPU and the machine named in the failure message and in a TAP
+diagnostic on pass, 81 REJECTED), that uniform-min N=150 — the
+document the 2026-09-12 bound sat exactly on — is now REJECTED by the cast
+bound, that N=151 is still rejected by the WEIGHT bound (so no pinned
+rejection changed its message), 20/30/40-cast ACCEPTED, 60-cast REJECTED,
+and that the weight bound stays strictly below bypass B's weight (computed
+from its own generator, not a literal).
+`node --experimental-strip-types tests/core/voice-bound-derivation.test.ts`
+re-derives the cast bound from the committed runner table.
 
 **Where it lives:** `server/lib/validation.ts`
 (`MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`'s own header comment carries the full
@@ -104,4 +147,8 @@ larger than ~150 without reopening this exact regression.
 - `docs/audits/2026-09-12-adversarial/engine-logic.md` finding 10
 - `docs/audits/2026-09-12-adversarial/rulebook-review.md` round 1, BLOCKER
   item 1
-- `docs/CLAIMS_REGISTER.md` row 69
+- `docs/CLAIMS_REGISTER.md` rows 69 and 116
+- `tests/fixtures/voice-bound-derivation.json` (the runner's calibration
+  table) and `tests/core/voice-bound-derivation.test.ts`
+- `scripts/measure-voice-bound-cost.mjs`, `scripts/lib/voice-bound.ts`,
+  `.github/workflows/calibrate-voice-bound.yml`

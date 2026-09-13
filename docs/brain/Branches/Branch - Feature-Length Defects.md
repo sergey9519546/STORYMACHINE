@@ -58,6 +58,16 @@ commit needs the same correction before the owner lands it, and the
 stacked branch [[Branch - Adversarial 2026-09-12]] is building the
 analyzer-side pair cap that makes the shape cheap.
 
+**What the main side actually did (2026-09-13, [[Audit - 2026-09-13 CI Green]]):**
+not a lower weight bound — a SECOND one. `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`
+stays at 675,000 and `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` now bounds the
+eligible cast count beside it, derived on the GitHub runner itself. A scalar
+weight bound the runner can carry also rejects an ordinary 40-character
+feature, so lowering it further was not available. So the correction this
+branch needs is BOTH constants, not a different number for the one it
+carries — and the analyzer-side pair cap remains the only way to raise
+either.
+
 **Why it is parked:** its receipt is PENDING. The scarcity saturation is
 identity at 15 scenes or fewer, so the public benchmark and the calibration
 corpus are blind to the half that matters at feature length; on the private

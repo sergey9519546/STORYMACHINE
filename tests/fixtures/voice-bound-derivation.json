@@ -1,0 +1,678 @@
+{
+  "_comment": "Rows measured by .github/workflows/calibrate-voice-bound.yml on ubuntu-latest and copied verbatim out of that run's `--json=-` block (see `machine.runId`); the `derivation` block and `marginFraction` are recomputed from those rows by `npm run measure-voice-bound -- --lock-from=<this file>`, which never touches a measurement. tests/core/voice-bound-derivation.test.ts re-derives MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT from these rows on every CI run, so editing the constant without a fresh table fails that test, and so does locking a fresh table without moving the constant. The per-row `guard` column is the verdict the tree the sweep ran on gave that document (cast bound provisionally 65 at the time), not a verdict this tree gives; nothing asserts on it and the derivation does not read it.",
+  "generatedAt": "2026-09-13T05:52:14.241Z",
+  "machine": {
+    "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+    "cores": 4,
+    "parallelism": 4,
+    "memGiB": 16,
+    "node": "v22.23.2",
+    "platform": "linux",
+    "arch": "x64",
+    "ci": "github-actions",
+    "runner": "Linux/X64/ubuntu24/20260907.300.1",
+    "runId": "34740951649"
+  },
+  "budgetMs": 30000,
+  "marginFraction": 0.2,
+  "primaryCondition": "loaded",
+  "repeats": 2,
+  "conditions": {
+    "idle": [
+      {
+        "shape": "max-admitted",
+        "n": 50,
+        "bytes": 95250,
+        "distinct": 50,
+        "pooledWords": 13500,
+        "weight": 675000,
+        "guard": "ACCEPT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          6245,
+          6165
+        ],
+        "wallMsSamples": [
+          6084,
+          6010
+        ],
+        "cpuMsMedian": 6205,
+        "cpuMsMax": 6245,
+        "wallMsMedian": 6047,
+        "wallMsMax": 6084
+      },
+      {
+        "shape": "max-admitted",
+        "n": 60,
+        "bytes": 79000,
+        "distinct": 60,
+        "pooledWords": 11160,
+        "weight": 669600,
+        "guard": "ACCEPT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          6386,
+          6437
+        ],
+        "wallMsSamples": [
+          6237,
+          6296
+        ],
+        "cpuMsMedian": 6412,
+        "cpuMsMax": 6437,
+        "wallMsMedian": 6267,
+        "wallMsMax": 6296
+      },
+      {
+        "shape": "max-admitted",
+        "n": 65,
+        "bytes": 71925,
+        "distinct": 65,
+        "pooledWords": 10140,
+        "weight": 659100,
+        "guard": "ACCEPT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          6544,
+          6593
+        ],
+        "wallMsSamples": [
+          6405,
+          6452
+        ],
+        "cpuMsMedian": 6569,
+        "cpuMsMax": 6593,
+        "wallMsMedian": 6429,
+        "wallMsMax": 6452
+      },
+      {
+        "shape": "max-admitted",
+        "n": 70,
+        "bytes": 65690,
+        "distinct": 70,
+        "pooledWords": 9240,
+        "weight": 646800,
+        "guard": "REJECT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          6648,
+          6738
+        ],
+        "wallMsSamples": [
+          6510,
+          6600
+        ],
+        "cpuMsMedian": 6693,
+        "cpuMsMax": 6738,
+        "wallMsMedian": 6555,
+        "wallMsMax": 6600
+      },
+      {
+        "shape": "max-admitted",
+        "n": 75,
+        "bytes": 64075,
+        "distinct": 75,
+        "pooledWords": 9000,
+        "weight": 675000,
+        "guard": "REJECT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          6930,
+          6956
+        ],
+        "wallMsSamples": [
+          6791,
+          6822
+        ],
+        "cpuMsMedian": 6943,
+        "cpuMsMax": 6956,
+        "wallMsMedian": 6807,
+        "wallMsMax": 6822
+      },
+      {
+        "shape": "max-admitted",
+        "n": 80,
+        "bytes": 58260,
+        "distinct": 80,
+        "pooledWords": 8160,
+        "weight": 652800,
+        "guard": "REJECT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          7114,
+          7171
+        ],
+        "wallMsSamples": [
+          6993,
+          7047
+        ],
+        "cpuMsMedian": 7143,
+        "cpuMsMax": 7171,
+        "wallMsMedian": 7020,
+        "wallMsMax": 7047
+      },
+      {
+        "shape": "max-admitted",
+        "n": 85,
+        "bytes": 54810,
+        "distinct": 85,
+        "pooledWords": 7650,
+        "weight": 650250,
+        "guard": "REJECT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          7355,
+          7436
+        ],
+        "wallMsSamples": [
+          7236,
+          7313
+        ],
+        "cpuMsMedian": 7396,
+        "cpuMsMax": 7436,
+        "wallMsMedian": 7275,
+        "wallMsMax": 7313
+      },
+      {
+        "shape": "max-admitted",
+        "n": 90,
+        "bytes": 50465,
+        "distinct": 90,
+        "pooledWords": 7020,
+        "weight": 631800,
+        "guard": "REJECT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          7389,
+          7408
+        ],
+        "wallMsSamples": [
+          7276,
+          7295
+        ],
+        "cpuMsMedian": 7399,
+        "cpuMsMax": 7408,
+        "wallMsMedian": 7286,
+        "wallMsMax": 7295
+      },
+      {
+        "shape": "max-admitted",
+        "n": 100,
+        "bytes": 47655,
+        "distinct": 100,
+        "pooledWords": 6600,
+        "weight": 660000,
+        "guard": "REJECT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          8023,
+          8020
+        ],
+        "wallMsSamples": [
+          7915,
+          7911
+        ],
+        "cpuMsMedian": 8022,
+        "cpuMsMax": 8023,
+        "wallMsMedian": 7913,
+        "wallMsMax": 7915
+      },
+      {
+        "shape": "uniform-min",
+        "n": 150,
+        "bytes": 33710,
+        "distinct": 150,
+        "pooledWords": 4500,
+        "weight": 675000,
+        "guard": "REJECT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          11986,
+          11709
+        ],
+        "wallMsSamples": [
+          11869,
+          11595
+        ],
+        "cpuMsMedian": 11848,
+        "cpuMsMax": 11986,
+        "wallMsMedian": 11732,
+        "wallMsMax": 11869
+      },
+      {
+        "shape": "probe-cast",
+        "n": 20,
+        "bytes": 122115,
+        "distinct": 20,
+        "pooledWords": 15192,
+        "weight": 303840,
+        "guard": "ACCEPT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          2890,
+          2875
+        ],
+        "wallMsSamples": [
+          2725,
+          2712
+        ],
+        "cpuMsMedian": 2883,
+        "cpuMsMax": 2890,
+        "wallMsMedian": 2719,
+        "wallMsMax": 2725
+      },
+      {
+        "shape": "probe-cast",
+        "n": 30,
+        "bytes": 122689,
+        "distinct": 30,
+        "pooledWords": 15240,
+        "weight": 457200,
+        "guard": "ACCEPT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          4319,
+          4263
+        ],
+        "wallMsSamples": [
+          4140,
+          4087
+        ],
+        "cpuMsMedian": 4291,
+        "cpuMsMax": 4319,
+        "wallMsMedian": 4114,
+        "wallMsMax": 4140
+      },
+      {
+        "shape": "probe-cast",
+        "n": 40,
+        "bytes": 122924,
+        "distinct": 40,
+        "pooledWords": 15240,
+        "weight": 609600,
+        "guard": "ACCEPT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          5792,
+          5785
+        ],
+        "wallMsSamples": [
+          5604,
+          5598
+        ],
+        "cpuMsMedian": 5789,
+        "cpuMsMax": 5792,
+        "wallMsMedian": 5601,
+        "wallMsMax": 5604
+      },
+      {
+        "shape": "probe-cast",
+        "n": 44,
+        "bytes": 123348,
+        "distinct": 44,
+        "pooledWords": 15282,
+        "weight": 672408,
+        "guard": "ACCEPT",
+        "condition": "idle",
+        "repeats": 2,
+        "cpuMsSamples": [
+          6425,
+          6447
+        ],
+        "wallMsSamples": [
+          6233,
+          6263
+        ],
+        "cpuMsMedian": 6436,
+        "cpuMsMax": 6447,
+        "wallMsMedian": 6248,
+        "wallMsMax": 6263
+      }
+    ],
+    "loaded": [
+      {
+        "shape": "max-admitted",
+        "n": 50,
+        "bytes": 95250,
+        "distinct": 50,
+        "pooledWords": 13500,
+        "weight": 675000,
+        "guard": "ACCEPT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          10212,
+          10288
+        ],
+        "wallMsSamples": [
+          10208,
+          10289
+        ],
+        "cpuMsMedian": 10250,
+        "cpuMsMax": 10288,
+        "wallMsMedian": 10249,
+        "wallMsMax": 10289
+      },
+      {
+        "shape": "max-admitted",
+        "n": 60,
+        "bytes": 79000,
+        "distinct": 60,
+        "pooledWords": 11160,
+        "weight": 669600,
+        "guard": "ACCEPT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          10780,
+          10903
+        ],
+        "wallMsSamples": [
+          10777,
+          10877
+        ],
+        "cpuMsMedian": 10842,
+        "cpuMsMax": 10903,
+        "wallMsMedian": 10827,
+        "wallMsMax": 10877
+      },
+      {
+        "shape": "max-admitted",
+        "n": 65,
+        "bytes": 71925,
+        "distinct": 65,
+        "pooledWords": 10140,
+        "weight": 659100,
+        "guard": "ACCEPT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          11091,
+          10974
+        ],
+        "wallMsSamples": [
+          11067,
+          10944
+        ],
+        "cpuMsMedian": 11033,
+        "cpuMsMax": 11091,
+        "wallMsMedian": 11006,
+        "wallMsMax": 11067
+      },
+      {
+        "shape": "max-admitted",
+        "n": 70,
+        "bytes": 65690,
+        "distinct": 70,
+        "pooledWords": 9240,
+        "weight": 646800,
+        "guard": "REJECT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          11071,
+          11001
+        ],
+        "wallMsSamples": [
+          11095,
+          10954
+        ],
+        "cpuMsMedian": 11036,
+        "cpuMsMax": 11071,
+        "wallMsMedian": 11025,
+        "wallMsMax": 11095
+      },
+      {
+        "shape": "max-admitted",
+        "n": 75,
+        "bytes": 64075,
+        "distinct": 75,
+        "pooledWords": 9000,
+        "weight": 675000,
+        "guard": "REJECT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          11892,
+          11776
+        ],
+        "wallMsSamples": [
+          11904,
+          11790
+        ],
+        "cpuMsMedian": 11834,
+        "cpuMsMax": 11892,
+        "wallMsMedian": 11847,
+        "wallMsMax": 11904
+      },
+      {
+        "shape": "max-admitted",
+        "n": 80,
+        "bytes": 58260,
+        "distinct": 80,
+        "pooledWords": 8160,
+        "weight": 652800,
+        "guard": "REJECT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          11771,
+          11848
+        ],
+        "wallMsSamples": [
+          11802,
+          11907
+        ],
+        "cpuMsMedian": 11810,
+        "cpuMsMax": 11848,
+        "wallMsMedian": 11855,
+        "wallMsMax": 11907
+      },
+      {
+        "shape": "max-admitted",
+        "n": 85,
+        "bytes": 54810,
+        "distinct": 85,
+        "pooledWords": 7650,
+        "weight": 650250,
+        "guard": "REJECT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          12132,
+          12158
+        ],
+        "wallMsSamples": [
+          12144,
+          12196
+        ],
+        "cpuMsMedian": 12145,
+        "cpuMsMax": 12158,
+        "wallMsMedian": 12170,
+        "wallMsMax": 12196
+      },
+      {
+        "shape": "max-admitted",
+        "n": 90,
+        "bytes": 50465,
+        "distinct": 90,
+        "pooledWords": 7020,
+        "weight": 631800,
+        "guard": "REJECT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          12417,
+          12560
+        ],
+        "wallMsSamples": [
+          12429,
+          12502
+        ],
+        "cpuMsMedian": 12489,
+        "cpuMsMax": 12560,
+        "wallMsMedian": 12466,
+        "wallMsMax": 12502
+      },
+      {
+        "shape": "max-admitted",
+        "n": 100,
+        "bytes": 47655,
+        "distinct": 100,
+        "pooledWords": 6600,
+        "weight": 660000,
+        "guard": "REJECT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          13836,
+          13405
+        ],
+        "wallMsSamples": [
+          13894,
+          13387
+        ],
+        "cpuMsMedian": 13621,
+        "cpuMsMax": 13836,
+        "wallMsMedian": 13641,
+        "wallMsMax": 13894
+      },
+      {
+        "shape": "uniform-min",
+        "n": 150,
+        "bytes": 33710,
+        "distinct": 150,
+        "pooledWords": 4500,
+        "weight": 675000,
+        "guard": "REJECT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          19917,
+          20022
+        ],
+        "wallMsSamples": [
+          19962,
+          20064
+        ],
+        "cpuMsMedian": 19970,
+        "cpuMsMax": 20022,
+        "wallMsMedian": 20013,
+        "wallMsMax": 20064
+      },
+      {
+        "shape": "probe-cast",
+        "n": 20,
+        "bytes": 122115,
+        "distinct": 20,
+        "pooledWords": 15192,
+        "weight": 303840,
+        "guard": "ACCEPT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          5153,
+          5088
+        ],
+        "wallMsSamples": [
+          5094,
+          5034
+        ],
+        "cpuMsMedian": 5121,
+        "cpuMsMax": 5153,
+        "wallMsMedian": 5064,
+        "wallMsMax": 5094
+      },
+      {
+        "shape": "probe-cast",
+        "n": 30,
+        "bytes": 122689,
+        "distinct": 30,
+        "pooledWords": 15240,
+        "weight": 457200,
+        "guard": "ACCEPT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          7708,
+          7615
+        ],
+        "wallMsSamples": [
+          7619,
+          7551
+        ],
+        "cpuMsMedian": 7662,
+        "cpuMsMax": 7708,
+        "wallMsMedian": 7585,
+        "wallMsMax": 7619
+      },
+      {
+        "shape": "probe-cast",
+        "n": 40,
+        "bytes": 122924,
+        "distinct": 40,
+        "pooledWords": 15240,
+        "weight": 609600,
+        "guard": "ACCEPT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          10433,
+          10606
+        ],
+        "wallMsSamples": [
+          10429,
+          10490
+        ],
+        "cpuMsMedian": 10520,
+        "cpuMsMax": 10606,
+        "wallMsMedian": 10460,
+        "wallMsMax": 10490
+      },
+      {
+        "shape": "probe-cast",
+        "n": 44,
+        "bytes": 123348,
+        "distinct": 44,
+        "pooledWords": 15282,
+        "weight": 672408,
+        "guard": "ACCEPT",
+        "condition": "loaded",
+        "repeats": 2,
+        "cpuMsSamples": [
+          11500,
+          11386
+        ],
+        "wallMsSamples": [
+          11464,
+          11370
+        ],
+        "cpuMsMedian": 11443,
+        "cpuMsMax": 11500,
+        "wallMsMedian": 11417,
+        "wallMsMax": 11464
+      }
+    ]
+  },
+  "derivation": {
+    "shape": "max-admitted",
+    "targetMs": 15000,
+    "ceilingMs": 12000,
+    "marginFraction": 0.2,
+    "derivedCast": 80,
+    "derivedCpuMsMax": 11848
+  }
+}

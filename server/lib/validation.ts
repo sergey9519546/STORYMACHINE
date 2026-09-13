@@ -726,7 +726,7 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 675_000;
 // tests/core/voice-bound-derivation.test.ts re-derives this constant from it,
 // so editing it without a fresh measurement fails the suite. Reproduce with
 // `npm run measure-voice-bound`.
-export const MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 65;
+export const MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 80;
 // 2026-09-06 review round 7 follow-up, non-blocking — RESIDUAL accepted
 // worst case, recorded here rather than left unstated: a document sitting
 // at the analyzer's own 400-scene ceiling, with a genuine (not hand-model-

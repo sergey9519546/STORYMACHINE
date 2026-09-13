@@ -61,6 +61,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-13 CI Green",
+      "path": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-13 Owner Measure Lane.md",
       "type": "audit",
       "title": "Audit — 2026-09-13 Owner Measure Lane",
@@ -929,6 +935,26 @@
       "to": "docs/brain/Patterns.md"
     },
     {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md",
+      "to": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md",
+      "to": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md",
+      "to": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
       "from": "docs/brain/Audits/Audit - 2026-09-13 Owner Measure Lane.md",
       "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
@@ -1015,6 +1041,10 @@
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
       "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
     },
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
@@ -1227,6 +1257,10 @@
     {
       "from": "docs/brain/Gates/Gate - Fountain Shape Guard.md",
       "to": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Fountain Shape Guard.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
     },
     {
       "from": "docs/brain/Gates/Gate - Honesty Audit.md",
