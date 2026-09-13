@@ -1,6 +1,6 @@
 ---
 type: home
-updated: 2026-09-05
+updated: 2026-09-13
 sources: [CLAUDE.md, ROADMAP.md, NORTH_STAR.md, docs/UNIFIED_STATE_2026-09-02.md, docs/PATH_TO_EXCELLENCE.md]
 status: active
 ---
@@ -90,6 +90,15 @@ decision, repo visibility. Each has its own note under `Owner/`; start at
   [[Audit - 2026-07-14 High-End Audit]].
 - **"What does this measurement document actually show?"** →
   `Measurements/` — start at [[Measurements Index|the Measurements Index]].
+- **"Does the generator produce anything good, and what did it cost?"** →
+  `Generation/` — [[Generation - Story Bench]], the instrument built on
+  2026-09-13 for the owner's direction to work on the product's ability to
+  generate stories people value. Read it before touching a prompt: it records
+  that there is no premise-to-outline step at all, that the compiled
+  screenplay is fixed-template output rather than generated prose, and that
+  the 14-pass revision is the only step in the pipeline that writes. The
+  ruling that the first lane MEASURES rather than tunes is
+  [[Decision 8 - Generation Quality Becomes a Measured Track]].
 - **"What can only the owner do, and why?"** → `Owner/` — start at
   [[Owner - Index]].
 - **"What is the R5 / advice-rule-fixes situation?"** → `Branches/` — start
