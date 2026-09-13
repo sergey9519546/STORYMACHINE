@@ -423,4 +423,8 @@ the same subject as Finding 10.
 
 ## Tip
 
-`<pending — see the trailing commit that names this round's own SHA, the same pattern used for round 2's tip>`
+`f0cf763cbf6d194cf904a441beebb83aa0218e0a` — round 3's one substantive
+commit, and the one a reviewer should read. Same reason as round 2's tip
+line (a commit cannot name its own SHA inside itself): this line is set by
+a small trailing commit once `f0cf763c`'s SHA was known. Both commits are
+pushed together in the one push this round asked for.
