@@ -115,6 +115,20 @@ import { normalizeScreenplay, isCharacterCue } from '../../server/nvm/analyze/sc
 // own oracle truncates its pipeline model at the SAME scene the guard and
 // the real analyzer do; see validation.ts's own comment on this same import.
 import { ANALYZER_SCENE_CEILING } from '../../server/nvm/analyze/fountain-analyzer.ts';
+// The two document shapes MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT is derived
+// against, and the rule that turns measured costs into the bound. These used
+// to be written out inside the "finding 10" describe block below, which meant
+// the calibration that derives the bound could only be reproduced by re-typing
+// them — and the 2026-09-13 re-derivation needed them run on a GitHub Actions
+// runner, not in this process. One implementation, imported here and by
+// scripts/measure-voice-bound-cost.mjs; verified byte-identical to the inline
+// versions at every cast this file uses before the move.
+import {
+  buildUniformMin,
+  buildProbeCastFeature,
+  uniformMinWeight,
+} from '../../scripts/lib/voice-bound.ts';
+import { machineFingerprint, formatMachineFingerprint } from '../../scripts/lib/machine-fingerprint.ts';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -2961,35 +2975,13 @@ describe('ROUND 7 equivalence: retiring the legacy voice-eligible-weight walk ch
 describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — realistic casts accept, DoS fixtures still reject', () => {
   const DLG6 = 'this is ordinary lowercase dialogue here.';
 
-  // Same Zipf-with-a-floor shape the constant's own header comment measures
-  // against (probe-cast.ts): every character clears VOICE_ELIGIBLE_MIN_WORDS
-  // with margin (the worst case for this bound — a real script's minors
-  // usually fall under the floor and skip it entirely), spread over a
-  // 110-page-scale feature.
-  function buildProbeCastFeature(cast: number, totalDialogueWords = 15_150): string {
-    const raw: number[] = [];
-    let rawSum = 0;
-    for (let i = 1; i <= cast; i++) { const w = 1 / i; raw.push(w); rawSum += w; }
-    const alloc = raw.map((w) => Math.max(35, Math.round((w / rawSum) * totalDialogueWords)));
-    const drift = totalDialogueWords - alloc.reduce((a, b) => a + b, 0);
-    alloc[0] = Math.max(35, alloc[0]! + drift);
-
-    const names = Array.from({ length: cast }, (_, i) => `CHARACTER${i + 1}`);
-    let text = 'INT. ROOM 0 - DAY\n\nA moment passes before anyone speaks.\n\n';
-    let scene = 1;
-    for (let i = 0; i < cast; i++) {
-      let remaining = alloc[i]!;
-      while (remaining > 0) {
-        const n = Math.min(remaining, 10);
-        text += `${names[i]}\n${DLG6}${n > 6 ? ' ' + DLG6 : ''}\n\n`;
-        remaining -= Math.min(remaining, n > 6 ? 12 : 6);
-        if (remaining > 0 && (i + scene) % 7 === 0) {
-          text += `INT. LOCATION ${scene++} - DAY\n\nA moment passes before anyone speaks.\n\n`;
-        }
-      }
-    }
-    return text;
-  }
+  // buildProbeCastFeature — the realistic shape (Zipf-with-a-floor: every
+  // character clears VOICE_ELIGIBLE_MIN_WORDS with margin, which is the worst
+  // case for this bound among real scripts, since a real script's minors
+  // usually fall under the floor and skip the check entirely) — and
+  // buildUniformMin — the worst case the bound admits at any weight — both
+  // live in scripts/lib/voice-bound.ts now, so the calibration run and these
+  // assertions measure the same bytes. See that file's header.
 
   for (const cast of [20, 30, 40]) {
     it(`a realistic ${cast}-cast fully-eligible feature (Zipf-distributed speech, 35-word floor, ~15,150 pooled dialogue words) is ACCEPTED`, () => {
@@ -3027,65 +3019,82 @@ describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — reali
   // clear the floor. Matches the round-1 reviewer's own "uniform-min"
   // methodology exactly (verified: this generator's weight/chars at N=223
   // reproduce the reviewer's reported 1,491,870 / 50,172 exactly).
-  function buildUniformMin(cast: number): string {
-    const DLG = 'this is ordinary lowercase dialogue here';
-    let t = '', occ = 0, scene = 0;
-    while (occ < cast) {
-      t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
-      for (let i = 0; i < 40 && occ < cast; i++, occ++) {
-        t += `CHARACTER${occ}\n\n`;
-        for (let p = 0; p < 5; p++) t += `${DLG}\n\n`;
-      }
-    }
-    return t;
-  }
+  //
+  // 2026-09-13: the boundary cast is DERIVED FROM THE CONSTANT rather than
+  // written out as a literal, so a re-derivation of the bound moves this
+  // boundary and its N+1 twin with it and the three can never disagree. What
+  // ties the constant itself to a real measurement is
+  // tests/core/voice-bound-derivation.test.ts, which re-derives it from the
+  // committed calibration table (tests/fixtures/voice-bound-derivation.json).
+  const BOUNDARY_CAST = Math.round(Math.sqrt(MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT / 30));
 
-  it('the uniform-min N=150 boundary (weight exactly 675,000) is ACCEPTED, and its measured runScriptDoctor cost stays inside the budget', async () => {
+  it(`the bound is exactly a uniform-min weight (N=${BOUNDARY_CAST} at the 30-word eligibility floor), so the boundary below is the real boundary`, () => {
+    assert.equal(
+      uniformMinWeight(BOUNDARY_CAST),
+      MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+      `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT (${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT}) must be 30N² for a whole N — the derivation is "the largest uniform-min cast whose cost clears the target", so a value between two casts would admit a cast whose cost was never measured`,
+    );
+  });
+
+  it(`the uniform-min N=${BOUNDARY_CAST} boundary (weight exactly ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT}) is ACCEPTED, and its measured runScriptDoctor cost stays inside the budget`, async (t) => {
     const { runScriptDoctor } = await import('../../server/nvm/analyze/doctor.ts');
     const { DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS } = await import('../../server/lib/doctor-budget.ts');
-    const text = buildUniformMin(150);
-    const w = 150 * (150 * 30);
-    assert.equal(w, 675_000, 'sanity: N=150 at exactly 30 words/speaker must land exactly on the bound');
+    const text = buildUniformMin(BOUNDARY_CAST);
     const reason = fountainShapeRejectionReason(text);
-    assert.equal(reason, null, `expected the N=150 uniform-min boundary to be accepted, got: ${reason}`);
+    assert.equal(reason, null, `expected the N=${BOUNDARY_CAST} uniform-min boundary to be accepted, got: ${reason}`);
     // This is the actual analysis, not just the guard — the whole point of
     // this bound is that the guard's ACCEPT decisions stay cheap. Round-2
     // review round 2, item 9: a plain wall-clock ceiling is the EXACT form
     // tests/core/doctor-analysis-budget.test.ts already retired for flaking
     // (its own header: 18,512ms / 21,624ms under a parallel `npm test` on an
-    // 8.5s-standalone fixture — 2.5x load inflation; this shape costs
-    // 13.4-15.2s standalone, so the same inflation clears any wall-only
-    // ceiling this test could set). Use that file's two-part form verbatim,
-    // derived from DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS instead of a bare
-    // literal: CPU time (immune to a busy box — `npm test` runs each file in
-    // its own process) against HALF the budget — the exact quantity the
-    // bound's own 2x-headroom design target is about — and wall clock
-    // against the FULL budget, the literal product guarantee. Measured
-    // 12.4-13.2s of CPU for this shape on the round-2 review's own box —
-    // inside the 15s half-budget with 12-17% margin — and this form would
-    // have caught round 1's 223-speaker document (27s of CPU) outright.
+    // 8.5s-standalone fixture — 2.5x load inflation). Use that file's two-part
+    // form verbatim, derived from DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS instead of
+    // a bare literal: CPU time against HALF the budget — the exact quantity
+    // the bound's own 2x-headroom design target is about — and wall clock
+    // against the FULL budget, the literal product guarantee.
+    //
+    // 2026-09-13: the form is unchanged and deliberately NOT loosened — what
+    // changed is the machine the bound is derived on. CPU is not as
+    // load-immune as round 2 assumed (`npm test` runs each file in its own
+    // process, but those processes share a memory system and, on a 4-vCPU
+    // runner, SMT siblings), and the first real Actions run since 2026-09-02
+    // measured 19,713ms of CPU here against the 15,000ms half-budget. The
+    // answer was to re-derive the bound on the slowest machine that enforces
+    // it, not to widen the fraction, add a CI skip, or drop to wall-only. So
+    // that the next failure does not need a second archaeology pass, both
+    // messages below now name the machine, and the measurement is emitted as
+    // a TAP diagnostic on PASS too — every CI run leaves the number in the
+    // log, whether or not anything went wrong.
     const cpuStart = process.cpuUsage();
     const wallStart = Date.now();
     await runScriptDoctor(text);
     const wallMs = Date.now() - wallStart;
     const cpu = process.cpuUsage(cpuStart);
     const cpuMs = (cpu.user + cpu.system) / 1000;
+    const machine = formatMachineFingerprint(machineFingerprint());
+    t.diagnostic(
+      `voice-bound worst-case cost: N=${BOUNDARY_CAST} (weight ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT}) `
+      + `cpu ${Math.round(cpuMs)}ms (${((cpuMs / (DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS / 2)) * 100).toFixed(0)}% of the `
+      + `${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS / 2}ms half-budget target), wall ${wallMs}ms — ${machine}`,
+    );
     assert.ok(
       cpuMs < DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS / 2,
-      `expected the N=150 worst-case accepted shape to cost under half the ${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms analysis budget of CPU, used ${Math.round(cpuMs)}ms — the bound's 2x-headroom derivation no longer holds`,
+      `expected the N=${BOUNDARY_CAST} worst-case accepted shape to cost under half the ${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms analysis budget of CPU, used ${Math.round(cpuMs)}ms — the bound's 2x-headroom derivation no longer holds on this machine: ${machine}. Re-derive with \`npm run measure-voice-bound\` on THIS machine (and .github/workflows/calibrate-voice-bound.yml for the runner), then re-lock tests/fixtures/voice-bound-derivation.json — do not raise the fraction`,
     );
     assert.ok(
       wallMs < DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS,
-      `expected the N=150 worst-case accepted shape to finish under the ${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms analysis budget, took ${Math.round(wallMs)}ms wall`,
+      `expected the N=${BOUNDARY_CAST} worst-case accepted shape to finish under the ${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms analysis budget, took ${Math.round(wallMs)}ms wall on ${machine}`,
     );
   });
 
-  it('the uniform-min N=151 boundary (one speaker over — weight 684,030) is REJECTED', () => {
-    const text = buildUniformMin(151);
-    const w = 151 * (151 * 30);
-    assert.equal(w, 684_030);
+  it(`the uniform-min N=${BOUNDARY_CAST + 1} boundary (one speaker over — weight ${uniformMinWeight(BOUNDARY_CAST + 1)}) is REJECTED`, () => {
+    const text = buildUniformMin(BOUNDARY_CAST + 1);
+    assert.ok(
+      uniformMinWeight(BOUNDARY_CAST + 1) > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+      'sanity: one speaker past the boundary must weigh more than the bound',
+    );
     const reason = fountainShapeRejectionReason(text);
-    assert.ok(reason, 'expected N=151 (one speaker past the boundary) to be rejected');
+    assert.ok(reason, `expected N=${BOUNDARY_CAST + 1} (one speaker past the boundary) to be rejected`);
     assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
   });
 
