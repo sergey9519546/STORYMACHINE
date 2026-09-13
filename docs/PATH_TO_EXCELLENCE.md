@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-13, main @ ce093a0c (nine session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-13, main @ 16b669f6 (ten session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -34,6 +34,94 @@ Product-surface verification was covered by the orchestrator's own full
 browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
+
+**2026-09-13 — CI green, and the story track begins: four defects only
+the runner could show, the owner's run as one command, and generation
+measured before it is tuned.** The GitHub Actions account block lifted at
+04:19 UTC, and the first real run on main since 2026-09-02 told the truth
+about ten days of work gated only on this sandbox: the browser battery was
+green on the runner; the test job was red on one subtest. Four lanes
+followed, each reviewed independently, none through on its first pass.
+
+The voice-weight bound's half-budget assertion had been derived on this
+box's CPU; the runner cost 19,713 ms against a 15,000 ms line. The lane put
+itself on the runner through a dispatch-only workflow that GitHub would not
+dispatch until it existed on main, so it added a push trigger on a
+dedicated `calibrate/**` prefix and measured there. The runner's own tables
+said no weight bound could hold the line without rejecting an ordinary
+40-character feature, so the fix is a second, orthogonal bound on the
+eligible cast (`MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` = 80), derived on
+three different runner CPUs twenty percent apart, locked in a table the
+test reads, with every realistic ensemble still accepted (75 roles at
+weight 674,025 accepted; 81 rejected) and a written disclosure that on the
+slowest fleet member under saturating load no cast bound can hold the line.
+Two review rounds sent back the record, not the design: a margin whose
+comment disagreed with its constant, a cross-machine correction, a "heaviest
+admitted document" false by 1.84x, and the named "real fix" being the wrong
+one — hoisting `burrowsDelta`'s per-pair re-derivation is 44–56x faster
+and bit-identical, needs only a receipt, and the owner note now points
+there.
+
+The cost question came from the owner: why so many CI runs. The lane
+standard pushes after every commit and CI ran on every push, so one docs
+commit cost one eight-minute run. A concurrency group now cancels
+superseded runs on lane branches and keys main's runs by SHA so none is
+ever cancelled or dropped; the job-log API returns only the last 100 KB of
+a seven-minute stream, so every test job now ends with a failure summary
+and uploads the full TAP. Three rounds: the pipefail assertion had been
+satisfied by the comment explaining it.
+
+The browser job went red three times in a row on one palette assertion and
+passed on a lane branch of the same tree. The racing quantity was the
+one-time lazy import of the Ship panel on its first open (813 ms first,
+27–66 ms after) inside the palette's exit animation (212–293 ms measured
+detach), and the assertion sampled the dialog count with no wait. The
+review inverted the lane's first explanation: throttling masks this race
+rather than reproducing it, and the runner is not slower than a sandbox
+carrying three agents. Fixed through `waitFor({ state: 'detached' })`
+with a scanner that now tracks each locator's own open and close.
+
+The last two reds were tests that passed here and failed there because the
+runner's ambient environment leaked into spawned children: a receipt-guard
+test inherited `GITHUB_EVENT_PATH` and exposed a real bug (`git rev-parse
+--verify` accepts any well-formed SHA without touching the object
+database), and the gates reporter inherited `RUN_E2E`. The review showed
+the first fix had no failing test of its own and that an unresolvable
+`before` now fell through to a range that could pass an unreceipted scoring
+change; both closed, with `npm run test:ci-env` replicating the runner's
+environment by subtraction as well as addition. Run 34752536029 on
+16b669f6 is the first fully green main run since 2026-09-02.
+
+Beside the CI work, `npm run owner:measure` landed: the owner's blocking
+corpus measurement as one command, reading the branch order from a
+committed plan a test checks against the owner note, refusing without the
+corpus, probing both trees before any AUC, measuring main first and each
+branch in a detached worktree, converting each PENDING receipt with the
+gate's own validator, asking accept or reject, re-locking the manifest in
+place, and ending at the AUC-24 table lock, with a no-corpus end-to-end
+mode on the 32 public scripts so every path runs in CI. Ten review items in
+round one, the first four about the receipt telling one true story, the two
+AUC-24 recipes now named beside their numbers and declared not comparable.
+
+Then the owner changed the direction: the product's ability to generate
+good stories people would value is the main track. A model key for an
+OpenAI-compatible endpoint went into `.env`; probes chose a strong model
+that answered a scene opening in twelve seconds and a fast non-reasoning
+model, after two candidates returned their reasoning as the script and one
+spent its whole budget thinking. A read-only map of the generative surface
+found what Decision #3 already said: nothing in the repository judges
+whether a generated scene is good, the craft knowledge base the generator
+was built for is neither in the repository nor consumed, and every
+generation path is quarantined behind Labs. A second read of every research
+document found nine built-and-tested modules that no generation path
+calls — voice constraint, subtext-before-generation, the audience red-team
+gate, fixed points and back-chaining, the epistemic ledger, the intention
+registry, the necessity certificate, the routed craft spec, the CC0 shorts
+as exemplars — and ranked them. The first story lane measures rather than
+tunes: six premises through the existing pipeline, doctor-scored, with a
+reading packet and a five-question rubric for the owner, the seed of the
+human-scored golden set Decision #3 named as the condition for promotion.
+Its baseline was not yet read when this record closed.
 
 **2026-09-12 — the adversarial review: twelve lanes, thirty-one review
 rounds, no lane through on its first pass.** The owner asked for a
