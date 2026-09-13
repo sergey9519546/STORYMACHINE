@@ -249,3 +249,57 @@ Items 2, 3 and 4 are all small enough to land in the same revision as item 1.
 Re-running the full `npm test` is not needed for a revision at this size;
 `tests/scripts/vite-cache-dir.test.ts` plus one `npm run verify:production`
 covers everything the list touches.
+
+---
+
+# Round 2 (`2d85079a`)
+
+Re-check of this reviewer's own four items against
+`git diff c33cbf13..2d85079a` (code at `a28839b4`, report tip at `2d85079a`),
+warm context, no battery. Same worktree, same procedure
+(`docs/LANE_STANDARD.md` §6).
+
+| # | round-1 item | disposition | verified |
+|---|---|---|---|
+| 1 | blocking — remove the false claim that the un-released slot cost the suite's OWN production boot a warm cache; state the true benefit | **fixed** | The sentence is gone from `scripts/lib/browser-verify.mjs:1263-1277` and `scripts/verify-production-build.mjs:505-521`, and the lane report §1 keeps the old paragraph with a "Corrected in round 2" blockquote naming it false rather than quietly rewriting history. `grep -rn "took a SECOND slot"` over `*.mjs` and `*.md` now hits only the three audit documents that quote it in order to correct it — no live comment repeats it. The replacement text is TRUE against the file: production boots first at `scripts/verify-production-build.mjs:243` (section 1), `bootProduction()` at `:210-237` spawns `tsx` directly with no `allocateViteCacheSlot()` call, and it sets `NODE_ENV: 'production'` at `:219`, which `server/app.ts:279` gates Vite creation on. The concurrent-gate benefit and the wait-for-death ordering are both real. One misdirected pointer inside the correction — see the note below; it is not a claim about behavior. |
+| 2 | state the SIGKILL-escalation trade-off, or restore it | **decided and written** | `scripts/verify-production-build.mjs:523-536` now names both halves: `graceMs = 0` sends one SIGTERM and waits up to `SERVER_EXIT_WAIT_MS` (5000 ms) without escalating, where the old inline path force-killed at 400 ms; and it says why `graceMs = 0` was chosen over `graceMs: 400` (one implementation of "how a dev boot dies", shared with the other three callers, and the thing that makes the "four callers" comment literally true). The report §4 row says the same. The choice is now visible, which is what the item asked for. |
+| 3 | correct "all eight call sites", or drop the count | **fixed, and derived instead of re-typed** | The doc comment above `zeroGraceShutdownCallers()` no longer carries a hand count; the file/call-site split is explained (a file with two call sites counts once for the "four callers" pin) and a new test at `tests/scripts/vite-cache-dir.test.ts:695-712` computes both numbers from `allShutdownCallSites()` — the same walk the scan uses — and asserts 11 sites in 8 files, plus the single-line property the `[^}]*` regex actually depends on, per site. That matches my own round-1 count. This is the stronger version of the item: the number that rotted is now produced, not stated. |
+| 4 | pin "no duplicate listeners" | **fixed, two directions** | `tests/scripts/vite-cache-dir.test.ts:508-565` allocates twice against the statically imported real module (the count must not grow) and twice against a mutant built by `loadMutant()` with the `has(signal)` guard replaced (the count must grow by exactly 2). `loadMutant()` asserts its anchor text is still present before mutating, so the fail-direction cannot silently measure nothing, and the cleanup removes by identity, for all three signals, exactly the listeners the mutant added. |
+
+## Reproduced, round 2
+
+```
+$ node --experimental-strip-types tests/scripts/vite-cache-dir.test.ts
+# tests 27 / # pass 27 / # fail 0            (real 0m0.515s)
+```
+
+The lane's finding-4 fail-first, reproduced by breaking the REAL module's
+guard rather than trusting the mutant arm alone:
+
+```
+$ sed -i 's|if (installedSignalHandlers.has(signal)) continue;|if (false) continue;|' vite-cache-dir.mjs
+$ node --experimental-strip-types tests/scripts/vite-cache-dir.test.ts
+not ok 6 - two allocations attach exactly one SIGTERM listener — …
+        14 !== 12
+# tests 27 / # pass 26 / # fail 1
+```
+
+`14 !== 12` exactly as the lane reported, and restoring the file returns it to
+27/27. `npm run verify:production` was driven at round 1 (71/71, 17.59 s) and
+round 2 touches no runtime path in that suite beyond comment text, so it was
+not re-run.
+
+## Note (non-blocking, fix on merge or leave)
+
+`scripts/lib/browser-verify.mjs:1267-1268` reads "never calls
+`allocateViteCacheSlot()` at all (that function spawns `tsx` directly — see
+this file's own header, 'WHY IT IS NOT bootKeylessServer()')". Two small
+slips, neither a claim about behavior: "that function" reads as
+`allocateViteCacheSlot()` where `bootProduction()` is meant, and the header it
+points to lives in `scripts/verify-production-build.mjs:23`, not in
+`browser-verify.mjs`. The same sentence in the lane report §1 and at
+`verify-production-build.mjs:509-512` is correct, because there "the file" IS
+that file. A four-word edit ("see `verify-production-build.mjs`'s own header")
+closes it; it does not hold the merge.
+
+**VERDICT: MERGE**
