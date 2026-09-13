@@ -246,6 +246,28 @@ export function isForcedTransitionLine(trimmed: string): boolean {
 export function isCenteredLine(trimmed: string): boolean {
   return trimmed.startsWith(FORCED_TRANSITION_MARKER) && trimmed.endsWith('<');
 }
+
+/** True when this parser reads `trimmed` as a transition WITHOUT a marker —
+ *  the four canonical phrases, or an all-caps line ending in `TO:`.
+ *
+ *  Hoisted out of the classification chain and exported 2026-09-13 so the
+ *  question "will this line read back as a transition?" has ONE answer. The
+ *  round-1 review found the inferred grammar written out in five places, and
+ *  the defect that came of it: `server/lib/pdf-import.ts` recognised `THE END.`
+ *  as a transition, emitted it unforced, and this parser read it back as
+ *  action — a false round-trip claim in the sibling of the importer whose
+ *  identical claim this branch had just corrected. That importer now asks this
+ *  function instead of restating the grammar, which is the same pattern
+ *  `fdx-import.ts`'s `formatCharacter` uses with `CHARACTER_CUE_RE`.
+ *
+ *  This is the PARSER's test, not a heuristic. The looser detectors in
+ *  `screenplay-normalizer.ts` and `canonical-fountain.ts` deliberately differ —
+ *  they guess at messy imports — and are named in the lane report rather than
+ *  folded in here. */
+export function isInferredTransitionLine(trimmed: string): boolean {
+  return /^(FADE IN:|FADE OUT\.|CUT TO:|DISSOLVE TO:)$/.test(trimmed)
+    || (/^[A-Z ]+ TO:$/.test(trimmed) && trimmed === trimmed.toUpperCase());
+}
 const CUE_EXTENSION_ALTERNATION = CUE_EXTENSIONS
   .map((e) => `\\(${e.replace(/[.]/g, '\\.')}\\)`)
   .join('|');
@@ -508,7 +530,7 @@ export function parseFountain(text: string): FountainBlock[] {
       if (prevBlock && (prevBlock.type === 'character' || prevBlock.type === 'dual_dialogue' || prevBlock.type === 'dialogue')) {
         type = 'parenthetical';
       }
-    } else if (trimmed.match(/^(FADE IN:|FADE OUT\.|CUT TO:|DISSOLVE TO:)$/) || (trimmed.match(/^[A-Z ]+ TO:$/) && trimmed === trimmed.toUpperCase())) {
+    } else if (isInferredTransitionLine(trimmed)) {
       type = 'transition';
     } else if (SHOT_LINE_RE.test(trimmed) && CAMERA_TERMS.some(term => trimmed.includes(term))) {
       type = 'shot';

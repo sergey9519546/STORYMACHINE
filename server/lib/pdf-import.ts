@@ -1,4 +1,5 @@
 import { MAX_FOUNTAIN_CHARS } from './runtime-limits.ts';
+import { FORCED_TRANSITION_MARKER, isInferredTransitionLine } from '../../src/lib/fountain.ts';
 
 // PDF screenplay import — converts a screenplay PDF (Final Draft, WriterDuet,
 // Arc Studio, or any app exporting the industry-standard US Letter screenplay
@@ -566,7 +567,7 @@ function classifyAndEmit(lines: RawLine[], bands: ColumnBand[]): { fountain: str
         break;
       case 'transition':
         openNewBlock();
-        out.push(text.toUpperCase());
+        out.push(formatTransitionLine(text));
         break;
       case 'character': {
         openNewBlock();
@@ -643,10 +644,37 @@ function classifyLine(text: string, band: ColumnBand, inSpeech: boolean): Role {
 // identically regardless of which importer produced it, and this module
 // doesn't need a reliable x-band for the (often sparse, 1-2 lines per
 // script) right-aligned transition column to recognize one.
+//
+// THE ROUND-TRIP CLAIM IN THAT PARAGRAPH WAS FALSE UNTIL 2026-09-13, in exactly
+// the way its twin in fdx-import.ts was. RECOGNITION here is deliberately WIDER
+// than the parser's inferred grammar — OTHER_TRANSITION_RE adds `THE END.`,
+// `TIME CUT:` and `INTERCUT WITH:`, which the shared set does not have — and
+// EMISSION pushed every recognised transition unforced. So this importer
+// identified a transition and then wrote Fountain that src/lib/fountain.ts read
+// back as ACTION: `THE END.` in, `scene_heading,action,action` out. Being wider
+// was never the bug; emitting the wider set with no marker was, and there was no
+// marker to emit until the parser learned `>`. `formatTransitionLine` below
+// closes it by asking the parser's own test rather than restating the grammar —
+// the pattern fdx-import.ts's formatCharacter already uses with
+// CHARACTER_CUE_RE.
 function isTransitionText(text: string): boolean {
   const upper = text.toUpperCase();
   if (upper !== text) return false;
   return AUTO_DETECTED_TRANSITION_RE.test(upper) || GENERIC_TRANSITION_RE.test(upper) || OTHER_TRANSITION_RE.test(upper);
+}
+
+/** A recognised transition, as Fountain this repository's parser reads back as
+ *  a transition. Forced with `> ` exactly when the bare line would not be —
+ *  the marker is added only where it is needed, so `CUT TO:` and every other
+ *  phrase in the shared auto-detect set emits byte-identically to before.
+ *
+ *  NOTE it does NOT append `:` the way fdx-import.ts's formatTransition does.
+ *  That mutation is pinned as known behaviour in tests/core/fdx-import.test.ts
+ *  and would turn `THE END.` into `THE END.:` here, which is worse than the
+ *  defect being fixed. */
+function formatTransitionLine(text: string): string {
+  const upper = text.toUpperCase();
+  return isInferredTransitionLine(upper) ? upper : `${FORCED_TRANSITION_MARKER} ${upper}`;
 }
 
 function isForceableHeading(text: string): boolean {

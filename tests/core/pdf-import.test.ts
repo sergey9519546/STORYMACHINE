@@ -16,6 +16,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { pdfToFountain } from '../../server/lib/pdf-import.ts';
+import { parseFountain, renderableText } from '../../src/lib/fountain.ts';
 
 // ── PDF fixture builder ──────────────────────────────────────────────────────
 // Places each run of text at an exact (x, y) PDF-user-space position via a
@@ -199,6 +200,61 @@ describe('pdfToFountain — classification by position', () => {
     const { fountain } = await pdfToFountain(new Uint8Array(pdf));
     assert.match(fountain, /^She waits\.$/m);
     assert.doesNotMatch(fountain, /^\.She waits\.$/m);
+  });
+});
+
+describe('pdfToFountain — a recognised transition comes back as a transition', () => {
+  // ROUND 2 of the renderer-residuals lane, review finding 3. This module's
+  // header claimed a transition "round-trips identically regardless of which
+  // importer produced it". It did not: RECOGNITION here is deliberately wider
+  // than the parser's inferred grammar (OTHER_TRANSITION_RE adds `THE END.`,
+  // `TIME CUT:` and `INTERCUT WITH:`), and EMISSION pushed every recognised
+  // transition unforced — so this importer identified a transition and wrote
+  // Fountain that src/lib/fountain.ts read back as ACTION. The same defect,
+  // with the same false comment, as the one corrected in fdx-import.ts.
+  const transitionPdf = (phrase: string) => buildScreenplayPdf([[
+    { y: 700, runs: [{ x: X_ACTION, text: 'INT. KITCHEN - DAY' }] },
+    { y: 680, runs: [{ x: X_ACTION, text: 'Sarah stares at the letter, hands trembling.' }] },
+    { y: 560, runs: [{ x: 380, text: phrase }] },
+  ]]);
+
+  it('FIRES: the three phrases only this importer recognises are forced, and re-parse as transitions', async () => {
+    for (const phrase of ['THE END.', 'TIME CUT:', 'INTERCUT WITH:']) {
+      const { fountain } = await pdfToFountain(new Uint8Array(transitionPdf(phrase)));
+      assert.match(fountain, new RegExp(`^> ${phrase.replace(/[.]/g, '\\.')}$`, 'm'),
+        `${phrase} must be emitted with the forced-transition marker, or the parser cannot read it back`);
+      assert.deepEqual(
+        parseFountain(fountain).filter((b) => b.type !== 'empty').map((b) => b.type),
+        ['scene_heading', 'action', 'transition'],
+        `${phrase} re-parsed as something other than a transition — before 2026-09-13 all three read `
+        + '`scene_heading,action,action`',
+      );
+      // The marker declares; it never prints.
+      const line = parseFountain(fountain).find((b) => b.type === 'transition')!;
+      assert.equal(renderableText(line), phrase, 'the marker must come off before the text reaches a page');
+    }
+  });
+
+  it('DOES NOT FIRE: a phrase the parser infers on its own is emitted unforced, byte-identically to before', async () => {
+    for (const phrase of ['CUT TO:', 'FADE OUT.', 'SMASH TO:']) {
+      const { fountain } = await pdfToFountain(new Uint8Array(transitionPdf(phrase)));
+      assert.match(fountain, new RegExp(`^${phrase.replace(/[.]/g, '\\.')}$`, 'm'),
+        `${phrase} must NOT gain a marker — it is already a transition to this parser, and adding one `
+        + 'would change the bytes of every existing import for no reason');
+      assert.equal(fountain.includes('>'), false, 'no marker may be added where none is needed');
+      assert.deepEqual(
+        parseFountain(fountain).filter((b) => b.type !== 'empty').map((b) => b.type),
+        ['scene_heading', 'action', 'transition'],
+      );
+    }
+  });
+
+  it('DOES NOT FIRE: the importer does not append a colon the way fdx-import.ts does', async () => {
+    // fdx-import.ts's formatTransition forces every transition to end in `:`,
+    // which is pinned as known behaviour in tests/core/fdx-import.test.ts and
+    // would turn `THE END.` into `THE END.:` here. Deliberately not copied.
+    const { fountain } = await pdfToFountain(new Uint8Array(transitionPdf('THE END.')));
+    assert.equal(fountain.includes('THE END.:'), false, 'the PDF importer must not mutate the phrase');
   });
 });
 
