@@ -21,6 +21,17 @@ name: Calibrate voice bound
 # no corpus text, and the whole result is a table of numbers that belongs in the
 # log and in a reviewed commit, not in an artifact nobody reads.
 
+# TWO TRIGGERS, AND WHY THE SECOND ONE EXISTS. `workflow_dispatch` is the
+# intended form. GitHub, however, only offers a workflow_dispatch workflow for
+# dispatch once the file exists on the DEFAULT branch — until this file is
+# merged, `POST /actions/workflows/calibrate-voice-bound.yml/dispatches` against
+# a lane branch answers 404 (verified 2026-09-13 on
+# lane/voice-bound-ci-derivation). A bound that has to be derived on the runner
+# before it can be merged cannot wait for its own merge, so the second trigger
+# runs this workflow on a push to any `calibrate/**` branch: a branch name
+# nothing else in this repository uses, that has to be created on purpose, and
+# that never fires on main, a lane branch, or a PR. Delete that branch after
+# reading the table.
 on:
   workflow_dispatch:
     inputs:
@@ -40,6 +51,8 @@ on:
         description: "idle, loaded, or idle,loaded — 'loaded' spins (parallelism - 1) sibling processes, the company the real assertion keeps under npm test"
         required: false
         default: "idle,loaded"
+  push:
+    branches: ["calibrate/**"]
 
 # Least privilege, same as ci.yml: this job only reads the checkout.
 permissions:
@@ -74,10 +87,12 @@ jobs:
       # known condition name).
       - name: Measure
         env:
-          UNIFORM_MIN: ${{ inputs.uniform_min }}
-          PROBE_CAST: ${{ inputs.probe_cast }}
-          REPEATS: ${{ inputs.repeats }}
-          CONDITIONS: ${{ inputs.conditions }}
+          # `inputs` is empty on a push event, so each falls back to the same
+          # default the dispatch form declares.
+          UNIFORM_MIN: ${{ inputs.uniform_min || '60,80,90,100,110,120,130,140,150,160' }}
+          PROBE_CAST: ${{ inputs.probe_cast || '20,30,40,44,60' }}
+          REPEATS: ${{ inputs.repeats || '2' }}
+          CONDITIONS: ${{ inputs.conditions || 'idle,loaded' }}
         run: |
           node --experimental-strip-types --no-warnings \
             scripts/measure-voice-bound-cost.mjs \
