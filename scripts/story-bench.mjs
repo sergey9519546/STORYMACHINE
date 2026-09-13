@@ -52,6 +52,7 @@
 
 import { spawn } from 'node:child_process';
 import http from 'node:http';
+import { fetch as undiciFetch, Agent } from 'undici';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -388,12 +389,24 @@ async function bootServerWithKey({ port, logSink }) {
   return proc;
 }
 
+// undici's DEFAULT headersTimeout is 300 s, and it is not the AbortSignal
+// below — it fires independently and it fired here. POST /api/nvm/revise sends
+// no headers until all fourteen sequential LLM passes have finished, so a
+// revision that legitimately takes longer than five minutes was aborted
+// client-side with a bare `fetch failed`. Measured: two premises of the
+// 2026-09-13-run2 run lost their ENTIRE revision step to it at 301 s, and the
+// bench recorded them as `revise failed — fetch failed` with no clue that the
+// deadline was its own. Both timeouts are disabled for the bench's own calls;
+// the AbortSignal remains the single real deadline, at a value the bench chose.
+const BENCH_DISPATCHER = new Agent({ headersTimeout: 0, bodyTimeout: 0 });
+
 async function post(base, route, body, timeoutMs = 2_400_000) {
-  const res = await fetch(`${base}${route}`, {
+  const res = await undiciFetch(`${base}${route}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeoutMs),
+    dispatcher: BENCH_DISPATCHER,
   });
   const text = await res.text();
   let json = null;
