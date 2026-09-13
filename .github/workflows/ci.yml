@@ -179,11 +179,21 @@ jobs:
         env:
           RUN_E2E: "1"
           GIT_SHA: ${{ github.sha }}
-        # `set -o pipefail` is explicit rather than assumed: without it, a
-        # failing `npm test` piped into `tee` would report the EXIT CODE OF
-        # `tee` (0, since tee itself succeeds), silently turning a red test
-        # run into a green step. `2>&1` folds stderr into the same file the
-        # TAP reporter's stdout goes to, since a crash can write to either.
+        # `shell: bash` is explicit, not relied on as the ambient default:
+        # this job is `ubuntu-latest` with no `container:`, so GitHub's own
+        # default `run:` shell already is `bash --noprofile --norc -eo
+        # pipefail {0}` — but that default is a property of the RUNNER, and
+        # would silently change to `sh` (no `set -o pipefail` support) if
+        # this step ever moved into a container image lacking bash. Pinning
+        # it here means that migration cannot silently drop pipefail; it can
+        # only fail loudly if bash is missing.
+        shell: bash
+        # `set -o pipefail` is ALSO explicit in the script itself (belt and
+        # braces with the `shell:` pin above): without it, a failing
+        # `npm test` piped into `tee` would report the EXIT CODE OF `tee`
+        # (0, since tee itself succeeds), silently turning a red test run
+        # into a green step. `2>&1` folds stderr into the same file the TAP
+        # reporter's stdout goes to, since a crash can write to either.
         run: |
           set -o pipefail
           npm test 2>&1 | tee test-output.tap

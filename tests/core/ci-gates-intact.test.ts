@@ -105,6 +105,20 @@ function stepBlock(source: string, stepName: string): string | null {
   for (let i = startIdx + 1; i < lines.length; i++) {
     const line = lines[i];
     if (line.trim() === '') { out.push(line); continue; }
+    // Round-2 review Finding 10 (the M6 comment-shadow shape, one helper
+    // over from topLevelConcurrencyBlock's own fix): a comment line must
+    // never be able to satisfy an `assert.match` against this block.
+    // Skipped BEFORE the dedent check — not pushed into `out`, and not used
+    // to decide the block boundary — so a comment sitting between this
+    // step's real content and the next step's `- name:` line is simply
+    // invisible here; the next step's actual marker line still ends the
+    // block exactly as before, since it is not itself a comment. Verified:
+    // deleting the live `set -o pipefail` line from the "Run tests" step
+    // used to leave the guard green, because the comment directly above the
+    // run block opens with the words "`set -o pipefail` is explicit rather
+    // than assumed" — the regex matched the EXPLANATION of the line instead
+    // of the line.
+    if (line.trim().startsWith('#')) continue;
     const lineIndent = line.search(/\S/);
     // A sibling step, or any dedent past this step's own indent, ends the block.
     if (lineIndent <= indent) break;
@@ -411,6 +425,42 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
     // it should still match — this test is about the cancel-in-progress
     // line specifically, not a claim that comment-stripping breaks everything.
     assert.match(block!, GROUP_KEY_RE, 'sanity: the live, correct group line must still match');
+  });
+
+  // Round-2 review Finding 10 (round-1's Finding 2, reintroduced one helper
+  // over): `stepBlock()` used to collect comment lines the same way
+  // `topLevelConcurrencyBlock()` once did. The comment written directly
+  // above ci.yml's/release.yml's "Run tests" run block explains
+  // `set -o pipefail` in prose ("`set -o pipefail` is explicit rather than
+  // assumed …"), so `assert.match(block, /set -o pipefail/)` was satisfied
+  // by the EXPLANATION even with the live command line deleted — a mutated,
+  // broken step (tee's exit code, not npm test's, would gate the job) read
+  // as correct. A self-contained fixture, independent of the real files'
+  // wording, pins the fix.
+  it("a comment mentioning `set -o pipefail` cannot satisfy the check when the live command line is gone (Finding 10)", () => {
+    const noPipefail = [
+      '      - name: Run tests (keyless — analysis-only posture)',
+      "        # `set -o pipefail` is explicit rather than assumed: without it,",
+      '        # a failing `npm test` piped into `tee` would report `tee`\'s own',
+      '        # exit code (0), silently turning a red test run into a green step.',
+      '        run: |',
+      '          npm test 2>&1 | tee test-output.tap',
+      '',
+      '      - name: Next step',
+    ].join('\n');
+    const block = stepBlock(noPipefail, 'Run tests (keyless — analysis-only posture)');
+    assert.ok(block, 'sanity: the step block itself must still be found');
+    assert.doesNotMatch(
+      block!,
+      /set -o pipefail/,
+      'a comment explaining `set -o pipefail` must NOT satisfy this check when the live command line has '
+      + 'been deleted — a naive stepBlock() that keeps comment text lets this mutated, broken step (which '
+      + 'would report `tee`\'s exit code instead of `npm test`\'s) read as correct (round-2 review, Finding 10)',
+    );
+    // The run body's OWN content — `tee test-output.tap` — is live, not
+    // commented, so it should still be found; this test is about the
+    // pipefail line specifically.
+    assert.match(block!, /tee\s+test-output\.tap/, 'sanity: the live tee line must still match');
   });
 
   // Round-1 review Finding 5 / orchestrator note: a fifth workflow can land

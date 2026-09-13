@@ -131,6 +131,9 @@ jobs:
         env:
           RUN_E2E: "1"
           GIT_SHA: ${{ github.sha }}
+        # Mirrors ci.yml's `shell: bash` pin — see that file's comment for
+        # why it stays explicit rather than relying on the runner default.
+        shell: bash
         # Mirrors ci.yml's pipefail+tee — see that file's comment for why
         # `set -o pipefail` is required (otherwise a failing `npm test`
         # piped into `tee` reports tee's own exit code, 0).

@@ -102,3 +102,11 @@ scripts/output/*.png
 # JSON/CSV above — regenerable on every retry, would otherwise bloat history
 # with console noise from whichever machine happened to be loaded.
 scripts/output/flaky-retries/
+
+# ci.yml's/release.yml's "Run tests" step tees `npm test`'s TAP output here
+# (see scripts/tap-failures.mjs) so a failing run's own not-ok lines survive
+# GitHub's job-log truncation. CI uploads it as a workflow artifact; it is
+# not evidence meant to live in the repo, and anyone reproducing that step
+# locally (`set -o pipefail; npm test 2>&1 | tee test-output.tap`) would
+# otherwise get an untracked file a `git add -A` could sweep in.
+test-output.tap

@@ -313,15 +313,114 @@ No full `npm test` — per the cost rule for this round.
   enough to threaten the same truncation this step exists to avoid; the
   full stack trace is in the uploaded artifact.
 
-## Tip
+## Round 2 tip (superseded by Round 3 — see below)
 
 `bfcaac4456d67b0f4d493c61c77afc787b81be2c` — the last substantive commit of
-this round (items 1-6 in `8507e1e3`, item 7 in `bfcaac44` itself), and the
-one a reviewer should read. This report's own Tip line names it via a small
-trailing commit once `bfcaac44`'s SHA was known (`git rev-parse HEAD`), the
-same "last commit points at the commit a reviewer should read" pattern
-`lane/voice-bound-ci-derivation` used for the identical problem — see that
-lane's `026c0948`. All of round 2's commits (`8507e1e3`, `bfcaac44`, and this
-trailing one) are pushed together in the one push this round's brief asked
-for — `git log --oneline main..HEAD` after the push is the full, authoritative
-list, this line just saves a reviewer that lookup.
+round 2 (items 1-6 in `8507e1e3`, item 7 in `bfcaac44` itself), and the one
+a round-2 reviewer should read. Recorded here via a small trailing commit
+once `bfcaac44`'s SHA was known, the same "last commit points at the commit
+a reviewer should read" pattern `lane/voice-bound-ci-derivation` used for
+the identical problem — see that lane's `026c0948`.
+
+# Round 3
+
+Review at `docs/audits/2026-09-13-ci-green/ci-concurrency-review.md`
+("Round 2 (`a343e034`)" section), verdict REVISE with exactly one must item
+(all six round-1 items confirmed CLOSED by re-check). Round 2's own item 7
+addition was accepted with the one finding below.
+
+**Finding 10 (must) — `stepBlock()` was comment-blind, the same defect as
+round 1's Finding 2 in the OTHER helper.** Deleting the live
+`set -o pipefail` line from both `ci.yml` and `release.yml` left the suite
+46/46 green: `stepBlock()` collected comment lines into the block text
+(unlike `topLevelConcurrencyBlock()`, which round 2 had already fixed), and
+the comment written directly above the run block opens with the words
+"`set -o pipefail` is explicit rather than assumed" — so
+`assert.match(block, /set -o pipefail/)` matched the EXPLANATION of the
+line instead of the live line itself. A mutated, broken step (which would
+report `tee`'s exit code, not `npm test`'s) read as correct — precisely the
+regression item 7 exists to prevent.
+
+**Fix**, verbatim as the reviewer specified and independently reproduced
+before applying it: `if (line.trim().startsWith('#')) continue;` added to
+`stepBlock()`'s loop, BEFORE the dedent check (so a comment neither joins
+the block text nor is mistaken for the line that ends it — the real
+dedented content, comment or not, still ends the block correctly). A
+self-contained regression test was added in the same shape as round 2's M6
+test for `topLevelConcurrencyBlock()`: a synthetic step fixture with the
+comment present and the live `set -o pipefail` line deleted, asserting the
+comment cannot satisfy the check.
+
+**Both optional notes taken:**
+- `shell: bash` added to both "Run tests" steps (`ci.yml`, `release.yml`) —
+  belt-and-braces so a future move into a container image without bash
+  cannot silently drop `pipefail` support; the job is `ubuntu-latest` with
+  no `container:` today, where the default shell already has it, so this
+  changes nothing about how the step runs now.
+- `.gitignore` gained a `test-output.tap` line, so reproducing the "Run
+  tests" step locally does not leave an untracked file a `git add -A`
+  could sweep in.
+
+## Proof — Finding 10, before and after
+
+Reproduced exactly as the review described: the live `set -o pipefail`
+line (not the comment mentioning it) deleted from both workflow files.
+
+Before the `stepBlock()` fix (round-2 helper, comments still collected):
+
+```
+$ <delete the live `set -o pipefail` line from ci.yml and release.yml>
+$ node --experimental-strip-types tests/core/ci-gates-intact.test.ts
+...
+# tests 46
+# pass 46
+# fail 0
+```
+
+46/46 — wrong; the mutated step would silently report a green exit code on
+a red test run. After the fix (comment lines skipped in `stepBlock()`):
+
+```
+$ node --experimental-strip-types tests/core/ci-gates-intact.test.ts
+...
+not ok 31 - ci.yml's "Run tests" step preserves its exit code through the tee (pipefail)
+not ok 34 - release.yml's "Run tests" step preserves its exit code through the tee (pipefail)
+...
+# tests 47
+# pass 45
+# fail 2
+```
+
+45/47, red on exactly the two pipefail assertions — matching the review's
+own reproduction exactly (46 -> 44 there; 47 -> 45 here because this round
+also added one new regression test, which itself goes from failing to
+passing across the same before/after). The new regression test
+(`"a comment mentioning \`set -o pipefail\` cannot satisfy the check when
+the live command line is gone (Finding 10)"`) was independently verified
+against the OLD (pre-fix) `stepBlock()` body and found to fail by itself
+(1 failing test, isolated from the two real-file checks above) before the
+fix landed. Restored and re-verified clean afterward — `git diff` on the
+workflow files is empty relative to the intended final content both times.
+
+## Round-3 gates
+
+| Gate | Command | Result |
+|---|---|---|
+| Touched test | `node --experimental-strip-types tests/core/ci-gates-intact.test.ts` | 47/47 pass (0 fail) — 46 round-2 + 1 new (Finding-10 regression) |
+| Type check | `npm run lint` | exit 0 |
+| Docs quality | `npm run check-docs` | exit 0 |
+| Honesty audit | `npm run honesty-audit` | exit 0 |
+| Brain freshness | `npm run brain` then `npm run check-brain` | graph unchanged (113 notes, 433 links — no brain note touched this round), `check-brain` exit 0 |
+
+No full `npm test` — per the cost rule for this round. `tests/scripts/tap-failures.test.ts`
+was also re-run (8/8, unaffected by this round's changes) since it shares
+the same subject as Finding 10.
+
+## Round-3 left undone / scope notes
+
+- None. This round's scope was the one must item plus the two named
+  optional notes, and all three are done.
+
+## Tip
+
+`<pending — see the trailing commit that names this round's own SHA, the same pattern used for round 2's tip>`
