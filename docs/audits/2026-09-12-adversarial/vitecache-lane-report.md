@@ -4,12 +4,14 @@
   `/home/user/STORYMACHINE/node_modules`, which is the hazard this lane fixes
   and is left in place)
 - **Branch:** `lane/vite-cache-isolation`, from `main` at `f79b47ec`
-- **Tip (last code/doc commit):** `bcd5de35e5e02f464dcddd9e0d135aa035a003a9` — this report is committed on top
-  of it, so the branch tip is one commit further; both SHAs are in the lane's
-  handback message.
+- **Tip:** `4b475582c97f3edc6e77095864535f44fa132406` — the tree every gate in §4
+  was confirmed against. Exactly one commit follows it on this branch and it
+  changes only these two lines and the log below, because a report cannot
+  contain the hash of the commit that contains the report.
 
 ```
 $ git log --oneline main..HEAD
+4b475582 docs(audit): the vite-cache-isolation lane report; release the cache slot after the kill
 bcd5de35 docs(brain): a Gate note for the Vite cache isolation harness
 d88cc1da fix(vite): one dependency-optimizer cache per worktree and per boot
 ```
@@ -513,4 +515,5 @@ four test files that pin `browser-verify.mjs`
 
 ---
 
-Tip: `bcd5de35e5e02f464dcddd9e0d135aa035a003a9` (the report commit that follows it is the branch tip).
+Tip: `4b475582c97f3edc6e77095864535f44fa132406` (the one commit after it is this
+line).
