@@ -59,6 +59,13 @@ import { fileURLToPath } from 'node:url';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = path.join(REPO, 'tests', 'fixtures', 'story-bench-premises.json');
 
+// The converge budget this bench asks for, and the route budget it needs to
+// let that finish. Both are the bench's numbers, not the product's: the route
+// still ships its own 180 s default and this only overrides the server the
+// bench itself boots. See bootServerWithKey for the measurement that set it.
+export const BENCH_CONVERGE_BUDGET = { maxIterations: 2, candidatesPerIteration: 2 };
+export const BENCH_CONVERGE_TIMEOUT_MS = 300_000;
+
 // ── Pure helpers (exported for tests/scripts/story-bench.test.ts) ────────────
 
 /** Today's run directory name — the date, so repeated runs in a day append. */
@@ -224,7 +231,22 @@ async function freePort() {
 async function bootServerWithKey({ port, logSink }) {
   const proc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
     cwd: REPO,
-    env: { ...process.env, PORT: String(port), NODE_ENV: 'development' },
+    env: {
+      ...process.env,
+      PORT: String(port),
+      NODE_ENV: 'development',
+      // MEASURED, NOT GUESSED. POST /api/nvm/converge defaults to a 180 s
+      // budget (AI_BUDGET_CONVERGE_TIMEOUT_MS, server/routes/nvm/converge.ts).
+      // One candidate-generation call against the configured reasoning model
+      // measured 15-78 s (n = 5, median ~26 s), and this budget calls
+      // generate() maxIterations times — so the first run of this bench lost
+      // EVERY beat of its first premise to `converge failed (181s)`. The
+      // default is right for a writer's request; it is not right for a bench
+      // that must let the loop finish. Raised for the bench's own boot only,
+      // never in the product, and only when the caller has not already set it.
+      AI_BUDGET_CONVERGE_TIMEOUT_MS:
+        process.env.AI_BUDGET_CONVERGE_TIMEOUT_MS ?? String(BENCH_CONVERGE_TIMEOUT_MS),
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let booted = false;
@@ -244,7 +266,7 @@ async function bootServerWithKey({ port, logSink }) {
   return proc;
 }
 
-async function post(base, route, body, timeoutMs = 900_000) {
+async function post(base, route, body, timeoutMs = 2_400_000) {
   const res = await fetch(`${base}${route}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -394,7 +416,7 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
     try {
       result = await post(base, '/api/nvm/converge', {
         sessionId, target, seed: 20260913 + target.sceneIdx,
-        budget: { maxIterations: 2, candidatesPerIteration: 2 },
+        budget: { ...BENCH_CONVERGE_BUDGET },
       });
     } catch (err) {
       console.log(`converge failed (${((Date.now() - beatStarted) / 1000).toFixed(0)}s)`);
