@@ -55,6 +55,23 @@ output-identity harness when scoring-adjacent · and the full `npm test`
 ONCE, on the final rebased tree. Every wait in a browser suite goes through
 `timing.ms()`.
 
+Before claiming green, run `npm run test:ci-env` (full suite, or pass the
+specific file paths the lane touched to check just those) — it replicates
+the GitHub Actions push-to-main runner's environment
+(`GITHUB_EVENT_NAME`/`GITHUB_SHA`/`GITHUB_EVENT_PATH` always set, plus the
+"Run tests" step's own `RUN_E2E`/`GIT_SHA`) and runs the suite under it.
+2026-09-13: 14,000 tests green on the sandbox three times in a row, and RED
+on the runner on two files, every push since CI resumed — both were a test
+(or the script it drove) building a child process's env with
+`{ ...process.env, ... }` or a bare `execFileSync` with no `env`, so it
+silently inherited the runner's ambient state into a throwaway repo or a
+self-check meant to see a clean environment. Neither leak could reproduce on
+a sandbox whose own `process.env` never carries `GITHUB_*`/`RUN_E2E` in the
+first place, so "green here" proved nothing about the runner — see
+`docs/audits/2026-09-13-ci-green/ci-env-lane-report.md`, and audit any new
+child-process spawn in a test the same way: does it build its env from
+scratch, or does it spread the ambient one and hope nothing in it matters?
+
 The orchestrator runs the full `npm test` and the whole eight-suite battery
 once per merge, on the rebased branch. Repeating either inside a revision
 round, or inside a review, costs more than it catches: a revision re-runs

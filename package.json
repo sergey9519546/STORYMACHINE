@@ -15,6 +15,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
+    "test:ci-env": "node scripts/test-ci-env.mjs",
     "test:metamorphic": "node --experimental-strip-types evals/scoring/runner/run-metamorphic.ts",
     "rulebook": "node --experimental-strip-types scripts/measure-rule-test-coverage.mjs --quiet && node --experimental-strip-types scripts/generate-rulebook.ts",
     "generate-p0-sample": "node --experimental-strip-types scripts/generate-p0-sample-report.ts",

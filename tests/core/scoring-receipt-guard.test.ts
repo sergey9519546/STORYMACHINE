@@ -442,11 +442,37 @@ function makeOrphanRepo() {
   return dir;
 }
 
+// The env vars scripts/check-scoring-receipt.mjs actually reads to resolve a
+// push-event range (pushEventBeforeSha() / resolveDefaultRange()). Stripped
+// from the OUTER process.env before every guard invocation below: this test
+// runs inside `npm test`, itself a CI job step, so process.env already
+// carries the REAL run's own GITHUB_EVENT_NAME / GITHUB_SHA / GITHUB_EVENT_PATH
+// (GitHub Actions sets these ambiently for every step) pointing at a
+// completely unrelated real push. Spreading `...process.env` first and a
+// test's explicit overrides last (`{ ...process.env, CI: '1', ...env }`) only
+// neutralizes the keys a given test bothers to override; any push-event key
+// a test does NOT set (GITHUB_EVENT_PATH in particular — most tests below only
+// set GITHUB_EVENT_NAME/PUSH_BEFORE_SHA/GITHUB_SHA) leaks straight into the
+// throwaway repo the guard is meant to be scoped to. Reproduced 2026-09-13:
+// under a real push-to-main runner env, the "no base ref at all" test's
+// orphan repo inherited the outer GITHUB_EVENT_PATH, the guard read a real
+// (but locally nonexistent) `before` SHA out of it, and — compounded by the
+// separate refExists() bug fixed above — built an invalid git range and
+// crashed with a raw stack trace instead of the intended "NO BASE REF"
+// message. See docs/audits/2026-09-13-ci-green/ci-env-lane-report.md.
+const PUSH_EVENT_ENV_KEYS = ['PUSH_BEFORE_SHA', 'GITHUB_EVENT_PATH', 'GITHUB_EVENT_NAME', 'GITHUB_SHA'];
+
+function baseGuardEnv(): Record<string, string | undefined> {
+  const base = { ...process.env };
+  for (const key of PUSH_EVENT_ENV_KEYS) delete base[key];
+  return base;
+}
+
 function runGuard(dir: string, env: Record<string, string>) {
   return spawnSync(process.execPath, [guardScript], {
     cwd: dir,
     encoding: 'utf8',
-    env: { ...process.env, CI: '1', ...env },
+    env: { ...baseGuardEnv(), CI: '1', ...env },
   });
 }
 
@@ -666,7 +692,7 @@ describe('measurement-receipt guard — push-event range', () => {
       const r = spawnSync(process.execPath, [guardScript], {
         cwd: dir,
         encoding: 'utf8',
-        env: { ...process.env, CI: '1', GITHUB_EVENT_NAME: 'push' },
+        env: { ...baseGuardEnv(), CI: '1', GITHUB_EVENT_NAME: 'push' },
       });
       assert.equal(r.status, 1, `stdout:\n${r.stdout}\nstderr:\n${r.stderr}`);
       assert.match(r.stderr, /NO BASE REF/);
@@ -679,7 +705,7 @@ describe('measurement-receipt guard — push-event range', () => {
   it('stays lenient (exit 0) with no base ref when CI is not set', () => {
     const dir = makeOrphanRepo();
     try {
-      const env = { ...process.env };
+      const env = baseGuardEnv();
       delete env.CI;
       delete env.GITHUB_EVENT_NAME;
       delete env.GITHUB_ACTIONS;

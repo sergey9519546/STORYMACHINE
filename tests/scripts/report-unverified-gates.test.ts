@@ -45,8 +45,26 @@ const SCRIPT = path.join(REPO_ROOT, 'scripts/report-unverified-gates.mjs');
  * spawns are the two the gutted-suite case needs, and they are memoised; the
  * genuine-suite case reads this same output rather than paying for a third
  * pair.
+ *
+ * 2026-09-13: this MUST NOT run with a bare `env: process.env` (the
+ * child_process default when `env` is omitted) — `gateRan()` in the real
+ * script reads `process.env` directly whenever `main()` calls
+ * `evaluateGates()` with no opts, so this self-invocation sees whatever
+ * ambient env var the SURROUNDING test run happens to export, not a clean
+ * "would this gate look satisfied with nothing extra done" check. Reproduced:
+ * ci.yml's "Run tests" step (the one that runs this very test file) sets
+ * `RUN_E2E=1` for itself; inheriting that into this execFileSync makes the
+ * E2E-journeys gate register as "ran" — the ~182-run-blind-spot shape, one
+ * layer down, and exactly the failure CI hit on every push since CI resumed
+ * (docs/audits/2026-09-13-ci-green/ci-env-lane-report.md has the
+ * reproduction). Every env var any GATES entry keys off of is stripped here,
+ * generically (`g.env`), so a gate added later inherits the same guarantee
+ * without anyone remembering to extend an explicit deny-list.
  */
-const REPORTER_OUTPUT = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8' });
+const GATE_ENV_KEYS = GATES.map((g) => g.env).filter((k) => typeof k === 'string');
+const CLEAN_GATE_ENV = { ...process.env };
+for (const key of GATE_ENV_KEYS) delete CLEAN_GATE_ENV[key];
+const REPORTER_OUTPUT = execFileSync('node', [SCRIPT], { cwd: REPO_ROOT, encoding: 'utf8', env: CLEAN_GATE_ENV });
 
 const envGate = { env: 'SOME_CORPUS_DIR', suite: 's1', protects: 'p', ifSkipped: 'i' };
 const fileGate = { file: 'tests/fixtures/real-corpus-manifest.json', suite: 's2', protects: 'p', ifSkipped: 'i' };

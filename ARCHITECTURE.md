@@ -507,6 +507,21 @@ Chromium and runs `npm run verify:browser`, and `publish` in `release.yml`
 blocks on the same job). There are **eight** suites — the eight
 `npm run verify:browser` runs — and they do not all drive the same front end.
 
+`npm test`'s `test` job is a plain GitHub Actions job step, so it runs with
+whatever the runner sets ambiently on a `push` (`GITHUB_EVENT_NAME`,
+`GITHUB_SHA`, `GITHUB_EVENT_PATH`, always set) plus that specific step's own
+`env:` block (`RUN_E2E`, `GIT_SHA`) — none of which the sandbox this repo is
+normally edited from ever carries. 2026-09-13: two test files spawned a child
+process with `{ ...process.env, ... }` (or a bare `execFileSync` with no
+`env` at all) and so silently inherited that ambient state into a throwaway
+repo or a self-check that was supposed to see a clean environment, passing
+on every sandbox run and failing on every runner run
+(`docs/audits/2026-09-13-ci-green/ci-env-lane-report.md`). `npm run
+test:ci-env` (`scripts/test-ci-env.mjs`) replicates that push-to-main runner
+environment locally — full suite by default, or pass file paths to check just
+the files a lane touched — and is the step `docs/LANE_STANDARD.md` §4 now
+requires before a lane reports its gates.
+
 `server/app.ts:279` picks one of two: `NODE_ENV !== 'production'` mounts Vite
 dev middleware, `NODE_ENV === 'production'` serves the built `dist/`. Which
 one a suite certifies is now an argument it passes and an assertion read back

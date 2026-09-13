@@ -260,9 +260,34 @@ function git(args) {
   return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' });
 }
 
+/** Does `ref` resolve to an actual commit IN THIS REPOSITORY'S OBJECT DATABASE?
+ *
+ * `git rev-parse --verify --quiet <ref>` alone is NOT that check for a
+ * full 40-hex SHA: git accepts a syntactically valid full-length hex string
+ * as "verified" without ever looking it up in the object database, and
+ * echoes it straight back with exit 0 — reproduced directly:
+ *   `git rev-parse --verify --quiet 1439ca5c800d3e72d3fa4d7a375952789b3afe35`
+ *   exits 0 in a brand-new repo that has never seen that object.
+ * Appending `^{commit}` forces git to actually resolve and dereference the
+ * object, which correctly fails (exit 1, no output) when it is absent.
+ *
+ * This was a real bug, not just a test artifact: `pushEventBeforeSha()`
+ * trusts $GITHUB_EVENT_PATH's `before` field, which is a real, syntactically
+ * valid 40-hex SHA from a DIFFERENT push (whatever the CI runner's job-level
+ * ambient env happens to carry) whenever a test — or any other CI step
+ * sharing the runner's ambient GITHUB_* env — spawns this script over an
+ * unrelated throwaway repository. With the un-anchored check, `refExists()`
+ * on that unrelated SHA returned true, `resolveDefaultRange()` built
+ * `<that sha>..<head>`, and `git diff --name-only` on it died with "fatal:
+ * Invalid revision range", an UNCAUGHT exception this script does not
+ * handle — a raw Node stack trace on stderr instead of the intended
+ * "NO BASE REF" / "FAILING because CI is set" message. See
+ * tests/core/scoring-receipt-guard.test.ts's "FAILS under CI when there is
+ * no base ref at all" test and docs/audits/2026-09-13-ci-green/
+ * ci-env-lane-report.md for the full reproduction. */
 function refExists(ref) {
   try {
-    git(['rev-parse', '--verify', '--quiet', ref]);
+    git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
     return true;
   } catch {
     return false;

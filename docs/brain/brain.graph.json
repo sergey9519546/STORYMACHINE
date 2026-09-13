@@ -959,6 +959,10 @@
       "to": "docs/brain/Patterns.md"
     },
     {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
       "from": "docs/brain/Audits/Audit - 2026-09-13 Owner Measure Lane.md",
       "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },

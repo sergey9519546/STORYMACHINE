@@ -1,7 +1,7 @@
 ---
 type: audit
 updated: 2026-09-13
-sources: [docs/audits/2026-09-13-ci-green/voice-bound-lane-report.md, server/lib/validation.ts, tests/fixtures/voice-bound-derivation.json, docs/LANE_STANDARD.md, docs/audits/2026-09-13-ci-green/ci-concurrency-lane-report.md, .github/workflows/ci.yml, .github/workflows/security.yml, .github/workflows/release.yml, tests/core/ci-gates-intact.test.ts, docs/audits/2026-09-13-ci-green/palette-race-lane-report.md]
+sources: [docs/audits/2026-09-13-ci-green/voice-bound-lane-report.md, server/lib/validation.ts, tests/fixtures/voice-bound-derivation.json, docs/LANE_STANDARD.md, docs/audits/2026-09-13-ci-green/ci-concurrency-lane-report.md, .github/workflows/ci.yml, .github/workflows/security.yml, .github/workflows/release.yml, tests/core/ci-gates-intact.test.ts, docs/audits/2026-09-13-ci-green/palette-race-lane-report.md, docs/audits/2026-09-13-ci-green/ci-env-lane-report.md, scripts/check-scoring-receipt.mjs, scripts/report-unverified-gates.mjs, scripts/test-ci-env.mjs]
 status: active
 ---
 
@@ -128,6 +128,51 @@ method, the audit of the other seven browser suites for the same shape, and
 the new deny-by-default scanner (`tests/scripts/wait-for-function-options-position.test.ts`)
 are in the report.
 
+## Lane: ci-env-failures
+
+**What it is:** the test job (not the browser job) was red on the runner on
+exactly two files — `tests/core/scoring-receipt-guard.test.ts` and
+`tests/scripts/report-unverified-gates.test.ts` — every push to `main` since
+CI resumed, and green on this sandbox every time (14,000 tests, three runs).
+Both failures were the same class of bug: a test built a child process's
+environment by spreading the outer `process.env` (or omitting `env`
+entirely), so it silently inherited whatever GitHub Actions sets ambiently
+for a `push`-event job step — state this sandbox's own `process.env` never
+carries, which is why "green here" proved nothing about the runner.
+
+**The two leaks, and what each exposed:** (1) `scoring-receipt-guard.test.ts`'s
+"no base ref at all" test leaked the runner's real `GITHUB_EVENT_PATH` into a
+throwaway orphan repo; `check-scoring-receipt.mjs`'s `pushEventBeforeSha()`
+read a real (but locally nonexistent) `before` SHA out of it, and a genuine,
+environment-independent bug in `refExists()` — `git rev-parse --verify
+--quiet <full-40-hex-sha>` returns success for a syntactically valid SHA
+WITHOUT checking the object database — made the guard treat that SHA as
+real, build an invalid git range, and crash with an uncaught exception
+instead of its intended "NO BASE REF" message. Fixed by verifying
+`` `${ref}^{commit}` `` instead, which forces git to actually dereference the
+object. (2) `report-unverified-gates.test.ts`'s `REPORTER_OUTPUT` spawned
+the real script with no `env` override at all, inheriting `RUN_E2E=1` —
+set by `ci.yml`'s "Run tests" step for itself, and not persisted to the
+later, separate "Report unverified gates" step where the gate normally
+runs — which made `gateRan()`'s `env = process.env` default report the
+E2E-journeys gate as "ran" for the wrong reason. Fixed by stripping every
+`GATES[].env` key from the child's environment before invoking it.
+
+**The fix that makes the class detectable going forward:**
+`scripts/test-ci-env.mjs` (`npm run test:ci-env`) replicates the push-to-main
+runner's ambient environment (`GITHUB_EVENT_NAME`/`GITHUB_SHA`/
+`GITHUB_EVENT_PATH`, plus the "Run tests" step's own `RUN_E2E`/`GIT_SHA`) and
+runs the full suite or named files under it — added to
+`docs/LANE_STANDARD.md` §4 as the step a lane runs before claiming green, and
+to `ARCHITECTURE.md` §9 beside the existing CI/browser-suite paragraph.
+
+**Related:** [[Patterns]] (a check whose enforcement depends on an
+environment nobody actually runs it in is not enforcing anything — the same
+principle as the `ci-concurrency` and `voice-bound-ci-derivation` lanes
+above, applied to test-harness environment fidelity rather than a workflow
+property or a runner's CPU), `docs/LANE_STANDARD.md` §4,
+`docs/audits/2026-09-13-ci-green/ci-env-lane-report.md`.
+
 ## Sources
 
 - `docs/audits/2026-09-13-ci-green/voice-bound-lane-report.md`
@@ -140,3 +185,7 @@ are in the report.
 - `.github/workflows/release.yml`
 - `tests/core/ci-gates-intact.test.ts`
 - `docs/audits/2026-09-13-ci-green/palette-race-lane-report.md`
+- `docs/audits/2026-09-13-ci-green/ci-env-lane-report.md`
+- `scripts/check-scoring-receipt.mjs`
+- `scripts/report-unverified-gates.mjs`
+- `scripts/test-ci-env.mjs`
