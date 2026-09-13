@@ -766,8 +766,10 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 675_000;
 // take fixes the proxy case: on that machine the smallest cast ever swept, 40,
 // already costs 12,442 ms, because feature-scale document cost, not cast size,
 // is what fills the budget there. A red build here is a machine report, not a
-// guard regression — the failure message names the machine and says to
-// re-derive.
+// guard regression, and the failure message says exactly that: it names the
+// machine, points back at this note, and tells a reader to establish which of
+// the two cases they are in BEFORE re-deriving — because on a machine of that
+// class re-deriving cannot help.
 //
 // WHAT WOULD LET BOTH BOUNDS RISE, AND IT IS NOT A PAIR CAP (2026-09-13 review,
 // finding 7 — this supersedes the "cap the O(distinct²) pair count" pointer in

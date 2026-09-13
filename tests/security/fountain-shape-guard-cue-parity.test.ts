@@ -3113,7 +3113,7 @@ describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — reali
     );
     assert.ok(
       cpuMs < DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS / 2,
-      `expected the max-admitted N=${BOUNDARY_CAST} worst-case accepted shape to cost under half the ${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms analysis budget of CPU, used ${Math.round(cpuMs)}ms — the bound's 2x-headroom derivation no longer holds on this machine: ${machine}. Re-derive with \`npm run measure-voice-bound\` on THIS machine (and .github/workflows/calibrate-voice-bound.yml for the runner), then re-lock tests/fixtures/voice-bound-derivation.json — do not raise the fraction`,
+      `expected the max-admitted N=${BOUNDARY_CAST} worst-case accepted shape to cost under half the ${DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS}ms analysis budget of CPU, used ${Math.round(cpuMs)}ms — the bound's 2x-headroom derivation no longer holds on this machine: ${machine}. BEFORE re-deriving, read MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT's "CAN THE ASSERTION STILL GO RED?" note in server/lib/validation.ts: on the slowest fleet member under a saturating load no cast this bound can take clears the ceiling (cast 40 already costs 12,442ms there), so a red on such a machine is a machine report, not a guard regression, and re-deriving cannot fix it. If this machine is not in that class, re-derive with \`npm run measure-voice-bound\` on THIS machine (and .github/workflows/calibrate-voice-bound.yml for the runner), then re-lock tests/fixtures/voice-bound-derivation.json — either way, do not raise the fraction`,
     );
     assert.ok(
       wallMs < DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS,
