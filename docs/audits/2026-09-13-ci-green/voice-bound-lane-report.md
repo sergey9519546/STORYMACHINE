@@ -2,7 +2,7 @@
 
 - **Worktree:** `/home/user/wt-bound`
 - **Branch:** `lane/voice-bound-ci-derivation` (branched from `main` @ `996e27a0`, rebased onto `68d05192`)
-- **Tip:** `8076d503` (pushed to `origin/lane/voice-bound-ci-derivation`, rebased onto `main` @ `68d05192`).
+- **Tip:** `48585b18` (pushed to `origin/lane/voice-bound-ci-derivation`, rebased onto `main` @ `68d05192`).
 - **Calibration branches (delete after review):** `calibrate/voice-bound-2026-09-13`,
   `…-13b`, `…-13c`, `…-13d` — push-triggered runs of the calibration workflow,
   which cannot be `workflow_dispatch`ed before the workflow reaches the default
@@ -297,4 +297,4 @@ f327b12e ci(calibrate): also run the voice-bound calibration on a calibrate/** b
 2e57f9d4 feat(guard): calibration script + runner workflow for the voice-bound derivation
 ```
 
-`Tip: 8076d503`
+`Tip: 48585b18`
