@@ -103,11 +103,17 @@
 //    belief-movement.ts, assertion-containment.ts, genre-obligation.ts,
 //    integrity-rate.ts, mystery-fairness.ts, scene-economy.ts,
 //    scene-value-shift.ts, well-made-surprise.ts, typed-promises.ts,
-//    story-spine.ts, voice-delta.ts, inflection-tension.ts,
+//    story-spine.ts, inflection-tension.ts,
 //    dialogue-info-ratio.ts, excellence-signals.ts, structural-genome.ts,
 //    story-graph-ops.ts, fix.ts, canonical-fountain.ts, and more — verified
 //    by hand against `grep -rl "from '.*<file>'" server` at the time this
-//    script was written) while correctly including everything doctor.ts
+//    script was written — with one correction on 2026-09-13: voice-delta.ts was
+//    in that list and is NOT unwired. fountain-analyzer.ts:172 imports
+//    analyzeVoices and calls it at :2482, so it is inside doctor.ts's reachable
+//    set — confirmed with scripts/lib/import-graph.mjs's computeReachableSet.
+//    The live walk below has always had it right; only this hand-written list
+//    was stale, and a reader deciding whether a voice-delta change needs a
+//    receipt would have been told the wrong thing. It does.) while correctly including everything doctor.ts
 //    actually imports transitively (deep-read.ts, anti-slop.ts,
 //    theme-extract.ts, interiority.ts, mirror-scene.ts, silence-signal.ts,
 //    bonding-signal.ts, cold-open-promise.ts, pattern-establishment.ts,

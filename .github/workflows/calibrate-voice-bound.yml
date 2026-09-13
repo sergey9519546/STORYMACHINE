@@ -1,6 +1,9 @@
 name: Calibrate voice bound
 
-# MANUAL ONLY. This workflow measures; it does not gate. It exists because
+# This workflow MEASURES; it does not gate, and it runs only when a person asks
+# for it — from the Actions tab, or by pushing a `calibrate/**` branch (see the
+# two triggers below; the second exists because a workflow_dispatch workflow
+# cannot be dispatched before its file reaches the default branch). It exists because
 # MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT (server/lib/validation.ts) is derived from
 # measured `runScriptDoctor` cost, the assertion that holds that derivation
 # honest runs in `ci.yml` on ubuntu-latest, and until 2026-09-13 nobody had ever
@@ -63,6 +66,14 @@ on:
 # Least privilege, same as ci.yml: this job only reads the checkout.
 permissions:
   contents: read
+
+# One sweep per ref at a time. Without this, N pushes to a `calibrate/**` branch
+# are N concurrent 60-minute jobs on a workflow whose whole output is a timing
+# table — and a stale sweep's numbers are worse than no numbers, because they
+# look lockable. Matches the group ci.yml and security.yml use.
+concurrency:
+  group: calibrate-voice-bound-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   calibrate:

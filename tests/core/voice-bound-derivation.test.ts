@@ -40,11 +40,13 @@ import { fileURLToPath } from 'node:url';
 import {
   MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT,
   MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+  fountainShapeRejectionReason,
 } from '../../server/lib/validation.ts';
 import { DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS } from '../../server/lib/doctor-budget.ts';
 import {
   deriveCast,
   maxAdmittedWordsPerSpeaker,
+  VOICE_BOUND_SHAPES,
   DERIVATION_MARGIN_FRACTION,
   DERIVATION_SHAPE,
   type VoiceBoundRow,
@@ -62,6 +64,7 @@ interface DerivationFixture {
   readonly primaryCondition: string;
   readonly repeats: number;
   readonly conditions: Record<string, VoiceBoundRow[]>;
+  readonly guardEvaluatedAgainst?: { readonly weight: number; readonly distinct: number };
   readonly derivation: {
     readonly shape: string;
     readonly targetMs: number;
@@ -165,6 +168,34 @@ describe('MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is derived from a committed measu
         `${DERIVATION_SHAPE} N=${row.n} measured ${row.pooledWords} pooled words, but the heaviest document the weight bound `
         + `admits at that cast carries ${row.n * maxAdmittedWordsPerSpeaker(row.n, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT)} — `
         + 'the table was measured against a different weight bound than this tree enforces',
+      );
+    }
+  });
+
+  it('the table\'s guard column is the verdict THIS tree gives, not the one the sweep\'s tree gave', () => {
+    // 2026-09-13 review, finding 6. The lock run carried a provisional cast
+    // bound of 65, so the column it printed read REJECT for max-admitted N=70,
+    // 75 and 80 — including the row this constant is derived from, which made
+    // the committed table say the derived boundary was rejected by the guard.
+    // `--lock-from` re-evaluates the column against the tree that ships it; this
+    // is the check that the re-evaluation actually happened and stays true. The
+    // guard is a pure function of the text and costs no analysis run.
+    assert.deepEqual(
+      fixture.guardEvaluatedAgainst,
+      { weight: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT, distinct: MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT },
+      'the table records the bound values its guard column was evaluated against, and they are not this tree\'s — '
+      + 're-run `npm run measure-voice-bound -- --lock-from=tests/fixtures/voice-bound-derivation.json`',
+    );
+    for (const row of primaryRows) {
+      const build = VOICE_BOUND_SHAPES[row.shape];
+      assert.ok(build, `the table carries an unknown shape "${row.shape}"`);
+      const expected = fountainShapeRejectionReason(build(row.n, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT)) === null
+        ? 'ACCEPT'
+        : 'REJECT';
+      assert.equal(
+        row.guard,
+        expected,
+        `${row.shape} N=${row.n}: the table says ${row.guard}, this tree's guard says ${expected}`,
       );
     }
   });

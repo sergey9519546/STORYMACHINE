@@ -65,8 +65,19 @@ eligible cast count beside it, derived on the GitHub runner itself. A scalar
 weight bound the runner can carry also rejects an ordinary 40-character
 feature, so lowering it further was not available. So the correction this
 branch needs is BOTH constants, not a different number for the one it
-carries — and the analyzer-side pair cap remains the only way to raise
-either.
+carries.
+
+**And the fix that raises either is not the pair cap** (2026-09-13 review,
+finding 7). `burrowsDelta` re-derives both characters' relative frequencies 130
+times per pair — `corpusStats` is called inside the loop over the 65 function
+words and recomputes `relativeFrequencies` for both sides each time, from two
+maps already in hand. Hoisting it is the same arithmetic in the same order:
+**bit-identical** (`maxDeltaDiff = 0` over every pair) and 43.8x faster on a
+435-pair corpus, 56.0x / 54.3x on the two shapes the bounds are derived against.
+`analyzeVoices` is ~99% of the worst admitted shape's cost and ~98% of that is
+redundant recomputation. It is scoring-path (`voice-delta.ts` is reachable from
+`doctor.ts`) so it needs a receipt — but it costs the score nothing, which a
+pair cap does not.
 
 **Why it is parked:** its receipt is PENDING. The scarcity saturation is
 identity at 15 scenes or fewer, so the public benchmark and the calibration

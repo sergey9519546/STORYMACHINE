@@ -195,45 +195,44 @@ export interface VoiceBoundRow {
 }
 
 /**
- * The safety margin the derivation holds back from the half-budget target, and
- * every part of it is a measurement.
+ * The safety margin the derivation holds back from the half-budget target.
  *
- * A margin covers the gap between the condition a bound is DERIVED in and the
- * conditions it is ENFORCED in. Two such gaps were measured on 2026-09-13, and
- * they point in opposite directions:
+ * WHAT IT IS FOR, AND WHAT IT IS NOT FOR. `ubuntu-latest` is not one machine.
+ * Four CI runs on 2026-09-13 landed on three different CPU models — AMD EPYC
+ * 9V74 (run 34739080950), AMD EPYC 7763 (run 34741928418), Intel Xeon Platinum
+ * 8573C (run 34740951649) — all four vCPU, all the same runner image. The same
+ * shape under the same saturating load proxy differs by **20.1%** between the
+ * two that were swept: uniform-min N=150 cost 20,022 ms on the Xeon (the
+ * committed table) and 24,052 ms on the EPYC 9V74 (run 34739790205). A table is
+ * locked from whichever runner the calibration happens to land on, and it has
+ * to hold on the others. That transfer is the whole job of this number, and
+ * 20% is what it measured.
  *
- *  1. THE LOAD PROXY IS HARSHER THAN THE REAL THING, so this gap needs no
- *     margin. The calibration's `loaded` sweep saturates every remaining core
- *     with CPU-bound siblings; the assertion actually runs inside `npm test`,
- *     whose sibling processes spend real time on startup, I/O and short files.
- *     Same shape, same machine class, same day: uniform-min N=150 cost
- *     24,052 ms of CPU under the proxy (run 34739790205) and 21,133 ms inside
- *     the real `npm test` (run 34739080950) — the proxy is 13.8% dearer.
+ * It is therefore applied to the LOCKED table only. Applying it again to a
+ * table already measured on the slower machine would double-count the same
+ * spread: on the EPYC 9V74 sweep the 12,000 ms ceiling clears no swept cast at
+ * all (the smallest, N=40, reads 12,442 ms) and `deriveCast` returns null. The
+ * check against that machine is the raw half-budget, not the discounted one,
+ * and the shipped cast reads 14,724 ms there — under 15,000 ms, but only just,
+ * and under a load harsher than the one the assertion runs in. This is stated
+ * rather than smoothed over; see MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT's own
+ * comment in server/lib/validation.ts for what that means for a red build.
  *
- *  2. `ubuntu-latest` IS NOT ONE MACHINE, and this gap is what the margin is
- *     for. The same shape, the same sweep, the same hour, two runners: an AMD
- *     EPYC 9V74 measured uniform-min N=150 at 24,052 ms (run 34739790205) and
- *     an Intel Xeon Platinum 8573C at 20,022 ms (run 34740951649). The slower
- *     machine costs **20.1%** more. A table locked from whichever runner the
- *     calibration happened to land on has to hold on the other one, and the
- *     2026-09-12 derivation failed for exactly this reason in a larger form —
- *     it was locked on a machine that never runs the assertion.
- *
- * So: 20%, the measured fleet spread. Checked both ways at the value it
- * produces — a cast cap of 80: on the faster runner's committed table
- * max-admitted N=80 costs 11,848 ms against a 12,000 ms ceiling, and on the
- * slower runner's own sweep the same shape cost 14,724 ms under the proxy,
- * which is 12,939 ms once the proxy's own 13.8% is taken back out — 86% of the
- * 15,000 ms the assertion enforces.
+ * VERIFIED END TO END, so none of the above has to be believed. The assertion
+ * measures the shipped boundary shape itself, inside the real `npm test`, on
+ * whatever runner CI lands on, and prints the number on pass. Run 34741928418,
+ * AMD EPYC 7763: **12,319 ms of CPU, 82% of the 15,000 ms target**. That is the
+ * quantity the derivation is about, measured in the condition it is enforced
+ * in, with no cross-machine arithmetic in between.
  *
  * NOT MORE THAN 20%, and the same tables say why. A realistic 40-character
  * feature (the committed probe-cast generator, ~15,240 pooled dialogue words)
- * costs 10,606 ms under the proxy on the faster runner and 12,057 ms on the
- * slower one — 71% to 80% of the half-budget with nothing pathological about
- * it. The analyzer's baseline cost on a feature-length document, not the voice
- * pass, is what fills most of that budget on these machines. A cast bound
- * cannot buy margin against it, and a larger margin would stop buying safety
- * and start refusing ordinary ensembles a score.
+ * costs 10,606 ms under the proxy on the Xeon and 12,057 ms on the EPYC 9V74 —
+ * 71% to 80% of the half-budget with nothing pathological about it. The
+ * analyzer's baseline cost on a feature-length document, not the voice pass,
+ * fills most of that budget on these machines. A cast bound cannot buy margin
+ * against it, and a larger margin would stop buying safety and start refusing
+ * ordinary ensembles a score.
  */
 export const DERIVATION_MARGIN_FRACTION = 0.20;
 

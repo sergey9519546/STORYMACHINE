@@ -246,7 +246,7 @@ that section before answering the accept/reject prompt.
 **One stated caveat travels with the stack**, and `owner:measure` prints it at
 the point it applies: it carries the first branch's 1,500,000 voice-eligible
 bound, which must not land before main's 675,000 re-derivation is applied on
-the merged tree with the analyzer cap in place.
+the merged tree with the analyzer cap in place. The thing that would let BOTH bounds rise is not the analyzer pair cap this row used to name: `burrowsDelta` re-derives both characters' relative frequencies 130 times per pair, and hoisting that is bit-identical (`maxDeltaDiff = 0`) and 43.8-56x faster. It is scoring-path and needs a receipt, but it costs the score nothing — point a scoring lane at that first.
 
 The stack CONTAINS both R5 singles as unsquashed ancestors, so merging it
 subsumes them and the other two need not be merged separately. Whichever lands

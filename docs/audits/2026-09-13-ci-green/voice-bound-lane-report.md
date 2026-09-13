@@ -199,11 +199,15 @@ every number quoting it. That is the honest answer to the brief's item 2: the
 weight bound was not mis-derived on its own terms, and lowering it is what
 cannot be done.
 
-**What the pair now admits at worst:** `max-admitted` at cast 80 —
-102 words per speaker, weight 652,800. Above that cast the cast
-bound rejects; at that cast the weight bound caps the words. Measured
-7,337 ms on this sandbox and 11,848 ms on the runner under the load
-proxy.
+**What the pair now admits at worst ON THE ELIGIBLE-SPEAKER DIMENSION**
+(narrowed in round 2 — see §11.4): `max-admitted` at cast 80 — 102 words per
+speaker, weight 652,800. Above that cast the cast bound rejects; at that cast
+the weight bound caps the words. Measured 7,337 ms on this sandbox and
+11,848 ms on the runner under the load proxy, and **12,319 ms inside the real
+`npm test` on an AMD EPYC 7763 runner (run 34741928418) — 82% of the 15,000 ms
+the assertion enforces.** It is NOT the heaviest document both bounds admit:
+neither bound constrains document size or scene count, and the same eligible
+body padded to the analyzer's 400-scene ceiling is accepted at 14,334 ms.
 
 ## 6. What this does NOT claim
 
@@ -276,10 +280,18 @@ record is the run id, not the branch.
    any number this lane measured, and pretending otherwise would be the same
    mistake the 2026-09-12 record made. If it moves, the failure message now
    names the machine and says how to re-derive.
-3. **The analyzer-side pair cap is still the real fix.** Capping
-   `analyzeVoices`'s O(distinct²) pair count would let both bounds rise. It is
-   scoring-path and belongs to the scoring lane; this lane changed nothing
-   reachable from `doctor.ts`.
+3. **The real fix is inside `burrowsDelta`, and it is free** (corrected in
+   round 2 from "cap the pair count", which would have moved scores).
+   `corpusStats` is called inside the loop over the 65 function words and
+   re-derives `relativeFrequencies` for BOTH characters every time — 130 full
+   re-tokenizations per pair, of two maps `burrowsDelta` already holds. Hoisting
+   it is the same arithmetic in the same order: **bit-identical**
+   (`maxDeltaDiff = 0` over every pair) and 43.8x faster on a 435-pair corpus
+   here, 56.0x / 54.3x on the two shapes these bounds are derived against (round-1
+   review §2.6). `server/nvm/analyze/voice-delta.ts` IS reachable from
+   `doctor.ts` (verified with `computeReachableSet`), so it is scoring-path and
+   needs a receipt — this lane changed nothing reachable from `doctor.ts` — but
+   it is the fix to hand the scoring lane.
 4. **The pre-existing residual (§6) is untouched.** An ineligible-walk-on
    document at the 400-scene ceiling still costs ~12-14 s locally and more on
    the runner. It is out of this bound's reach by construction.
@@ -298,3 +310,71 @@ f327b12e ci(calibrate): also run the voice-bound calibration on a calibrate/** b
 ```
 
 `Tip: 48585b18`
+
+---
+
+# Round 2 — against `docs/audits/2026-09-13-ci-green/voice-bound-review.md` (reviewed object `026c0948`)
+
+Nothing in the design moved: weight bound 675,000, cast bound 80, weight
+evaluated first, the workflow, the shapes. Every item below is the record
+catching up with measurements — three of which this round took itself, and one
+of which (the cast-80 cost inside the real `npm test`) removes the piece of
+cross-machine arithmetic the review objected to rather than repairing it.
+
+**One measurement the review did not have, and it settles items 2 and 3.** The
+assertion's own pass-time TAP diagnostic, from CI run `34741928418` on the
+reviewed object:
+
+```
+# voice-bound worst-case cost: max-admitted N=80 (102 words/speaker)
+#   cpu 12319ms (82% of the 15000ms half-budget target), wall 12769ms
+#   — github-actions: AMD EPYC 7763 64-Core Processor x4 (parallelism 4, 16 GiB),
+#     node v22.23.2, linux/x64, runner Linux/X64/ubuntu24/20260907.300.1,
+#     run 34741928418
+```
+
+The shipped boundary shape, measured by the assertion, inside the real
+`npm test`, on a **third** CPU model, at 82% of target. The derivation no longer
+rests on a proxy-to-real correction at all.
+
+| # | Item | Disposition | Where |
+|---|---|---|---|
+| 1 | Comment says "15% margin"; rule applies 0.20 | **Fixed, and the number is gone rather than corrected.** `validation.ts` now names `DERIVATION_MARGIN_FRACTION` and states no percentage — a number in prose beside a number in code is the drift, so the fix is one source, not two agreeing sources. The test already reads the constant (`deriveCast`'s default) and asserts `fixture.marginFraction === DERIVATION_MARGIN_FRACTION`. | `server/lib/validation.ts:732-745` |
+| 2 | The 13.8% proxy correction is cross-machine | **Withdrawn, not repaired.** Run `34739080950` IS an AMD EPYC 9V74 (its own failure message names it), but I could not cheaply confirm the CPU of `34739790205`, and the correction is no longer needed: the end-to-end measurement above replaces it. `DERIVATION_MARGIN_FRACTION`'s comment now cites only same-condition comparisons, names the CPU model of every run it cites, lists the **three** models seen (EPYC 9V74, EPYC 7763, Xeon Platinum 8573C), and ends on the verified 12,319 ms. Every sentence that divided by 13.8% is deleted. | `scripts/lib/voice-bound.ts:196-236` |
+| 3 | On the EPYC table the stated rule derives `null` | **Stated, in both places a reader will look.** The margin is a fleet-TRANSFER allowance and is applied to the locked table only; applying it again to a table already measured on the slower machine double-counts the same spread. The check against that machine is the raw half-budget: cast 80 reads **14,724 ms** there, inside 15,000 ms with 2% to spare, under a load harsher than the assertion's. And the honest consequence is written down: **the assertion can go red on the slowest fleet member under that load, and no cast this bound could take fixes it** — on the EPYC the smallest cast ever swept (40) already costs 12,442 ms, because feature-scale document cost, not cast size, fills the budget there. A red build there is a machine report, not a guard regression. | `scripts/lib/voice-bound.ts:206-220`, `server/lib/validation.ts:760-771` |
+| 4 | "the heaviest document BOTH bounds admit" is false by 1.87x | **Fixed, and reproduced independently.** Subtest renamed to "the worst shape on the ELIGIBLE-SPEAKER dimension these two bounds govern". Reproduced on this sandbox with the lane's own harness: the same 80-speaker body + 398 action-only scenes is **ACCEPTED** at **14,334 ms** of CPU / 400 scenes, against the derivation shape's **7,800 ms** in the same process shape — 1.84x. Recorded in the test's comment, in the constant's comment (as a section of its own, since the `RESIDUAL` note does not cover it — `analyzeVoices` does not abstain here), in the gate note, and in §5 above. What the pair bounds is the eligible-speaker dimension; document size is bounded by `MAX_FOUNTAIN_CHARS`, `MAX_FOUNTAIN_CUE_WEIGHT`, the 400-scene ceiling, and `DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS`'s hard stop. | `tests/security/…:3057`, `:3083-3100`, `server/lib/validation.ts:747-758` |
+| 5 | "121-150" is really 81-150; the 15,460 ms is uncited | **Both fixed, and the range is now asserted instead of restated.** Five new subtests drive uniform-min at N=81/90/110/150 (each weighing 196,830-675,000, all under the weight bound) and assert the cast bound rejects them, plus N=80 still ACCEPTED. The uncited 15,460 is replaced by the committed table's own N=150 rows (20,022 ms proxy / 11,986 ms idle). | `tests/security/…:3150-3170`, `server/lib/validation.ts:718-730`, gate note |
+| 6 | The fixture's `guard` column was measured under DISTINCT = 65 | **Re-measured, and the test reads it.** `--lock-from` now re-evaluates the column against the shipping tree's guard (a pure function of the text — no analysis run) and records `guardEvaluatedAgainst: {weight, distinct}`. The column now reads ACCEPT for max-admitted 50-80 and REJECT for 85+, and a new subtest re-runs `fountainShapeRejectionReason` over every primary row and compares. Shown failing: flipping the derivation row's verdict fails it by name. Timings are never touched by `--lock-from`. | `scripts/measure-voice-bound-cost.mjs:…`, `tests/fixtures/voice-bound-derivation.json`, `tests/core/voice-bound-derivation.test.ts` |
+| 7 | The "real fix" pointer names the score-moving one | **Replaced in all four places, with the mechanism verified here.** Read the code: `corpusStats` is called inside `burrowsDelta`'s loop over the 65 function words and re-derives `relativeFrequencies` for BOTH sides each time. Benchmarked independently on a 435-pair cast-30 corpus: **1,070 ms → 24 ms, 43.8x, `maxDeltaDiff` exactly 0** (the review's 56.0x / 54.3x on the two derivation shapes are cited as theirs). Reachability confirmed with `computeReachableSet(ROOT, ['server/nvm/analyze/doctor.ts'])` → `voice-delta.ts` present, so it stays scoring-path and out of this lane. The stale claim in `scripts/check-scoring-receipt.mjs` that `voice-delta.ts` is unwired is corrected in place. | `validation.ts:772-790`, gate note, `Branch - Feature-Length Defects`, Owner R5, `check-scoring-receipt.mjs:106` |
+| 8 | `PATH_TO_EXCELLENCE.md:84`; workflow header; `concurrency` | **All three done.** The 12-14 s claim now names the box and the runner's 19.7-21.1 s. "MANUAL ONLY" replaced with a sentence that matches the file's own two triggers. `concurrency: calibrate-voice-bound-${{ github.ref }}` with `cancel-in-progress`. | `docs/PATH_TO_EXCELLENCE.md:84`, `.github/workflows/calibrate-voice-bound.yml` |
+
+**Pushed back on: nothing.** Two items were answered differently from the way
+the review proposed, both in the direction of less prose rather than more:
+item 1 deletes the margin number from `validation.ts` instead of correcting it,
+and item 2 withdraws the 13.8% correction instead of re-deriving it. Item 3 is
+answered with a disclosure the review did not ask for — that no value of this
+bound makes the assertion unconditionally green on the slowest fleet member —
+because the alternative was to imply a guarantee the measurements do not
+support.
+
+**Not addressed (reviewer's own scoping):** LOW 11 (the batch README) is the
+orchestrator's. LOW 12 (one shared builder for the two duplicated rejection
+messages) follows the file's existing pattern for the weight-bound message and
+would touch the retired legacy function's shape; left as the reviewer filed it,
+non-blocking.
+
+## Round 2 gates
+
+| Gate | Result |
+|---|---|
+| `tests/security/fountain-shape-guard-cue-parity.test.ts` | **667/667, exit 0** (five new subtests) |
+| `tests/core/voice-bound-derivation.test.ts` | **8/8, exit 0**, 0.35 s — plus the new fail-first (stale guard row) |
+| `npm run lint` | exit 0 |
+| `npm run check-no-console` | exit 0 |
+| `npm run check-docs` | exit 0 |
+| `npm run honesty-audit` | exit 0 |
+| `node scripts/check-scoring-receipt.mjs origin/main..HEAD` | exit 0 — no scoring-path files changed |
+| `npm run check-brain` | exit 0 — 113 notes, 441 links |
+| full `npm test` | **not re-run** — the round-2 diff is comments, docs, one fixture column and five guard-only subtests; the cost rule for this round says the touched files only. Round 1's full run (13,824 / 0 fail) stands on the same tree plus these. |
+
+`Tip: <round-2 tip>`

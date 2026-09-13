@@ -3054,7 +3054,7 @@ describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — reali
     );
   });
 
-  it(`the max-admitted N=${BOUNDARY_CAST} boundary — the heaviest document BOTH bounds admit — is ACCEPTED, and its measured runScriptDoctor cost stays inside the budget`, async (t) => {
+  it(`the max-admitted N=${BOUNDARY_CAST} boundary — the worst shape on the ELIGIBLE-SPEAKER dimension these two bounds govern — is ACCEPTED, and its measured runScriptDoctor cost stays inside the budget`, async (t) => {
     const { runScriptDoctor } = await import('../../server/nvm/analyze/doctor.ts');
     const { DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS } = await import('../../server/lib/doctor-budget.ts');
     const text = buildMaxAdmitted(BOUNDARY_CAST, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT);
@@ -3080,14 +3080,24 @@ describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — reali
     // messages name the machine, and the measurement is emitted as a TAP
     // diagnostic on PASS too, so every CI log carries the number.
     //
-    // What this does NOT claim: that every document the analyzer accepts costs
-    // less than this. A 400-scene document with a genuine one-line walk-on is
-    // ineligible for the voice pass, is accepted by both bounds, and measures
-    // ~12-14s on a developer box — see MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's
-    // "RESIDUAL accepted worst case" note. That cost belongs to the analyzer's
-    // own advertised capacity and to DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS's hard
-    // stop, not to these bounds; this test is about the worst shape the
-    // ELIGIBLE path admits.
+    // WHAT THIS DOES NOT CLAIM, corrected 2026-09-13 (review finding 4). An
+    // earlier version of this test's title called this shape "the heaviest
+    // document BOTH bounds admit". It is not, and the gap is 1.84x: neither
+    // bound constrains document size or scene count, and buildMaxAdmitted emits
+    // one scene heading per 40 speakers, so this document has TWO. The same
+    // eligible body padded with action-only scenes to the analyzer's 400-scene
+    // ceiling is ACCEPTED by both bounds and measured 14,334 ms of CPU on the
+    // lane's sandbox against this shape's 7,800 ms in the same harness — and
+    // analyzeVoices does NOT abstain there, so the "RESIDUAL accepted worst
+    // case" note beside MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT (an INELIGIBLE
+    // walk-on document at ~12-14s on a developer box) does not cover it either.
+    //
+    // What these two bounds bound is the ELIGIBLE-SPEAKER dimension of the
+    // cost, not the cost. Document size is bounded elsewhere
+    // (MAX_FOUNTAIN_CHARS, MAX_FOUNTAIN_CUE_WEIGHT, the analyzer's own
+    // 400-scene ceiling) and ultimately by DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS's
+    // hard stop, which is the guarantee a writer actually gets. This test is
+    // the eligible-speaker half, and its title now says so.
     const cpuStart = process.cpuUsage();
     const wallStart = Date.now();
     await runScriptDoctor(text);
@@ -3136,6 +3146,27 @@ describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — reali
     const reason = fountainShapeRejectionReason(text);
     assert.ok(reason, 'expected N=151 (one speaker past the weight boundary) to be rejected');
     assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
+
+  // The band the cast bound newly rejects, CHECKED rather than restated. The
+  // constant's comment said "121-150" for a day; it is 81-150, and prose is how
+  // that happened, so the range is asserted against the guard here: every one of
+  // these documents weighs comfortably under MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT
+  // (so the weight bound alone would admit it) and is rejected by the cast bound.
+  for (const cast of [81, 90, 110, 150]) {
+    it(`uniform-min N=${cast} weighs ${uniformMinWeight(cast)} — under the weight bound — and is rejected by the CAST bound (the 81-150 band)`, () => {
+      assert.ok(
+        uniformMinWeight(cast) <= MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+        `sanity: N=${cast} must be a document the WEIGHT bound would admit, or it says nothing about the cast bound`,
+      );
+      const reason = fountainShapeRejectionReason(buildUniformMin(cast));
+      assert.ok(reason, `expected uniform-min N=${cast} to be rejected`);
+      assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT/);
+    });
+  }
+
+  it(`the band starts at ${BOUNDARY_CAST + 1}: uniform-min N=${BOUNDARY_CAST} is still ACCEPTED`, () => {
+    assert.equal(fountainShapeRejectionReason(buildUniformMin(BOUNDARY_CAST)), null);
   });
 
   // The cast bound must stay ABOVE every realistic ensemble this file pins as

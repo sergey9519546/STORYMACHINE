@@ -1263,6 +1263,10 @@
       "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
     },
     {
+      "from": "docs/brain/Gates/Gate - Fountain Shape Guard.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
       "from": "docs/brain/Gates/Gate - Honesty Audit.md",
       "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
     },

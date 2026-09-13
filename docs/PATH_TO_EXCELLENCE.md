@@ -81,7 +81,11 @@ into `docs/audits/2026-09-12-adversarial/` before its verdict
   zero-diff guard; the voice-eligible weight bound is derived from measured
   cost — the first derivation (1,500,000) was rejected because a 223-speaker
   document of 30-word speeches costs 27 seconds under it, the second
-  (675,000) admits a worst shape of 12–14 s CPU against a 30 s budget, and
+  (675,000) admits a worst shape of 12–14 s CPU against a 30 s budget on an
+  unnamed developer box — the GitHub runner measured that same shape at
+  19.7–21.1 s and the assertion failed there on 2026-09-13, which is what the
+  `voice-bound-ci-derivation` lane re-derived (a second bound,
+  `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`, derived on the runner itself) — and
   the test asserts CPU under half the budget AND wall under the whole of it.
 - **`writer-followups`** (e9b4cff8, REVISE → REVISE → MERGE): the gate
   rate-limit multiplier reaches only the browser gates, so the fuzzer, the

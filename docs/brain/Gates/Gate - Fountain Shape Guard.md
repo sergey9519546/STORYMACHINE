@@ -68,7 +68,9 @@ fully-eligible ensemble (909,000) is now correctly REJECTED — disclosed,
 not hidden; unlocking larger ensembles safely needs `analyzeVoices`'s
 O(distinct²) pair count capped (scoring-path, the scoring lane's item), not
 a further raise of this bound. Bypass B's margin widened from 1.28x to
-2.84x.
+2.84x. *(2026-09-13: the "pair count capped" pointer in this dated paragraph is
+corrected in the 2026-09-13 section below — the pair count is not what makes a
+pair expensive.)*
 
 **2026-09-13 — the second bound, derived on the machine that enforces it.**
 The first real Actions run since 2026-09-02 failed the cost assertion above:
@@ -91,8 +93,13 @@ carrying floor(675,000 / d²) words, which at d=60 is 186 words, not the 30
 `uniform-min` gives it). It REMOVES NOTHING: the weight bound is untouched
 and evaluated FIRST, so every pinned DoS/bypass payload keeps the message it
 has always had, and the cast bound only turns ACCEPTs into REJECTs — the
-121-150-speaker shapes that weighed under 675,000 and cost 15,460-24,052 ms
-on the runner. The table is committed at
+**81-150**-speaker shapes that weighed under 675,000 (uniform-min at N=81/90/
+100/110/120 weighs 196,830 / 243,000 / 300,000 / 363,000 / 432,000, all under
+the weight bound), of which the heaviest, N=150, cost **20,022 ms** on the
+runner under the calibration's load proxy and 11,986 ms idle — both in the
+committed table. The range is asserted against the guard in the finding-10
+block rather than restated in prose: an earlier draft of it said "121-150",
+understating the narrowing by forty casts. The table is committed at
 `tests/fixtures/voice-bound-derivation.json` and
 `tests/core/voice-bound-derivation.test.ts` re-derives the constant from it
 on every CI run, so the constant cannot be edited without a fresh
@@ -128,8 +135,26 @@ round-1 and round-2 derivations, the sweep, the rate fit, and the bracket);
 sentence interpolates the constant directly, so it stayed true across both
 value changes without a wording edit — only the quoted number).
 
-**What it cannot catch:** the real cost driver is `analyzeVoices`'s
-O(distinct²) pair count, not this product directly — round 2 derives the
+**What it cannot catch (and what would let both bounds rise).** Neither bound
+constrains document size or scene count: the derivation shape has TWO scene
+headings, and the same 80-speaker eligible body padded to the analyzer's
+400-scene ceiling is ACCEPTED by both and cost 14,334 ms of CPU where the
+derivation shape reads 7,800 ms (1.84x, same box, same harness; `analyzeVoices`
+does not abstain, so the `RESIDUAL accepted worst case` note does not cover it).
+These bounds bound the ELIGIBLE-SPEAKER dimension of the cost, not the cost.
+
+And the fix that would raise them is **not** a pair cap. `burrowsDelta`
+re-derives both characters' relative frequencies 130 times per pair — inside the
+loop over the 65 function words, of two maps already in hand. Hoisting it is
+bit-identical (`maxDeltaDiff = 0` over every pair) and 43.8x faster on a
+435-pair corpus, 56.0x / 54.3x on the two shapes these bounds are derived
+against. `server/nvm/analyze/voice-delta.ts` IS reachable from `doctor.ts`, so
+that is scoring-path and needs a receipt — but it is free and score-preserving,
+which a pair cap is not. See [[Gate - Receipt Gate]].
+
+**What it cannot catch (2026-09-12 framing, superseded above):** the real cost
+driver was described as `analyzeVoices`'s O(distinct²) pair count, not this
+product directly — round 2 derives the
 bound from the worst-case (uniform-min) shape specifically to close the
 round-1 gap, but a future shape this derivation did not anticipate could
 still expose the same mismatch at a different point. The investigator's

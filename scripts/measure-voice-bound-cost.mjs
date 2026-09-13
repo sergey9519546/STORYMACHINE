@@ -281,6 +281,23 @@ async function main() {
     const rows = parsed.conditions?.[parsed.primaryCondition] ?? [];
     parsed.marginFraction = DERIVATION_MARGIN_FRACTION;
     parsed.derivation = deriveCast(rows, parsed.budgetMs, DERIVATION_MARGIN_FRACTION);
+    // The `guard` column is NOT a measurement — it is a verdict, and a sweep
+    // necessarily runs on whatever bound values the tree carried at the time.
+    // The lock run for this file carried a provisional cast bound, so its column
+    // read REJECT for the very row the constant is derived from (2026-09-13
+    // review, finding 6). Re-evaluate it here against THIS tree's guard, which
+    // is deterministic, free, and the only verdict a reader of the committed
+    // file can act on. Timings are never touched.
+    const { fountainShapeRejectionReason: guardOf, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT: weightBound } =
+      await import('../server/lib/validation.ts');
+    for (const conditionRows of Object.values(parsed.conditions ?? {})) {
+      for (const row of conditionRows) {
+        const build = VOICE_BOUND_SHAPES[row.shape];
+        if (!build) throw new Error(`lock file has an unknown shape "${row.shape}"`);
+        row.guard = guardOf(build(row.n, weightBound)) === null ? 'ACCEPT' : 'REJECT';
+      }
+    }
+    parsed.guardEvaluatedAgainst = { weight: weightBound, distinct: (await import('../server/lib/validation.ts')).MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT };
     writeFileSync(target, `${JSON.stringify(parsed, null, 2)}\n`);
     process.stderr.write(
       `normalized ${path.relative(REPO_ROOT, target)} — derived cast `

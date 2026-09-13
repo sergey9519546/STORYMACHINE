@@ -1,5 +1,5 @@
 {
-  "_comment": "Rows measured by .github/workflows/calibrate-voice-bound.yml on ubuntu-latest and copied verbatim out of that run's `--json=-` block (see `machine.runId`); the `derivation` block and `marginFraction` are recomputed from those rows by `npm run measure-voice-bound -- --lock-from=<this file>`, which never touches a measurement. tests/core/voice-bound-derivation.test.ts re-derives MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT from these rows on every CI run, so editing the constant without a fresh table fails that test, and so does locking a fresh table without moving the constant. The per-row `guard` column is the verdict the tree the sweep ran on gave that document (cast bound provisionally 65 at the time), not a verdict this tree gives; nothing asserts on it and the derivation does not read it.",
+  "_comment": "TIMINGS are measurements: rows swept by .github/workflows/calibrate-voice-bound.yml on ubuntu-latest and copied verbatim out of that run's `--json=-` block (see `machine.runId`); nothing recomputes them. The `derivation` block, `marginFraction`, the per-row `guard` column and `guardEvaluatedAgainst` are all DERIVED from those rows by `npm run measure-voice-bound -- --lock-from=<this file>` against the current tree \u2014 `guard` is a verdict, not a measurement, and the sweep necessarily ran on whatever bound values the tree carried at the time (the lock run carried a provisional cast bound of 65 and its column read REJECT for the very row the constant is derived from), so it is re-evaluated here and `guardEvaluatedAgainst` records the bounds it was re-evaluated against. tests/core/voice-bound-derivation.test.ts re-derives MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT from these rows on every CI run AND re-checks the guard column, so editing the constant without a fresh table fails that test, locking a fresh table without moving the constant fails it, and a stale verdict column fails it.",
   "generatedAt": "2026-09-13T05:52:14.241Z",
   "machine": {
     "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
@@ -95,7 +95,7 @@
         "distinct": 70,
         "pooledWords": 9240,
         "weight": 646800,
-        "guard": "REJECT",
+        "guard": "ACCEPT",
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
@@ -118,7 +118,7 @@
         "distinct": 75,
         "pooledWords": 9000,
         "weight": 675000,
-        "guard": "REJECT",
+        "guard": "ACCEPT",
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
@@ -141,7 +141,7 @@
         "distinct": 80,
         "pooledWords": 8160,
         "weight": 652800,
-        "guard": "REJECT",
+        "guard": "ACCEPT",
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
@@ -419,7 +419,7 @@
         "distinct": 70,
         "pooledWords": 9240,
         "weight": 646800,
-        "guard": "REJECT",
+        "guard": "ACCEPT",
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
@@ -442,7 +442,7 @@
         "distinct": 75,
         "pooledWords": 9000,
         "weight": 675000,
-        "guard": "REJECT",
+        "guard": "ACCEPT",
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
@@ -465,7 +465,7 @@
         "distinct": 80,
         "pooledWords": 8160,
         "weight": 652800,
-        "guard": "REJECT",
+        "guard": "ACCEPT",
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
@@ -666,6 +666,10 @@
         "wallMsMax": 11464
       }
     ]
+  },
+  "guardEvaluatedAgainst": {
+    "weight": 675000,
+    "distinct": 80
   },
   "derivation": {
     "shape": "max-admitted",

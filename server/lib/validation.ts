@@ -663,6 +663,12 @@ const VOICE_ELIGIBLE_MIN_WORDS = 30;
 //     O(distinct²) pair count so cost stops scaling with the SQUARE of cast
 //     size — not a further increase of this bound; that pair-cap is
 //     scoring-path and is the scoring lane's item, not this guard's.
+//     (2026-09-13 CORRECTION, left here rather than rewritten into the dated
+//     record above: the pair COUNT is not what makes a pair expensive. See
+//     MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT's comment below — burrowsDelta
+//     re-derives both sides' relative frequencies 130 times per pair, and
+//     hoisting that is bit-identical and 44-56x faster. Point a scoring lane
+//     at THAT, not at a lossy pair cap.)
 // (e) The lightest payload the existing DoS/bypass regression fixtures
 //     (tests/security/fountain-shape-guard-cue-parity.test.ts) pin as
 //     REJECTED via this bound remains ROUND 3's "bypass B" at 1,920,000 —
@@ -711,13 +717,24 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 675_000;
 // unchanged), and this only ever turns an ACCEPT into a REJECT. The
 // documents it newly rejects are those with more than this many characters who
 // EACH speak enough to be individually voice-scored while still weighing under
-// 675,000 — the 121-150-speaker uniform-ish shapes, which is precisely the
-// range the neighbouring MAX_FOUNTAIN_FREQUENT_CUE_LINES comment already calls
-// out as something no real script does ("dozens ... not HUNDREDS").
+// 675,000 — measured, the 81-150-speaker band: uniform-min at N=81/90/100/110/
+// 120 weighs 196,830 / 243,000 / 300,000 / 363,000 / 432,000, all comfortably
+// under the weight bound and all newly rejected here. (An earlier draft of this
+// comment said "121-150", understating the narrowing by forty casts; the range
+// is checked against the guard itself in
+// tests/security/fountain-shape-guard-cue-parity.test.ts's finding-10 block
+// rather than restated in prose again.) That band is what the neighbouring
+// MAX_FOUNTAIN_FREQUENT_CUE_LINES comment already calls out as something no
+// real script does ("dozens ... not HUNDREDS") — and it is narrower than it
+// looks, because ONE walk-on under VOICE_ELIGIBLE_MIN_WORDS makes allEligible
+// false and neither bound is consulted at all.
 //
 // DERIVED, not chosen: it is the largest cast whose worst measured
-// runScriptDoctor CPU stays under half DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS less a
-// 15% margin, measured on ubuntu-latest by
+// runScriptDoctor CPU stays under half DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS less
+// DERIVATION_MARGIN_FRACTION — the margin is defined, derived and explained
+// once, in scripts/lib/voice-bound.ts, and deliberately not restated here,
+// because a number in prose beside a number in code is how the 2026-09-12
+// derivation drifted in the first place. Measured on ubuntu-latest by
 // .github/workflows/calibrate-voice-bound.yml, against the heaviest document
 // the weight bound still admits at that cast (scripts/lib/voice-bound.ts's
 // `max-admitted` shape — d speakers each carrying floor(675,000 / d²) words,
@@ -726,6 +743,52 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 675_000;
 // tests/core/voice-bound-derivation.test.ts re-derives this constant from it,
 // so editing it without a fresh measurement fails the suite. Reproduce with
 // `npm run measure-voice-bound`.
+//
+// WHAT THIS PAIR OF BOUNDS DOES NOT BOUND (2026-09-13 review, finding 4).
+// Neither bound constrains document size or scene count, and the derivation
+// shape carries only two scene headings. The same 80-speaker, 102-words-each
+// eligible body padded with action-only scenes to the analyzer's 400-scene
+// ceiling is ACCEPTED by both bounds and cost 14,334 ms of CPU on the lane's
+// sandbox where the derivation shape reads 7,800 ms — 1.84x, and the voice pass
+// is fully paid (analyzeVoices does NOT abstain, so the residual note below
+// does not cover this case). These two bounds bound the ELIGIBLE-SPEAKER
+// dimension of the cost, not the cost. Document size is bounded elsewhere —
+// MAX_FOUNTAIN_CHARS, MAX_FOUNTAIN_CUE_WEIGHT, the analyzer's own 400-scene
+// ceiling — and ultimately by DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS's hard stop,
+// which is the guarantee a writer actually gets.
+//
+// CAN THE ASSERTION STILL GO RED? Yes, on the slowest fleet member under a load
+// harsher than `npm test`, and the record says so rather than discovering it
+// again. On the EPYC 9V74 sweep (run 34739790205) this cast's shape read
+// 14,724 ms under the saturating load proxy — inside 15,000 ms, with 2% to
+// spare. In the condition the assertion actually runs in it reads 12,319 ms
+// (run 34741928418, AMD EPYC 7763, 82% of target), and no cast this bound could
+// take fixes the proxy case: on that machine the smallest cast ever swept, 40,
+// already costs 12,442 ms, because feature-scale document cost, not cast size,
+// is what fills the budget there. A red build here is a machine report, not a
+// guard regression — the failure message names the machine and says to
+// re-derive.
+//
+// WHAT WOULD LET BOTH BOUNDS RISE, AND IT IS NOT A PAIR CAP (2026-09-13 review,
+// finding 7 — this supersedes the "cap the O(distinct²) pair count" pointer in
+// item (d) of the weight bound's 2026-09-12 derivation above, which is left as
+// written because it is a dated record). The pair COUNT is not what makes a
+// pair expensive. voice-delta.ts's `burrowsDelta` computes both characters'
+// relative frequencies once (`freqA`, `freqB`) and then calls `corpusStats`
+// INSIDE the loop over the 65 function words, and `corpusStats` re-derives
+// `relativeFrequencies` for BOTH sides every time — 130 full re-tokenizations
+// per pair, of two maps already in hand. Hoisting it is the same arithmetic in
+// the same order: measured bit-identical, `maxDeltaDiff = 0` over every pair,
+// at 43.8x on a 435-pair corpus (this lane, cast 30 x ~102 words) and 56.0x /
+// 54.3x on the two shapes these bounds are derived against (the round-1
+// reviewer, 3,160 and 11,175 pairs). `analyzeVoices` is ~99% of the derivation
+// shape's cost, and ~98% of that is redundant recomputation.
+//
+// This lane cannot land it: `server/nvm/analyze/voice-delta.ts` IS reachable
+// from doctor.ts (verified with scripts/lib/import-graph.mjs's
+// computeReachableSet), so it is scoring-path and needs a measurement receipt.
+// But it is the fix to point at — free and bit-identical — rather than a pair
+// cap, which would move scores.
 export const MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 80;
 // 2026-09-06 review round 7 follow-up, non-blocking — RESIDUAL accepted
 // worst case, recorded here rather than left unstated: a document sitting
