@@ -202,14 +202,18 @@ export function makeLLMCandidateGenerator(): CandidateGenerator {
     let temperature: number;
     try {
       const ai = await import('../../engine/ai.ts');
-      provider = ai.geminiProvider;
+      // The ACTIVE provider (2026-09-13). This was `ai.geminiProvider`, so on
+      // an OpenAI-compatible deployment every candidate generation threw
+      // 'Gemini provider not available' into the catch below and the loop
+      // converged over structural stubs — visible only as an
+      // `llm_generator_failed` warn line. Keyless behaviour is unchanged: with
+      // no provider configured the seam still holds geminiProvider.
+      provider = ai.getLLMProvider();
       candidateModel = ai.modelForTask('CANDIDATE');
       // Candidate generation wants high diversity; bias the configured base
       // temperature upward but never below 0.9 so the proof loop has variety
       // to select from. Falls back to 0.9 if config is unavailable.
       temperature = Math.max(0.9, ai.getTemperature());
-      // Test that the provider is usable (key present)
-      ai.getAI();
     } catch (err) {
       // No key or provider unavailable — use stubs. Log so silent stub
       // fallback is observable in metrics rather than invisible.

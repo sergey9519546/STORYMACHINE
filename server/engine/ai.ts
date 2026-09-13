@@ -244,6 +244,20 @@ if (aiProviderManager.hasProvider()) {
 }
 
 export function setLLMProvider(p: LLMProvider): void         { _provider = p; }
+/**
+ * The ACTIVE LLM provider — whatever server/lib/ai-config.ts last wired
+ * (openai-compat when AI_PROVIDER says so, Gemini otherwise).
+ *
+ * Added 2026-09-13 (story-bench lane). Two generative call sites reached for
+ * the exported `geminiProvider` constant instead of this seam —
+ * server/nvm/revision/rewrite-llm.ts and server/nvm/generate/llm-generator.ts —
+ * so with AI_PROVIDER=openai-compat and no GEMINI_API_KEY they threw
+ * 'Gemini provider not available' on every call and took their documented
+ * fallback (the unchanged draft; a structural stub). The fallbacks are
+ * correct and still apply when there is genuinely no provider; what was wrong
+ * is that a fully configured non-Gemini deployment could never get past them.
+ */
+export function getLLMProvider(): LLMProvider               { return _provider; }
 export function resetLLMProvider(): void                     { 
   // Reset to multi-provider system if available, otherwise Gemini
   if (aiProviderManager.hasProvider()) {
@@ -372,6 +386,13 @@ const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 // A failure is transient (worth retrying) if it's a rate-limit, an upstream
 // 5xx, a timeout, or a dropped connection. Bad-request / auth errors are not.
 function isTransient(err: unknown): boolean {
+  // An error that declares itself permanent is never retried. Today the only
+  // producer is OpenAICompatUnavailableError (an unavailable/retired model, or
+  // a rejected credential — server/lib/ai-providers/openai-compat.ts): three
+  // attempts at a model this account cannot serve cost three round trips and
+  // return the identical answer. Read as a duck-typed flag rather than via
+  // instanceof so this file keeps no import edge to the provider adapters.
+  if ((err as { nonRetryable?: unknown })?.nonRetryable === true) return false;
   const msg = ((err as Error)?.message ?? String(err)).toLowerCase();
   const status = (err as { status?: number })?.status;
   if (status === 429 || status === 500 || status === 502 || status === 503 || status === 504) return true;
