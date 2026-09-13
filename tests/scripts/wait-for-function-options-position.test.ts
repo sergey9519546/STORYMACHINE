@@ -421,58 +421,172 @@ function handRolledStreamHolds(source: string): { line: number; text: string }[]
 }
 
 /**
- * Find a "the dialog closed" check — `<locator>.count() === 0` (or the
- * `.then((n) => n === 0)` form this repo also uses) — read within a few
- * lines of a `.press(`/`.click(` action, where THAT SAME locator's own
- * detachment/hidden state was never actually waited for first.
+ * Find a "the dialog closed" check on a locator that this file itself
+ * OPENED — confirmed present with a `.waitFor(...)` that does not ask for
+ * `state: 'detached'|'hidden'` — where THAT SAME locator was later read
+ * for absence (any of the shapes below) without a genuine
+ * `.waitFor({ state: 'detached' | 'hidden' })` (or `expectDetached(name,
+ * …)`, this repo's shared helper name for the same wait) on it FIRST.
  *
- * ── Why (2026-09-13, palette-close-race lane) ────────────────────────────
+ * ── Why (2026-09-13, palette-close-race lane, round 2) ───────────────────
  * `scripts/verify-e5-command-palette.mjs`'s "the palette itself closes
  * after running an action" assertion sampled `paletteDialog.count()`
  * synchronously the instant an unrelated element (the Ship panel) became
  * visible — CI failed it 3/3 on `main` while it stayed 17/17 on an idle
  * local box (docs/audits/2026-09-13-ci-green/palette-race-lane-report.md).
- * The dialog is CommandPalette, which exits through AnimatePresence (a
- * 0.14s timed animation) — its unmount is not gated on the triggering
- * action finishing, so a read taken right after the action can land before
- * React actually removes the node. `waitFor({ state: 'detached' })` on
- * that SAME locator is the fix; a fixed-duration `waitForTimeout` guess is
- * the same defect with a bigger margin, not the fix, which is why the scan
- * requires a real detached/hidden wait on the checked locator itself,
- * not merely SOME wait somewhere upstream (the original bug had one — a
- * `waitFor` for the Ship panel — between the action and the race).
+ * The dialog exits through AnimatePresence, so its unmount is not gated on
+ * the triggering action finishing and a read taken right after can land
+ * before React actually removes the node.
  *
- * Deliberately narrow to reduce false positives on the rest of this
- * battery: a `.count() > 0` appearance check is not in scope (a mount
- * commits in the same React commit as the triggering event in every
- * component this repo has — AnimatePresence only ever delays REMOVAL), and
- * neither is a synchronous focus/DOM read (Tab and a ref's own `.focus()`
- * call take effect within the same event dispatch, no animation between
- * the action and the read). Only an absence check — the one shape that
- * really can be racing an exit transition — is flagged.
+ * Round 1 gated this on textual proximity to a `.press(`/`.click(` within
+ * 10 lines. Round-1 review (docs/audits/2026-09-13-ci-green/
+ * palette-race-review.md, F1) broke that with one mutation: reverting only
+ * the fixed line back to the bug, with the lane's own explanatory comment
+ * left in place, put the triggering `press('Enter')` 21 lines above the
+ * check — outside the window, 0 offenders reported on the file it exists
+ * to guard. Round 2 drops the distance heuristic entirely and tracks
+ * OWNERSHIP instead: was THIS locator ever confirmed open, and was its
+ * OWN close ever confirmed before this read — regardless of how many lines,
+ * comments, or unrelated waits sit between the triggering action and the
+ * read. That also defeats every other evasion round-1 review's F2 found
+ * (an action spelled `.tap()`/`.fill()` instead of `.press()`/`.click()`;
+ * the action 11 lines away instead of 10): none of them matter to a
+ * name-and-order-based check that never looks at actions at all.
+ *
+ * Also widened per F2 to the ten spellings the round-1 review's mutation
+ * matrix caught this scanner missing: `const n = await x.count(); … n ===
+ * 0` (assignment split across statements), the parenthesised
+ * `(await x.count()) === 0` / `== 0` and its reversed `0 === (…)` form —
+ * the spelling `smoke-p0-live-flow.mjs:477` and
+ * `verify-p2-p3-surfaces.mjs:2004` already use for an unrelated,
+ * legitimately-out-of-scope shape (an existence GUARD on a locator that was
+ * never opened in the first place — see below) —
+ * `expect(x).toHaveCount(0)`, `x.isHidden()`, `!(await x.isVisible())`, and
+ * a one-time `page.evaluate(() => !document.querySelector(...))` read
+ * (unconditional, not name-gated: there is no Playwright locator variable
+ * to own it). Ten shapes plus the original two is what "deny-by-default"
+ * means for this rule now — verified against all ten in the mutation-matrix
+ * fixtures below, not asserted.
+ *
+ * ── The false positives this design avoids (F3) ──────────────────────────
+ * A `page.waitForFunction(() => !document.querySelector(...))` — the
+ * CORRECT version of the same idea, used at `verify-focus-traps.mjs:175` —
+ * is never flagged: it is a real wait (blocks until true or timeout), and
+ * the method name is `waitForFunction`, not `evaluate`; the two do not
+ * share a substring, so the one-time-`evaluate` shape above cannot match
+ * it. A locator that was never opened at all — `budgetRetry` in
+ * `smoke-p0-live-flow.mjs:477`, `tab` in `verify-p2-p3-surfaces.mjs:2004` —
+ * is a existence GUARD ("is this optional thing here or not"), not a
+ * dialog-closed assertion, and is correctly invisible here because it is
+ * never added to `openedEver` (nothing in the file ever calls
+ * `.waitFor(` on it to confirm it was shown).
+ *
+ * ── A caveat this rule cannot enforce, so it is written down instead ─────
+ * The fix this scan recommends — `.waitFor({ state: 'detached' })` /
+ * `expectDetached(...)` — is VACUOUS for an assertion that something never
+ * appeared at all ("no error toast after this click"): waiting for an
+ * already-absent locator to detach resolves immediately and the check
+ * becomes unconditionally true. That shape needs a positive presence check
+ * first (or a fixed settle window with a comment saying so), not this wait.
+ * Nothing here can distinguish "was shown, now confirming it is gone" from
+ * "never shown, still not shown" by text alone — a human applying an
+ * offender fixed here must know which one they have.
  */
 function unwaitedCloseChecks(source: string): { line: number; text: string }[] {
-  const bad: { line: number; text: string }[] = [];
-  const ACTION = /\.(?:press|click)\(/;
-  const CLOSE_CHECK = /\b([A-Za-z_$][\w.$]*)\.count\(\)\s*(?:\.then\(\s*\(?\s*n\s*\)?\s*=>\s*n\s*===\s*0\s*\)|(?:===|==)\s*0)/;
-  const lines = source.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const m = CLOSE_CHECK.exec(lines[i]);
-    if (!m) continue;
+  const NAME = '[A-Za-z_$][\\w.$]*';
+
+  // 1. Every `<name>.waitFor(` call: an OPEN confirmation (no `state`, or a
+  //    state other than detached/hidden) or a CLOSE confirmation (state:
+  //    'detached' | 'hidden'). `expectDetached(<name>, …)` — this repo's
+  //    shared-helper name for the identical wait, should one exist in a
+  //    file under scan — counts as a CLOSE confirmation too.
+  type Ev = { index: number; name: string; kind: 'open' | 'close' };
+  const events: Ev[] = [];
+  const waitForRe = new RegExp(`(${NAME})\\s*\\.waitFor\\(`, 'g');
+  for (let m = waitForRe.exec(source); m; m = waitForRe.exec(source)) {
     const name = m[1];
-    let sawAction = false;
-    for (let j = Math.max(0, i - 10); j < i; j++) {
-      if (ACTION.test(lines[j])) { sawAction = true; break; }
+    const open = m.index + m[0].length - 1;
+    let depth = 0;
+    let i = open;
+    for (; i < source.length; i++) {
+      const c = source[i];
+      if (c === '(') depth++;
+      else if (c === ')') { depth--; if (depth === 0) break; }
     }
-    if (!sawAction) continue; // a stable read with no triggering action nearby
+    const args = source.slice(open + 1, i);
+    const isClose = /state\s*:\s*['"](?:detached|hidden)['"]/.test(args);
+    events.push({ index: m.index, name, kind: isClose ? 'close' : 'open' });
+  }
+  const expectDetachedRe = new RegExp(`expectDetached\\(\\s*(${NAME})\\b`, 'g');
+  for (let m = expectDetachedRe.exec(source); m; m = expectDetachedRe.exec(source)) {
+    events.push({ index: m.index, name: m[1], kind: 'close' });
+  }
+
+  const openedEver = new Set(events.filter((e) => e.kind === 'open').map((e) => e.name));
+
+  // 2. Risky absence reads, one name at a time — only for a locator this
+  //    file ever opened; a guard on something never confirmed present is a
+  //    different, legitimate shape (see docstring).
+  type Read = { index: number; name: string | null; text: string };
+  const reads: Read[] = [];
+  for (const name of openedEver) {
     const escaped = name.replace(/[.$]/g, '\\$&');
-    const detachedWaitRe = new RegExp(`${escaped}\\s*\\.waitFor\\(\\s*\\{[^)]*state:\\s*['"](?:detached|hidden)['"]`);
-    let waitedOwnClose = false;
-    for (let j = Math.max(0, i - 40); j < i; j++) {
-      if (detachedWaitRe.test(lines[j])) { waitedOwnClose = true; break; }
+    const patterns = [
+      new RegExp(`${escaped}\\.count\\(\\)\\s*\\.then\\(\\s*\\(?\\s*n\\s*\\)?\\s*=>\\s*n\\s*===\\s*0\\s*\\)`, 'g'),
+      new RegExp(`\\(?\\s*await\\s+${escaped}\\.count\\(\\)\\s*\\)?\\s*(?:===|==)\\s*0`, 'g'),
+      new RegExp(`0\\s*(?:===|==)\\s*\\(?\\s*await\\s+${escaped}\\.count\\(\\)\\s*\\)?`, 'g'),
+      new RegExp(`expect\\(\\s*${escaped}\\s*\\)\\s*\\.toHaveCount\\(\\s*0\\s*\\)`, 'g'),
+      new RegExp(`${escaped}\\.isHidden\\(`, 'g'),
+      new RegExp(`!\\s*\\(?\\s*await\\s+${escaped}\\.isVisible\\(\\)\\s*\\)?`, 'g'),
+      new RegExp(`${escaped}\\.isVisible\\(\\)\\s*\\)?\\s*===\\s*false`, 'g'),
+    ];
+    for (const re of patterns) {
+      for (let m = re.exec(source); m; m = re.exec(source)) {
+        reads.push({ index: m.index, name, text: m[0] });
+      }
     }
-    if (waitedOwnClose) continue;
-    bad.push({ line: i + 1, text: lines[i].trim().slice(0, 140) });
+    // The split form: `const n = await x.count();` … later `n === 0`.
+    const assignRe = new RegExp(`(?:const|let)\\s+([A-Za-z_$]\\w*)\\s*=\\s*await\\s+${escaped}\\.count\\(\\)`, 'g');
+    for (let m = assignRe.exec(source); m; m = assignRe.exec(source)) {
+      const varName = m[1];
+      const windowText = source.slice(m.index, m.index + 400);
+      const cmpRe = new RegExp(`\\b${varName}\\b\\s*(?:===|==)\\s*0|0\\s*(?:===|==)\\s*\\b${varName}\\b`);
+      const cmpM = cmpRe.exec(windowText);
+      if (cmpM) reads.push({ index: m.index + cmpM.index, name, text: cmpM[0] });
+    }
+  }
+
+  // Unconditional — no locator name owns a raw `document.querySelector`, so
+  // this shape cannot be gated on `openedEver`. Method name only:
+  // `evaluate` is not a substring of `waitForFunction`, so the correct
+  // pattern (a real wait) never matches.
+  const evalAbsenceRe = /\.evaluate\(\s*\(\)\s*=>\s*!\s*document\.querySelector\(/g;
+  for (let m = evalAbsenceRe.exec(source); m; m = evalAbsenceRe.exec(source)) {
+    reads.push({ index: m.index, name: null, text: m[0] });
+  }
+
+  // 3. One pass in file order: a read is an offender unless its OWN name
+  //    already had a CLOSE confirmation strictly before it. Re-opening a
+  //    name clears any earlier close confirmation — it needs its own.
+  type TimelineEvent =
+    | { index: number; name: string; kind: 'open' }
+    | { index: number; name: string; kind: 'close' }
+    | { index: number; name: string | null; kind: 'read'; text: string };
+  const timeline: TimelineEvent[] = [
+    ...events.map((e): TimelineEvent => (e.kind === 'open'
+      ? { index: e.index, name: e.name, kind: 'open' }
+      : { index: e.index, name: e.name, kind: 'close' })),
+    ...reads.map((r): TimelineEvent => ({ index: r.index, name: r.name, kind: 'read', text: r.text })),
+  ].sort((a, b) => a.index - b.index);
+
+  const confirmedClosed = new Set<string>();
+  const bad: { line: number; text: string }[] = [];
+  for (const e of timeline) {
+    if (e.kind === 'open') { confirmedClosed.delete(e.name); continue; }
+    if (e.kind === 'close') { confirmedClosed.add(e.name); continue; }
+    if (e.name !== null && confirmedClosed.has(e.name)) continue; // properly waited for
+    const line = source.slice(0, e.index).split('\n').length;
+    bad.push({ line, text: e.text });
   }
   return bad;
 }
@@ -789,50 +903,120 @@ describe('waitForFunction option position', () => {
   });
 });
 
-describe('a "closed" check waits for its OWN locator to detach, not a nearby action', () => {
-  it('the scanner finds the defect it is meant to find (fail-first, verbatim shape)', () => {
-    // scripts/verify-e5-command-palette.mjs before the 2026-09-13 fix,
-    // trimmed to the load-bearing three lines.
-    const unfixed = "await page.keyboard.press('Enter');\n"
-      + "const shipPanelOpened = await page.locator('[aria-labelledby=\"ship-panel-title\"]').waitFor({ timeout: 5000 }).then(() => true).catch(() => false);\n"
-      + 'const paletteClosedAfterRun = await paletteDialog.count().then((n) => n === 0);';
-    const hits = unwaitedCloseChecks(unfixed);
-    assert.equal(hits.length, 1, 'a wait for a DIFFERENT locator between the action and the check must not exempt it');
+describe('a "closed" check waits for its OWN locator to detach — round 2 (owner/order, not distance)', () => {
+  it('F1 (round-1 review, major): catches the exact reintroduction in the file as shipped, comment and all', () => {
+    // The round-1 review's mutation, verbatim: revert ONLY the fixed
+    // assertion in the real, on-disk scripts/verify-e5-command-palette.mjs
+    // back to the pre-fix line, leaving the lane's own 20-line explanatory
+    // comment (and everything else) in place. Round 1's distance-based scan
+    // reported ZERO offenders here because the comment pushed the
+    // triggering `press('Enter')` to line 130, 21 lines above the check at
+    // line 151 — outside its 10-line window.
+    const real = readFileSync(path.join(REPO, 'scripts/verify-e5-command-palette.mjs'), 'utf8');
+    const fixedLine = "const paletteClosedAfterRun = await paletteDialog\n"
+      + "    .waitFor({ state: 'detached', timeout: timing.ms(3000) })\n"
+      + '    .then(() => true)\n'
+      + '    .catch(() => false);';
+    assert.ok(real.includes(fixedLine), 'the shipped fixed line must match verbatim, or this fixture is stale');
+    const mutated = real.replace(
+      fixedLine,
+      'const paletteClosedAfterRun = await paletteDialog.count().then((n) => n === 0);',
+    );
+    assert.notEqual(mutated, real, 'the replace must actually have applied');
+
+    const hits = unwaitedCloseChecks(mutated);
+    assert.equal(hits.length, 1, `expected exactly the reintroduced line to be flagged, got: ${JSON.stringify(hits)}`);
     assert.match(hits[0].text, /paletteDialog\.count\(\)/);
 
-    // The `=== 0` spelling is the same offender.
+    // And the real, unmutated shipped file is clean.
+    assert.deepEqual(unwaitedCloseChecks(real), []);
+  });
+
+  it('F2 (round-1 review, moderate): the ten evasion spellings the mutation matrix caught missing', () => {
+    // Every fixture opens `d` first (`d.waitFor({ timeout: … })`, no state —
+    // an OPEN confirmation), so each read below is tested on a locator this
+    // scan actually tracks, not exempted for the wrong reason.
+    const OPEN = "await d.waitFor({ timeout: 5000 });\nawait page.keyboard.press('Enter');\n";
+    const cases: Array<[string, string]> = [
+      ['baseline: .then((n) => n === 0)', 'const ok = await d.count().then((n) => n === 0);'],
+      ['split form: const n = …; n === 0', 'const n = await d.count();\nconst ok = n === 0;'],
+      ['paren form: (await d.count()) === 0', 'const ok = (await d.count()) === 0;'],
+      ['paren form, == : (await d.count()) == 0', 'const ok = (await d.count()) == 0;'],
+      ['reversed: 0 === (await d.count())', 'const ok = 0 === (await d.count());'],
+      ['expect().toHaveCount(0)', 'await expect(d).toHaveCount(0);'],
+      ['isHidden()', 'const ok = await d.isHidden();'],
+      ['negated isVisible()', 'const ok = !(await d.isVisible());'],
+      ['tap() instead of click()/press()', 'const ok2 = await d.count().then((n) => n === 0);'],
+      ['11 lines between the action and the read', `${'await page.screenshot({ path: "x.png" });\n'.repeat(11)}const ok = await d.count().then((n) => n === 0);`],
+    ];
+    for (const [label, read] of cases) {
+      const source = label === 'tap() instead of click()/press()'
+        ? "await d.waitFor({ timeout: 5000 });\nawait other.tap();\n" + read
+        : OPEN + read;
+      const hits = unwaitedCloseChecks(source);
+      assert.equal(hits.length, 1, `${label}: expected 1 offender, got ${hits.length} — ${JSON.stringify(hits)}`);
+    }
+
+    // The eleventh: a one-time evaluate() reading DOM absence directly —
+    // unconditional, not gated on `d` ever being opened at all.
     assert.equal(
-      unwaitedCloseChecks("await page.keyboard.press('Escape');\nconst n = someDialog.count() === 0;").length,
+      unwaitedCloseChecks("await page.keyboard.press('Enter');\n"
+        + 'const ok = await page.evaluate(() => !document.querySelector(\'[role="dialog"]\'));').length,
       1,
+      'a one-time evaluate() reading DOM absence is the same defect, with no locator to gate it on',
     );
   });
 
-  it('the fix — waitFor({ state: "detached" }) on the SAME locator — clears it', () => {
-    const fixed = "await page.keyboard.press('Enter');\n"
-      + "await page.locator('[aria-labelledby=\"ship-panel-title\"]').waitFor({ timeout: 5000 }).then(() => true).catch(() => false);\n"
-      + "const paletteClosedAfterRun = await paletteDialog.waitFor({ state: 'detached', timeout: 3000 }).then(() => true).catch(() => false);";
+  it('the fix — waitFor({ state: "detached" }) (or expectDetached) on the SAME locator — clears every shape', () => {
+    const fixed = "await d.waitFor({ timeout: 5000 });\n"
+      + "await page.keyboard.press('Enter');\n"
+      + "const ok = await d.waitFor({ state: 'detached', timeout: 3000 }).then(() => true).catch(() => false);";
     assert.equal(unwaitedCloseChecks(fixed).length, 0);
+
+    const viaHelper = "await d.waitFor({ timeout: 5000 });\n"
+      + "await page.keyboard.press('Enter');\n"
+      + 'const ok = await expectDetached(d, timing);';
+    assert.equal(unwaitedCloseChecks(viaHelper).length, 0, 'expectDetached(name, …) is recognized as the same close confirmation');
   });
 
-  it('an appearance check (count() > 0) is out of scope — mounting is never animation-gated', () => {
+  it('F3 (round-1 review, minor): the correct waitForFunction pattern is never flagged', () => {
+    // verify-focus-traps.mjs:175, verbatim shape: a REAL wait (blocks until
+    // true or timeout), not a one-time evaluate() read. `evaluate` is not a
+    // substring of `waitForFunction`, so the unconditional evaluate-shape
+    // rule cannot match it, and there is no `d.count()`-style read here for
+    // the name-gated rules to see either.
+    const correct = "await closeDialog();\n"
+      + "await page.waitForFunction(() => !document.querySelector('[role=\"dialog\"]'), undefined, { timeout: 3000 }).catch(() => {});\n"
+      + 'const restoreOk = await page.evaluate((el) => el === document.activeElement, trigger);';
+    assert.equal(unwaitedCloseChecks(correct).length, 0);
+  });
+
+  it('an appearance check (count() > 0) is out of scope even on an OPENED locator — mounting is never animation-gated', () => {
     assert.equal(
-      unwaitedCloseChecks("await exportMenuBtn.click();\nconst itemVisible = await item.count() > 0;").length,
+      unwaitedCloseChecks("await item.waitFor({ timeout: 5000 });\nawait exportMenuBtn.click();\nconst itemVisible = await item.count() > 0;").length,
       0,
     );
   });
 
-  it('a count()===0 read with no triggering action nearby is a stable baseline, not this defect', () => {
+  it('a locator never confirmed open is an existence GUARD, not this defect (smoke-p0-live-flow.mjs:477 shape)', () => {
+    // budgetRetry is never the subject of a `.waitFor(` anywhere — it is
+    // read for the first and only time in the guard itself.
     assert.equal(
-      unwaitedCloseChecks('await page.goto(BASE);\nconst flashBefore = await page.locator(".x").count();\nconst none = flashBefore === 0;').length,
+      unwaitedCloseChecks("await budgetPage.getByRole('button', { name: /try sample coverage/i }).first().click();\n"
+        + "await budgetPage.getByText(/coverage failed/i).first().waitFor({ timeout: 5000 });\n"
+        + 'if ((await budgetRetry.count()) === 0) { throw new Error("x"); }').length,
       0,
+      'an existence guard on a locator that was never opened must not be flagged',
     );
   });
 
-  it('a prior wait for a DIFFERENT locator\'s detached state does not exempt this one', () => {
-    const stillBad = "await other.waitFor({ state: 'detached', timeout: 3000 });\n"
+  it('re-opening a locator clears an earlier close confirmation — it needs its own', () => {
+    const stillBad = "await d.waitFor({ timeout: 5000 });\n"
+      + "await d.waitFor({ state: 'detached', timeout: 3000 });\n"
+      + "await d.waitFor({ timeout: 5000 });\n" // re-opened — the earlier close no longer covers it
       + "await page.keyboard.press('Escape');\n"
-      + 'const closed = paletteDialog.count().then((n) => n === 0);';
-    assert.equal(unwaitedCloseChecks(stillBad).length, 1, 'only THIS locator\'s own detached wait may clear it');
+      + 'const closed = await d.count().then((n) => n === 0);';
+    assert.equal(unwaitedCloseChecks(stillBad).length, 1, 'a close confirmation before the most recent open must not carry over');
   });
 
   it('none of the browser suites re-introduces the defect this lane fixed', () => {
@@ -846,9 +1030,10 @@ describe('a "closed" check waits for its OWN locator to detach, not a nearby act
     assert.deepEqual(
       offenders,
       [],
-      'a dialog-closed check must waitFor({ state: \'detached\' | \'hidden\' }) on its OWN locator, not sample '
-        + '.count() right after a keyboard/click action (docs/audits/2026-09-13-ci-green/'
-        + 'palette-race-lane-report.md):\n  ' + offenders.join('\n  '),
+      'a dialog-closed check must waitFor({ state: \'detached\' | \'hidden\' }) (or expectDetached(...)) on its OWN '
+        + 'locator before it is read for absence — not sample .count()/.isHidden()/.isVisible() or evaluate() '
+        + 'against document — regardless of distance to the triggering action '
+        + '(docs/audits/2026-09-13-ci-green/palette-race-lane-report.md):\n  ' + offenders.join('\n  '),
     );
   });
 });
