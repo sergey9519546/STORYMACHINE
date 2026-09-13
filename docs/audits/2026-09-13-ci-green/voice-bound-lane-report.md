@@ -1,8 +1,8 @@
 # Lane report — `voice-bound-ci-derivation`
 
 - **Worktree:** `/home/user/wt-bound`
-- **Branch:** `lane/voice-bound-ci-derivation` (from `main` @ `996e27a0`)
-- **Tip:** see the Tip line at the end of this file.
+- **Branch:** `lane/voice-bound-ci-derivation` (branched from `main` @ `996e27a0`, rebased onto `68d05192`)
+- **Tip:** `8076d503` (pushed to `origin/lane/voice-bound-ci-derivation`, rebased onto `main` @ `68d05192`).
 - **Calibration branches (delete after review):** `calibrate/voice-bound-2026-09-13`,
   `…-13b`, `…-13c`, `…-13d` — push-triggered runs of the calibration workflow,
   which cannot be `workflow_dispatch`ed before the workflow reaches the default
@@ -283,3 +283,18 @@ record is the run id, not the branch.
 4. **The pre-existing residual (§6) is untouched.** An ineligible-walk-on
    document at the 400-scene ceiling still costs ~12-14 s locally and more on
    the runner. It is out of this bound's reach by construction.
+
+## 10. Log
+
+```
+git log --oneline origin/main..HEAD
+8076d503 docs(audit): the calibration branches cannot be deleted from the sandbox (proxy 403 on ref deletion)
+944ef19b feat(guard): MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 80, derived on ubuntu-latest
+598cbae8 feat(guard): a second, orthogonal bound — MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT
+f0337297 feat(calibrate): sweep the shape the weight bound ACTUALLY admits, not the cheapest one
+8641a554 ci(calibrate): print the lock file into the log (--json=-)
+f327b12e ci(calibrate): also run the voice-bound calibration on a calibrate/** branch push
+2e57f9d4 feat(guard): calibration script + runner workflow for the voice-bound derivation
+```
+
+`Tip: 8076d503`
