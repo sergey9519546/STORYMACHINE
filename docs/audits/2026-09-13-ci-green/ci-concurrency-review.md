@@ -470,3 +470,60 @@ Optional, no re-check: `shell: bash` on the two "Run tests" steps; a
 `.gitignore` line for `test-output.tap`.
 
 Round-3 re-check is this one assertion only.
+
+---
+
+# Round 3 (`c35fd757`)
+
+Re-checked object: `lane/ci-concurrency` tip **`c35fd757`**, two commits on the
+round-2 object `a343e034`: `f0cf763c` (Finding 10 and both optional notes),
+`c35fd757` (Tip line). Same reviewer, one item. Mutation run once against a
+fresh copy of the tree under `<session scratch>/cireview/`; worktree read-only.
+
+**Finding 10 — CLOSED.** `stepBlock()` now skips comment lines, placed before
+the dedent check so a comment can neither enter the block text nor end it
+early. Reproduced both of the lane's numbers exactly:
+
+| What | Result |
+|---|---|
+| `tests/core/ci-gates-intact.test.ts`, unmutated | **47 tests / 47 pass / 0 fail** [claimed 47/47 — matches] |
+| Live `set -o pipefail` deleted from **both** `ci.yml` and `release.yml` | **45 pass / 2 fail**, red on exactly `ci.yml's "Run tests" step preserves its exit code through the tee (pipefail)` and its `release.yml` twin [claimed 45/47 on exactly those two — matches] |
+
+A YAML parser confirms the mutated step's live body is
+`'npm test 2>&1 | tee test-output.tap\n'` — the comment explaining the deleted
+line is still present and no longer satisfies the regex, which was the whole
+finding. `tests/scripts/tap-failures.test.ts` 8/8 and `brain-coverage` 7/7
+unchanged. The added regression case is self-contained (it builds its own
+fixture rather than depending on the real files' wording), so it survives a
+future rewording of those comments.
+
+Checked the one risk the new `continue` introduces: skipping comments before
+the dedent test means a comment no longer ends a block, so a step could in
+principle over-collect past its own end. It cannot here — a block still ends at
+the first NON-comment line at or shallower than the step's indent, and in a
+workflow the line after a step's trailing comments is always a real sibling
+`- name:` or a dedented job key. The suite's own mirror checks (which compare
+whole run bodies between `ci.yml` and `release.yml`) stay green, which is the
+evidence that nothing over-collected.
+
+Both optional notes taken, and the first taken more thoroughly than suggested:
+`shell: bash` is pinned on both "Run tests" steps with the reason (the runner
+default is a property of the runner and would become `sh` inside a bash-less
+container), and `.gitignore:112` now carries `test-output.tap`
+(`git check-ignore -v` confirms). Worth recording that the pin makes the script's
+own `set -o pipefail` redundant on a real runner — GitHub's explicit
+`shell: bash` is `bash --noprofile --norc -eo pipefail {0}`, pipefail already
+set — so the two are belt and braces, as the comment says, not one mechanism
+mistaken for two.
+
+## VERDICT: MERGE
+
+All six round-1 items, the lane's self-added item 7, and round 2's Finding 10
+are closed, each shown red on its own mutation before green. No open items.
+Two things for the orchestrator at merge, neither the lane's to fix: reconcile
+the two `docs/brain/Audits/Audit - 2026-09-13 CI Green.md` notes as a union
+(round-1 section, "Brain-note reconciliation") and re-run `npm run brain`
+afterwards; and `calibrate-voice-bound.yml`, arriving from
+`lane/voice-bound-ci-derivation`, now has a test that will fail on it by
+default — whichever lane merges second adds its group or its allowlist row
+with a reason (round-1 Finding 5).
