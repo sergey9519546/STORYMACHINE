@@ -242,6 +242,19 @@ export function scriptWordCount(fountain) {
 }
 
 /**
+ * Every `<id>.row.json` in a run directory, ordered by the fixture's own
+ * premise order so a re-run of one premise cannot reshuffle the table.
+ */
+export function rowsFromDir(dir, orderedIds) {
+  const out = [];
+  for (const id of orderedIds) {
+    const f = path.join(dir, `${id}.row.json`);
+    if (existsSync(f)) out.push(JSON.parse(readFileSync(f, 'utf8')));
+  }
+  return out;
+}
+
+/**
  * The directory this run writes to. `<date>/` for the first run of a day, then
  * `<date>-run2/`, `-run3/` ... `--out <name>` names one explicitly. Never
  * returns a directory that already holds a summary.json, so no run can destroy
@@ -260,6 +273,12 @@ export function nextRunDir(root, date, exists, explicit) {
 
 function allocateRunDir(argv) {
   const root = path.join(REPO, 'data', 'story-bench');
+  // `--into <dir>` is the deliberate, named way to write into a run directory
+  // that already exists — used to re-run the rows one run lost, without
+  // disturbing the rows it did not. `--out` still refuses to reuse a directory
+  // that holds a summary.json, which is the accident-prevention half.
+  const into = argv.includes('--into') ? argv[argv.indexOf('--into') + 1] : null;
+  if (into) return path.join(root, into);
   const explicit = argv.includes('--out') ? argv[argv.indexOf('--out') + 1] : null;
   return nextRunDir(root, runDirName(), (f) => existsSync(f), explicit);
 }
@@ -731,6 +750,13 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
     pageEstimate: report?.pageEstimate ?? null,
     topFindings: (report?.topPriorities ?? report?.issues ?? []).slice(0, 10),
   }, null, 2));
+  // THE ROW IS A FILE (round 2, review MEDIUM 6 taken to its conclusion). The
+  // table and the summary are DERIVED from these, never the other way round, so
+  // re-running one premise into an existing run directory replaces that
+  // premise's row and rebuilds the table around it instead of overwriting five
+  // other premises with a one-row table. That is what made re-running the three
+  // rows this run lost to the undici headersTimeout a bounded operation.
+  writeFileSync(path.join(outDir, `${premise.id}.row.json`), JSON.stringify(row, null, 2));
   writeFileSync(path.join(outDir, `${premise.id}.calls.json`), JSON.stringify({
     classification, committedScenes: committed, requestedScenes: targets.length,
     blockingProofs, scenesWithoutTier1Winner, committedNonStub, modelAuthoredOps,
@@ -750,10 +776,13 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
 
 async function runBench(argv) {
   loadEnvFile();
-  const only = argv.includes('--only') ? argv[argv.indexOf('--only') + 1] : null;
+  // `--only` accepts a comma-separated list, so re-running the rows one run
+  // lost is one invocation rather than three.
+  const onlyArg = argv.includes('--only') ? argv[argv.indexOf('--only') + 1] : null;
+  const only = onlyArg ? onlyArg.split(',').map((x) => x.trim()).filter(Boolean) : null;
   const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8'));
-  const premises = only ? fixture.premises.filter((p) => p.id === only) : fixture.premises;
-  if (premises.length === 0) throw new Error(`no premise matched --only ${only}`);
+  const premises = only ? fixture.premises.filter((p) => only.includes(p.id)) : fixture.premises;
+  if (premises.length === 0) throw new Error(`no premise matched --only ${onlyArg}`);
 
   if (process.env.AI_PROVIDER === 'openai-compat' && !process.env.AI_BASE_URL) {
     console.error('[story-bench] AI_PROVIDER=openai-compat with no AI_BASE_URL — nothing to generate with.');
@@ -822,17 +851,37 @@ async function runBench(argv) {
     reach.relay?.server.close();
   }
 
-  const table = renderTable(rows);
+  // Every row file in the directory, in fixture order — including rows written
+  // by an earlier run into this same directory that this invocation did not
+  // re-run. `--only` therefore updates one row and leaves the rest standing.
+  const allRows = rowsFromDir(outDir, fixture.premises.map((p) => p.id));
+  const table = renderTable(allRows);
   console.log('\n' + table + '\n');
-  const failed = rows.filter((r) => r.status === 'FAILED').length;
-  console.log(`[story-bench] ${rows.length - failed}/${rows.length} runs produced generated prose; ${failed} FAILED (labelled, not reported as stories).`);
+  const byStatus = {};
+  for (const r of allRows) byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+  const withModelScene = allRows.filter((r) => (r.committedNonStub ?? 0) > 0).length;
+  console.log(
+    `[story-bench] ${allRows.length} run(s): `
+    + Object.entries(byStatus).map(([k, v]) => `${v} ${k}`).join(', ') + '.',
+  );
+  console.log(
+    `[story-bench] ${withModelScene}/${allRows.length} committed at least one scene whose IR came from the model `
+    + '— the column that decides what the run measured.',
+  );
   console.log('[story-bench] The health column measures STRUCTURE. It does not measure whether the story is interesting.');
   writeFileSync(path.join(outDir, 'table.md'), table + '\n');
+  const priorDetails = existsSync(path.join(outDir, 'summary.json'))
+    ? (JSON.parse(readFileSync(path.join(outDir, 'summary.json'), 'utf8')).details ?? [])
+    : [];
+  const freshIds = new Set(details.map((d) => d.row.id));
   writeFileSync(path.join(outDir, 'summary.json'), JSON.stringify({
     ranAt: new Date().toISOString(),
     beatSource: 'hand-authored in tests/fixtures/story-bench-premises.json — this repository has no premise-to-outline step',
-    rows,
-    details: details.map((d) => ({ id: d.row.id, classification: d.classification, committed: d.committed, requested: d.requested, notes: d.convergeNotes })),
+    rows: allRows,
+    details: [
+      ...priorDetails.filter((d) => !freshIds.has(d.id)),
+      ...details.map((d) => ({ id: d.row.id, classification: d.classification, committed: d.committed, requested: d.requested, notes: d.convergeNotes })),
+    ],
   }, null, 2));
   writeFileSync(path.join(outDir, 'server.log'), logBuffer.join('\n') + '\n');
   console.log(`[story-bench] wrote ${outDir} (gitignored)`);
