@@ -32,7 +32,7 @@ function loadPlan() {
 
 /** A minimal plan the shape checks accept, so each check can be broken one at
  *  a time and shown firing. */
-function goodPlan(): Record<string, unknown> {
+function goodPlan(): any {
   return {
     schemaVersion: 1,
     updated: '2026-09-13',

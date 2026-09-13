@@ -284,6 +284,18 @@ local poking accumulates real `.db` files there over time.
 - `npm run honesty-audit` - Scan shipped surface for overclaim language (CI-enforced)
 - `npm run check-scoring-receipt` - Fail if a scoring-path file changed without a matching measurement receipt (CI-enforced)
 - `npm run measure-real` - Measure discrimination on the local real-script corpus (needs `REAL_SCRIPT_CORPUS_DIR`; not runnable in CI)
+- `npm run owner:measure` - The owner's one command for the whole real-corpus
+  measurement: it reads the branch order from
+  `docs/p1-benchmark/owner-measurement-plan.json` (checked against the owner
+  note by a test), runs the pre-flight, measures `main` and then each branch in
+  a detached worktree, converts each branch's PENDING measurement receipt,
+  re-locks the 72-row corpus manifest on acceptance, and locks
+  `tests/fixtures/auc24-table.json` — the artifact CI blocks on from
+  2026-10-01. Needs `REAL_SCRIPT_CORPUS_DIR`; refuses without it. Every log and
+  probe CSV it writes lands OUTSIDE the repository, because those files index
+  the corpus. `--plan` prints the order and the reason for every step and does
+  nothing; `--dry-run` runs it all and writes nothing; `--push` is off by
+  default so the owner reads the diff first.
 - `npm run discharge-obligations` - Run the measurements the receipt trail currently owes
 - `npm run gates` - Report which gates are asserted but not machine-verified
 - `npm run test:metamorphic` - Run the metamorphic scoring invariants (the `empty_verbosity` case is a documented known-failing witness)

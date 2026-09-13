@@ -132,10 +132,13 @@ export const GATES = [
       + 'the corpus-gated suite above — which means nowhere. The machinery is delivered '
       + 'and tested (tests/core/auc.test.ts, tests/scripts/lock-auc24.test.ts); what is '
       + 'missing is one owner-local run: '
-      + '`REAL_SCRIPT_CORPUS_DIR=/path/to/corpus npm run lock-auc24`, then commit '
-      + 'tests/fixtures/auc24-table.json. The values cannot be produced anywhere the '
-      + 'corpus is absent, and inventing them is the exact fabrication the table exists '
-      + 'to make expensive.',
+      + '`REAL_SCRIPT_CORPUS_DIR=/path/to/corpus npm run owner:measure`, which ends by '
+      + 'running lock-auc24 on the accepted tip (or on main if nothing was accepted — '
+      + 'the deadline is the TABLE, not the branches) and staging '
+      + 'tests/fixtures/auc24-table.json for you to commit. `npm run lock-auc24` alone '
+      + 'still does the lock and nothing else. The values cannot be produced anywhere '
+      + 'the corpus is absent, and inventing them is the exact fabrication the table '
+      + 'exists to make expensive.',
   },
   {
     env: 'REAL_SLOP_CORPUS_DIR',

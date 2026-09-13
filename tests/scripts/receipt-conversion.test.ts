@@ -15,7 +15,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ConversionError, PENDING_PHRASE_REWRITES, convertHeading, convertPendingEntries,
-  fieldParagraph, findEntries, formatEdits, retensePhrases,
+  fieldParagraph, findEntries, formatEdits, retensePhrases, rewriteFor,
 } from '../../scripts/lib/receipt-conversion.mjs';
 import { PENDING_PHRASES, extractEntries, pendingReason, validateEntry } from '../../scripts/check-scoring-receipt.mjs';
 
@@ -218,7 +218,7 @@ describe('the phrase table cannot drift from the gate', () => {
   it('every phrase the gate scans for has a rewrite', () => {
     for (const phrase of PENDING_PHRASES) {
       assert.ok(
-        PENDING_PHRASE_REWRITES[phrase],
+        rewriteFor(phrase),
         `the gate scans for "${phrase}" and the converter has no rewrite for it`,
       );
     }

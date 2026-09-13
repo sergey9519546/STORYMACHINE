@@ -16,6 +16,20 @@ ceasing to mean what it claims. If you need to migrate or rewrite fields on
 every entry (e.g. `scripts/migrate-corpus-ids.mjs`), map the array
 **in place**, one-to-one, preserving index order exactly.
 
+## There IS an automated re-lock now (2026-09-13)
+
+This file used to say there was none, and a hand edit over 72 rows is exactly
+where an accidental sort comes from. `scripts/lib/manifest-relock.mjs` is the
+automated one, run as a step of `npm run owner:measure`: it maps the array in
+place, BY INDEX, and `assertOrderPreserved` REFUSES any result whose row
+identities are not the same in the same positions — shown failing on a
+sorted array in `tests/scripts/manifest-relock.test.ts` before it is shown
+passing on an honest one. It moves `health`, `verdict` and `sceneCount` only;
+a row whose local bytes no longer hash to its locked `contentHash` is a
+different script, and the re-lock stops rather than quietly moving the floor's
+subset onto text nobody reviewed. A no-op re-lock reproduces this file's
+committed bytes exactly, which the same test pins.
+
 ## Schema note (see `docs/p1-benchmark/CORPUS_IDENTIFICATION.md`)
 
 As of this writing this manifest is still the **pre-migration** schema:

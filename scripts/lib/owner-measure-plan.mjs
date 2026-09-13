@@ -230,6 +230,10 @@ export function wrap(text, width = 76, indent = '      ') {
 /**
  * The printed plan: every step, whether it will run, and WHY — before
  * anything is done. `--plan` prints exactly this and exits.
+ *
+ * @param {Record<string, any>} plan
+ * @param {{ noteProblems?: string[] }} [opts]
+ * @returns {string}
  */
 export function formatPlan(plan, { noteProblems = [] } = {}) {
   const out = [];

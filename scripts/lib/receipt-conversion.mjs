@@ -70,6 +70,14 @@ export const PENDING_PHRASE_REWRITES = Object.freeze({
   'pending owner measurement': 'awaiting owner measurement as filed',
 });
 
+/** One phrase's rewrite, by phrase text. A function so callers (and this file)
+ *  need no index signature on the frozen table. */
+export function rewriteFor(phrase) {
+  return Object.prototype.hasOwnProperty.call(PENDING_PHRASE_REWRITES, phrase)
+    ? PENDING_PHRASE_REWRITES[phrase]
+    : undefined;
+}
+
 /** The fields a converted entry owes, in the order they are written. The four
  *  the gate REQUIRES are marked; `Measured AUC-24` is not required by the gate
  *  but is the whole point of the run, so it is filled too. */
@@ -165,7 +173,7 @@ export function retensePhrases(text) {
   let out = text;
   const hits = [];
   for (const phrase of PENDING_PHRASES) {
-    const replacement = PENDING_PHRASE_REWRITES[phrase];
+    const replacement = rewriteFor(phrase);
     if (!replacement) {
       throw new ConversionError(
         `the receipt gate knows a pending phrase this converter does not: "${phrase}". `
@@ -368,7 +376,7 @@ function convertEntry(lines, span, facts) {
     edits.push({
       scan: 'two (pending phrases, re-tensed)',
       before: hits.join(' · '),
-      after: hits.map((h) => PENDING_PHRASE_REWRITES[h.toLowerCase()] ?? '(re-tensed)').join(' · '),
+      after: hits.map((h) => rewriteFor(h.toLowerCase()) ?? '(re-tensed)').join(' · '),
     });
     const replacement = retensed.split('\n');
     out.splice(span.start + 1, end - (span.start + 1), ...replacement);
@@ -395,6 +403,10 @@ function lastFieldEnd(lines, start, end) {
  * `pendingReason` to decide which entries are pending and to verify the
  * result. Returns { text, converted: [{heading, edits}], unchanged: [...] }.
  *
+ * @param {string} receiptText
+ * @param {Record<string, unknown>} facts
+ * @param {{ only?: Set<string> | null }} [opts]  the headings the RANGE adds;
+ *        null converts every pending entry (used by tests, never by the CLI).
  * @throws ConversionError naming the entry AND the scan that still fails, when
  *         an entry cannot be closed mechanically. The caller prints that and
  *         does not commit — which is the whole contract: this either produces

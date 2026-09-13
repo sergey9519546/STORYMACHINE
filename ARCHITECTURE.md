@@ -271,6 +271,28 @@ deep-read and PDF routes are deliberately one-shot.
 | Human agreement / PMF | Unknown — not validated |
 | `draftRank` (2026-09-04) ranks against the reference set | No — it ranks against the writer's OWN saved snapshots of this one script (`src/lib/snapshot-trend.ts`'s `computeDraftRank`); an additive field alongside `healthPercentile`, computed client-side and passed through `POST /api/export/coverage-letter` and `POST /api/export/coverage` as display copy, never recomputed by `doctor.ts` |
 
+### The owner's measurement path (2026-09-13)
+
+The AUC-24 ratchet is measured on a corpus that cannot reach CI, so one step of
+the scoring trust contract is executed by a person on their own machine.
+`npm run owner:measure` (`scripts/owner-measure.mjs`) is that step as one
+command: it executes the order recorded in
+`docs/p1-benchmark/owner-measurement-plan.json` — the machine-readable half of
+the table in `docs/brain/Owner/Owner - R5 Measurement and Merge.md`, which
+`tests/scripts/owner-measure-plan.test.ts` fails if the two disagree — after a
+pre-flight that refuses without the corpus, verifies every recorded branch tip
+against the remote, and treats `measure-real`'s exit-0 SKIP banner as a
+failure. Each branch is measured in a detached worktree, its PENDING receipt
+entries are converted in place by `scripts/lib/receipt-conversion.mjs` (the
+three scans `check-scoring-receipt.mjs` runs, using that gate's own exported
+functions to verify the result), the 72-row manifest is re-locked IN PLACE by
+`scripts/lib/manifest-relock.mjs` only on acceptance, and `lock-auc24` writes
+the committed table last. Nothing that indexes the corpus enters the
+repository: tool output goes to a local directory outside it, and what travels
+into a receipt is numbers, hashes and a fingerprint.
+`tests/scripts/owner-measure-e2e.test.ts` runs the whole pipeline in CI against
+the 32 committed public screenplays.
+
 ### Cross-surface consistency (honesty-audit matrix, 2026-09-04)
 
 An adversarial audit drove every surface that shows `health`/`healthPercentile`/

@@ -209,8 +209,13 @@ function git(repoRoot, gitArgs, { allowFail = false } = {}) {
  * and `measure-real`'s log index the corpus, and a file under the repo is one
  * `git add -A` away from being published. The guard below is what makes that a
  * property rather than a convention.
+ *
+ * @param {string} repoRoot
+ * @param {{ override?: string | null, date?: string,
+ *           env?: Record<string, string | undefined>, home?: string }} [opts]
+ * @returns {string}
  */
-export function resolveOutDir(repoRoot, { override = null, date, env = process.env, home = os.homedir() } = {}) {
+export function resolveOutDir(repoRoot, { override = null, date = '', env = process.env, home = os.homedir() } = {}) {
   const base = override
     ? path.resolve(override)
     : path.join(
