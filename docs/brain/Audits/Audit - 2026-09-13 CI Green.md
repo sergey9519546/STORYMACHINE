@@ -166,6 +166,34 @@ runs the full suite or named files under it — added to
 `docs/LANE_STANDARD.md` §4 as the step a lane runs before claiming green, and
 to `ARCHITECTURE.md` §9 beside the existing CI/browser-suite paragraph.
 
+**Round 2 (independent review, REVISE 4):** the diagnosis and both root
+causes held, but round 1's `refExists()` fix was pinned by no test — its own
+test hardening (`baseGuardEnv()`) had stripped the only condition that ever
+exercised the bug, so reverting the one-line fix left the file 24/24 green.
+The SAME fix also opened a new silent-pass: making "before present,
+non-zero, unresolvable" reachable in `resolveDefaultRange()`'s push branch
+for the first time (previously such a SHA always read as existing, so the
+guard either used it or crashed loudly) left that branch falling through to
+`origin/main...HEAD` — the same commit twice, diffing nothing — for a real
+unreceipted `doctor.ts` change with an unresolvable wired `before`: exit 1
+(red) became exit 0 (green, nothing checked). The reviewer's exposure
+statement is the corrected record: the OLD bug could never let an
+unreceipted change through CI (an uncaught exception is exit 1 on a
+blocking step, and `PUSH_BEFORE_SHA` + `fetch-depth: 0` guarantee a real SHA
+in the actual receipt step) — its exposure was diagnostic and a permanently
+red job. Round 1's report should have said this and did not. Fixed: two
+fail-first tests pin both `refExists()` (a deliberately-set, not leaked,
+`GITHUB_EVENT_PATH` with an absent 40-hex `before`) and the fall-through (a
+real push repo with an unreceipted change and an unresolvable `before`, now
+correctly exiting 1 with "NO BASE REF" instead of exit 0 "OK"); `test:ci-env`
+now subtracts `GEMINI_API_KEY`/`REAL_SCRIPT_CORPUS_DIR`/
+`HONESTY_AUDIT_REPO`/`GITHUB_TOKEN`/`GH_TOKEN` (each with its own reason)
+rather than replicating by addition alone; and the file's own
+`NODE_TEST_CONTEXT` poison-test spawn, twenty lines from the round-1 fix,
+now builds from `CLEAN_GATE_ENV` instead of `process.env` too. A full audit
+of every `spawn`/`exec` call site in `tests/` (18 files) is in the lane
+report's Round 2 section, each with a disposition.
+
 **Related:** [[Patterns]] (a check whose enforcement depends on an
 environment nobody actually runs it in is not enforcing anything — the same
 principle as the `ci-concurrency` and `voice-bound-ci-derivation` lanes

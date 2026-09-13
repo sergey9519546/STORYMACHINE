@@ -657,10 +657,17 @@ describe('floor liveness — check (5): the mutation run', () => {
     // runSuiteDefault now deletes NODE_TEST_CONTEXT from the child env and pins
     // `--test-reporter=tap`. This drives the poisoned environment directly, so the
     // trap cannot come back silently.
+    // Built from CLEAN_GATE_ENV (2026-09-13 round 2, review finding 4), not
+    // `...process.env` directly: this file's OWN module-level REPORTER_OUTPUT
+    // build strips every GATES[].env key for exactly this reason, and a
+    // second execFileSync twenty lines from that fix that still spread the
+    // raw env would inherit the runner's RUN_E2E the same way — inert only
+    // by the accident that this test's assertions read the `[RAN]`/mutation
+    // lines rather than the `[SKIPPED]` section the leak actually corrupts.
     const poisoned = execFileSync('node', [SCRIPT], {
       cwd: REPO_ROOT,
       encoding: 'utf8',
-      env: { ...process.env, NODE_TEST_CONTEXT: 'child-v8' },
+      env: { ...CLEAN_GATE_ENV, NODE_TEST_CONTEXT: 'child-v8' },
     });
     assert.match(
       poisoned,

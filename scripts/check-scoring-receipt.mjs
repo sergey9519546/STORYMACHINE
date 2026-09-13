@@ -334,16 +334,34 @@ function pushEventBeforeSha() {
  *
  *  Local: diff against whichever of origin/main / main exists, so uncommitted
  *  work is included (a dev wants to know before committing, not after). Last
- *  resort: the previous commit. Returns null only when nothing resolves — a
- *  brand-new repo, or a first push that creates a branch with the all-zeros
- *  `before` sentinel AND no origin/main to fall back on. Callers treat null as
- *  "no base to compare against"; it is announced loudly rather than passed off
- *  as a clean result. */
+ *  resort: the previous commit. Returns null when nothing resolves — a
+ *  brand-new repo; a first push that creates a branch with the all-zeros
+ *  `before` sentinel AND no origin/main to fall back on; OR (2026-09-13
+ *  round 2) a `push` event whose `before` is present, non-zero, and does NOT
+ *  resolve in this checkout — a stale `PUSH_BEFORE_SHA` wired from a
+ *  different workflow, a `fetch-depth` regression, a force-push after a `git
+ *  gc`. That last case is deliberately NOT allowed to fall through to
+ *  `origin/main...HEAD`: on a push to main that range names the same commit
+ *  TWICE and diffs nothing, so falling through would print "no scoring-path
+ *  files changed. OK." for a range that was never actually diffed — exactly
+ *  the ~182-run blind spot this file exists to close, now reached by the
+ *  highest-stakes input there is (a real push's own recorded `before`).
+ *  Reviewer finding 2 (`docs/audits/2026-09-13-ci-green/ci-env-review.md`):
+ *  before this file's `refExists()` fix, a non-zero 40-hex `before` could
+ *  never reach this fall-through at all (the pre-fix `refExists()` always
+ *  reported such a SHA as existing, so `resolveDefaultRange()` either used it
+ *  or the whole script crashed with an uncaught exception — exit 1 either
+ *  way). Fixing `refExists()` to actually check the object database made
+ *  "unresolvable" a reachable state for the first time, and reaching it must
+ *  fail as loudly as "no base ref at all", never silently as "nothing
+ *  changed". Callers treat null as "no base to compare against"; it is
+ *  announced loudly rather than passed off as a clean result. */
 function resolveDefaultRange() {
   if (process.env.CI) {
     if (process.env.GITHUB_EVENT_NAME === 'push') {
       const before = pushEventBeforeSha();
-      if (before && !ZERO_SHA_RE.test(before) && refExists(before)) {
+      if (before && !ZERO_SHA_RE.test(before)) {
+        if (!refExists(before)) return null;
         const head = process.env.GITHUB_SHA && refExists(process.env.GITHUB_SHA)
           ? process.env.GITHUB_SHA
           : 'HEAD';

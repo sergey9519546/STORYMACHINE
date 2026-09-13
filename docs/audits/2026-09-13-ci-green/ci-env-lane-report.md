@@ -4,10 +4,14 @@ Worktree: `/home/user/wt-cienv`. Branch: `lane/ci-env-failures`, from `main`
 @ `030782e2` (fast-forwarded onto `origin/main` @ `32fa44f6` mid-lane, once it
 was confirmed the concurrently-landed `ci-concurrency` and
 `palette-close-race` lanes touch none of the files this lane changes — see §4).
+Round 1 tip: `156a1ca6`. Round 2 tip: see the `Tip:` line the lane's final
+message reports (round 2's own commit is the tip, so it cannot name its own
+SHA in advance).
 
 ```
 $ git log --oneline main..HEAD
-<this lane's commit(s) — see the final message's Tip line>
+156a1ca6 fix(ci): replicate the GitHub Actions runner env to catch two test-only env leaks
+<round 2's commit, addressing docs/audits/2026-09-13-ci-green/ci-env-review.md>
 ```
 
 ## 1. What the thing IS
@@ -255,3 +259,192 @@ transcript above is the durable record per §7 of this file).
 
 No full `npm test` run (per the brief's GATES line — the orchestrator runs it
 at merge).
+
+---
+
+## Round 2
+
+Independent review at `docs/audits/2026-09-13-ci-green/ci-env-review.md`
+(reviewed object `156a1ca6`) returned **REVISE, 4 items**. The reviewer's
+exposure statement is recorded here as the correct account, replacing this
+lane's own round-1 framing where the two differ:
+
+**The old `refExists()` hole could NOT let an unreceipted scoring-path
+change through CI.** `getChangedFiles()` re-threw the `git diff` failure out
+of `main()` uncaught; an uncaught exception exits 1, and the
+`Scoring-path change requires a measurement receipt` step in `ci.yml` is
+blocking. The range never silently became empty — it was never diffed at
+all. So the old bug's real exposure was (i) diagnostic (a raw stack trace
+instead of the guard's own "NO BASE REF … FAILING because CI is set"
+message) and (ii) a permanently red test job on every push since CI
+resumed — not a hole an unreceipted change could ship through. In the real
+CI receipt step the hole was inert regardless: `PUSH_BEFORE_SHA` is wired
+from `github.event.before` and `fetch-depth: 0` guarantees that object is
+present, so `refExists()` was only ever asked about a SHA that genuinely
+existed. **Round 1's report did not say this, and should have** — it framed
+the bug as "a real, environment-independent bug" without stating plainly
+that it could not have shipped an unreceipted change. Item 2 below is the
+one exposure that runs the other way (a real, if narrower, silent-pass risk
+this lane's own fix — round 1's `refExists()` change — introduced).
+
+### 1. Pinned `refExists()` with a fail-first test (HIGH)
+
+Round 1's `baseGuardEnv()` hardening stripped the only condition
+(`GITHUB_EVENT_PATH`) that had ever exercised the bug, so with round 1's
+production line reverted (`${ref}^{commit}` → `ref`) and everything else
+kept, the file was 24/24 green — the reviewer's exact reproduction, verified
+independently here first:
+
+```
+$ node --experimental-strip-types --test tests/core/scoring-receipt-guard.test.ts   # ^{commit} reverted
+# tests 26 / # pass 26 / # fail 0
+```
+
+(26, not the reviewer's 24, because round 2 had already added two new tests
+by the time this was run — see below; both included, both green on the
+reverted line, which is itself the bug this section fixes.)
+
+Added `tests/core/scoring-receipt-guard.test.ts`: "a syntactically valid but
+ABSENT 40-hex `before` fails loudly instead of being treated as real" — sets
+`GITHUB_EVENT_PATH` **deliberately** (via `runGuard()`, not by leakage) to a
+payload whose `before` is `1439ca5c800d3e72d3fa4d7a375952789b3afe35` (a real,
+syntactically valid SHA absent from the throwaway orphan repo), and asserts
+`NO BASE REF` / `FAILING because CI is set`, exit 1, and — critically — that
+stderr does NOT contain `Invalid revision range` or `git diff failed`
+(the old crash's signature, which is also exit 1 and would otherwise let a
+wrong-reason pass slip through an exit-code-only assertion).
+
+```
+$ node --experimental-strip-types --test tests/core/scoring-receipt-guard.test.ts   # fixed tree
+# tests 26 / # pass 26 / # fail 0
+
+# refExists()'s `git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`])`
+# reverted, in place, to the pre-round-1 `git(['rev-parse', '--verify', '--quiet', ref])`:
+$ node --experimental-strip-types --test tests/core/scoring-receipt-guard.test.ts
+not ok 8 - a syntactically valid but ABSENT 40-hex `before` fails loudly …
+not ok 9 - an unresolvable non-zero `before` never falls through …
+not ok 3 - measurement-receipt guard — push-event range
+# tests 26 / # pass 24 / # fail 2
+```
+
+Exactly the two new tests fail, nothing else — the fix is now pinned. (The
+tree was restored from a pre-edit backup immediately after each fail-first
+run below, verified back to 26/26 before moving to the next item.)
+
+### 2. Closed the `origin/main...HEAD` silent-pass for an unresolvable `before` (HIGH)
+
+`resolveDefaultRange()`'s push branch used to fall through, when
+`refExists(before)` was false, straight to the next candidate
+(`origin/main...HEAD`, which on a push to `main` names the same commit twice
+and diffs nothing). Before round 1, a non-zero 40-hex `before` could never
+reach that fall-through — the pre-fix `refExists()` always reported it as
+existing, so the guard either used it or crashed loudly. Round 1's own fix
+made "unresolvable" reachable for the first time, and left it falling
+through silently: a real push carrying an unreceipted `doctor.ts` change,
+whose wired `before` cannot be resolved (a stale `PUSH_BEFORE_SHA`, a
+`fetch-depth` regression, a force-push after `git gc`), would print
+`no scoring-path files changed. OK.` and exit 0.
+
+Fix: `resolveDefaultRange()`'s push branch now returns `null` (the same "no
+base to compare against" signal as "no base ref at all") the moment `before`
+is present, non-zero, and unresolvable — it never reaches the
+`origin/main...HEAD` candidate. Added
+`tests/core/scoring-receipt-guard.test.ts`: "an unresolvable non-zero
+`before` never falls through to origin/main...HEAD" — a real push repo
+(`makePushRepo`) carrying an unreceipted `doctor.ts` change, with
+`GITHUB_EVENT_PATH` wired to a `before` that is valid-hex but absent from
+that repo. Fail-first, isolated from item 1 by reverting ONLY the new
+`if (!refExists(before)) return null;` line back to the round-1 shape
+(`if (before && !ZERO_SHA_RE.test(before) && refExists(before)) { … }` with
+no early return), keeping `${ref}^{commit}` intact:
+
+```
+$ node --experimental-strip-types --test tests/core/scoring-receipt-guard.test.ts   # only item 2's line reverted
+not ok 9 - an unresolvable non-zero `before` never falls through …
+# tests 26 / # pass 25 / # fail 1        # item 1's test stays green — isolated correctly
+```
+
+Fixed tree: 26/26. The all-zeros first-push sentinel is untouched (still
+falls through leniently — "falls back to origin/main...HEAD on the all-zeros
+first-push sentinel" is unchanged and still green, pinning the other
+direction the review asked for).
+
+### 3. `test:ci-env` now subtracts as well as adds (MEDIUM)
+
+`scripts/test-ci-env.mjs` gained `DELETE_FROM_RUNNER_ENV`, a keyed map
+(`PUSH_BEFORE_SHA`, `GEMINI_API_KEY`, `REAL_SCRIPT_CORPUS_DIR`,
+`HONESTY_AUDIT_REPO`, `GITHUB_TOKEN`, `GH_TOKEN`) each with the one-line
+reason ci.yml's "Run tests" step does not carry it, applied after the
+additive `GITHUB_*`/`RUNNER_*` block. The tool now prints which of these it
+actually removed from the caller's shell:
+
+```
+$ node scripts/test-ci-env.mjs tests/core/scoring-receipt-guard.test.ts
+test:ci-env — replicating the GitHub Actions push-to-main runner env
+  before=156a1ca67f76 after=0ef8a2993c41 ref=refs/heads/lane/ci-env-failures
+  event payload: /tmp/ci-env-repro-…/event.json
+  removed from the caller's env (the runner does not carry these): GITHUB_TOKEN, GH_TOKEN
+  running 1 file(s)
+```
+
+`GITHUB_TOKEN`/`GH_TOKEN` present and removed, live, in this very sandbox —
+the reviewer's exact finding, confirmed rather than merely fixed on paper.
+Also (finding 6, low, folded in since it was cheap): the scratch directory
+is now removed in a `finally` block (`ls /tmp` after a run shows nothing
+left behind, confirmed), and a detached-HEAD checkout no longer produces
+`GITHUB_REF=refs/heads/<40-hex-sha>` — a shape Actions never emits — falling
+back to `refs/heads/main` instead, since this tool always simulates a push
+to main.
+
+### 4. Closed the same-class site 20 lines from the fix (MEDIUM)
+
+`tests/scripts/report-unverified-gates.test.ts`'s `NODE_TEST_CONTEXT`
+poison-test spawn now builds from `CLEAN_GATE_ENV` (already defined for
+`REPORTER_OUTPUT`, twenty lines above) instead of `{ ...process.env,
+NODE_TEST_CONTEXT: 'child-v8' }`. Confirmed still green, both plain and
+under a leaked `RUN_E2E=1` (it was inert either way — its own assertions
+read the `[RAN]`/mutation lines, not the `[SKIPPED]` section the leak
+actually corrupts — which is exactly why it needed a human, not a failing
+test, to catch it; a fail-first pin was not attempted for this one, per the
+review's own framing of it as "the cheapest possible" class-closure, not a
+live bug).
+
+**Full spawn/exec audit of `tests/`** (`grep -rln -E
+"spawnSync\(|execFileSync\(|execSync\(|\bspawn\(" tests/`, 18 files —
+matches the reviewer's count), each verified independently and given a
+disposition:
+
+| file | disposition |
+|---|---|
+| `tests/core/scoring-receipt-guard.test.ts` | fixed this lane (`baseGuardEnv()`, round 1) |
+| `tests/scripts/report-unverified-gates.test.ts` | fixed this lane (`CLEAN_GATE_ENV`, rounds 1 and 2) |
+| `tests/core/check-scoring-receipt.test.ts:94` (`{ ...process.env, CI: '' }`) | spawns the **same guard**; inert only because every call site here passes an explicit range argument, so `resolveDefaultRange()` (the function this lane's whole fix lives in) is never reached. One range-less call away from the same class — noted, not fixed; out of this lane's scope (the file is untouched by either the brief or the review's VERDICT items) |
+| `tests/core/honesty-audit-claims.test.ts:35` (`spawnSync('node', [SCRIPT], { cwd })`, no `env`) | inert because `HONESTY_AUDIT_REPO` is not ambient in "Run tests"; `GITHUB_TOKEN` IS ambient in this sandbox (confirmed by item 3's removal list above), so the repo-metadata lane of a spawned honesty-audit run is one branch condition away from hitting the network under a unit test's label — noted, not fixed; out of scope |
+| `scripts/report-unverified-gates.mjs:459` (`runSuiteDefault`) | production code, not a test; spreads `process.env` and deletes only `NODE_TEST_CONTEXT` — same shape, already carries the precedent comment explaining why subtraction matters; out of scope (not a test-env leak, and not named in the review's VERDICT items) |
+| `tests/core/build-info.test.ts` | explicit `env: { ...process.env, GIT_SHA: <value> }` per call — GIT_SHA is exactly the variable under test; no ambient leak risk beyond what each assertion already controls |
+| `tests/core/doctor-analysis-budget.test.ts:658`, `tests/security/fountain-shape-guard-cue-parity.test.ts:289` | `execFileSync('git', ['ls-files', …])`, no `env` — plain repo enumeration, reads no `GITHUB_*`/`RUN_E2E` |
+| `tests/core/shape-rhythm-panel-copy.test.ts:138`, `tests/core/structural-signal-precision-consistency.test.ts:364` | `spawnSync('grep', […])`, no `env` — static-analysis greps over `src`/`server`, read no environment at all |
+| `tests/core/public-benchmark-limits.test.ts`, `tests/core/rebuild-experiment.test.ts`, `tests/scripts/verify-report.test.ts`, `tests/scripts/vite-cache-dir.test.ts`, `tests/scripts/owner-measure-e2e.test.ts`, `tests/core/rate-limit-verification-override.test.ts`, `tests/core/runtime-limits.test.ts`, `tests/e2e/journeys.test.ts`, `tests/routes/rotation-child-server.ts` | inherit the caller's env (several via `{ ...process.env, ... }`, several via omitting `env`), but the target scripts they drive (`rebuild-experiment.mjs`, `verify-report.mjs`, the vite-cache CLI, `owner-measure.mjs`, the rate-limit/runtime-limit route code, the E2E server, the rotation child) read no `GITHUB_*`/`RUN_E2E`/`CI` env var ambiently set by "Run tests" — verified by grepping each target's own `process.env` reads. Latent, not live; unchanged by this lane |
+
+None of the "noted, not fixed" rows block: the runner's own TAP named
+exactly two red files, both are green now under the replicated env, and
+`npm run test:ci-env` is the standing instrument for anything in this list
+that later turns live.
+
+### Gates, round 2
+
+| gate | result |
+|---|---|
+| `tests/core/scoring-receipt-guard.test.ts`, plain env | 26/26 |
+| `tests/core/scoring-receipt-guard.test.ts`, `npm run test:ci-env` | 26/26 |
+| `tests/core/scoring-receipt-guard.test.ts`, `${ref}^{commit}` reverted (item 1 fail-first) | 24/26 — exactly the two new tests + their parent suite red |
+| `tests/core/scoring-receipt-guard.test.ts`, only item 2's `return null` line reverted (item 2 fail-first, item 1 kept) | 25/26 — exactly one new test red |
+| `tests/scripts/report-unverified-gates.test.ts`, plain env | 42/42 |
+| `tests/scripts/report-unverified-gates.test.ts`, `RUN_E2E=1` | 42/42 |
+| both files together, `npm run test:ci-env` | 68/68 |
+| `npm run lint` | exit 0 |
+| `npm run check-docs` | exit 0 |
+| `npm run honesty-audit` | exit 0 |
+| `node scripts/check-scoring-receipt.mjs main..HEAD` | exit 0 — no scoring-path files changed |
+
+No full `npm test` (per the coordinator's round-2 cost rule).

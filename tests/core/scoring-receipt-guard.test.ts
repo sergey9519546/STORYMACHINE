@@ -679,6 +679,85 @@ describe('measurement-receipt guard — push-event range', () => {
     }
   });
 
+  // 2026-09-13 round 2 (docs/audits/2026-09-13-ci-green/ci-env-review.md
+  // finding 1): the round-1 fix to refExists() — verifying `${ref}^{commit}`
+  // instead of bare `ref` — was pinned by NOTHING. Every other test in this
+  // file that could exercise a push-event `before` sets one that either is
+  // real (makePushRepo's own `before`) or is the all-zeros sentinel;
+  // baseGuardEnv() (round 1's own hardening) strips the outer GITHUB_EVENT_PATH
+  // that used to leak a real-but-locally-absent SHA in. With round 1's
+  // production line reverted (`${ref}^{commit}` -> `ref`) and everything else
+  // kept, this file was 24/24 green. This test sets GITHUB_EVENT_PATH
+  // DELIBERATELY (not via leakage) to a payload whose `before` is a
+  // syntactically valid, 40-hex SHA that is not any object in this throwaway
+  // repo — the exact shape `git rev-parse --verify --quiet <sha>` accepts
+  // without checking the object database.
+  it('a syntactically valid but ABSENT 40-hex `before` fails loudly instead of being treated as real — pins refExists() against the rev-parse --verify quirk', () => {
+    const dir = makeOrphanRepo();
+    const eventPath = path.join(dir, 'event.json');
+    const absentSha = '1439ca5c800d3e72d3fa4d7a375952789b3afe35';
+    fs.writeFileSync(eventPath, JSON.stringify({ before: absentSha, after: absentSha }));
+    try {
+      const r = runGuard(dir, {
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_EVENT_PATH: eventPath,
+        PUSH_BEFORE_SHA: '',
+      });
+      assert.equal(
+        r.status,
+        1,
+        `an absent-but-syntactically-valid before must fail loudly.\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+      );
+      assert.match(r.stderr, /NO BASE REF/, 'must take the NO BASE REF path, not crash on an invalid git range');
+      assert.match(r.stderr, /FAILING because CI is set/);
+      assert.doesNotMatch(
+        r.stderr,
+        /Invalid revision range|git diff failed/,
+        'must never reach getChangedFiles with a range built from a SHA that was never actually verified',
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // 2026-09-13 round 2, finding 2: fixing refExists() made "before present,
+  // non-zero, unresolvable" reachable in resolveDefaultRange() for the first
+  // time (pre-fix, such a SHA always read as "exists", so the guard either
+  // used it or crashed — exit 1 either way). The push branch used to fall
+  // through, on that condition, to `origin/main...HEAD` — which on a push to
+  // main names the same commit twice and diffs NOTHING, silently passing a
+  // real unreceipted scoring change. This drives that exact shape: a real
+  // push repo carrying an unreceipted doctor.ts change, whose WIRED `before`
+  // (as if from a stale PUSH_BEFORE_SHA or a different workflow's event) does
+  // not resolve here.
+  it('an unresolvable non-zero `before` never falls through to origin/main...HEAD — a real unreceipted change must not go green silently', () => {
+    const { dir, after } = makePushRepo({ doctorBody: 'export const health = 21;\n' });
+    const eventPath = path.join(dir, 'event.json');
+    const staleBefore = '2222222222222222222222222222222222222222';
+    fs.writeFileSync(eventPath, JSON.stringify({ before: staleBefore, after }));
+    try {
+      const r = runGuard(dir, {
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_EVENT_PATH: eventPath,
+        PUSH_BEFORE_SHA: '',
+        GITHUB_SHA: after,
+      });
+      assert.equal(
+        r.status,
+        1,
+        `an unresolvable before must fail loudly, never silently pass an undiffed push.\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+      );
+      assert.match(r.stderr, /NO BASE REF/);
+      assert.doesNotMatch(
+        r.stdout,
+        /no scoring-path files changed\. OK\./,
+        'must never claim the unreceipted doctor.ts change was checked when the wired before could not be diffed',
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // 2026-09-02: the guard used to print "This is not a pass; it is an absent
   // check" and then exit 0 — including under CI. A shallow or misconfigured
   // checkout therefore rendered as a green build, which is the exact shape of

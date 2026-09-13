@@ -20,14 +20,20 @@
 // about the runner. Full writeup, both root causes, and the fix:
 // docs/audits/2026-09-13-ci-green/ci-env-lane-report.md.
 //
-// WHAT THIS DOES: sets every GITHUB_*/RUNNER_*/CI env var Actions sets on a
-// push to main (see the list below, matched against a real ci.yml run) plus
-// the "Run tests" step's own RUN_E2E/GIT_SHA, points GITHUB_EVENT_PATH at a
-// real push-shaped event.json built from this repo's own last two commits,
-// and then runs the suite exactly as `npm test` does (scripts/run-tests.mjs,
-// which inherits this process's env) — or, with file arguments, runs just
-// those files via `node --experimental-strip-types --test <files>`, the same
-// way `npm test` invokes them, so a lane can check the one file it touched in
+// WHAT THIS DOES: replicates the runner's env by ADDITION AND SUBTRACTION,
+// not addition alone (round-2 review finding 3 — addition-only left
+// GEMINI_API_KEY/REAL_SCRIPT_CORPUS_DIR/HONESTY_AUDIT_REPO/GITHUB_TOKEN
+// leaking through from whatever shell ran this tool, none of which the real
+// "Run tests" step carries). It sets every GITHUB_*/RUNNER_*/CI env var
+// Actions sets on a push to main (see the list below, matched against a real
+// ci.yml run) plus the "Run tests" step's own RUN_E2E/GIT_SHA, points
+// GITHUB_EVENT_PATH at a real push-shaped event.json built from this repo's
+// own last two commits, DELETES every var the real step does not carry
+// (DELETE_FROM_RUNNER_ENV below, each with its own reason), and then runs
+// the suite exactly as `npm test` does (scripts/run-tests.mjs, which
+// inherits this process's env) — or, with file arguments, runs just those
+// files via `node --experimental-strip-types --test <files>`, the same way
+// `npm test` invokes them, so a lane can check the one file it touched in
 // seconds instead of paying for the full suite.
 //
 // WHAT THIS DELIBERATELY DOES NOT DO: detach HEAD or run from a scratch
@@ -54,7 +60,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -74,13 +80,19 @@ function resolveRef(rev) {
 
 const after = git(['rev-parse', 'HEAD']);
 const before = resolveRef('HEAD~1') ?? '0'.repeat(40); // all-zeros: this commit created the ref
-let refName;
+// This tool never detaches HEAD itself (see the header), so `branch` is
+// normally a real branch name. A detached checkout (or a failed lookup) has
+// no branch name to report; fall back to `main`, since a push event's
+// GITHUB_REF is always `refs/heads/<something>` and this tool otherwise
+// simulates a push to main — never the raw commit SHA Actions never puts
+// there (round-2 review finding 6).
+let branch;
 try {
-  const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
-  refName = branch === 'HEAD' ? after : `refs/heads/${branch}`;
+  branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
 } catch {
-  refName = after;
+  branch = 'HEAD';
 }
+const refName = `refs/heads/${branch === 'HEAD' ? 'main' : branch}`;
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'ci-env-repro-'));
 const eventPath = path.join(scratch, 'event.json');
@@ -127,31 +139,70 @@ const ciEnv = {
   RUN_E2E: '1',
   GIT_SHA: after,
 };
-// PUSH_BEFORE_SHA is deliberately NOT set: it is wired only into the
-// separate "Report unverified gates" / check-scoring-receipt CI steps, never
-// into "Run tests" — leaving it unset here is what makes the runner's real
-// leak (GITHUB_EVENT_PATH, not PUSH_BEFORE_SHA) reproducible.
-delete ciEnv.PUSH_BEFORE_SHA;
+// The runner's "Run tests" step is defined as much by what it does NOT
+// carry as by what it does (round-2 review finding 3: replicating by
+// addition alone left every one of these leaking through from whatever
+// shell this tool happens to run in, so a green run here proved less than
+// the tool's own name claimed). Each is deleted, with the reason it is
+// absent on the real runner:
+const DELETE_FROM_RUNNER_ENV = {
+  PUSH_BEFORE_SHA:
+    'wired only into the separate "Report unverified gates" / '
+    + 'check-scoring-receipt CI steps, never into "Run tests" — leaving it '
+    + 'unset here is what makes the runner\'s real leak (GITHUB_EVENT_PATH, '
+    + 'not PUSH_BEFORE_SHA) reproducible.',
+  GEMINI_API_KEY:
+    'ci.yml omits it deliberately for the "Run tests" step — the product\'s '
+    + 'official keyless analysis-only mode is what CI must prove. A developer '
+    + 'with a key in their shell runs a strictly different, untested posture '
+    + 'if this leaks through.',
+  REAL_SCRIPT_CORPUS_DIR:
+    'set nowhere in .github/ (CLAUDE.md is explicit — this is why the AUC-24 '
+    + 'live-measurement suite has never run in CI). On the owner\'s own '
+    + 'machine — the one machine where this IS set, and the machine most '
+    + 'likely to run this tool before a push — leaving it in would run the '
+    + 'real-corpus suite under a "CI" label that never runs it for real.',
+  HONESTY_AUDIT_REPO:
+    'set only on ci.yml\'s dedicated "Honesty string audit" step, not on '
+    + '"Run tests" — leaving it in makes the repo-metadata lane of a spawned '
+    + 'honesty-audit run under a label that never carries it.',
+  GITHUB_TOKEN:
+    'set ambiently in interactive/agent shells (this very sandbox included) '
+    + 'but only wired into ci.yml\'s honesty-audit step, not "Run tests" — '
+    + 'leaking it through here is one env var away from a spawned test '
+    + 'hitting the network under a label that claims no such credential.',
+  GH_TOKEN: 'the gh-cli equivalent of GITHUB_TOKEN above; same reason.',
+};
+const removed = Object.keys(DELETE_FROM_RUNNER_ENV).filter((k) => k in process.env);
+for (const key of Object.keys(DELETE_FROM_RUNNER_ENV)) delete ciEnv[key];
 
 const fileArgs = process.argv.slice(2);
 
 console.log(`test:ci-env — replicating the GitHub Actions push-to-main runner env`);
 console.log(`  before=${before.slice(0, 12)} after=${after.slice(0, 12)} ref=${refName}`);
 console.log(`  event payload: ${eventPath}`);
+if (removed.length > 0) {
+  console.log(`  removed from the caller's env (the runner does not carry these): ${removed.join(', ')}`);
+}
 console.log(fileArgs.length > 0 ? `  running ${fileArgs.length} file(s)` : '  running the full suite (scripts/run-tests.mjs)');
 console.log('');
 
-const result = fileArgs.length > 0
-  ? spawnSync(process.execPath, ['--experimental-strip-types', '--test', ...fileArgs], {
-      cwd: REPO_ROOT,
-      stdio: 'inherit',
-      env: ciEnv,
-    })
-  : spawnSync(process.execPath, ['scripts/run-tests.mjs'], {
-      cwd: REPO_ROOT,
-      stdio: 'inherit',
-      env: ciEnv,
-    });
+let result;
+try {
+  result = fileArgs.length > 0
+    ? spawnSync(process.execPath, ['--experimental-strip-types', '--test', ...fileArgs], {
+        cwd: REPO_ROOT,
+        stdio: 'inherit',
+        env: ciEnv,
+      })
+    : spawnSync(process.execPath, ['scripts/run-tests.mjs'], {
+        cwd: REPO_ROOT,
+        stdio: 'inherit',
+        env: ciEnv,
+      });
+} finally {
+  rmSync(scratch, { recursive: true, force: true });
+}
 
 if (result.error) throw result.error;
 process.exit(result.status ?? 1);
