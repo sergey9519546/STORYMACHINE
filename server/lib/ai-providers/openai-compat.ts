@@ -523,6 +523,7 @@ export function makeOpenAICompatLLMProvider(cfg: {
         body.max_tokens = Math.floor(maxOut);
       }
 
+      const startedAt = Date.now();
       const res = await fetchOpenAICompat(`${cfg.baseURL}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -581,6 +582,22 @@ export function makeOpenAICompatLLMProvider(cfg: {
           completionTokens: data.usage?.completion_tokens ?? 0,
         });
       }
+
+      // PER-CALL RECORD (story-bench lane, 2026-09-13). metrics.recordAiCall()
+      // already aggregates latency and tokens, but it buckets by CALL-SITE
+      // CATEGORY and keeps no model identity, so it cannot answer the one
+      // question a generation run has to answer: which model produced this
+      // text, how long did it take, and what did it cost. One structured line
+      // per completion; `npm run story:bench` parses these out of the server's
+      // own log stream rather than instrumenting a second code path.
+      logger.info('openai_compat_call', {
+        model: String(params.model ?? '(unset)'),
+        ms: Date.now() - startedAt,
+        promptTokens: data.usage?.prompt_tokens ?? 0,
+        completionTokens: data.usage?.completion_tokens ?? 0,
+        completionChars: text.length,
+        finishReason: choice?.finish_reason ?? '(none)',
+      });
 
       // RESPONSE SHAPE. Callers in this repository read BOTH shapes: the engine
       // seam's own helpers read `.text`, while server/nvm/revision/rewrite-llm.ts

@@ -337,6 +337,35 @@ exposure** to NVM/converge/twin/simulation jargon; time-to-first-report is
 measured. — The gating is complete; time-to-first-report measurement landed
 with P3's instrumentation (`first_report` → `avgTimeToFirstReportMs`).
 
+**Amendment 2026-09-13 — generation quality becomes a first-class, MEASURED
+track (owner direction).** The owner's instruction that day was to work mainly
+on "the storymachine ability to actually generate good and quality stories that
+people will value and be entertained by." Decision #3 gated the generative
+surface precisely because nothing measured it; this amendment does not reopen
+that gate, it starts building the thing the gate is waiting for. **The Labs
+gate stays exactly as Decision #3 set it, and its condition for re-promotion —
+roughly 30 cases, a rubric, at least two scorers, a pinned model, running in
+CI — is unchanged and unmet.** What is new is that generation now has an
+instrument and a standing measurement, rather than an open question:
+
+- `npm run story:bench` (`scripts/story-bench.mjs`) drives the existing
+  pipeline end to end over six committed premises and writes down, per run,
+  every LLM call's model, latency and tokens, every fallback, the compiled and
+  final Fountain, and the doctor's deterministic score. A run in which every
+  revision pass fell back to the unchanged draft is labelled FAILED, not
+  reported as a story.
+- `npm run story:bench -- --packet` assembles those scripts into one reading
+  packet with a five-question rubric and a blank score grid. That packet is
+  the SEED of Decision #3's golden set — six cases of about thirty, one
+  scorer of at least two. It satisfies nothing on its own.
+- The bench generates, so it needs a key and it is NOT part of `npm test` and
+  has no CI step. It makes no quality claim anywhere; the doctor's health
+  score on a generated script measures that script's STRUCTURE, and neither it
+  nor anything else in this repository can see whether a story is interesting.
+- Method, the first run's table, and two honest readings:
+  `docs/story-generation/STORY_BENCH_2026-09-13.md`. The decision record is
+  `docs/DECISION_LOG.md` Decision #8.
+
 ### P3 — Ship the shareable, verifiable coverage report (the growth loop) ✅
 
 **Status (2026-07-29):** DONE. Every exported report now publishes the claims
@@ -427,6 +456,15 @@ real, quiet, and shareable does revision history become valuable.
 - Auth + accounts (currently a deploy blocker per docs/AUTH.md, not yet a product gap).
 
 **Exit gate:** Returning-user rate and multi-revision session rate are measured.
+
+**Amendment 2026-09-13 — where the generation track sits in this sequence.**
+The generation-quality track added under P2 above is **not** a new P5 and does
+not move ahead of P0/P1. It belongs here in spirit — a writer comes back for
+output they value — but it is sequenced as an evidence lane that runs in
+parallel, on the same footing Decision #2 gave P0: it produces measurements
+and a human-scored packet, and it changes no user-visible surface until
+Decision #3's condition is met. Nothing in it raises, lowers or re-points any
+scoring floor; `check-scoring-receipt` reports no scoring-path file touched.
 
 ---
 

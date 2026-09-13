@@ -1,0 +1,138 @@
+{
+  "_readme": [
+    "Six premises for `npm run story:bench` (scripts/story-bench.mjs).",
+    "",
+    "WHY EACH ONE CARRIES ITS OWN BEATS. This repository has NO premise-to-outline",
+    "step. POST /api/nvm/converge and /api/nvm/converge-arc both require a",
+    "SceneTarget[] (server/nvm/generate/proof-spec.ts: sceneIdx, sceneFunction,",
+    "activeMechanisms, tensionTarget, themeHint) from the caller; the Story wizard",
+    "produces a StoryConfig and stops; nothing anywhere turns a paragraph of",
+    "English into a beat sheet. So the `beats` array below is HAND-AUTHORED, and",
+    "the bench says so in every run it prints. It is scaffolding for the",
+    "measurement, not a product feature, and a reader must not take the structure",
+    "the bench produces as structure the product derived.",
+    "",
+    "The premises are written for this fixture (no existing property, no real",
+    "person). Six shapes on purpose: a large cast, a two-hander, a comedy, a",
+    "non-linear structure, an animation-shaped family film, and a thriller."
+  ],
+  "premises": [
+    {
+      "id": "harbor-lights",
+      "title": "HARBOR LIGHTS",
+      "shape": "ensemble / large cast",
+      "genre": "drama",
+      "tone": "restrained, communal",
+      "theme": "What a town owes the people who keep it running",
+      "premise": "The night the cannery announces it is closing, eleven people in a small fishing harbour each decide, separately, what they will do about it: the foreman who has the closure letter and has not opened it, the harbourmaster who has been quietly selling moorings, the two sisters who run the only diner, a deckhand with a fake certificate, the priest who knows about the certificate, a shipping agent down from the city, a teenager who has already packed, the mechanic who will not leave, the mayor who negotiated the deal, and the foreman's wife, who tells him to open the letter.",
+      "characters": "TOMAS (foreman), NELL (his wife), DRU (harbourmaster), THE SISTERS, KAI (deckhand), FATHER ORR, MS. AVERY (agent), JUNE (teenager), BASS (mechanic), MAYOR LOCK",
+      "beats": [
+        { "sceneFunction": "establish_world",   "activeMechanisms": ["community_pressure"], "tensionTarget": 30, "themeHint": "the harbour before the letter" },
+        { "sceneFunction": "advance_plot",      "activeMechanisms": ["community_pressure", "secret"], "tensionTarget": 45, "themeHint": "the letter arrives unopened" },
+        { "sceneFunction": "reveal_character",  "activeMechanisms": ["secret"], "tensionTarget": 50, "themeHint": "the harbourmaster's private sale" },
+        { "sceneFunction": "build_tension",     "activeMechanisms": ["community_pressure", "deadline"], "tensionTarget": 62, "themeHint": "the town finds out" },
+        { "sceneFunction": "set_up_payoff",     "activeMechanisms": ["secret", "deadline"], "tensionTarget": 68, "themeHint": "the fake certificate surfaces" },
+        { "sceneFunction": "build_tension",     "activeMechanisms": ["deadline", "betrayal"], "tensionTarget": 78, "themeHint": "the mayor's deal is named out loud" },
+        { "sceneFunction": "advance_plot",      "activeMechanisms": ["betrayal"], "tensionTarget": 85, "themeHint": "the meeting at the cannery gate" },
+        { "sceneFunction": "provide_relief",    "activeMechanisms": ["community_pressure"], "tensionTarget": 55, "themeHint": "what the town keeps" }
+      ]
+    },
+    {
+      "id": "counterweight",
+      "title": "COUNTERWEIGHT",
+      "shape": "two-hander",
+      "genre": "drama",
+      "tone": "close, adversarial, warming",
+      "theme": "Whether being right is worth being alone",
+      "premise": "A structural engineer and the building inspector who condemned her bridge are trapped together overnight in the inspection gantry beneath it, 40 metres above a river, after the access lift fails. She has eleven hours to persuade him the calculation he rejected was correct; he has eleven hours to make her admit she already knew it wasn't. Neither can leave, and the tide is coming in beneath them.",
+      "characters": "ILKA SORO (engineer), DESMOND WRAY (inspector)",
+      "beats": [
+        { "sceneFunction": "establish_world",   "activeMechanisms": ["confinement"], "tensionTarget": 40, "themeHint": "the lift fails" },
+        { "sceneFunction": "reveal_character",  "activeMechanisms": ["confinement", "argument"], "tensionTarget": 50, "themeHint": "the first version of the story" },
+        { "sceneFunction": "build_tension",     "activeMechanisms": ["argument", "deadline"], "tensionTarget": 62, "themeHint": "the tide" },
+        { "sceneFunction": "set_up_payoff",     "activeMechanisms": ["secret"], "tensionTarget": 70, "themeHint": "the notebook page she did not submit" },
+        { "sceneFunction": "build_tension",     "activeMechanisms": ["argument", "betrayal"], "tensionTarget": 80, "themeHint": "he has read it already" },
+        { "sceneFunction": "advance_plot",      "activeMechanisms": ["deadline"], "tensionTarget": 88, "themeHint": "the water reaches the gantry" },
+        { "sceneFunction": "provide_relief",    "activeMechanisms": ["confinement"], "tensionTarget": 45, "themeHint": "what they sign in the morning" }
+      ]
+    },
+    {
+      "id": "the-understudy-clause",
+      "title": "THE UNDERSTUDY CLAUSE",
+      "shape": "comedy",
+      "genre": "comedy",
+      "tone": "farce, escalating, warm",
+      "theme": "Everyone is understudying someone",
+      "premise": "A regional theatre's insurance policy pays out only if a production opens, so when the lead breaks both wrists the day before press night, the company manager quietly promotes the understudy — who is the box-office clerk, who cannot act, and who has been signing the lead's autographs for two years. The critic arrives early. The real lead arrives in a taxi. The insurance assessor is already in seat F12 and has been told nothing.",
+      "characters": "PRUE BALLANTYNE (manager), OZ KETTLE (clerk/understudy), MARGUERITE VANE (lead), HOLLIS (critic), MR. DAWE (assessor)",
+      "beats": [
+        { "sceneFunction": "establish_world",   "activeMechanisms": ["deception"], "tensionTarget": 28, "themeHint": "the autograph table" },
+        { "sceneFunction": "advance_plot",      "activeMechanisms": ["deception", "deadline"], "tensionTarget": 42, "themeHint": "both wrists" },
+        { "sceneFunction": "build_tension",     "activeMechanisms": ["deception", "mistaken_identity"], "tensionTarget": 55, "themeHint": "the assessor takes his seat" },
+        { "sceneFunction": "set_up_payoff",     "activeMechanisms": ["mistaken_identity"], "tensionTarget": 60, "themeHint": "the critic recognises the clerk" },
+        { "sceneFunction": "build_tension",     "activeMechanisms": ["deadline", "mistaken_identity"], "tensionTarget": 74, "themeHint": "the taxi" },
+        { "sceneFunction": "advance_plot",      "activeMechanisms": ["deception"], "tensionTarget": 84, "themeHint": "the curtain goes up anyway" },
+        { "sceneFunction": "provide_relief",    "activeMechanisms": ["deception"], "tensionTarget": 40, "themeHint": "the review nobody expected" }
+      ]
+    },
+    {
+      "id": "nine-minutes-of-tape",
+      "title": "NINE MINUTES OF TAPE",
+      "shape": "non-linear",
+      "genre": "mystery",
+      "tone": "cool, fragmented, precise",
+      "theme": "An account is not the same thing as the truth",
+      "premise": "Nine minutes of a hotel corridor's security tape are missing from the night a translator disappeared. The film assembles the evening out of order — the last scene chronologically comes first, the first comes last — from four accounts that agree on everything except who was holding the room key. Each retelling restores a little more of the tape, and the final fragment shows something none of the four described.",
+      "characters": "MIRA HALVE (translator), ANSEL (night manager), DET. RUTH OKONJO, PAOLO (guest), THE KEY",
+      "beats": [
+        { "sceneFunction": "advance_plot",      "activeMechanisms": ["mystery"], "tensionTarget": 55, "themeHint": "the end, told first: the corridor at 3am" },
+        { "sceneFunction": "reveal_character",  "activeMechanisms": ["mystery", "unreliable_account"], "tensionTarget": 48, "themeHint": "the night manager's version" },
+        { "sceneFunction": "build_tension",     "activeMechanisms": ["unreliable_account"], "tensionTarget": 60, "themeHint": "the guest's version contradicts it" },
+        { "sceneFunction": "set_up_payoff",     "activeMechanisms": ["mystery", "secret"], "tensionTarget": 66, "themeHint": "the key changes hands" },
+        { "sceneFunction": "reveal_character",  "activeMechanisms": ["unreliable_account"], "tensionTarget": 70, "themeHint": "the detective's own account" },
+        { "sceneFunction": "build_tension",     "activeMechanisms": ["mystery", "deadline"], "tensionTarget": 80, "themeHint": "the recovered minute" },
+        { "sceneFunction": "advance_plot",      "activeMechanisms": ["secret"], "tensionTarget": 88, "themeHint": "the beginning, told last" }
+      ]
+    },
+    {
+      "id": "the-long-way-round",
+      "title": "THE LONG WAY ROUND",
+      "shape": "animation / family",
+      "genre": "animation",
+      "tone": "bright, kinetic, sincere",
+      "theme": "Home is a direction, not a place",
+      "premise": "A migrating crane chick who cannot navigate is separated from her flock over a city and takes up with a rooftop pigeon who has never flown further than four blocks and claims, loudly, to know the way south. Their route is wrong in every particular, and it works — because the pigeon's four blocks are full of people, awnings, cables and updrafts he understands completely, and the crane's instinct for distance is exactly what he lacks.",
+      "characters": "PEEP (crane chick), GUTTER (pigeon), THE FLOCK, A WINDOW CLEANER, THE KESTREL",
+      "beats": [
+        { "sceneFunction": "establish_world",   "activeMechanisms": ["wonder"], "tensionTarget": 25, "themeHint": "the flock above the city" },
+        { "sceneFunction": "advance_plot",      "activeMechanisms": ["separation"], "tensionTarget": 45, "themeHint": "the storm splits them" },
+        { "sceneFunction": "reveal_character",  "activeMechanisms": ["wonder"], "tensionTarget": 38, "themeHint": "the pigeon's four blocks" },
+        { "sceneFunction": "build_tension",     "activeMechanisms": ["chase"], "tensionTarget": 58, "themeHint": "the kestrel on the water tower" },
+        { "sceneFunction": "set_up_payoff",     "activeMechanisms": ["wonder", "separation"], "tensionTarget": 52, "themeHint": "the updraft he has always used" },
+        { "sceneFunction": "build_tension",     "activeMechanisms": ["chase", "deadline"], "tensionTarget": 76, "themeHint": "the flock is leaving" },
+        { "sceneFunction": "advance_plot",      "activeMechanisms": ["separation"], "tensionTarget": 84, "themeHint": "the wrong route, flown right" },
+        { "sceneFunction": "provide_relief",    "activeMechanisms": ["wonder"], "tensionTarget": 35, "themeHint": "four blocks, from above" }
+      ]
+    },
+    {
+      "id": "cold-open",
+      "title": "COLD OPEN",
+      "shape": "thriller",
+      "genre": "thriller",
+      "tone": "tight, procedural, cold",
+      "theme": "The cost of being believed",
+      "premise": "A live overnight radio host takes a call from a man who describes, calmly and in verifiable detail, a murder that has not been reported. Her producer says it is a hoax. The police say it is a hoax. The caller says he will call back at four, and that by then she will have checked the one detail he gave that only the killer could know. She has ninety minutes of airtime and a studio door that locks from the inside.",
+      "characters": "VIC SANDOVAL (host), TERE (producer), THE CALLER, DET. LOWE, THE NIGHT SECURITY GUARD",
+      "beats": [
+        { "sceneFunction": "establish_world",   "activeMechanisms": ["suspense"], "tensionTarget": 35, "themeHint": "the studio at one in the morning" },
+        { "sceneFunction": "advance_plot",      "activeMechanisms": ["suspense", "threat"], "tensionTarget": 52, "themeHint": "the first call" },
+        { "sceneFunction": "build_tension",     "activeMechanisms": ["threat", "deadline"], "tensionTarget": 64, "themeHint": "nobody believes her" },
+        { "sceneFunction": "set_up_payoff",     "activeMechanisms": ["suspense", "secret"], "tensionTarget": 70, "themeHint": "the detail she can check" },
+        { "sceneFunction": "reveal_character",  "activeMechanisms": ["threat"], "tensionTarget": 74, "themeHint": "why she works nights" },
+        { "sceneFunction": "build_tension",     "activeMechanisms": ["threat", "deadline"], "tensionTarget": 86, "themeHint": "the guard does not answer" },
+        { "sceneFunction": "advance_plot",      "activeMechanisms": ["deadline"], "tensionTarget": 92, "themeHint": "four o'clock" },
+        { "sceneFunction": "provide_relief",    "activeMechanisms": ["suspense"], "tensionTarget": 48, "themeHint": "the dead air after" }
+      ]
+    }
+  ]
+}

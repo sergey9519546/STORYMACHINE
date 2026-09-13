@@ -73,6 +73,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-13 Owner Measure Lane.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-13 Story Bench Lane.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-13 Story Bench Lane",
+      "path": "docs/brain/Audits/Audit - 2026-09-13 Story Bench Lane.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
       "type": "branch",
       "title": "Branch — Adversarial 2026-09-12",
@@ -163,6 +169,12 @@
       "path": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
     },
     {
+      "id": "docs/brain/Decisions/Decision 8 - Generation Quality Becomes a Measured Track.md",
+      "type": "decision",
+      "title": "Decision #8 — Generation Quality Becomes a Measured Track (2026-09-13)",
+      "path": "docs/brain/Decisions/Decision 8 - Generation Quality Becomes a Measured Track.md"
+    },
+    {
       "id": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
       "type": "gate",
       "title": "Gate — AUC-24 Ratchet",
@@ -239,6 +251,12 @@
       "type": "gate",
       "title": "Gate — Vite Cache Isolation",
       "path": "docs/brain/Gates/Gate - Vite Cache Isolation.md"
+    },
+    {
+      "id": "docs/brain/Generation/Generation - Story Bench.md",
+      "type": "measurement",
+      "title": "Generation — Story Bench",
+      "path": "docs/brain/Generation/Generation - Story Bench.md"
     },
     {
       "id": "docs/brain/Glossary.md",
@@ -774,6 +792,14 @@
     },
     {
       "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Generation/Generation - Story Bench.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Decisions/Decision 8 - Generation Quality Becomes a Measured Track.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
       "to": "docs/brain/Owner/Owner - Index.md"
     },
     {
@@ -1001,6 +1027,18 @@
       "to": "docs/brain/Gates/Gate - Corpus Layout Verification.md"
     },
     {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 Story Bench Lane.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 Story Bench Lane.md",
+      "to": "docs/brain/Generation/Generation - Story Bench.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 Story Bench Lane.md",
+      "to": "docs/brain/Decisions/Decision 8 - Generation Quality Becomes a Measured Track.md"
+    },
+    {
       "from": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
       "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
     },
@@ -1209,6 +1247,14 @@
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
+      "from": "docs/brain/Decisions/Decision 8 - Generation Quality Becomes a Measured Track.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 8 - Generation Quality Becomes a Measured Track.md",
+      "to": "docs/brain/Generation/Generation - Story Bench.md"
+    },
+    {
       "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
       "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
     },
@@ -1347,6 +1393,18 @@
     {
       "from": "docs/brain/Gates/Gate - Vite Cache Isolation.md",
       "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
+    },
+    {
+      "from": "docs/brain/Generation/Generation - Story Bench.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Generation/Generation - Story Bench.md",
+      "to": "docs/brain/Decisions/Decision 8 - Generation Quality Becomes a Measured Track.md"
+    },
+    {
+      "from": "docs/brain/Generation/Generation - Story Bench.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 Story Bench Lane.md"
     },
     {
       "from": "docs/brain/Glossary.md",

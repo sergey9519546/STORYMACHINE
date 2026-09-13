@@ -829,6 +829,115 @@ with each mechanism disarmed before passing with it.
 
 ---
 
+## Decision #8: Generation Quality Becomes a Measured Track, and the Bench Is Built Before Anything Is Tuned (2026-09-13)
+
+**Context**: On 2026-09-13 the owner gave a direction in their own words:
+work mainly on "the storymachine ability to actually generate good and quality
+stories that people will value and be entertained by." The project's own
+record answers that with a problem rather than a plan. Decision #3 (2026-09-03)
+demoted the entire generative surface to Labs on the finding that *"every
+LLM-adjacent test in the repository is plumbing … Not one assertion anywhere
+says whether a rewrite pass, a copilot suggestion, or a deep-read annotation is
+good, or even not worse than its input."* Ten days later that was still true.
+There was no number to improve, no artifact to read, and no way to tell a
+tuning change that helped from one that did nothing.
+
+Building the bench first also turned up why the question had stayed open. On an
+OpenAI-compatible deployment the generative half could not run at all: both
+generative call sites reached for the exported `geminiProvider` CONSTANT
+instead of the provider seam, so every candidate generation and all fourteen
+revision passes threw `Gemini provider not available` and took their documented
+fallback. A run looked like fourteen clean passes over a compiled script with a
+health score, and not one word of it had been written by a model.
+
+**The Question**: Should the first move on the owner's direction be to improve
+generation, or to measure it?
+
+**Options Considered**:
+1. **Tune first** — change prompts, craft-spec directives, pass ordering, the
+   convergence budget, and judge by reading the output.
+2. **Measure first** — build a bench that drives the existing pipeline end to
+   end, records what every call did, scores the result with the deterministic
+   doctor, and puts the scripts in front of a human reader with a rubric.
+3. **Add an LLM judge** — have a model score generated scenes, and optimize
+   that score.
+
+**Decision**: **Measure first** (Option 2), and build the bench as an internal
+research instrument that makes no quality claim.
+
+**Rationale**:
+- Option 1 is the failure mode this project already has a constitution about.
+  `NORTH_STAR.md` §1's *measure discrimination on runnable, real writing —
+  always* exists because every detector that skipped measurement died or
+  inverted. A tuning pass with no instrument would have produced a changelog,
+  not a change.
+- Option 3 is forbidden as a product mechanism (*No LLM-as-judge*: every
+  verdict a user sees is a deterministic rule or formula) and is a bad research
+  instrument here besides — it would optimize for a model's taste at the exact
+  moment the open question is a human's. The bench may carry an optional,
+  clearly labelled research-signal column; it feeds no user-visible number.
+- Decision #3 already named the shape of the answer: a roughly 30-case,
+  human-scored golden set with a rubric, at least two scorers and a pinned
+  model, running in CI. Nothing had started on it. A packet of six scored
+  scripts is the first six cases of that set.
+- Measuring first is also what surfaced the dead provider seam. A tuning lane
+  would have spent its whole budget changing prompts that were never sent.
+
+**What changed**:
+- `scripts/story-bench.mjs` + `npm run story:bench`, over six committed
+  premises (`tests/fixtures/story-bench-premises.json`) of six different
+  shapes. It records every LLM call's model, latency and tokens, every
+  fallback, the compiled Fountain, the final Fountain and the doctor's score,
+  under `data/story-bench/<date>/` (gitignored).
+- `--check` probes `/models` for reachability before spending a generation;
+  `--packet` assembles the six scripts into one Fountain file and one PDF with
+  the five-question rubric and a blank score grid.
+- `server/lib/ai-providers/openai-compat.ts`: four guards, each reproduced
+  live against the configured endpoint first and each shown failing on the
+  unfixed adapter — `content:null` as an empty completion with a structured
+  log line, a named non-retryable error for an unavailable model,
+  `maxOutputTokens` forwarded as `max_tokens`, and the `@google/genai`
+  response shape emitted alongside `.text`.
+- `server/engine/ai.ts`: `getLLMProvider()`, and `withRetry` honours a
+  `nonRetryable` error.
+- `server/nvm/revision/rewrite-llm.ts` and
+  `server/nvm/generate/llm-generator.ts` call the seam instead of the Gemini
+  constant.
+- `ROADMAP.md`: amendments under P2 and P4 recording the direction and where
+  the track sits in the sequence.
+
+**What this does NOT decide**:
+- **The Labs gate does not move.** Decision #3 stands exactly as written, and
+  its condition for re-promotion is unchanged and unmet. Six scripts is not
+  thirty; one scorer is not two; nothing here runs in CI.
+- **No quality claim is made anywhere.** The doctor's health on a generated
+  script is a real measurement of that script's STRUCTURE. It cannot see
+  whether a story is interesting, whether a line sounds like a person, or
+  whether a scene ends on a turn.
+- **Nothing is tuned.** No prompt, craft-spec directive, pass order or
+  convergence budget was changed to make a number better. That is the next
+  lane's job, and it now has a before.
+- **No scoring floor moves.** `node scripts/check-scoring-receipt.mjs
+  main..HEAD` reports no scoring-path file changed.
+
+**Expected Outcomes**: The next person who asks "is the generated output any
+good?" has a command that answers "here is what it produced, here is what each
+call cost, here is where it fell back", plus a packet a human can score. The
+tuning lane that follows has a before to beat.
+
+**Evidence**: `docs/story-generation/STORY_BENCH_2026-09-13.md` (method, the
+first run's table, two honest readings, and what the doctor cannot see);
+`docs/audits/2026-09-13-story/story-bench-lane-report.md` (the lane record,
+including each guard's recorded pre-fix failure);
+`tests/core/openai-compat-generation-guards.test.ts` and
+`tests/scripts/story-bench.test.ts`.
+
+**Decided by**: maintainer delegate, on the owner's 2026-09-13 direction.
+
+**Status**: Active.
+
+---
+
 ## Decision Template (for future entries)
 
 **Context**: What situation prompted this decision?
