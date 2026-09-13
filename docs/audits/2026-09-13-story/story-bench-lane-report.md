@@ -144,7 +144,36 @@ what stops the non-retryable flag from widening into "never retry anything".
 
 ## 7. Left undone, and why
 
-<!-- UNDONE -->
+**Not done, and named rather than quietly dropped:**
+
+1. **No held-out or repeated measurement.** Six premises, one run each, one
+   seed family (`20260913 + sceneIdx`). Generation is stochastic and the
+   endpoint's latency alone varied 5x on one prompt; a single run per premise
+   establishes a shape, not a distribution. A second lane wanting to claim a
+   change helped will need repeats.
+2. **No LLM-reader column.** The brief allowed an optional one. It is not
+   built, because on this run there was no question it would have answered
+   that the two human readings do not, and an unpinned research signal is a
+   liability the moment someone quotes it. If it is added, §6 of the method
+   doc states the conditions in advance: labelled *research signal, not a
+   verdict*, pinned model and prompt, feeding no user-visible number.
+3. **The packet has one scorer, and it is not a scorer.** `--packet` produces
+   the artifact; the scores are the owner's to give. Decision #3's condition
+   needs about thirty cases and at least two scorers, and this lane
+   deliberately does not pretend otherwise anywhere.
+4. **Why convergence fails Tier 1 was not diagnosed.** The bench records it
+   per scene (§4) and commits the best-of-run IR instead, which is what the
+   route offers. Finding out WHY the proof kernel rejects LLM candidates is an
+   engine question, and this lane's whole premise is that it measures first.
+   It is the most useful next thing to look at.
+5. **The browser suites were not run.** This lane changes no user-visible
+   surface: no component, no route contract, no copy a writer reads. The
+   surfaces the generative controls live behind are Labs-gated and untouched.
+6. **`npm run story:bench` has no CI step, deliberately.** It generates, so it
+   needs a key; CI has none. The pure helpers ARE covered in CI by
+   `tests/scripts/story-bench.test.ts`, and the bench itself exits 2 with
+   "Nothing was measured. This is not a result." when no provider is
+   configured.
 
 ---
 

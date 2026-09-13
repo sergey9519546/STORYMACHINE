@@ -89,6 +89,38 @@ export function beatsToSceneTargets(premise) {
   }));
 }
 
+/**
+ * The cast-grounding ops the bench prepends to the FIRST committed scene.
+ *
+ * WHY. IntentionalProof is a Tier 1 proof, so it BLOCKS a commit: any op
+ * referencing a character with no belief in state, and none introduced by the
+ * same IR, fails it (`server/nvm/proof/tier1/intentional.ts`). A fresh session
+ * has no characters, so the bench's first full run had every scene of every
+ * premise rejected at POST /api/nvm/converge/commit with exactly that.
+ *
+ * The product has no premise-to-cast step any more than it has a
+ * premise-to-outline one, so the cast is fixture data, and this is the same
+ * kind of disclosed scaffolding the beats are. One UPDATE_BELIEF per member,
+ * prepended to scene one only: that grounds them for every later scene AND puts
+ * them in buildSystemPreamble's "known characters" line, which is what the
+ * generator reads. It is NOT prepended to every scene — the bench must not
+ * write the story it is measuring.
+ */
+export function castGroundingOps(premise) {
+  return (premise.cast ?? []).map((c, i) => ({
+    op: 'UPDATE_BELIEF',
+    charId: c.id,
+    belief: {
+      id: `${premise.id}-seed-${i}`,
+      proposition: c.believes,
+      confidence: 0.8,
+      source: 'witnessed',
+      source_event_id: `${premise.id}-open`,
+      acquired_at: 0,
+    },
+  }));
+}
+
 /** Parse one line of the server's structured log stream, or null. */
 export function parseLogLine(line) {
   const trimmed = line.trim();
@@ -163,12 +195,13 @@ export function renderTable(rows) {
   const cols = [
     ['premise', (r) => r.id],
     ['shape', (r) => r.shape],
-    ['scenes', (r) => String(r.scenes)],
+    ['scenes', (r) => `${r.committedScenes ?? r.scenes}/${r.requestedScenes ?? r.scenes}`],
     ['words', (r) => String(r.words)],
     ['health', (r) => (r.health === null ? '—' : String(r.health))],
     ['verdict', (r) => r.verdict ?? '—'],
     ['llm calls', (r) => String(r.llmCalls)],
     ['fallbacks', (r) => String(r.fallbacks)],
+    ['passes changed', (r) => `${r.revisionPassesWithChanges ?? 0}/${r.revisionPassCount ?? 0}`],
     ['wall s', (r) => (r.wallMs / 1000).toFixed(1)],
     ['tokens', (r) => String(r.promptTokens + r.completionTokens)],
     ['status', (r) => r.status],
@@ -276,7 +309,12 @@ async function post(base, route, body, timeoutMs = 2_400_000) {
   const text = await res.text();
   let json = null;
   try { json = JSON.parse(text); } catch { /* not json */ }
-  if (!res.ok) throw new Error(`${route} -> HTTP ${res.status}: ${text.slice(0, 400)}`);
+  if (!res.ok) {
+    const err = new Error(`${route} -> HTTP ${res.status}: ${text.slice(0, 400)}`);
+    err.status = res.status;
+    err.body = json;
+    throw err;
+  }
   return json;
 }
 
@@ -405,6 +443,12 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
   //    /api/nvm/compile.
   let committed = 0;
   const convergeNotes = [];
+  // Which Tier 1 proof blocked each rejected scene, counted rather than left
+  // inside a truncated error string. On the first working run of this bench 6
+  // of 7 scenes of one premise were lost to a single proof, and the report
+  // could not say which without this.
+  const blockingProofs = {};
+  let scenesWithoutTier1Winner = 0;
   for (const target of targets) {
     // Progress is printed per beat on purpose. One converge call against a
     // reasoning model measured 15-78 s here (n=6, median ~26 s), so a premise
@@ -444,25 +488,39 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
       continue;
     }
     if (!winner?.ir) {
+      scenesWithoutTier1Winner++;
       convergeNotes.push(
         `scene ${target.sceneIdx}: no Tier-1-passing candidate in ${result?.iterations} iteration(s) `
         + `— committing the best-of-run IR instead (composite=${result?.finalComposite})`,
       );
     }
     try {
+      // Scene one carries the cast grounding ahead of the generated ops (see
+      // castGroundingOps). Every later scene commits exactly what converge
+      // produced.
+      const opsToCommit = committed === 0 ? [...castGroundingOps(premise), ...ir.ops] : ir.ops;
       await post(base, '/api/nvm/converge/commit', {
         sessionId,
-        ops: ir.ops,
+        ops: opsToCommit,
         sceneIdx: target.sceneIdx,
         activeMechanisms: target.activeMechanisms,
         preconditions: ir.preconditions?.length ? ir.preconditions : ['prior scene'],
         summary: (target.themeHint ?? '').slice(0, 200),
       });
       committed++;
-      console.log(`committed ${ir.ops.length} ops from ${source} (${((Date.now() - beatStarted) / 1000).toFixed(0)}s)`);
+      console.log(`committed ${opsToCommit.length} ops from ${source} (${((Date.now() - beatStarted) / 1000).toFixed(0)}s)`);
     } catch (err) {
-      console.log(`commit rejected (${((Date.now() - beatStarted) / 1000).toFixed(0)}s)`);
-      convergeNotes.push(`scene ${target.sceneIdx}: commit rejected — ${String(err.message).slice(0, 240)}`);
+      const failures = Array.isArray(err?.body?.failures) ? err.body.failures : [];
+      for (const f of failures) {
+        const name = String(f?.proof ?? 'unknown');
+        blockingProofs[name] = (blockingProofs[name] ?? 0) + 1;
+      }
+      const named = failures.map((f) => f?.proof).filter(Boolean).join(', ') || 'unknown';
+      console.log(`commit rejected by ${named} (${((Date.now() - beatStarted) / 1000).toFixed(0)}s)`);
+      convergeNotes.push(
+        `scene ${target.sceneIdx}: commit rejected by ${named} — `
+        + failures.map((f) => `${f.proof}: ${f.reason}`).join(' | ').slice(0, 400),
+      );
     }
   }
 
@@ -518,6 +576,12 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
     promptTokens: calls.promptTokens,
     completionTokens: calls.completionTokens,
     status: classification.ok ? 'ok' : 'FAILED',
+    committedScenes: committed,
+    requestedScenes: targets.length,
+    blockingProofs,
+    scenesWithoutTier1Winner,
+    revisionPassesWithChanges: revision?.passesWithChanges ?? 0,
+    revisionPassCount: passResults.length,
   };
 
   mkdirSync(outDir, { recursive: true });
@@ -532,6 +596,7 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
   }, null, 2));
   writeFileSync(path.join(outDir, `${premise.id}.calls.json`), JSON.stringify({
     classification, committedScenes: committed, requestedScenes: targets.length,
+    blockingProofs, scenesWithoutTier1Winner,
     notes: convergeNotes,
     revision: {
       passCount: passResults.length,

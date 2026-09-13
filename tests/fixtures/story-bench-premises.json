@@ -14,7 +14,28 @@
     "",
     "The premises are written for this fixture (no existing property, no real",
     "person). Six shapes on purpose: a large cast, a two-hander, a comedy, a",
-    "non-linear structure, an animation-shaped family film, and a thriller."
+    "non-linear structure, an animation-shaped family film, and a thriller.",
+    "",
+    "WHY EACH PREMISE ALSO CARRIES A `cast`. IntentionalProof (a Tier 1 proof, so it",
+    "BLOCKS a commit) fails any op that references a character with no belief in",
+    "state and none introduced by the same IR. A fresh session has no characters, so",
+    "the first run of this bench had every scene of every premise rejected at",
+    "POST /api/nvm/converge/commit. The product has no premise-to-cast step either,",
+    "so the cast is fixture data too: the bench prepends one UPDATE_BELIEF per",
+    "member to the FIRST committed scene, which grounds them for every later scene",
+    "and puts them in buildSystemPreamble's \"known characters\" list. It is the same",
+    "kind of scaffolding as the beats, disclosed the same way.",
+    "",
+    "WHY THE MECHANISM NAMES LOOK LIKE THAT. `activeMechanisms` is NOT free text.",
+    "MechanismProof is a Tier 1 proof and it BLOCKS a commit whose IR names a",
+    "mechanism with no matching server/nvm/mechanisms/<id>.mech.json. That",
+    "directory holds exactly SIX: clue_cascade, false_purpose,",
+    "identity_performance, legitimacy_split, object_burden and",
+    "relationship_externalization. The first version of this fixture used",
+    "story-shaped names (\"confinement\", \"deception\", \"deadline\") and every scene",
+    "of every premise was rejected at POST /api/nvm/converge/commit with",
+    "\"unknown mechanism ... no matching .mech.json\". Nothing in the product",
+    "surfaces that vocabulary to a caller; the test beside this file pins it."
   ],
   "premises": [
     {
@@ -27,14 +48,100 @@
       "premise": "The night the cannery announces it is closing, eleven people in a small fishing harbour each decide, separately, what they will do about it: the foreman who has the closure letter and has not opened it, the harbourmaster who has been quietly selling moorings, the two sisters who run the only diner, a deckhand with a fake certificate, the priest who knows about the certificate, a shipping agent down from the city, a teenager who has already packed, the mechanic who will not leave, the mayor who negotiated the deal, and the foreman's wife, who tells him to open the letter.",
       "characters": "TOMAS (foreman), NELL (his wife), DRU (harbourmaster), THE SISTERS, KAI (deckhand), FATHER ORR, MS. AVERY (agent), JUNE (teenager), BASS (mechanic), MAYOR LOCK",
       "beats": [
-        { "sceneFunction": "establish_world",   "activeMechanisms": ["community_pressure"], "tensionTarget": 30, "themeHint": "the harbour before the letter" },
-        { "sceneFunction": "advance_plot",      "activeMechanisms": ["community_pressure", "secret"], "tensionTarget": 45, "themeHint": "the letter arrives unopened" },
-        { "sceneFunction": "reveal_character",  "activeMechanisms": ["secret"], "tensionTarget": 50, "themeHint": "the harbourmaster's private sale" },
-        { "sceneFunction": "build_tension",     "activeMechanisms": ["community_pressure", "deadline"], "tensionTarget": 62, "themeHint": "the town finds out" },
-        { "sceneFunction": "set_up_payoff",     "activeMechanisms": ["secret", "deadline"], "tensionTarget": 68, "themeHint": "the fake certificate surfaces" },
-        { "sceneFunction": "build_tension",     "activeMechanisms": ["deadline", "betrayal"], "tensionTarget": 78, "themeHint": "the mayor's deal is named out loud" },
-        { "sceneFunction": "advance_plot",      "activeMechanisms": ["betrayal"], "tensionTarget": 85, "themeHint": "the meeting at the cannery gate" },
-        { "sceneFunction": "provide_relief",    "activeMechanisms": ["community_pressure"], "tensionTarget": 55, "themeHint": "what the town keeps" }
+        {
+          "sceneFunction": "establish_world",
+          "activeMechanisms": [
+            "legitimacy_split"
+          ],
+          "tensionTarget": 30,
+          "themeHint": "the harbour before the letter"
+        },
+        {
+          "sceneFunction": "advance_plot",
+          "activeMechanisms": [
+            "legitimacy_split",
+            "clue_cascade"
+          ],
+          "tensionTarget": 45,
+          "themeHint": "the letter arrives unopened"
+        },
+        {
+          "sceneFunction": "reveal_character",
+          "activeMechanisms": [
+            "clue_cascade"
+          ],
+          "tensionTarget": 50,
+          "themeHint": "the harbourmaster's private sale"
+        },
+        {
+          "sceneFunction": "build_tension",
+          "activeMechanisms": [
+            "legitimacy_split",
+            "object_burden"
+          ],
+          "tensionTarget": 62,
+          "themeHint": "the town finds out"
+        },
+        {
+          "sceneFunction": "set_up_payoff",
+          "activeMechanisms": [
+            "clue_cascade",
+            "object_burden"
+          ],
+          "tensionTarget": 68,
+          "themeHint": "the fake certificate surfaces"
+        },
+        {
+          "sceneFunction": "build_tension",
+          "activeMechanisms": [
+            "false_purpose",
+            "legitimacy_split"
+          ],
+          "tensionTarget": 78,
+          "themeHint": "the mayor's deal is named out loud"
+        },
+        {
+          "sceneFunction": "advance_plot",
+          "activeMechanisms": [
+            "false_purpose"
+          ],
+          "tensionTarget": 85,
+          "themeHint": "the meeting at the cannery gate"
+        },
+        {
+          "sceneFunction": "provide_relief",
+          "activeMechanisms": [
+            "relationship_externalization"
+          ],
+          "tensionTarget": 55,
+          "themeHint": "what the town keeps"
+        }
+      ],
+      "cast": [
+        {
+          "id": "TOMAS",
+          "believes": "the letter can still be unopened tomorrow"
+        },
+        {
+          "id": "NELL",
+          "believes": "Tomas has to open it tonight"
+        },
+        {
+          "id": "DRU",
+          "believes": "nobody knows about the moorings"
+        },
+        {
+          "id": "KAI",
+          "believes": "the certificate will hold"
+        },
+        {
+          "id": "FATHER_ORR",
+          "believes": "the certificate is a sin worth keeping quiet"
+        },
+        {
+          "id": "MAYOR_LOCK",
+          "believes": "the deal was the only deal there was"
+        }
       ]
     },
     {
@@ -47,13 +154,75 @@
       "premise": "A structural engineer and the building inspector who condemned her bridge are trapped together overnight in the inspection gantry beneath it, 40 metres above a river, after the access lift fails. She has eleven hours to persuade him the calculation he rejected was correct; he has eleven hours to make her admit she already knew it wasn't. Neither can leave, and the tide is coming in beneath them.",
       "characters": "ILKA SORO (engineer), DESMOND WRAY (inspector)",
       "beats": [
-        { "sceneFunction": "establish_world",   "activeMechanisms": ["confinement"], "tensionTarget": 40, "themeHint": "the lift fails" },
-        { "sceneFunction": "reveal_character",  "activeMechanisms": ["confinement", "argument"], "tensionTarget": 50, "themeHint": "the first version of the story" },
-        { "sceneFunction": "build_tension",     "activeMechanisms": ["argument", "deadline"], "tensionTarget": 62, "themeHint": "the tide" },
-        { "sceneFunction": "set_up_payoff",     "activeMechanisms": ["secret"], "tensionTarget": 70, "themeHint": "the notebook page she did not submit" },
-        { "sceneFunction": "build_tension",     "activeMechanisms": ["argument", "betrayal"], "tensionTarget": 80, "themeHint": "he has read it already" },
-        { "sceneFunction": "advance_plot",      "activeMechanisms": ["deadline"], "tensionTarget": 88, "themeHint": "the water reaches the gantry" },
-        { "sceneFunction": "provide_relief",    "activeMechanisms": ["confinement"], "tensionTarget": 45, "themeHint": "what they sign in the morning" }
+        {
+          "sceneFunction": "establish_world",
+          "activeMechanisms": [
+            "legitimacy_split"
+          ],
+          "tensionTarget": 40,
+          "themeHint": "the lift fails"
+        },
+        {
+          "sceneFunction": "reveal_character",
+          "activeMechanisms": [
+            "legitimacy_split",
+            "relationship_externalization"
+          ],
+          "tensionTarget": 50,
+          "themeHint": "the first version of the story"
+        },
+        {
+          "sceneFunction": "build_tension",
+          "activeMechanisms": [
+            "object_burden"
+          ],
+          "tensionTarget": 62,
+          "themeHint": "the tide"
+        },
+        {
+          "sceneFunction": "set_up_payoff",
+          "activeMechanisms": [
+            "clue_cascade"
+          ],
+          "tensionTarget": 70,
+          "themeHint": "the notebook page she did not submit"
+        },
+        {
+          "sceneFunction": "build_tension",
+          "activeMechanisms": [
+            "clue_cascade",
+            "false_purpose"
+          ],
+          "tensionTarget": 80,
+          "themeHint": "he has read it already"
+        },
+        {
+          "sceneFunction": "advance_plot",
+          "activeMechanisms": [
+            "object_burden",
+            "legitimacy_split"
+          ],
+          "tensionTarget": 88,
+          "themeHint": "the water reaches the gantry"
+        },
+        {
+          "sceneFunction": "provide_relief",
+          "activeMechanisms": [
+            "relationship_externalization"
+          ],
+          "tensionTarget": 45,
+          "themeHint": "what they sign in the morning"
+        }
+      ],
+      "cast": [
+        {
+          "id": "ILKA",
+          "believes": "the calculation was right and the bridge is safe"
+        },
+        {
+          "id": "DESMOND",
+          "believes": "she knew the calculation was wrong when she filed it"
+        }
       ]
     },
     {
@@ -66,13 +235,87 @@
       "premise": "A regional theatre's insurance policy pays out only if a production opens, so when the lead breaks both wrists the day before press night, the company manager quietly promotes the understudy — who is the box-office clerk, who cannot act, and who has been signing the lead's autographs for two years. The critic arrives early. The real lead arrives in a taxi. The insurance assessor is already in seat F12 and has been told nothing.",
       "characters": "PRUE BALLANTYNE (manager), OZ KETTLE (clerk/understudy), MARGUERITE VANE (lead), HOLLIS (critic), MR. DAWE (assessor)",
       "beats": [
-        { "sceneFunction": "establish_world",   "activeMechanisms": ["deception"], "tensionTarget": 28, "themeHint": "the autograph table" },
-        { "sceneFunction": "advance_plot",      "activeMechanisms": ["deception", "deadline"], "tensionTarget": 42, "themeHint": "both wrists" },
-        { "sceneFunction": "build_tension",     "activeMechanisms": ["deception", "mistaken_identity"], "tensionTarget": 55, "themeHint": "the assessor takes his seat" },
-        { "sceneFunction": "set_up_payoff",     "activeMechanisms": ["mistaken_identity"], "tensionTarget": 60, "themeHint": "the critic recognises the clerk" },
-        { "sceneFunction": "build_tension",     "activeMechanisms": ["deadline", "mistaken_identity"], "tensionTarget": 74, "themeHint": "the taxi" },
-        { "sceneFunction": "advance_plot",      "activeMechanisms": ["deception"], "tensionTarget": 84, "themeHint": "the curtain goes up anyway" },
-        { "sceneFunction": "provide_relief",    "activeMechanisms": ["deception"], "tensionTarget": 40, "themeHint": "the review nobody expected" }
+        {
+          "sceneFunction": "establish_world",
+          "activeMechanisms": [
+            "identity_performance"
+          ],
+          "tensionTarget": 28,
+          "themeHint": "the autograph table"
+        },
+        {
+          "sceneFunction": "advance_plot",
+          "activeMechanisms": [
+            "identity_performance",
+            "false_purpose"
+          ],
+          "tensionTarget": 42,
+          "themeHint": "both wrists"
+        },
+        {
+          "sceneFunction": "build_tension",
+          "activeMechanisms": [
+            "identity_performance",
+            "object_burden"
+          ],
+          "tensionTarget": 55,
+          "themeHint": "the assessor takes his seat"
+        },
+        {
+          "sceneFunction": "set_up_payoff",
+          "activeMechanisms": [
+            "clue_cascade"
+          ],
+          "tensionTarget": 60,
+          "themeHint": "the critic recognises the clerk"
+        },
+        {
+          "sceneFunction": "build_tension",
+          "activeMechanisms": [
+            "false_purpose",
+            "object_burden"
+          ],
+          "tensionTarget": 74,
+          "themeHint": "the taxi"
+        },
+        {
+          "sceneFunction": "advance_plot",
+          "activeMechanisms": [
+            "identity_performance"
+          ],
+          "tensionTarget": 84,
+          "themeHint": "the curtain goes up anyway"
+        },
+        {
+          "sceneFunction": "provide_relief",
+          "activeMechanisms": [
+            "relationship_externalization"
+          ],
+          "tensionTarget": 40,
+          "themeHint": "the review nobody expected"
+        }
+      ],
+      "cast": [
+        {
+          "id": "PRUE",
+          "believes": "the insurance pays only if the curtain goes up"
+        },
+        {
+          "id": "OZ",
+          "believes": "he can be believed for one night"
+        },
+        {
+          "id": "MARGUERITE",
+          "believes": "the part is hers whatever the hospital says"
+        },
+        {
+          "id": "HOLLIS",
+          "believes": "something about the lead is wrong"
+        },
+        {
+          "id": "MR_DAWE",
+          "believes": "the claim is straightforward"
+        }
       ]
     },
     {
@@ -85,13 +328,84 @@
       "premise": "Nine minutes of a hotel corridor's security tape are missing from the night a translator disappeared. The film assembles the evening out of order — the last scene chronologically comes first, the first comes last — from four accounts that agree on everything except who was holding the room key. Each retelling restores a little more of the tape, and the final fragment shows something none of the four described.",
       "characters": "MIRA HALVE (translator), ANSEL (night manager), DET. RUTH OKONJO, PAOLO (guest), THE KEY",
       "beats": [
-        { "sceneFunction": "advance_plot",      "activeMechanisms": ["mystery"], "tensionTarget": 55, "themeHint": "the end, told first: the corridor at 3am" },
-        { "sceneFunction": "reveal_character",  "activeMechanisms": ["mystery", "unreliable_account"], "tensionTarget": 48, "themeHint": "the night manager's version" },
-        { "sceneFunction": "build_tension",     "activeMechanisms": ["unreliable_account"], "tensionTarget": 60, "themeHint": "the guest's version contradicts it" },
-        { "sceneFunction": "set_up_payoff",     "activeMechanisms": ["mystery", "secret"], "tensionTarget": 66, "themeHint": "the key changes hands" },
-        { "sceneFunction": "reveal_character",  "activeMechanisms": ["unreliable_account"], "tensionTarget": 70, "themeHint": "the detective's own account" },
-        { "sceneFunction": "build_tension",     "activeMechanisms": ["mystery", "deadline"], "tensionTarget": 80, "themeHint": "the recovered minute" },
-        { "sceneFunction": "advance_plot",      "activeMechanisms": ["secret"], "tensionTarget": 88, "themeHint": "the beginning, told last" }
+        {
+          "sceneFunction": "advance_plot",
+          "activeMechanisms": [
+            "clue_cascade"
+          ],
+          "tensionTarget": 55,
+          "themeHint": "the end, told first: the corridor at 3am"
+        },
+        {
+          "sceneFunction": "reveal_character",
+          "activeMechanisms": [
+            "identity_performance",
+            "clue_cascade"
+          ],
+          "tensionTarget": 48,
+          "themeHint": "the night manager's version"
+        },
+        {
+          "sceneFunction": "build_tension",
+          "activeMechanisms": [
+            "false_purpose"
+          ],
+          "tensionTarget": 60,
+          "themeHint": "the guest's version contradicts it"
+        },
+        {
+          "sceneFunction": "set_up_payoff",
+          "activeMechanisms": [
+            "object_burden",
+            "clue_cascade"
+          ],
+          "tensionTarget": 66,
+          "themeHint": "the key changes hands"
+        },
+        {
+          "sceneFunction": "reveal_character",
+          "activeMechanisms": [
+            "identity_performance"
+          ],
+          "tensionTarget": 70,
+          "themeHint": "the detective's own account"
+        },
+        {
+          "sceneFunction": "build_tension",
+          "activeMechanisms": [
+            "clue_cascade",
+            "object_burden"
+          ],
+          "tensionTarget": 80,
+          "themeHint": "the recovered minute"
+        },
+        {
+          "sceneFunction": "advance_plot",
+          "activeMechanisms": [
+            "clue_cascade",
+            "false_purpose"
+          ],
+          "tensionTarget": 88,
+          "themeHint": "the beginning, told last"
+        }
+      ],
+      "cast": [
+        {
+          "id": "MIRA",
+          "believes": "the key was never hers to give back"
+        },
+        {
+          "id": "ANSEL",
+          "believes": "he handed the key over at midnight"
+        },
+        {
+          "id": "RUTH",
+          "believes": "one of the four accounts is a lie"
+        },
+        {
+          "id": "PAOLO",
+          "believes": "he never touched the key"
+        }
       ]
     },
     {
@@ -104,14 +418,87 @@
       "premise": "A migrating crane chick who cannot navigate is separated from her flock over a city and takes up with a rooftop pigeon who has never flown further than four blocks and claims, loudly, to know the way south. Their route is wrong in every particular, and it works — because the pigeon's four blocks are full of people, awnings, cables and updrafts he understands completely, and the crane's instinct for distance is exactly what he lacks.",
       "characters": "PEEP (crane chick), GUTTER (pigeon), THE FLOCK, A WINDOW CLEANER, THE KESTREL",
       "beats": [
-        { "sceneFunction": "establish_world",   "activeMechanisms": ["wonder"], "tensionTarget": 25, "themeHint": "the flock above the city" },
-        { "sceneFunction": "advance_plot",      "activeMechanisms": ["separation"], "tensionTarget": 45, "themeHint": "the storm splits them" },
-        { "sceneFunction": "reveal_character",  "activeMechanisms": ["wonder"], "tensionTarget": 38, "themeHint": "the pigeon's four blocks" },
-        { "sceneFunction": "build_tension",     "activeMechanisms": ["chase"], "tensionTarget": 58, "themeHint": "the kestrel on the water tower" },
-        { "sceneFunction": "set_up_payoff",     "activeMechanisms": ["wonder", "separation"], "tensionTarget": 52, "themeHint": "the updraft he has always used" },
-        { "sceneFunction": "build_tension",     "activeMechanisms": ["chase", "deadline"], "tensionTarget": 76, "themeHint": "the flock is leaving" },
-        { "sceneFunction": "advance_plot",      "activeMechanisms": ["separation"], "tensionTarget": 84, "themeHint": "the wrong route, flown right" },
-        { "sceneFunction": "provide_relief",    "activeMechanisms": ["wonder"], "tensionTarget": 35, "themeHint": "four blocks, from above" }
+        {
+          "sceneFunction": "establish_world",
+          "activeMechanisms": [
+            "false_purpose"
+          ],
+          "tensionTarget": 25,
+          "themeHint": "the flock above the city"
+        },
+        {
+          "sceneFunction": "advance_plot",
+          "activeMechanisms": [
+            "relationship_externalization"
+          ],
+          "tensionTarget": 45,
+          "themeHint": "the storm splits them"
+        },
+        {
+          "sceneFunction": "reveal_character",
+          "activeMechanisms": [
+            "false_purpose",
+            "relationship_externalization"
+          ],
+          "tensionTarget": 38,
+          "themeHint": "the pigeon's four blocks"
+        },
+        {
+          "sceneFunction": "build_tension",
+          "activeMechanisms": [
+            "object_burden"
+          ],
+          "tensionTarget": 58,
+          "themeHint": "the kestrel on the water tower"
+        },
+        {
+          "sceneFunction": "set_up_payoff",
+          "activeMechanisms": [
+            "object_burden",
+            "false_purpose"
+          ],
+          "tensionTarget": 52,
+          "themeHint": "the updraft he has always used"
+        },
+        {
+          "sceneFunction": "build_tension",
+          "activeMechanisms": [
+            "relationship_externalization",
+            "clue_cascade"
+          ],
+          "tensionTarget": 76,
+          "themeHint": "the flock is leaving"
+        },
+        {
+          "sceneFunction": "advance_plot",
+          "activeMechanisms": [
+            "false_purpose"
+          ],
+          "tensionTarget": 84,
+          "themeHint": "the wrong route, flown right"
+        },
+        {
+          "sceneFunction": "provide_relief",
+          "activeMechanisms": [
+            "relationship_externalization"
+          ],
+          "tensionTarget": 35,
+          "themeHint": "four blocks, from above"
+        }
+      ],
+      "cast": [
+        {
+          "id": "PEEP",
+          "believes": "south is a direction she can feel"
+        },
+        {
+          "id": "GUTTER",
+          "believes": "he knows the way south"
+        },
+        {
+          "id": "KESTREL",
+          "believes": "the small one is easy prey"
+        }
       ]
     },
     {
@@ -124,14 +511,92 @@
       "premise": "A live overnight radio host takes a call from a man who describes, calmly and in verifiable detail, a murder that has not been reported. Her producer says it is a hoax. The police say it is a hoax. The caller says he will call back at four, and that by then she will have checked the one detail he gave that only the killer could know. She has ninety minutes of airtime and a studio door that locks from the inside.",
       "characters": "VIC SANDOVAL (host), TERE (producer), THE CALLER, DET. LOWE, THE NIGHT SECURITY GUARD",
       "beats": [
-        { "sceneFunction": "establish_world",   "activeMechanisms": ["suspense"], "tensionTarget": 35, "themeHint": "the studio at one in the morning" },
-        { "sceneFunction": "advance_plot",      "activeMechanisms": ["suspense", "threat"], "tensionTarget": 52, "themeHint": "the first call" },
-        { "sceneFunction": "build_tension",     "activeMechanisms": ["threat", "deadline"], "tensionTarget": 64, "themeHint": "nobody believes her" },
-        { "sceneFunction": "set_up_payoff",     "activeMechanisms": ["suspense", "secret"], "tensionTarget": 70, "themeHint": "the detail she can check" },
-        { "sceneFunction": "reveal_character",  "activeMechanisms": ["threat"], "tensionTarget": 74, "themeHint": "why she works nights" },
-        { "sceneFunction": "build_tension",     "activeMechanisms": ["threat", "deadline"], "tensionTarget": 86, "themeHint": "the guard does not answer" },
-        { "sceneFunction": "advance_plot",      "activeMechanisms": ["deadline"], "tensionTarget": 92, "themeHint": "four o'clock" },
-        { "sceneFunction": "provide_relief",    "activeMechanisms": ["suspense"], "tensionTarget": 48, "themeHint": "the dead air after" }
+        {
+          "sceneFunction": "establish_world",
+          "activeMechanisms": [
+            "clue_cascade"
+          ],
+          "tensionTarget": 35,
+          "themeHint": "the studio at one in the morning"
+        },
+        {
+          "sceneFunction": "advance_plot",
+          "activeMechanisms": [
+            "clue_cascade",
+            "object_burden"
+          ],
+          "tensionTarget": 52,
+          "themeHint": "the first call"
+        },
+        {
+          "sceneFunction": "build_tension",
+          "activeMechanisms": [
+            "legitimacy_split"
+          ],
+          "tensionTarget": 64,
+          "themeHint": "nobody believes her"
+        },
+        {
+          "sceneFunction": "set_up_payoff",
+          "activeMechanisms": [
+            "object_burden",
+            "clue_cascade"
+          ],
+          "tensionTarget": 70,
+          "themeHint": "the detail she can check"
+        },
+        {
+          "sceneFunction": "reveal_character",
+          "activeMechanisms": [
+            "relationship_externalization"
+          ],
+          "tensionTarget": 74,
+          "themeHint": "why she works nights"
+        },
+        {
+          "sceneFunction": "build_tension",
+          "activeMechanisms": [
+            "false_purpose",
+            "clue_cascade"
+          ],
+          "tensionTarget": 86,
+          "themeHint": "the guard does not answer"
+        },
+        {
+          "sceneFunction": "advance_plot",
+          "activeMechanisms": [
+            "clue_cascade",
+            "object_burden"
+          ],
+          "tensionTarget": 92,
+          "themeHint": "four o'clock"
+        },
+        {
+          "sceneFunction": "provide_relief",
+          "activeMechanisms": [
+            "legitimacy_split"
+          ],
+          "tensionTarget": 48,
+          "themeHint": "the dead air after"
+        }
+      ],
+      "cast": [
+        {
+          "id": "VIC",
+          "believes": "the caller is telling the truth"
+        },
+        {
+          "id": "TERE",
+          "believes": "it is a hoax and the show has to go on"
+        },
+        {
+          "id": "THE_CALLER",
+          "believes": "she will check the detail before four"
+        },
+        {
+          "id": "LOWE",
+          "believes": "there is no body, so there is no case"
+        }
       ]
     }
   ]

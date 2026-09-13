@@ -14,7 +14,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -24,6 +24,7 @@ const bench = await import(pathToFileURL(path.join(ROOT, 'scripts', 'story-bench
   parseLogLine: (line: string) => Record<string, unknown> | null;
   summariseCalls: (entries: Array<Record<string, unknown>>) => Record<string, unknown>;
   classifyRun: (a: { llmCalls: number; revisionPassesWithChanges: number; revisionPassCount: number }) => { ok: boolean; label: string };
+  castGroundingOps: (p: unknown) => Array<Record<string, unknown>>;
   scriptWordCount: (f: string) => number;
   renderTable: (rows: Array<Record<string, unknown>>) => string;
   packetFrontMatter: (rows: Array<Record<string, unknown>>, runDate: string) => string;
@@ -35,6 +36,18 @@ const FIXTURE = JSON.parse(
 ) as { premises: Array<Record<string, unknown>> };
 
 describe('story-bench fixture', () => {
+  it('every premise carries a cast, because IntentionalProof blocks an ungrounded character', () => {
+    for (const p of FIXTURE.premises) {
+      const cast = p.cast as Array<{ id: string; believes: string }>;
+      assert.ok(Array.isArray(cast) && cast.length >= 2, `${p.id}: needs a cast of at least two`);
+      for (const c of cast) {
+        assert.match(c.id, /^[A-Z][A-Z_]*$/, `${p.id}: cast ids are screenplay cues`);
+        assert.ok(c.believes.length > 10, `${p.id}/${c.id}: a belief must be a proposition, not a label`);
+      }
+      assert.equal(new Set(cast.map((c) => c.id)).size, cast.length, `${p.id}: duplicate cast id`);
+    }
+  });
+
   it('carries six premises of six distinct shapes, each with 6-10 beats', () => {
     assert.equal(FIXTURE.premises.length, 6);
     const shapes = FIXTURE.premises.map((p) => p.shape);
@@ -58,6 +71,32 @@ describe('story-bench fixture', () => {
     assert.match(readme, /HAND-AUTHORED/);
   });
 
+  it('every beat names a REGISTERED mechanism, so a commit is not blocked by MechanismProof', () => {
+    // MechanismProof is Tier 1 — it BLOCKS the commit — and it resolves each
+    // activeMechanisms entry against server/nvm/mechanisms/<id>.mech.json.
+    // The first version of this fixture used story-shaped names and every
+    // scene of every premise was rejected with "unknown mechanism ... no
+    // matching .mech.json". Read from disk rather than hard-coded, so adding a
+    // seventh mechanism does not make this test a lie.
+    const mechDir = path.join(ROOT, 'server', 'nvm', 'mechanisms');
+    const registered = new Set(
+      readdirSync(mechDir)
+        .filter((f) => f.endsWith('.mech.json'))
+        .map((f) => f.slice(0, -'.mech.json'.length)),
+    );
+    assert.ok(registered.size > 0, 'server/nvm/mechanisms must hold at least one .mech.json');
+
+    const unknown: string[] = [];
+    for (const p of FIXTURE.premises) {
+      for (const [i, beat] of (p.beats as Array<{ activeMechanisms: string[] }>).entries()) {
+        for (const m of beat.activeMechanisms) {
+          if (!registered.has(m)) unknown.push(`${p.id}[${i}]: ${m}`);
+        }
+      }
+    }
+    assert.deepEqual(unknown, [], `beats naming a mechanism with no .mech.json: ${unknown.join(', ')}`);
+  });
+
   it('every beat is a valid SceneTarget the converge routes accept', () => {
     const FUNCTIONS = new Set([
       'advance_plot', 'reveal_character', 'build_tension',
@@ -76,6 +115,29 @@ describe('story-bench fixture', () => {
         assert.ok(tension > 0 && tension <= 100, `${p.id}[${i}]: tensionTarget out of range`);
       });
     }
+  });
+});
+
+describe('story-bench cast grounding', () => {
+  it('emits one well-formed UPDATE_BELIEF per cast member', () => {
+    const p = FIXTURE.premises.find((x) => x.id === 'counterweight')!;
+    const ops = bench.castGroundingOps(p);
+    assert.equal(ops.length, (p.cast as unknown[]).length);
+    for (const op of ops) {
+      assert.equal(op.op, 'UPDATE_BELIEF');
+      const belief = op.belief as Record<string, unknown>;
+      // StoryOpItemSchema + llm-generator's parseOp both require a string
+      // proposition; the dispatcher keys characterBeliefs off charId, which is
+      // what buildSystemPreamble later reads as "known characters".
+      assert.equal(typeof op.charId, 'string');
+      assert.equal(typeof belief.proposition, 'string');
+      assert.equal(typeof belief.confidence, 'number');
+    }
+    assert.equal(new Set(ops.map((o) => (o.belief as { id: string }).id)).size, ops.length, 'belief ids must be distinct');
+  });
+
+  it('returns nothing for a premise with no cast, rather than a malformed op', () => {
+    assert.deepEqual(bench.castGroundingOps({ id: 'x' }), []);
   });
 });
 
@@ -143,8 +205,8 @@ describe('story-bench run classification — the honesty rule', () => {
 
 describe('story-bench reporting', () => {
   const rows = [
-    { id: 'alpha', shape: 'thriller', scenes: 8, words: 1200, health: 61.5, verdict: 'NEEDS WORK', llmCalls: 22, fallbacks: 3, wallMs: 91_000, promptTokens: 9000, completionTokens: 4000, status: 'ok' },
-    { id: 'b', shape: 'comedy', scenes: 0, words: 0, health: null, verdict: null, llmCalls: 0, fallbacks: 14, wallMs: 2_000, promptTokens: 0, completionTokens: 0, status: 'FAILED' },
+    { id: 'alpha', shape: 'thriller', scenes: 8, committedScenes: 8, requestedScenes: 8, words: 1200, health: 61.5, verdict: 'NEEDS WORK', llmCalls: 22, fallbacks: 3, revisionPassesWithChanges: 4, revisionPassCount: 14, wallMs: 91_000, promptTokens: 9000, completionTokens: 4000, status: 'ok' },
+    { id: 'b', shape: 'comedy', scenes: 0, committedScenes: 0, requestedScenes: 7, words: 0, health: null, verdict: null, llmCalls: 0, fallbacks: 14, revisionPassesWithChanges: 0, revisionPassCount: 14, wallMs: 2_000, promptTokens: 0, completionTokens: 0, status: 'FAILED' },
   ];
 
   it('renders one aligned row per run and an em dash for an absent score', () => {
@@ -152,6 +214,12 @@ describe('story-bench reporting', () => {
     const lines = table.split('\n');
     assert.equal(lines.length, 4, 'header, rule, two rows');
     assert.ok(lines[0].includes('premise') && lines[0].includes('fallbacks') && lines[0].includes('tokens'));
+    // The scenes column is committed/requested, never a bare count: a premise
+    // whose scenes were rejected by a Tier 1 proof must not read as a premise
+    // that asked for that many.
+    assert.ok(lines[3].includes('0/7'), 'a run that committed nothing must show 0/7, not 0');
+    assert.ok(lines[2].includes('8/8'));
+    assert.ok(lines[0].includes('passes changed'), 'the revision column must be in the table');
     assert.match(lines[2], /alpha/);
     assert.match(lines[3], /FAILED/);
     assert.ok(lines[3].includes('—'), 'a run with no score shows an em dash, never 0');
