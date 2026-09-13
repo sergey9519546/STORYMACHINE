@@ -2973,10 +2973,10 @@ branch.
   every command listed above in this worktree and read its output. I did NOT
   run `npm run measure-real`, `scripts/measure-auc-split.mjs`, or any other
   private-corpus measurement: `REAL_SCRIPT_CORPUS_DIR` is unset here and the
-  corpus does not exist in this environment. No number in this entry is
-  simulated, estimated, extrapolated or projected; every figure above came out
-  of a command that ran. The AUC-24 for this range **has not been run** and is
-  the owner's step.
+  corpus does not exist in this environment. Every figure above came out of a
+  command that ran in this worktree, and I read its output; nothing in this
+  entry stands in for a run that did not happen. The AUC-24 for this range
+  **has not been run** and is the owner's step.
 - **What the owner reads first.** `npm run --silent probe-corpus-shape --` on
   the private corpus, and specifically its **`>tr`** column — the same
   instrument round 3 added as `@cue`, for the same reason. A draft whose `>tr`
