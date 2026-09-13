@@ -344,7 +344,7 @@ All run on the final rebased tree (`lane/story-bench` on `origin/main`
 | scoring receipt | `node scripts/check-scoring-receipt.mjs main..HEAD` | **0** — *"no scoring-path files changed"* |
 | unverified-gate report | `npm run gates` | **0** |
 | brain graph | `npm run brain` then `npm run check-brain` | **0** — 118 notes, 468 links, fresh |
-| full suite | `npm test` | **0** — 14,047 tests, **13,955 pass / 0 fail**, 91 skipped, 1 todo, 341 s, once on the final rebased tree |
+| full suite | `npm test` | **0** — 14,047 tests, **13,955 pass / 0 fail**, 91 skipped, 1 todo, ~341 s. Run on the rebased tree, and run AGAIN after the three docs-only commits that followed it: identical counts both times |
 
 **`check-scoring-receipt` agrees that generation is not the scoring path**, as
 the brief asked me to confirm: the range reports *no scoring-path files
@@ -365,6 +365,10 @@ and with no provider configured it prints *"Nothing was measured. This is not a
 result."* and exits 2. What DOES run in CI is
 `tests/scripts/story-bench.test.ts`, which imports the module for its pure
 helpers and never boots a server or makes a call.
+
+Verified rather than asserted: with `.env` reduced to `AI_PROVIDER=gemini` and
+no key, `node scripts/story-bench.mjs` printed those two sentences and exited
+**2**, and `grep -rn "story-bench" .github/` returns nothing.
 
 ---
 
