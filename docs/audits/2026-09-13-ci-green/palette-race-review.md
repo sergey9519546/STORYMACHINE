@@ -481,3 +481,79 @@ of the finding.
 Items 1, 2, 3 and 6 are closed and will not be re-checked. Item 4 and item 5
 are closed in the report and re-check only against R2-1. Nothing else from
 round 1 remains open; on R2-1 landing, this lane is a MERGE.
+
+---
+
+# Round 3 (`9ddf6d81`)
+
+The lane was rebased over `main` @ `030782e2` (voice-bound and ci-concurrency
+now sit underneath), so the round-2 SHAs are rewritten: the reviewed content
+is `d189a0fa` (the R2-1 comment rewrite) and `9ddf6d81` (the three-lane brain
+note union), with the round-1 and round-2 lane commits unchanged in content.
+One item was open. It is closed.
+
+## R2-1 — CLOSED
+
+Read against the three bullets of round 2's list:
+
+- **The retracted premise is gone.** `"on a loaded CI runner the Ship-panel
+  wait above can itself eat into that 0.14s window"` no longer appears
+  anywhere in `scripts/` or `tests/` (grep: the only remaining occurrences in
+  the repository are this review file quoting the old text). In its place the
+  comment names the actual quantity — the one-time `React.lazy` import of
+  `ShipPanel` on the first Ship open in a session, 813 ms first open against
+  27-66 ms on every later open — and draws the right consequence for both
+  observations: 17/17 idle here because this suite opens Ship exactly once and
+  always pays the slow first-import path; 3/3 red on the runner because that
+  same one-time cost lands under the detach window there.
+- **The inverted throttling sentence is gone and replaced with its
+  correction.** `"reproduced deterministically under CPU throttling"` is now
+  `"CPU throttling and a CPU hog do NOT reproduce this: they slow the lazy
+  import's transform along with everything else, pushing the gap back past the
+  detach window and MASKING the race (measured 10/10, 10/10, 7/8 passing under
+  throttling/load) — the reproduction that actually goes red is the cold,
+  repeated-open path, not a throttled one."` That is the lane's own finding,
+  stated as the finding rather than as its inverse.
+- **0.14 s is a floor everywhere it is cited.** All five surviving citations
+  (`scripts/verify-e5-command-palette.mjs:138,139,184,186` and
+  `tests/core/command-palette-wiring.test.ts:217`) now say "declared duration"
+  / "a floor, not the mounted window" and carry the measured 212-293 ms detach
+  beside them. The Escape-close block also picks up the argument round 1 asked
+  for and round 2 found only in the report: the Settings check's old 300 ms
+  margin "sat INSIDE the measured 212-293ms range rather than comfortably past
+  it". The report's "every place that cited 0.14s has been corrected" sentence
+  is now true of the code as well as of itself.
+
+Comments only, as claimed: `git show d189a0fa --stat` is two files, +51/-30,
+and no executable line moved.
+
+## Re-run here
+
+| command | result |
+|---|---|
+| `node --experimental-strip-types tests/core/command-palette-wiring.test.ts` | **29/29, 0 fail** |
+| `node --experimental-strip-types tests/scripts/wait-for-function-options-position.test.ts` | 21/21, 0 fail (re-run after the rebase: the fixture that reads the real shipped script still matches it verbatim) |
+| `npm run check-brain` | OK, 114 notes, 454 links, fresh |
+| `node --experimental-strip-types tests/core/brain-coverage.test.ts` | 7/7 |
+
+## Round-1 item (e) — settled by the lane
+
+`docs/brain/Audits/Audit - 2026-09-13 CI Green.md` at `9ddf6d81` is the
+three-lane union round 1 asked the orchestrator to produce: one shared
+directory blurb, a `## Lane:` section each for voice-bound, ci-concurrency and
+palette-close-race, and a `sources:` list containing all three lane reports
+(the palette report included). `check-brain` passes on the merged graph, so
+the `GRAPH.md` / `brain.graph.json` counter conflict round 1 flagged was
+resolved by regeneration rather than by hand-merging hunks.
+
+One nit, not blocking and not worth a round: that note's palette paragraph
+still summarizes the mechanism as "a 0.14s timed animation" without the floor
+qualifier now carried everywhere else. It is true as written (0.14 s is what
+the component declares) and it is a summary, not evidence. Fold it in the next
+time the note is regenerated, or leave it.
+
+Nothing from rounds 1 or 2 remains open, and round 3 introduced no new
+findings: the diff is comments plus a brain note, both verified against the
+measurements they cite.
+
+## VERDICT: MERGE
