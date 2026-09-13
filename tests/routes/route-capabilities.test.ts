@@ -233,6 +233,10 @@ const deterministicRoutes: ReadonlySet<string> = new Set([
   'POST /api/emotional-arc', 'POST /api/director-style', 'POST /api/story-genre',
   'POST /api/story-tone', 'POST /api/character-arc-mode', 'POST /api/story-theme',
   'GET /api/outline', 'POST /api/outline', 'DELETE /api/outline', 'POST /api/outline/apply-preset',
+  // Necessity Certificate FORM check: a pure function of the request body
+  // (server/lib/necessity-certificate.ts imports nothing but the prompt
+  // sanitizer), so it reaches no provider — gameLimiter, and keyless.
+  'POST /api/outline/necessity-check',
   'GET /api/session/export', 'POST /api/session/import', 'POST /api/session/rotate',
   'POST /api/session/delete',
   // server/routes/ai-providers.ts

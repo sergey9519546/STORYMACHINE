@@ -103,6 +103,61 @@ export interface NecessityCertificate {
   forcingFunction: string;
 }
 
+// ── Where it attaches ───────────────────────────────────────────────────────
+//
+// The certificate rides INSIDE the outline beat it belongs to — the beat
+// object server/routes/config.ts persists (`stage.setOutline`) and
+// server/engine/Stage.ts serializes into Illusion_State.outline_json — so it
+// travels with the beat through save, reload, export and preset replacement
+// without a second store to keep in sync.
+//
+// WHY IT IS NOT A FIELD ON `OutlineBeat` ITSELF. OutlineBeat is declared in
+// server/engine/types.ts:383, and server/engine/types.ts is INSIDE the
+// reachable set rooted at server/nvm/analyze/doctor.ts — i.e. it is a
+// SCORING-PATH file by scripts/check-scoring-receipt.mjs's tier-2 definition
+// (verified with scripts/lib/import-graph.mjs's computeReachableSet). Editing
+// it requires a measurement receipt for a change that touches no score at
+// all. The certificate is author-stated prose that reaches a prompt and
+// nothing else, so it is modelled as a structural EXTENSION of the beat here
+// instead. Nothing is lost: server/lib/validation.ts's OutlineBeatSchema is
+// `.passthrough()`, the POST /api/outline handler spreads `...beat`, and
+// Stage.ts round-trips the beat as JSON — so the field survives the whole
+// path, and this module is where it is typed, validated and sanitized.
+
+/** An outline beat carrying its certificate. Structural, so it applies to
+ *  engine/types.ts's OutlineBeat and to the client's own beat type alike
+ *  without either importing the other. */
+export type WithNecessity<T> = T & { necessity?: NecessityCertificate };
+
+/** The fields of a beat that identify it. */
+export interface NecessityBeatRef {
+  phase: string;
+  turn_start: number;
+  turn_end: number;
+}
+
+/**
+ * The canonical id of the beat a certificate belongs to.
+ *
+ * OutlineBeat has no id field, and the outline is an ARRAY — an array index
+ * would re-point every certificate at a different beat the moment a beat is
+ * inserted or removed. Phase plus turn range is what the engine itself uses
+ * to select the active beat (server/engine/agent/decision.ts:196 and
+ * server/engine/DirectorNode.ts:874 both find a beat by
+ * `phase === phase && turn within [turn_start, turn_end]`), so it is the
+ * identity the rest of the system already treats as a beat's identity.
+ *
+ * The route stamps this onto every stored certificate, which is what makes
+ * `beatIdMismatch` meaningful: a certificate whose id does not match the beat
+ * carrying it has been moved, not authored, for that beat.
+ */
+export function necessityBeatId(beat: NecessityBeatRef): string {
+  const phase = typeof beat.phase === 'string' ? beat.phase : '';
+  const start = Number.isFinite(beat.turn_start) ? beat.turn_start : 0;
+  const end = Number.isFinite(beat.turn_end) ? beat.turn_end : 0;
+  return `${phase}:${start}-${end}`;
+}
+
 // ── Form thresholds (the defensible bar) ────────────────────────────────────
 
 /** Minimum trimmed length of one answer, in characters.

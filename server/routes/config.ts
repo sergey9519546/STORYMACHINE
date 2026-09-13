@@ -14,7 +14,13 @@ import {
   PacingTargetBodySchema, EmotionalArcBodySchema, DirectorStyleBodySchema,
   StoryGenreBodySchema, CharacterArcModeBodySchema, StoryThemeBodySchema,
   ApplyPresetBodySchema, RotateSessionBodySchema, DeleteSessionBodySchema,
+  NecessityCheckBodySchema,
 } from '../lib/validation.ts';
+import {
+  checkNecessity, coerceNecessityCertificate, necessityBeatId,
+  NECESSITY_CHECK_DISCLAIMER, NECESSITY_QUESTIONS,
+  type NecessityCertificate,
+} from '../lib/necessity-certificate.ts';
 import { z } from 'zod';
 import type { ToneName } from '../lib/genre-router.ts';
 import {
@@ -495,7 +501,26 @@ router.post('/api/outline', gameLimiter, validate(OutlineBodySchema), withSessio
     const beat = b as Record<string, unknown>;
     const sanitizeField = (v: unknown, max = 500) =>
       typeof v === 'string' ? sanitizeForPrompt(v, max) : v;
-    return {
+    // The Necessity Certificate (server/lib/necessity-certificate.ts) rides
+    // inside the beat and takes the same road into a generation prompt as
+    // goal/constraint/avoid, so it gets the same treatment plus one more:
+    // coerceNecessityCertificate() flattens newlines, which on a four-line
+    // prompt block would otherwise forge a fifth line. The stored beatId is
+    // STAMPED from the beat itself rather than trusted from the client — that
+    // is what makes a later beatIdMismatch mean "this certificate was moved",
+    // not "the client sent a different string".
+    const rawNecessity = coerceNecessityCertificate(beat.necessity);
+    const necessity: NecessityCertificate | undefined = rawNecessity
+      ? {
+          ...rawNecessity,
+          beatId: necessityBeatId({
+            phase: typeof beat.phase === 'string' ? beat.phase : '',
+            turn_start: Number(beat.turn_start),
+            turn_end: Number(beat.turn_end),
+          }),
+        }
+      : undefined;
+    const out: Record<string, unknown> = {
       ...beat,
       goal:       sanitizeField(beat.goal),
       constraint: sanitizeField(beat.constraint),
@@ -503,6 +528,10 @@ router.post('/api/outline', gameLimiter, validate(OutlineBodySchema), withSessio
       description: sanitizeField(beat.description, 1000),
       title:      sanitizeField(beat.title, 256),
     };
+    // Absent stays absent: a beat the writer never answered for must not gain
+    // an empty certificate that four blank answers would then "fail".
+    if (necessity) out.necessity = necessity; else delete out.necessity;
+    return out;
   });
   stage.setOutline(sanitizedBeats as OutlineBeat[]);
   res.json({ status: 'ok', beatCount: sanitizedBeats.length });
@@ -512,6 +541,31 @@ router.delete('/api/outline', gameLimiter, withSessionCommand(async (_req, res, 
   const { stage } = session;
   stage.setOutline([]);
   res.json({ status: 'cleared' });
+}));
+
+// POST /api/outline/necessity-check — the Necessity Certificate's FORM check,
+// exposed so the writer's outline surface can show per-field reasons without
+// re-implementing the rules in the browser (one implementation:
+// server/lib/necessity-certificate.ts).
+//
+// KEYLESS AND DETERMINISTIC BY CONSTRUCTION: no AI import, no session read, no
+// clock — the response is a pure function of the request body, which is why
+// this takes gameLimiter rather than aiLimiter. It reports whether each of the
+// four questions was ANSWERED, never whether an answer is good; the response
+// carries that sentence (`disclaimer`) so no surface can render the verdict
+// without the limit on it.
+router.post('/api/outline/necessity-check', gameLimiter, validate(NecessityCheckBodySchema), asyncHandler(async (req, res) => {
+  const body = req.body as {
+    certificate: Record<string, unknown>;
+    beatId?: string;
+    context?: string[];
+  };
+  const cert = coerceNecessityCertificate(body.certificate);
+  const result = checkNecessity(cert, {
+    beatId: typeof body.beatId === 'string' ? body.beatId : undefined,
+    context: Array.isArray(body.context) ? body.context : undefined,
+  });
+  res.json({ ...result, questions: NECESSITY_QUESTIONS, disclaimer: NECESSITY_CHECK_DISCLAIMER });
 }));
 
 // Apply a structure preset — instantiates beat templates into OutlineBeat[] and persists.

@@ -11,6 +11,9 @@ import { STORY_OP_KINDS } from '../nvm/ops/StoryOp.ts';
 import { TONE_NAME_LIST, GENRE_NAMES } from './genre-router.ts';
 import { ARC_TENSION_CURVES, STYLE_MODIFIERS, CHARACTER_ARC_MODES, STRUCTURE_NAMES } from './structure-presets.ts';
 import { MAX_FOUNTAIN_CHARS } from './runtime-limits.ts';
+// One cap for a certificate answer, shared with the form checker rather than
+// re-typed as a literal here (see NecessityCertificateSchema below).
+import { NECESSITY_MAX_CHARS } from './necessity-certificate.ts';
 // One definition of "what is a character cue" (2026-09-04, guard/analyzer cue
 // parity fix; revised same day after independent review found a second gap).
 // CUE_INITIAL_CLASS / CUE_LETTER_CLASS are src/lib/fountain.ts's OWN
@@ -2238,6 +2241,25 @@ const noControlChars = z.string().refine(s => !CONTROL_CHARS_RE.test(s), {
   message: 'must not contain control characters',
 });
 
+// Necessity Certificate (server/lib/necessity-certificate.ts) — the four
+// stated reasons a scene exists, authored at outline time and carried INSIDE
+// the beat so they travel with it. Validated here for SHAPE and size only:
+// whether the four answers are well-FORMED is checkNecessity()'s job (one
+// implementation, deliberately not restated as zod refinements), and whether
+// they are GOOD is nobody's job in this codebase — NORTH_STAR §1 forbids an
+// LLM judge and no deterministic rule is a substitute for one.
+//
+// Every field is capped at NECESSITY_MAX_CHARS — the same 500 the beat's own
+// goal/constraint/avoid carry below, because these four strings take the same
+// road: POST /api/outline → Illusion_State.outline_json → a generation prompt.
+export const NecessityCertificateSchema = z.object({
+  beatId:          noControlChars.max(128).default(''),
+  whyNow:          noControlChars.max(NECESSITY_MAX_CHARS).default(''),
+  whyHere:         noControlChars.max(NECESSITY_MAX_CHARS).default(''),
+  whyThem:         noControlChars.max(NECESSITY_MAX_CHARS).default(''),
+  forcingFunction: noControlChars.max(NECESSITY_MAX_CHARS).default(''),
+});
+
 export const OutlineBeatSchema = z.object({
   phase: z.enum(['Setup', 'Turn', 'Prestige']),
   turn_start: z.number().int().min(0),
@@ -2247,6 +2269,7 @@ export const OutlineBeatSchema = z.object({
   avoid:       noControlChars.max(500).default(''),
   title:       noControlChars.max(256).default('').optional(),
   description: noControlChars.max(1000).default('').optional(),
+  necessity:   NecessityCertificateSchema.optional(),
 }).passthrough().refine(
   b => b.turn_end >= b.turn_start,
   { message: 'turn_end must be >= turn_start', path: ['turn_end'] },
@@ -2254,6 +2277,17 @@ export const OutlineBeatSchema = z.object({
 
 export const OutlineBodySchema = z.object({
   beats: z.array(OutlineBeatSchema).max(50),
+});
+
+// POST /api/outline/necessity-check — the keyless form check the writer's
+// outline surface calls. Body is one certificate plus optional context (the
+// scene heading / beat goal the answers are about, which the restates_context
+// rule reads). No sessionId: the check is a pure function of its body and
+// touches no session state.
+export const NecessityCheckBodySchema = z.object({
+  certificate: NecessityCertificateSchema,
+  beatId: noControlChars.max(128).optional(),
+  context: z.array(noControlChars.max(1000)).max(8).optional(),
 });
 
 // ── Collaboration rooms (share-link capability model) ───────────────────────
