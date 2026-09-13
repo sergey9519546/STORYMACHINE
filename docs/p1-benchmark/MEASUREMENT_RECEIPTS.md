@@ -2877,3 +2877,109 @@ correction cannot have moved anything on them.
 
 If AUC-24 falls, the finding is about what those drafts contain and what shape
 they arrive in. Read them. Do not move `AUC24_FLOOR`.
+
+---
+
+### 2026-09-13 — RENDERER RESIDUALS: Fountain's forced transition `>` read at the parser seam and stripped by every renderer, and the `@`-out-of-cue-position decision written down (PENDING OWNER MEASUREMENT — no real-corpus run happened)
+
+**Branch:** `scoring/renderer-residuals`, stacked on `scoring/forced-cue` @
+`089bec91`, which is stacked on `scoring/adversarial-2026-09-12` @ `4cf5b2f3`.
+**This is a scoring-path change** (`src/lib/fountain.ts`,
+`server/nvm/analyze/screenplay-normalizer.ts`,
+`server/nvm/analyze/canonical-fountain.ts`) **and its AUC-24 is not known.**
+`node scripts/check-scoring-receipt.mjs 089bec91..HEAD` exits **1** on this
+entry, which is the intended state: the entry is an honest ledger row, not a
+receipt. No AUC-24 number is stated, implied or projected anywhere on this
+branch.
+
+- **Command:** `npm run benchmark:public` (on this tree and on a
+  `git archive 089bec91` export) ·
+  `node scripts/check-doctor-output-identity.mjs --tree <089bec91 export>
+  --out <before>`, `--tree . --out <after>`, `--compare <before> <after>`, with
+  `GIT_SHA=batterypin` pinned equal on both sides ·
+  `npm run --silent probe-corpus-shape -- --public` ·
+  `npm run test:metamorphic` ·
+  `node --experimental-strip-types --test tests/core/parse-format-invariance.test.ts
+  tests/core/fdx-import.test.ts` (and the adjacent suites listed in the lane
+  report) · `npm run lint` · `npm run check-no-console` ·
+  `npm run check-server-reachability` · `npm run build` · `npm run check-docs` ·
+  `npm run honesty-audit` · `npm run check-brain` · `npm run gates` ·
+  `npm test`. Every one was run in the foreground in this worktree and its
+  output read. **`npm run measure-real` was NOT among them** — see the
+  attestation below.
+- **Git SHA:** measured on `scoring/renderer-residuals`, branched from
+  `089bec91` — a real commit in this repository, and an ancestor of this
+  branch. The last commit touching anything outside `docs/` is named in
+  `docs/audits/2026-09-12-adversarial/residuals-lane-report.md`.
+- **Measured AUC-24:** **not applicable, and deliberately left blank.** No
+  real-corpus measurement was run for this range and none is claimed. The
+  private corpus does not exist in this environment and must never be uploaded
+  to one.
+- **What changed, and why it is on the scoring path.** `parseFountain` had no
+  forced-transition branch, so a `>` line was typed `action`. The analysis seam
+  stripped the marker anyway (`stripForcedMarkers`, whose `>` entry carried
+  `parserTypes: false` precisely because the parser did not read it) while all
+  four exporters printed `>CUT TO:` verbatim at the action indent. A CUSTOM
+  transition — `>SMASH TO BLACK.`, which no inferred rule in this parser
+  reaches — was worse still: the seam's re-parse check refused the strip, so
+  the line stayed ACTION PROSE carrying a literal `>` into every rule lexicon
+  and word count. That is the case the marker exists for.
+- **Public-benchmark statistics, this tree and the `089bec91` export, same
+  command:** `SHUFFLE_DROP` matched-pair **0.8438** [0.7188, 0.9688] /
+  all-pairs **0.7896** [0.6738, 0.8975]; `CLIMAX_RELOCATE` **0.5938**
+  [0.4219, 0.7500] / **0.5234** [0.4678, 0.5874]; `DIALOGUE_FLATTEN` (control)
+  **1.0000** [1.0000, 1.0000] / **0.9814** [0.9531, 1.0000]. **All six
+  identical to the digit on both trees**, so no floor would move and none was
+  moved: `npm run benchmark:public -- --lock` was NEVER run, `AUC24_FLOOR` is
+  untouched at 0.622, and `git diff 089bec91..HEAD -- scripts/lib/auc.ts
+  tests/fixtures/public-corpus-manifest.json
+  tests/fixtures/public-benchmark-split.json` is empty. The control was checked
+  deliberately, because a change to transition or character typing is exactly
+  the kind that could move it: it did not.
+- **Output identity: PASS — all 45 reports byte-identical** (`analyzedAt`
+  excluded), `GIT_SHA=batterypin` pinned equal on both trees.
+- **Re-scored all 32 committed public scripts on both trees: 0 of 32 surfaces
+  differ.** The reason is checkable rather than hoped for: no committed fixture
+  contains a line beginning `>` or `@` (grep over `data/screenplays/*.fountain`,
+  `tests/fixtures/*.fountain`, `tests/fixtures/blind-pairs/*.fountain` returns
+  zero), and `npm run --silent probe-corpus-shape -- --public` reads
+  **"scripts with a forced transition 0 of 32"** in its new `>tr` column.
+- **THE SIZE OF THE CHANGE, measured on the same 32 scripts with the SAME
+  BYTES on both trees** — one custom forced transition (`>SMASH TO BLACK.`)
+  inserted before each script's last scene heading, nothing else altered:
+  **8 of 32 reports differ between the two engines**, mean health delta over
+  all 32 **+0.028**, largest **+3.1** (`transfer-window`, 51.6 -> 54.7),
+  largest in the other direction **-1.5** (`the-key-under-the-mat`,
+  69.3 -> 67.8), **0 verdict flips and 0 scene-count changes**. Against the
+  untouched script, that one marked line costs **-4.2** on `transfer-window`
+  at `089bec91` and **-1.1** here. The mechanism is scene-text density: an
+  `action` block feeds `actionLines`, the word count and every rule lexicon
+  (`server/nvm/analyze/fountain-analyzer.ts`, the `extractSceneContent`
+  accumulation), a `transition` block is skipped by those heuristics while
+  still counting in `wordCount` via `PRINTING_BLOCK_TYPES`. The direction is
+  not uniformly favourable — `night-shift-excellent` goes 82 -> 100 issues and
+  78.9 -> 77.8 — which is what a correctness fix looks like rather than a
+  tuning one.
+- **A redundant `>` on lines the parser ALREADY typed as transitions moves 0 of
+  the 6 applicable scripts on BOTH trees**, unchanged: round 2's normaliser
+  strip already closed that half, and this change does not disturb it.
+- **Corpus fingerprint:** none for AUC-24 — no private corpus was read, and no
+  AUC-24 value appears anywhere in this entry. The corpus that WAS read is the
+  32 committed distributable scripts (20 CC0 `data/screenplays/*.fountain` plus
+  the 12 `tests/fixtures/blind-pairs/*.fountain`), whose sha256s are pinned in
+  `tests/fixtures/public-corpus-manifest.json` and are byte-identical to
+  `089bec91`.
+- **Runner attestation:** I am the lane agent that built this change. I ran
+  every command listed above in this worktree and read its output. I did NOT
+  run `npm run measure-real`, `scripts/measure-auc-split.mjs`, or any other
+  private-corpus measurement: `REAL_SCRIPT_CORPUS_DIR` is unset here and the
+  corpus does not exist in this environment. No number in this entry is
+  simulated, estimated, extrapolated or projected; every figure above came out
+  of a command that ran. The AUC-24 for this range **has not been run** and is
+  the owner's step.
+- **What the owner reads first.** `npm run --silent probe-corpus-shape --` on
+  the private corpus, and specifically its **`>tr`** column — the same
+  instrument round 3 added as `@cue`, for the same reason. A draft whose `>tr`
+  count is 0 cannot have moved because of this change, so a corpus of zeroes
+  settles the question in one run. Only then AUC-24. If it falls, read the
+  drafts; do not move `AUC24_FLOOR`.
