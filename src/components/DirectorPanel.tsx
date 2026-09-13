@@ -6,6 +6,7 @@ import {
   NECESSITY_FIELDS,
   NECESSITY_QUESTIONS,
   NECESSITY_CHECK_DISCLAIMER,
+  NECESSITY_SAVED_WITH_BEAT_COPY,
   type NecessityCertificate,
   type NecessityField,
   type WithNecessity,
@@ -1538,7 +1539,7 @@ export default function DirectorPanel({
                           Necessity — why this scene exists
                         </legend>
                         <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] leading-relaxed">
-                          {NECESSITY_CHECK_DISCLAIMER} Answers you give are sent to the generator as constraints on the scene.
+                          {NECESSITY_CHECK_DISCLAIMER} {NECESSITY_SAVED_WITH_BEAT_COPY}
                         </p>
                         {NECESSITY_FIELDS.map((field) => {
                           const fieldResult = necessityChecks[idx]?.fields?.[field];

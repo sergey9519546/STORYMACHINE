@@ -301,6 +301,16 @@ export const NECESSITY_CHECK_DISCLAIMER =
   'This checks that you answered all four questions, not whether the answers are good. ' +
   'No model reads them and nothing here scores them — the engine cannot tell a true reason from a plausible one.';
 
+/** What the writer is told about where the answers go. Conditional on
+ *  purpose, because the claim has to hold in every state: the certificate is
+ *  stored on the beat unconditionally, and it becomes prompt constraints for
+ *  a scene generated FROM that beat (buildSystemPreamble, via a SceneTarget
+ *  carrying it). It does not claim that some other scene, generated from an
+ *  archetype rather than from this beat, is constrained by it — no client
+ *  generates scenes from outline beats today. */
+export const NECESSITY_SAVED_WITH_BEAT_COPY =
+  'Answers are saved with the beat, and a scene generated from this beat states all four to the generator as constraints.';
+
 // ── Normalization ───────────────────────────────────────────────────────────
 
 /** Lowercase, strip everything that is not a letter/digit/space, collapse

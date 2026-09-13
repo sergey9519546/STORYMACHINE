@@ -829,6 +829,90 @@ with each mechanism disarmed before passing with it.
 
 ---
 
+## Decision #8: A Necessity Certificate is Form-Checked, Never Judged (2026-09-13)
+
+**Context**: `docs/research-archive/_CLEVER_MOVES.md` §10 designed the
+Necessity Certificate — four questions (why now, why here, why these
+characters, what makes the scene unavoidable) answered at outline time, so
+that generation is given the four anchors it currently invents. It was never
+built. Building it forces a question the archive answered in one sentence and
+that this repository has to answer as a standing rule, because the same
+question will be asked of every future quality feature: what does the engine
+do with the answers?
+
+**The Question**: Does the engine check that the four questions were
+ANSWERED, or does it also assess whether an answer is a GOOD reason?
+
+**Options Considered**:
+
+1. **Form only.** Deterministic rules over the TEXT — present, non-empty,
+   long enough, enough different words, not only placeholder tokens, not a
+   restatement of the scene heading, not a copy of a sibling answer — and no
+   opinion whatsoever about the content.
+2. **Form plus an LLM quality pass.** Ask a model whether "because the
+   protagonist needs a win" is a real reason, and surface that as a warning.
+3. **Form plus a deterministic "quality" heuristic.** No model, but rules
+   that reach for meaning — require a time expression in `whyNow`, a
+   location noun in `whyHere`, and so on (which is what the archive's own
+   field COMMENTS promise, though its code never implements them).
+
+**Decision**: **Form only** (Option 1), as a standing constraint on this
+feature and on anything built on top of it.
+
+**Rationale**:
+
+- Option 2 is `NORTH_STAR.md` §1's *no LLM-as-judge* verbatim: every verdict
+  a user sees is a deterministic rule, inspectable and reproducible; LLMs may
+  SENSE but never SCORE. A model grading a stated reason is a verdict a user
+  sees. There is no version of it that is not the banned thing.
+- Option 3 fails for a subtler reason and is the tempting one. A rule that
+  demands a time expression in `whyNow` is not a form check with extra care;
+  it is a *bad* judge — it passes "at some point soon" and fails "the vault
+  opens once and it is opening" for having no clock noun. It would ship the
+  judgement of Option 2 with none of its ability, while looking deterministic
+  enough to trust. The archive's own comments describe Option 3; its code
+  implements Option 1. The code was right.
+- The measured failure mode is the SKIPPED question, not the weak answer. The
+  archive states this plainly ("the engine's job is to enforce that *some*
+  answer exists, which is enough to catch the 90% case"). The engine has no
+  standing to do more: it cannot tell a true reason from a plausible one, and
+  a feature that pretends otherwise is a trust liability of the kind
+  `docs/CLAIMS_REGISTER.md` exists to police.
+- What Option 1 gives up is real and worth naming: a writer who fills all
+  four boxes with fluent nonsense passes. That is the archive's 10% case, and
+  optimizing for it is precisely how the check becomes a judge.
+
+**Implications**:
+
+- `checkNecessity()` (`server/lib/necessity-certificate.ts`) makes no model
+  call, reads no corpus, and returns the same result for the same input
+  forever. `tests/nvm/generate/craft-guardrails.test.ts`'s sibling assertions
+  and this lane's own tests pin that shape.
+- Every surface that shows a necessity verdict must also show what the check
+  does not do. The sentence is a single exported constant
+  (`NECESSITY_CHECK_DISCLAIMER`), returned with every route response and
+  registered in `docs/CLAIMS_REGISTER.md` (row 117), so a surface cannot
+  render the verdict without the limit on it.
+- The thresholds are floors on EFFORT, not on quality. A shallow but
+  well-formed answer passes, and a test asserts it, so a future change that
+  starts failing weak answers fails a test that says why.
+- Raising a threshold is allowed; adding a rule that reads for MEANING is
+  this decision being revisited, not an implementation detail.
+
+**Expected Outcomes**: scenes generated from a beat with a certificate carry
+four author-stated anchors instead of four the model invented; no quality
+verdict anywhere in the feature; and the next proposal to "just have the
+model check whether the reason is any good" has a decision to argue with.
+
+**Status**: Active
+
+**Revision History**: 2026-09-13 — created with the feature
+(`lane/necessity-certificate`); see
+`docs/story-generation/NECESSITY_CERTIFICATE.md` and
+`docs/audits/2026-09-13-necessity/necessity-lane-report.md`.
+
+---
+
 ## Decision Template (for future entries)
 
 **Context**: What situation prompted this decision?
