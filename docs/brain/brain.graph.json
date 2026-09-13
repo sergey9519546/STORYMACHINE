@@ -67,6 +67,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-13 Necessity Certificate.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-13 Necessity Certificate",
+      "path": "docs/brain/Audits/Audit - 2026-09-13 Necessity Certificate.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-13 Owner Measure Lane.md",
       "type": "audit",
       "title": "Audit — 2026-09-13 Owner Measure Lane",
@@ -161,6 +167,12 @@
       "type": "decision",
       "title": "Decision #7 — Bound One Analysis by Wall Clock, Not by Shape (2026-09-06)",
       "path": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
+    },
+    {
+      "id": "docs/brain/Decisions/Decision 8 - Necessity Certificate is Form-Checked Never Judged.md",
+      "type": "decision",
+      "title": "Decision #8 — A Necessity Certificate is Form-Checked, Never Judged (2026-09-13)",
+      "path": "docs/brain/Decisions/Decision 8 - Necessity Certificate is Form-Checked Never Judged.md"
     },
     {
       "id": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
@@ -969,6 +981,26 @@
       "to": "docs/brain/Patterns.md"
     },
     {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 Necessity Certificate.md",
+      "to": "docs/brain/Decisions/Decision 8 - Necessity Certificate is Form-Checked Never Judged.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 Necessity Certificate.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 Necessity Certificate.md",
+      "to": "docs/brain/Decisions/Decision 8 - Necessity Certificate is Form-Checked Never Judged.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 Necessity Certificate.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 Necessity Certificate.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
       "from": "docs/brain/Audits/Audit - 2026-09-13 Owner Measure Lane.md",
       "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
@@ -1206,6 +1238,18 @@
     },
     {
       "from": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 8 - Necessity Certificate is Form-Checked Never Judged.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 Necessity Certificate.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 8 - Necessity Certificate is Form-Checked Never Judged.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 8 - Necessity Certificate is Form-Checked Never Judged.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
     },
     {
