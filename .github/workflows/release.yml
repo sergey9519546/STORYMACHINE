@@ -131,7 +131,30 @@ jobs:
         env:
           RUN_E2E: "1"
           GIT_SHA: ${{ github.sha }}
-        run: npm test
+        # Mirrors ci.yml's pipefail+tee — see that file's comment for why
+        # `set -o pipefail` is required (otherwise a failing `npm test`
+        # piped into `tee` reports tee's own exit code, 0).
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.tap
+
+      # Mirrors ci.yml's failure-summary step — see that file's comment for
+      # the incident (GitHub's ~100 KB job-log truncation hiding a red run's
+      # own `not ok` lines). A release run is the last place this should be
+      # unreadable.
+      - name: Print test failure summary
+        if: always()
+        run: node scripts/tap-failures.mjs test-output.tap
+
+      # Mirrors ci.yml's artifact upload — see that file's comment.
+      - name: Upload full test output (TAP)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-tap
+          path: test-output.tap
+          retention-days: 7
+          if-no-files-found: warn
 
       # Mirrors ci.yml's receipt gate, scoped to a release instead of a change.
       # A tag does not "introduce" commits, so there is no push range to diff:

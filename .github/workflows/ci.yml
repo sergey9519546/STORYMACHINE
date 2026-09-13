@@ -179,7 +179,48 @@ jobs:
         env:
           RUN_E2E: "1"
           GIT_SHA: ${{ github.sha }}
-        run: npm test
+        # `set -o pipefail` is explicit rather than assumed: without it, a
+        # failing `npm test` piped into `tee` would report the EXIT CODE OF
+        # `tee` (0, since tee itself succeeds), silently turning a red test
+        # run into a green step. `2>&1` folds stderr into the same file the
+        # TAP reporter's stdout goes to, since a crash can write to either.
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.tap
+
+      # 2026-09-13 (ci-concurrency round 2, item 7): the GitHub job-log API
+      # returns only the LAST ~100 KB of a job's log. This step's TAP stream
+      # is ~13,800 tests over ~7 minutes — far bigger than that — so a red
+      # run's `not ok` lines can scroll out of the readable tail entirely.
+      # Found reading run 34741928418: its job summary said "# fail 2" with
+      # no way to name the two failures from the API. `if: always()` is
+      # required, not decoration — this is exactly the case where the
+      # PREVIOUS step failed, and a step with no `if:` is skipped once an
+      # earlier step in the job fails. scripts/tap-failures.mjs degrades
+      # gracefully (prints one line, exits 0) if test-output.tap does not
+      # exist at all — e.g. an earlier step like `npm ci` failed before
+      # "Run tests" ever ran, which is a different problem this step does
+      # not try to diagnose.
+      - name: Print test failure summary
+        if: always()
+        run: node scripts/tap-failures.mjs test-output.tap
+
+      # The summary above is deliberately lossy (a `not ok` line plus its
+      # `location:` and `error:`, nothing else) so it survives truncation;
+      # the full TAP stream is still needed for anything beyond that (a
+      # stack trace, a neighboring test's output for context), so it is
+      # uploaded here rather than only summarized. `if-no-files-found: warn`
+      # matches the summary step's own graceful handling of a missing file —
+      # this step must not itself fail the job over a file that legitimately
+      # does not exist because an earlier step never ran.
+      - name: Upload full test output (TAP)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-tap
+          path: test-output.tap
+          retention-days: 7
+          if-no-files-found: warn
 
       # Required-receipt enforcement for the AUC-24 structural-degradation
       # floor (CLAUDE.md). CI cannot verify the AUC VALUE — the corpus is

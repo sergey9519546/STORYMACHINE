@@ -169,6 +169,7 @@ Findings 1/2/9/6+7/3+4+8/5 respectively).
 | 4 (should) | No-`paths-ignore` comment sits 19 lines below `on:`, but `paths-ignore` is written inside `on:`; `check-docs` is `continue-on-error: true` and cannot fail the job, so it should not be named as a docs gate | **Fixed, both halves**: the comment now sits directly above `on:` in `ci.yml`, with a one-line pointer inside both the `push:` and `pull_request:` blocks themselves (where a `paths-ignore` edit is actually typed); `check-docs` is dropped from the list of things that can fail the job and the comment says plainly it is advisory. | `ci.yml:3-17` |
 | 5 (nice) | Allow an optional quote in both regexes (M2/M4 false-fail on equivalent YAML); assert exactly one top-level `concurrency:` key (M5: a second block wins for YAML, the old helper read the first); LANE_STANDARD half-clause on citing the last push's run id | **All three done.** Both regexes now allow an optional leading/trailing quote (`(['"]?)…\1`) — M2 (double-quoted `cancel-in-progress`) no longer false-fails; M4 (single-line flow-mapping `concurrency: { … }`) still false-fails, because that is a structural difference `topLevelConcurrencyBlock`'s line-based block-finder does not parse at all (it never finds a line that is exactly `concurrency:`), not a quoting difference — out of scope for a one-line quote fix, and the failure direction stays safe (a real block written that way would need to be rewritten to the two-line form the rest of this repo's workflows already use, which is themselves the working examples). `topLevelConcurrencyKeyCount()` + a new "exactly one top-level concurrency group" test per file catches M5. LANE_STANDARD §7 item 1 gained the half-clause. | Regexes: `GROUP_KEY_RE`/`CANCEL_EXCEPT_MAIN_RE` in `tests/core/ci-gates-intact.test.ts`; uniqueness: same file, `topLevelConcurrencyKeyCount()` and its test; LANE_STANDARD: `docs/LANE_STANDARD.md:114-115` |
 | 6 | Reviewer's Finding 5: a fifth workflow (`calibrate-voice-bound.yml`, on `lane/voice-bound-ci-derivation`, not yet on `main`) has no group and the hardcoded `ci.yml`/`security.yml` list would never notice | **Done**: the test now derives the workflow list from `fs.readdirSync('.github/workflows')` and requires every `*.yml` file to have a top-level concurrency group UNLESS it is named in an explicit `ALLOWED_NO_TOP_LEVEL_GROUP` map with a reason (`release.yml`, `edge.yml` — the latter's reason is separately verified against the actual file rather than trusted). A workflow landing later with no group and no allowlist entry now fails this test by construction, which is exactly the gap the review named. `calibrate-voice-bound.yml` itself is untouched — it does not exist on this branch, and adding a group to a file this lane cannot see would be inventing a change to code that is not here yet; whichever side merges second is who the review already named as responsible. | `tests/core/ci-gates-intact.test.ts` — `'every .github/workflows/*.yml file has a top-level (or, if allowlisted, job-level) concurrency group'`, `"edge.yml's allowlisted job-level concurrency group still exists…"`, `'release.yml documents, in-file, why it has no concurrency group'` |
+| 7 (coordinator, mid-round) | Reading a red run, the GitHub job-log API returned only the last ~100 KB — run 34741928418's job summary said "# fail 2" with no way to name the two failures. `npm test`'s TAP stream is ~13,800 tests over ~7 minutes, far bigger than that. | **Done**: `ci.yml`'s (and, to keep the mirror test honest, `release.yml`'s) "Run tests" step now `set -o pipefail`s and pipes into `tee test-output.tap`; a new "Print test failure summary" step (`if: always()`) runs `scripts/tap-failures.mjs test-output.tap`, a small parser (own test file, 8 cases) that pulls out every `not ok` line plus its `location:` and `error:` — small enough to always survive the truncation; a new "Upload full test output (TAP)" step (`if: always()`, `actions/upload-artifact@v4`, `retention-days: 7`) keeps the complete stream retrievable for anything the summary leaves out. Both new steps are pinned in `ci-gates-intact.test.ts` for both files (shown red on the pre-item-7 workflows — 6 subtests failing — and green after; see §"Proof" for item 7 below). | `ci.yml` ("Run tests" step + the two new steps), `release.yml` (identical, required by the existing "mirrored gate steps run the SAME commands" test), `scripts/tap-failures.mjs`, `tests/scripts/tap-failures.test.ts`, `tests/core/ci-gates-intact.test.ts` (three new checks × 2 files) |
 
 ## Proof — the M6 comment-shadow mutation, before and after
 
@@ -220,11 +221,58 @@ M5 duplicate key (bad second)     block: true group: true  cancel: true  count==
 M6 comment shadow                 block: true group: true  cancel: false count==1: true   <- correctly red (Finding 2)
 ```
 
+## Proof — item 7 (job-log-truncation fix), before and after
+
+`scripts/tap-failures.mjs` itself, run directly against a captured TAP
+stream with one failure (a real `node --test` run, not a fabricated
+string):
+
+```
+$ node --test /tmp/fail-demo.test.mjs > /tmp/demo.tap 2>&1
+$ node scripts/tap-failures.mjs /tmp/demo.tap
+FAILURE SUMMARY: 1 failing test(s) (full TAP output is the uploaded workflow artifact)
+
+not ok 2 - a failing test
+  location: '/tmp/fail-demo.test.mjs:4:1'
+  error: one is not two 1 !== 2
+```
+
+Its own test file: `node --experimental-strip-types tests/scripts/tap-failures.test.ts`
+— 8/8 pass (multi-line block-scalar errors, short inline errors, the
+zero-failures case, a missing-file case, and a case where one failure has no
+diagnostic block at all and the scan must not swallow the next failure's).
+
+The three new `ci-gates-intact.test.ts` checks (pipefail+tee, the summary
+step exists and runs `if: always()`, the artifact-upload step exists and
+runs `if: always()`), shown red on the pre-item-7 workflows and green after,
+by temporarily swapping in the pre-item-7 `ci.yml`/`release.yml` (the
+committed round-2 tip, before this round's item-7 commit) and restoring them
+afterward:
+
+```
+$ cp <pre-item-7 ci.yml/release.yml> .github/workflows/
+$ node --experimental-strip-types tests/core/ci-gates-intact.test.ts
+...
+# tests 46
+# pass 40
+# fail 6
+$ <restore item-7 ci.yml/release.yml>
+$ node --experimental-strip-types tests/core/ci-gates-intact.test.ts
+...
+# tests 46
+# pass 46
+# fail 0
+```
+
+6 red (the 3 new checks × 2 files), 0 red after — the guard could not have
+passed on the workflows it exists to catch.
+
 ## Round-2 gates
 
 | Gate | Command | Result |
 |---|---|---|
-| Touched test | `node --experimental-strip-types tests/core/ci-gates-intact.test.ts` | 40/40 pass (0 fail) — 34 round-1 tests + 6 new (uniqueness ×2 files, workflow-list allowlist, edge.yml allowlist-reason check, release.yml allowlist-reason check, M6 regression) |
+| Touched test | `node --experimental-strip-types tests/core/ci-gates-intact.test.ts` | 46/46 pass (0 fail) — 34 round-1 + 6 review-driven (uniqueness ×2 files, workflow-list allowlist, edge.yml allowlist-reason check, release.yml allowlist-reason check, M6 regression) + 6 item-7 (pipefail/summary/upload ×2 files) |
+| New test | `node --experimental-strip-types tests/scripts/tap-failures.test.ts` | 8/8 pass |
 | Type check | `npm run lint` | exit 0 |
 | Docs quality | `npm run check-docs` | exit 0 |
 | Honesty audit | `npm run honesty-audit` | exit 0 |
@@ -249,6 +297,21 @@ No full `npm test` — per the cost rule for this round.
   `ALLOWED_NO_TOP_LEVEL_GROUP` with a reason, which is the review's own
   suggested resolution (Finding 5, "whoever merges second should add the
   group there, or record the skip").
+- Item 7's fix was applied to `release.yml` as well as `ci.yml`, even though
+  the coordinator's message named only `ci.yml`: `ci-gates-intact.test.ts`'s
+  pre-existing "release.yml really does mirror ci.yml, step for step" and
+  "mirrored gate steps run the SAME commands" checks require every named
+  ci.yml step (and, for shared names, its exact run body) to have a
+  release.yml counterpart — leaving release.yml's "Run tests" step
+  unchanged would have failed both of those on this round's own diff, and a
+  release run has the identical ~13,800-test TAP-truncation exposure ci.yml
+  does. `edge.yml` and `security.yml` do not run `npm test` at all and were
+  left untouched.
+- `scripts/tap-failures.mjs`'s summary collapses a multi-line `error:` body
+  to one line (joined with spaces) rather than preserving line breaks —
+  deliberate, so one failure's summary entry cannot itself grow large
+  enough to threaten the same truncation this step exists to avoid; the
+  full stack trace is in the uploaded artifact.
 
 ## Tip
 

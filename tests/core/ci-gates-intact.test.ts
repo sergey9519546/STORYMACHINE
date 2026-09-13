@@ -474,6 +474,70 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
     );
   });
 
+  // 2026-09-13 (ci-concurrency round 2, item 7): the GitHub job-log API
+  // returns only the LAST ~100 KB of a job's log. `npm test`'s TAP stream is
+  // ~13,800 tests over ~7 minutes — far bigger than that — so a red run's
+  // own `not ok` lines can scroll out of the readable tail (found reading
+  // run 34741928418: "# fail 2" with no way to name them from the API).
+  // These three checks pin the fix in both workflows that run `npm test`.
+  for (const [file, src] of [['ci.yml', ci], ['release.yml', release]] as const) {
+    it(`${file}'s "Run tests" step preserves its exit code through the tee (pipefail)`, () => {
+      const block = stepBlock(src, 'Run tests (keyless — analysis-only posture)');
+      assert.ok(block, `${file} must keep the "Run tests" step`);
+      assert.match(
+        block!,
+        /set -o pipefail/,
+        `${file}'s "Run tests" step must \`set -o pipefail\` before piping \`npm test\` into \`tee\` — `
+        + 'without it, a failing test run reports the exit code of `tee` (0), silently turning a red run green',
+      );
+      assert.match(
+        block!,
+        /tee\s+test-output\.tap/,
+        `${file}'s "Run tests" step must tee its output to test-output.tap for the summary/upload steps to read`,
+      );
+    });
+
+    it(`${file} prints a test-failure summary that runs even when "Run tests" failed`, () => {
+      const block = stepBlock(src, 'Print test failure summary');
+      assert.ok(
+        block,
+        `${file} must keep a step named "Print test failure summary" — otherwise a red "Run tests" step's `
+        + 'own failures are unreadable once the job log truncates',
+      );
+      assert.match(
+        block!,
+        /if:\s*always\(\)/,
+        `${file}'s "Print test failure summary" step must run \`if: always()\` — a step with no \`if:\` is `
+        + 'skipped once an earlier step in the job fails, which is exactly when this summary is needed',
+      );
+      assert.match(
+        block!,
+        /tap-failures\.mjs/,
+        `${file}'s "Print test failure summary" step must invoke scripts/tap-failures.mjs`,
+      );
+    });
+
+    it(`${file} uploads the full TAP output as a retrievable workflow artifact`, () => {
+      const block = stepBlock(src, 'Upload full test output (TAP)');
+      assert.ok(block, `${file} must keep a step named "Upload full test output (TAP)"`);
+      assert.match(
+        block!,
+        /if:\s*always\(\)/,
+        `${file}'s TAP-upload step must run \`if: always()\` — a red run is exactly when the full output is needed`,
+      );
+      assert.match(
+        block!,
+        /actions\/upload-artifact@v4/,
+        `${file}'s TAP-upload step must use actions/upload-artifact@v4`,
+      );
+      assert.match(
+        block!,
+        /retention-days:\s*7/,
+        `${file}'s TAP-upload step must set retention-days: 7`,
+      );
+    });
+  }
+
   it('release.yml keeps the registry write token out of the test job', () => {
     // Workflow-level `packages: write` is inherited by EVERY job, so the test
     // job held a GHCR push credential while running `npm ci` — one malicious
