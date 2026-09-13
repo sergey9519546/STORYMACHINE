@@ -219,12 +219,11 @@ export function renderTable(rows) {
 
 // ── Everything below runs only as a script ──────────────────────────────────
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  await main().catch((err) => {
-    console.error(`[story-bench] ${err?.stack ?? err}`);
-    process.exit(2);
-  });
-}
+// The CLI entry point is at the BOTTOM of this file, not here. It used to sit
+// at this line, which put main() on the module's top-level await BEFORE the
+// consts below were initialised: `npm run story:bench -- --packet` died with
+// `Cannot access 'RUBRIC' before initialization`, while --check and a full run
+// (which never reach that const) worked. Keep it last.
 
 function loadEnvFile() {
   const envPath = path.join(REPO, '.env');
@@ -813,4 +812,12 @@ async function main() {
   if (argv.includes('--check')) { process.exit(await runCheck()); }
   if (argv.includes('--packet')) { process.exit(await runPacket()); }
   process.exit(await runBench(argv));
+}
+
+// ── CLI entry point — last, so every const above it is initialised ─────────
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await main().catch((err) => {
+    console.error(`[story-bench] ${err?.stack ?? err}`);
+    process.exit(2);
+  });
 }
