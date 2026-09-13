@@ -10,6 +10,10 @@ import type { SceneFunction } from '../ir/NarrativeTransitionIR.ts';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 import { genrePromptBlock } from '../../lib/genre-router.ts';
 import { buildCraftPromptSection, looksLikeAnimationGenre, type SceneCraftContext } from './craft-spec.ts';
+import {
+  buildNecessityPromptBlock, coerceNecessityCertificate,
+  type NecessityCertificate,
+} from '../../lib/necessity-certificate.ts';
 
 export interface SceneTarget {
   sceneIdx: number;
@@ -18,6 +22,15 @@ export interface SceneTarget {
   tensionTarget: number;   // 0–100 desired tension after this scene
   qualityTarget?: number;  // 0–100 minimum quality score (default 60)
   themeHint?: string;      // nudge toward a theme argument
+  /** The author's four stated reasons this scene exists — why now, why here,
+   *  why these characters, and what makes it unavoidable
+   *  (server/lib/necessity-certificate.ts). Authored at outline time on the
+   *  beat and passed through by the caller for the scene being generated.
+   *  When present AND well-formed, buildSystemPreamble() states the four as
+   *  binding constraints on the scene; when absent or incomplete the preamble
+   *  is byte-identical to what it was before, so no existing caller changes.
+   *  It is never scored, and no model is asked whether a reason is good. */
+  necessity?: NecessityCertificate;
 }
 
 export interface GenerationConstraint {
@@ -338,6 +351,27 @@ export function buildSystemPreamble(
     sceneContext,
   });
 
+  // Necessity Certificate injection — the author's four stated reasons this
+  // scene exists (server/lib/necessity-certificate.ts). These are the anchors
+  // generation would otherwise invent: without them the model chooses the
+  // moment, the place, the cast and the pressure for itself, and any scene it
+  // writes is defensible because nothing said which scene this was.
+  //
+  // It is deliberately NOT folded into the numbered PROOF CONSTRAINTS list
+  // below: that list is what the proof kernel actually verifies
+  // (server/nvm/proof/**), and no proof verifies a stated reason. Listing
+  // these there would claim a check that does not exist.
+  //
+  // coerce first: a SceneTarget reaches this function from
+  // ConvergeArcBodySchema's `scenes: z.array(z.unknown())`, so `necessity` is
+  // caller-controlled text. coerceNecessityCertificate() shape-checks and
+  // flattens newlines, and buildNecessityPromptBlock() renders nothing at all
+  // unless the certificate passes the FORM check — three anchors out of four
+  // would read to the model as the whole answer.
+  const necessityBlock = target
+    ? buildNecessityPromptBlock(coerceNecessityCertificate(target.necessity))
+    : '';
+
   const constraintLines = constraints
     .map((c, i) => `${i + 1}. [${c.kind}] ${sanitizeForPrompt(c.description, 400)}`)
     .join('\n');
@@ -348,6 +382,7 @@ export function buildSystemPreamble(
     stateLines,
     genreBlock,
     '',
+    necessityBlock,
     craftBlock,
     '',
     'PROOF CONSTRAINTS (your output must satisfy all of these):',
