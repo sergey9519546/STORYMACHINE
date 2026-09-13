@@ -34,7 +34,15 @@ function stubIR(spec: GenerationSpec, idx: number): NarrativeTransitionIR {
 
 // ── Parse LLM JSON response into IRs ─────────────────────────────────────────
 
-function parseOp(raw: Record<string, unknown>): StoryOp | null {
+/**
+ * Exported for tests only (2026-09-13). IR_SCHEMA above is a declaration of
+ * exactly what this function accepts, and the two drifted apart invisibly once
+ * already — the schema asked for a bare `op` and this returned null for every
+ * one. tests/core/llm-generator-schema.test.ts round-trips one instance of each
+ * declared branch through here, so a future edit to either side that breaks the
+ * other fails in CI instead of over 83 live calls.
+ */
+export function parseOp(raw: Record<string, unknown>): StoryOp | null {
   try {
     const opStr = raw['op'];
     if (typeof opStr !== 'string') return null;
@@ -153,7 +161,143 @@ function parseIR(raw: unknown, spec: GenerationSpec, idx: number): NarrativeTran
 
 // ── The generator ─────────────────────────────────────────────────────────────
 
-const IR_SCHEMA = {
+// ── The op schema ───────────────────────────────────────────────
+// WHY EVERY OP KIND IS DECLARED HERE, AND WHAT IT COST NOT TO BE.
+//
+// Until 2026-09-13 `ops.items` was `{type:'object', properties:{op:{type:
+// 'string'}}, required:['op']}` — one property, no payload. A structured
+// decoder honours that literally, so an endpoint enforcing `response_format:
+// json_schema` returned, measured live:
+//
+//   "ops": [ {"op":"ADD_FACT"}, {"op":"UPDATE_BELIEF"},
+//            {"op":"SEED_CLUE"}, {"op":"RAISE_CLOCK"} ]
+//
+// — 4 of 4 ops carrying nothing but the discriminator. parseOp() below returns
+// null for every one of them, parseIR falls back to stubIR, and the
+// `llm_generator_partial_parse` warn fires. Over one 83-call bench run that was
+// 74 of 74 returned candidates stubbed and ZERO model-authored ops committed
+// (docs/story-generation/STORY_BENCH_2026-09-13.md). The loop looked like a
+// model that could not write a scene; it was a schema that never asked for one.
+//
+// StoryOp is a DISCRIMINATED UNION (server/nvm/ops/StoryOp.ts), and the only
+// way to say that to a decoder is `anyOf` with one branch per kind. Two fields
+// make a flat merge impossible rather than merely ugly: `fact` is an
+// AtomicFact object under ADD_FACT and a plain string under
+// RECORD_VISUAL_FACT/RECORD_SONIC_FACT, and `delta` is a RelationshipDelta
+// under SHIFT_RELATIONSHIP and a ReaderStateDelta under UPDATE_READER_STATE.
+//
+// EVERY BRANCH MIRRORS parseOp BELOW, WHICH IS THE REAL CONTRACT. parseOp
+// rejects an op whose required fields are missing or mistyped, so a branch that
+// drifts from it produces valid JSON that still parses to null. All 14 kinds
+// are declared; tests/core/llm-generator-schema.test.ts asserts the set here
+// equals STORY_OP_KINDS and round-trips one instance of each through parseOp.
+//
+// `server/lib/ai-providers/schema.ts` had to learn anyOf in the same change —
+// it was dropping the key, so a union declared here would have been deleted on
+// the way to the wire.
+
+const S = { type: 'string' } as const;
+const N = { type: 'number' } as const;
+
+const ATOMIC_FACT = {
+  type: 'object',
+  properties: {
+    factId: S, subject: S, predicate: S, object: S,
+    addedAtTurn: N, validFrom: N,
+    validTo: { type: ['number', 'null'] },   // null = still valid
+  },
+  required: ['factId', 'subject', 'predicate', 'object', 'addedAtTurn', 'validFrom', 'validTo'],
+};
+
+const BELIEF = {
+  type: 'object',
+  properties: {
+    id: S, proposition: S, confidence: N,
+    source: S, source_event_id: S, acquired_at: N,
+  },
+  required: ['id', 'proposition', 'confidence', 'source', 'source_event_id', 'acquired_at'],
+};
+
+const EMOTION = {
+  type: 'object',
+  properties: {
+    joy: N, distress: N, anger: N, fear: N, pride: N, shame: N,
+    dominant: S, intensity: N, last_updated_at: N,
+  },
+  required: ['dominant', 'intensity'],
+};
+
+// The 14 RelationshipDelta dimensions and 11 ThemeMove / 18 ClueCarrier values
+// are enumerated rather than left as free strings: parseOp does not check them,
+// but the dispatcher and the projector do read them, and an enum is the one
+// place a decoder can be stopped from inventing a fifteenth dimension.
+const RELATIONSHIP_DELTA = {
+  type: 'object',
+  properties: {
+    dimension: { type: 'string', enum: [
+      'love', 'trust', 'intimacy', 'admiration', 'resentment', 'fear', 'contempt',
+      'guilt', 'obligation', 'dependency', 'jealousy', 'respect', 'rivalry', 'protectiveness',
+    ] },
+    amount: N,
+    reason: S,
+  },
+  required: ['dimension', 'amount', 'reason'],
+};
+
+const READER_STATE_DELTA = {
+  type: 'object',
+  properties: { suspense: N, curiosity: N, investment: N, knownFact: S },
+};
+
+/** One anyOf branch per StoryOp kind, each mirroring parseOp's requirements. */
+const OP_BRANCHES = [
+  { kind: 'ADD_FACT', props: { fact: ATOMIC_FACT }, required: ['fact'] },
+  { kind: 'EXPIRE_FACT', props: { factId: S, atTurn: N }, required: ['factId', 'atTurn'] },
+  { kind: 'UPDATE_BELIEF', props: { charId: S, belief: BELIEF }, required: ['charId', 'belief'] },
+  { kind: 'APPRAISE_EMOTION', props: { charId: S, emotion: EMOTION }, required: ['charId', 'emotion'] },
+  {
+    kind: 'SHIFT_RELATIONSHIP',
+    props: { pair: { type: 'array', items: S }, delta: RELATIONSHIP_DELTA },
+    required: ['pair', 'delta'],
+  },
+  { kind: 'ADVANCE_OBJECT_ARC', props: { objectId: S, toState: S }, required: ['objectId', 'toState'] },
+  { kind: 'TRIGGER_RULE', props: { mechanismId: S, ruleId: S }, required: ['mechanismId', 'ruleId'] },
+  {
+    kind: 'SEED_CLUE',
+    props: { clueId: S, carrier: { type: 'string', enum: [
+      'object', 'line', 'gesture', 'location', 'absence', 'behavior', 'camera', 'sound',
+      'costume', 'lighting', 'timing', 'silence', 'transformation', 'wound', 'document',
+      'symbol', 'animal', 'price',
+    ] } },
+    required: ['clueId', 'carrier'],
+  },
+  { kind: 'PAYOFF_SETUP', props: { setupId: S, payoffEventId: S }, required: ['setupId', 'payoffEventId'] },
+  { kind: 'RAISE_CLOCK', props: { clockId: S, amount: N }, required: ['clockId', 'amount'] },
+  {
+    kind: 'ADVANCE_THEME_ARGUMENT',
+    props: { claimId: S, move: { type: 'string', enum: [
+      'support', 'attack', 'undercut', 'complicate', 'resolve', 'invert', 'parallel',
+      'echo', 'interrogate', 'demonstrate_through_failure', 'humanize',
+    ] } },
+    required: ['claimId', 'move'],
+  },
+  { kind: 'UPDATE_READER_STATE', props: { delta: READER_STATE_DELTA }, required: ['delta'] },
+  { kind: 'RECORD_VISUAL_FACT', props: { sceneId: S, fact: S }, required: ['sceneId', 'fact'] },
+  { kind: 'RECORD_SONIC_FACT', props: { sceneId: S, fact: S }, required: ['sceneId', 'fact'] },
+] as const;
+
+/** Exported for tests: the op kinds this schema declares, in declaration order. */
+export const SCHEMA_OP_KINDS: readonly string[] = OP_BRANCHES.map(b => b.kind);
+
+const STORY_OP_SCHEMA = {
+  anyOf: OP_BRANCHES.map(b => ({
+    type: 'object',
+    properties: { op: { type: 'string', enum: [b.kind] }, ...b.props },
+    required: ['op', ...b.required],
+  })),
+};
+
+export const IR_SCHEMA = {
   type: 'object',
   properties: {
     candidates: {
@@ -165,13 +309,7 @@ const IR_SCHEMA = {
           sceneFunction: { type: 'string', enum: ['advance_plot','reveal_character','build_tension','provide_relief','set_up_payoff','establish_world'] },
           ops: {
             type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                op: { type: 'string' },
-              },
-              required: ['op'],
-            },
+            items: STORY_OP_SCHEMA,
           },
           preconditions: { type: 'array', items: { type: 'string' } },
           postconditions: { type: 'array', items: { type: 'string' } },
@@ -202,13 +340,16 @@ export function makeLLMCandidateGenerator(): CandidateGenerator {
     let temperature: number;
     try {
       const ai = await import('../../engine/ai.ts');
-      // The ACTIVE provider (2026-09-13). This was `ai.geminiProvider`, so on
+      // The GENERATIVE seam (2026-09-13). This was `ai.geminiProvider`, so on
       // an OpenAI-compatible deployment every candidate generation threw
       // 'Gemini provider not available' into the catch below and the loop
       // converged over structural stubs — visible only as an
       // `llm_generator_failed` warn line. Keyless behaviour is unchanged: with
-      // no provider configured the seam still holds geminiProvider.
-      provider = ai.getLLMProvider();
+      // no provider configured the seam still holds geminiProvider. It is
+      // getGenerativeProvider() rather than getLLMProvider() because an
+      // AUTO-SELECTED FreeRide bridge must not serve this surface — see that
+      // function's comment and ai-config.ts's llmReady().
+      provider = ai.getGenerativeProvider();
       candidateModel = ai.modelForTask('CANDIDATE');
       // Candidate generation wants high diversity; bias the configured base
       // temperature upward but never below 0.9 so the proof loop has variety

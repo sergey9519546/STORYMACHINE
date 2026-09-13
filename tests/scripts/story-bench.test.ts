@@ -23,7 +23,9 @@ const bench = await import(pathToFileURL(path.join(ROOT, 'scripts', 'story-bench
   beatsToSceneTargets: (p: unknown) => Array<Record<string, unknown>>;
   parseLogLine: (line: string) => Record<string, unknown> | null;
   summariseCalls: (entries: Array<Record<string, unknown>>) => Record<string, unknown>;
-  classifyRun: (a: { llmCalls: number; revisionPassesWithChanges: number; revisionPassCount: number }) => { ok: boolean; label: string };
+  classifyRun: (a: { llmCalls: number; revisionPassesWithChanges: number; revisionPassCount: number; committedScenes?: number; requestedScenes?: number; committedNonStub?: number }) => { ok: boolean; status: string; label: string };
+  nextRunDir: (root: string, date: string, exists: (f: string) => boolean, explicit?: string | null) => string;
+  listRunDirs: (names: string[]) => string[];
   castGroundingOps: (p: unknown) => Array<Record<string, unknown>>;
   scriptWordCount: (f: string) => number;
   renderTable: (rows: Array<Record<string, unknown>>) => string;
@@ -201,12 +203,96 @@ describe('story-bench run classification — the honesty rule', () => {
     const c = bench.classifyRun({ llmCalls: 3, revisionPassesWithChanges: 0, revisionPassCount: 0 });
     assert.equal(c.ok, true, 'zero passes is not "every pass fell back"');
   });
+
+  // ── The clauses added in round 2 ────────────────────────────────────────
+  // `status: ok` used to be the first thing a reader saw on a run that
+  // committed 1 scene of 8 and shipped a 142-word fragment. These clauses are
+  // purely structural — scene counts and a provenance flag, no prose
+  // judgement — so NORTH_STAR §1 is untouched.
+  const full = { llmCalls: 9, revisionPassesWithChanges: 2, revisionPassCount: 14 };
+
+  it('FAILED when no committed scene carried a model-authored op', () => {
+    const c = bench.classifyRun({ ...full, committedScenes: 1, requestedScenes: 8, committedNonStub: 0 });
+    assert.equal(c.status, 'FAILED');
+    assert.match(c.label, /every candidate stubbed/);
+    assert.equal(c.ok, false);
+  });
+
+  it('FAILED when nothing was committed at all', () => {
+    const c = bench.classifyRun({ ...full, committedScenes: 0, requestedScenes: 8, committedNonStub: 0 });
+    assert.equal(c.status, 'FAILED');
+    assert.match(c.label, /no scene was committed/);
+  });
+
+  it('FRAGMENT below half the requested scenes, or below three', () => {
+    assert.equal(bench.classifyRun({ ...full, committedScenes: 2, requestedScenes: 8, committedNonStub: 2 }).status, 'FRAGMENT');
+    // 2 of 3 is two-thirds, so the half rule does not catch it — the <3 rule does.
+    assert.equal(bench.classifyRun({ ...full, committedScenes: 2, requestedScenes: 3, committedNonStub: 2 }).status, 'FRAGMENT');
+  });
+
+  it('DEGRADED at half or better but short of every scene', () => {
+    const c = bench.classifyRun({ ...full, committedScenes: 6, requestedScenes: 8, committedNonStub: 6 });
+    assert.equal(c.status, 'DEGRADED');
+    assert.match(c.label, /6 of 8/);
+  });
+
+  it('ok only when every requested scene committed', () => {
+    const c = bench.classifyRun({ ...full, committedScenes: 8, requestedScenes: 8, committedNonStub: 8 });
+    assert.equal(c.status, 'ok');
+    assert.equal(c.ok, true);
+  });
+
+  it('keeps the two original clauses FIRST, so claims row 117 stays literally true', () => {
+    // Row 117: "a run in which every revision pass fell back to the unchanged
+    // draft is labelled FAILED, not reported as a story." A perfect scene
+    // record must not be able to talk that clause out of firing.
+    const c = bench.classifyRun({
+      llmCalls: 9, revisionPassesWithChanges: 0, revisionPassCount: 14,
+      committedScenes: 8, requestedScenes: 8, committedNonStub: 8,
+    });
+    assert.equal(c.status, 'FAILED');
+    assert.match(c.label, /every revision pass fell back/);
+  });
+
+  it('falls back to the original two-clause behaviour when no scene accounting is supplied', () => {
+    const c = bench.classifyRun({ llmCalls: 9, revisionPassesWithChanges: 2, revisionPassCount: 14 });
+    assert.equal(c.status, 'ok');
+  });
+});
+
+describe('story-bench run directories are non-destructive', () => {
+  // A --only run after a six-premise run used to replace that run's six-row
+  // table.md and summary.json with a one-row one, overwrite four artifacts, and
+  // turn --packet into a one-script packet. The reviewer hit it for real.
+  it('uses <date> for the first run of a day', () => {
+    assert.equal(bench.nextRunDir('/r', '2026-09-13', () => false), path.join('/r', '2026-09-13'));
+  });
+
+  it('never returns a directory that already holds a summary.json', () => {
+    const taken = new Set([path.join('/r', '2026-09-13', 'summary.json')]);
+    assert.equal(bench.nextRunDir('/r', '2026-09-13', (f) => taken.has(f)), path.join('/r', '2026-09-13-run2'));
+    taken.add(path.join('/r', '2026-09-13-run2', 'summary.json'));
+    assert.equal(bench.nextRunDir('/r', '2026-09-13', (f) => taken.has(f)), path.join('/r', '2026-09-13-run3'));
+  });
+
+  it('honours an explicit --out name', () => {
+    assert.equal(bench.nextRunDir('/r', '2026-09-13', () => true, 'seam-fix'), path.join('/r', 'seam-fix'));
+  });
+
+  it('orders run directories so --packet reads the newest, not the lexically last', () => {
+    // '2026-09-13-run10' sorts before '-run2' as a string; the packet must
+    // still read run10.
+    assert.deepEqual(
+      bench.listRunDirs(['2026-09-13-run10', '2026-09-12', '2026-09-13', '2026-09-13-run2', 'notes.txt']),
+      ['2026-09-12', '2026-09-13', '2026-09-13-run2', '2026-09-13-run10'],
+    );
+  });
 });
 
 describe('story-bench reporting', () => {
   const rows = [
-    { id: 'alpha', shape: 'thriller', scenes: 8, committedScenes: 8, requestedScenes: 8, words: 1200, health: 61.5, verdict: 'NEEDS WORK', llmCalls: 22, fallbacks: 3, revisionPassesWithChanges: 4, revisionPassCount: 14, wallMs: 91_000, promptTokens: 9000, completionTokens: 4000, status: 'ok' },
-    { id: 'b', shape: 'comedy', scenes: 0, committedScenes: 0, requestedScenes: 7, words: 0, health: null, verdict: null, llmCalls: 0, fallbacks: 14, revisionPassesWithChanges: 0, revisionPassCount: 14, wallMs: 2_000, promptTokens: 0, completionTokens: 0, status: 'FAILED' },
+    { id: 'alpha', shape: 'thriller', scenes: 8, committedScenes: 8, committedNonStub: 8, requestedScenes: 8, words: 1200, health: 61.5, verdict: 'NEEDS WORK', llmCalls: 22, fallbacks: 3, revisionPassesWithChanges: 4, revisionPassCount: 14, wallMs: 91_000, promptTokens: 9000, completionTokens: 4000, status: 'ok' },
+    { id: 'b', shape: 'comedy', scenes: 0, committedScenes: 0, committedNonStub: 0, requestedScenes: 7, words: 0, health: null, verdict: null, llmCalls: 0, fallbacks: 14, revisionPassesWithChanges: 0, revisionPassCount: 14, wallMs: 2_000, promptTokens: 0, completionTokens: 0, status: 'FAILED' },
   ];
 
   it('renders one aligned row per run and an em dash for an absent score', () => {
@@ -220,6 +306,11 @@ describe('story-bench reporting', () => {
     assert.ok(lines[3].includes('0/7'), 'a run that committed nothing must show 0/7, not 0');
     assert.ok(lines[2].includes('8/8'));
     assert.ok(lines[0].includes('passes changed'), 'the revision column must be in the table');
+    // The column that decides what the run measured: committed scenes whose IR
+    // is not a stub. 0/N means the stub generator was measured, not the model.
+    assert.ok(lines[0].includes('model scenes'), 'the model-scenes column must be in the table');
+    assert.ok(lines[2].includes('8/8'));
+    assert.ok(lines[3].includes('0/0'));
     assert.match(lines[2], /alpha/);
     assert.match(lines[3], /FAILED/);
     assert.ok(lines[3].includes('—'), 'a run with no score shows an em dash, never 0');
