@@ -3,18 +3,28 @@
 - **Worktree:** `/home/user/wt-notes` (its `node_modules` is a symlink to
   `/home/user/STORYMACHINE/node_modules`)
 - **Branch:** `lane/vitecache-notes`, from `main` at `996e27a0`
-- **Tip:** `e5c42d7fcc1eb3e24cd01d4d26dc9e236b8f21cb` — the tree every gate in
-  §3 was confirmed against.
+- **Tip:** `a28839b4478b08e7b41f7ede779c14809be84c24` — the round-2 code
+  commit, and the tree every round-2 gate in §4 was confirmed against. This
+  edit (correcting the Tip line to name it) is exactly one commit past it,
+  because a report cannot contain the hash of the commit that contains the
+  report — same convention as `vitecache-lane-report.md`.
+- **Rounds:** round 1 reviewed at `c33cbf13` (REVISE,
+  `vitecache-notes-review.md`); round 2 is §4.
 
 ```
 $ git log --oneline main..HEAD
+a28839b4 fix: round 2 — correct the false rationale, decide SIGKILL trade-off, pin call-site count and listener count
+b10b6de5 docs(audit): vitecache-notes-review round 1 (c33cbf13) — REVISE
+c33cbf13 docs(audit): vitecache-notes lane report
 e5c42d7f fix: three vite-cache-isolation review observations (a)-(c)
 ```
 
 **Source:** `docs/audits/2026-09-12-adversarial/vitecache-review.md`, round 2
 (`fe92429f`, merged to `main` at `ce093a0c`), the three non-blocking
 observations (a)–(c) under "Observations (non-blocking, no action required
-to merge)". All three are addressed here, one commit.
+to merge)". All three are addressed here; round 1's independent review
+(`vitecache-notes-review.md`) sent it back on one blocking and three small
+items, addressed in §4.
 
 ---
 
@@ -347,4 +357,4 @@ finding 2 named, and it is now explicit at the call site and here.
 
 ---
 
-Tip: `<pending round-2 commit>`
+Tip: `a28839b4478b08e7b41f7ede779c14809be84c24`
