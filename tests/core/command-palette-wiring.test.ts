@@ -213,15 +213,20 @@ describe("CommandPalette.tsx — dialog wiring", () => {
   // investigation hinged on: the writer presses Enter, the palette closes
   // immediately (React state flips within the same handler); any perceived
   // delay before the <dialog> node actually leaves the DOM is
-  // AnimatePresence's own 0.14s exit animation (see this file's `exit={{
-  // duration: 0.14 }}` above), not the app waiting on the action. A
-  // verify-e5-command-palette.mjs assertion that samples `.count()` the
-  // instant the Ship panel appears was racing that animation, not this
-  // handler — see scripts/verify-e5-command-palette.mjs's fix. If `runAt`
-  // ever becomes `async` and awaits `action.run()` before closing, this
-  // guard fails and it should: that would be a real behavior change (the
-  // palette staying open through the action's own work), not just a
-  // slower browser-test read.
+  // AnimatePresence's own exit animation (see this file's `exit={{ duration:
+  // 0.14 }}` above) — 0.14s is that animation's DECLARED duration, not the
+  // measured mounted window (Motion's exit is frame-driven, so it is a
+  // floor; measured detach on the investigating box was 212-293ms after
+  // Enter). A verify-e5-command-palette.mjs assertion that samples
+  // `.count()` the instant the Ship panel appears was racing that detach
+  // window, not this handler — and the quantity actually racing it is the
+  // one-time cost of ShipPanel's first `React.lazy` import in a session
+  // (813ms first open vs 27-66ms on every later open, same session, same
+  // box), not general render speed — see scripts/verify-e5-command-
+  // palette.mjs's fix for the full account. If `runAt` ever becomes `async`
+  // and awaits `action.run()` before closing, this guard fails and it
+  // should: that would be a real behavior change (the palette staying open
+  // through the action's own work), not just a slower browser-test read.
   it("runAt calls action.run() then onClose() synchronously — not after an await", () => {
     const runAtBlock = source.match(/const runAt = \(index: number\) => \{[\s\S]*?\n {2}\};/);
     assert.ok(runAtBlock, "expected a runAt function body");

@@ -134,20 +134,32 @@ async function main() {
   // CommandPalette's runAt() calls action.run() then onClose() back-to-back
   // in the SAME synchronous handler (tests/core/command-palette-wiring.test.ts
   // pins this) — the writer's Enter closes the palette immediately in React
-  // state terms. But the <dialog> node itself stays mounted for the 0.14s
-  // AnimatePresence exit animation this component declares (`exit={{
-  // duration: 0.14 }}`), same as the Escape-close case handled a few lines
-  // below with its own margin comment. A synchronous `.count()` read taken
-  // the instant the Ship panel becomes visible samples mid-animation and
-  // races the harness against React, not against the app: on a loaded CI
-  // runner the Ship-panel wait above can itself eat into that 0.14s window,
-  // so the count read below could land before the exit transition commits.
+  // state terms. But the <dialog> node itself stays mounted while
+  // AnimatePresence plays this component's declared `exit={{ duration: 0.14
+  // }}` — 0.14s is the ANIMATION'S DECLARED DURATION, not the measured
+  // mounted window: Motion's exit is frame-driven (requestAnimationFrame-
+  // paced), so it is a floor; measured detach on the investigating box was
+  // 212-293ms after Enter. A synchronous `.count()` read taken the instant
+  // the Ship panel becomes visible can land before that detach commits,
+  // racing the harness against React, not against the app.
   // 2026-09-13 (docs/audits/2026-09-13-ci-green/palette-race-lane-report.md):
-  // this is exactly what made CI fail 3/3 on main while staying 17/17 on an
-  // idle local box — reproduced deterministically under CPU throttling, see
-  // the audit report. Fix: wait for the dialog to actually detach (bounded,
-  // scaled by load) instead of sampling synchronously — this still fails a
-  // palette that never closes.
+  // the quantity actually racing that detach window is not "how fast this
+  // runner renders" in general — it is the ONE-TIME cost of ShipPanel's
+  // first dynamic import in a browser session (`lazy(() => import(
+  // "./scriptide/ShipPanel"))`, ScriptIDE.tsx). Measured: the Ship-panel
+  // wait above resolves in 813ms on the FIRST open of a session (comfortably
+  // past 212-293ms, which is why this suite — which opens Ship exactly once
+  // — passed 17/17 every time it was run idle) but only 27-66ms on every
+  // LATER open in the same session (under the detach window, which is why a
+  // repeated-open probe failed the unfixed read 0/6 cold and this exact
+  // assertion failed CI 3/3 on `main`). CPU throttling and a CPU hog do NOT
+  // reproduce this: they slow the lazy import's transform along with
+  // everything else, pushing the gap back past the detach window and MASKING
+  // the race (measured 10/10, 10/10, 7/8 passing under throttling/load) —
+  // the reproduction that actually goes red is the cold, repeated-open path,
+  // not a throttled one. Fix: wait for the dialog to actually detach
+  // (bounded, scaled by load) instead of sampling synchronously — this still
+  // fails a palette that never closes.
   const paletteClosedAfterRun = await paletteDialog
     .waitFor({ state: 'detached', timeout: timing.ms(3000) })
     .then(() => true)
@@ -169,14 +181,18 @@ async function main() {
   await page.keyboard.press(`${MOD}+k`);
   await paletteDialog.waitFor({ timeout: timing.ms(5000) });
   await page.keyboard.press('Escape');
-  // CommandPalette exits via AnimatePresence (0.14s fade/scale) — the
-  // <dialog> node stays mounted for that long even after React state
-  // flips paletteOpen false, so an immediate .count() check would
-  // (falsely) still see it. `waitFor({ state: 'detached' })` waits for the
-  // actual unmount (bounded, scaled by load) instead of guessing a fixed
-  // margin — same fix, and the same reasoning, as the Enter-runs-an-action
-  // close check above. Same pattern used for every other exit-animated
-  // close below.
+  // CommandPalette exits via AnimatePresence (0.14s declared duration —
+  // measured detach on the investigating box was 212-293ms after Enter, so
+  // 0.14s is a floor, not the mounted window) — the <dialog> node stays
+  // mounted for that long even after React state flips paletteOpen false, so
+  // an immediate .count() check would (falsely) still see it.
+  // `waitFor({ state: 'detached' })` waits for the actual unmount (bounded,
+  // scaled by load) instead of guessing a fixed margin — same fix, and the
+  // same reasoning, as the Enter-runs-an-action close check above. Same
+  // pattern used for every other exit-animated close below (including the
+  // Settings check three sections down, whose old 300ms
+  // `waitForTimeout`-then-`.count()` margin sat INSIDE the measured
+  // 212-293ms range rather than comfortably past it).
   const paletteClosedOnEscape = await paletteDialog
     .waitFor({ state: 'detached', timeout: timing.ms(3000) })
     .then(() => true)
