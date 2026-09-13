@@ -396,7 +396,21 @@ have to disambiguate.
 
 ## Tip and origin
 
-`git ls-remote origin scoring/renderer-residuals` gives the tip at any moment,
-and is the authority. The last commit touching anything outside `docs/` is
-`80b1621f`, so `git diff 80b1621f..HEAD -- ':!docs'` is empty and every
-measurement above was taken on that tree.
+**Tip: `f1c66f7b`, plus the one commit that writes this line.** A line inside a
+file cannot name the commit that writes it, so the SHA above is this section's
+parent and the tip is one past it; that last commit touches only this file and
+nothing else, which is checkable with
+`git diff f1c66f7b..HEAD --stat`. `git ls-remote origin scoring/renderer-residuals`
+gives the tip at any moment and is the authority.
+
+The last commit touching anything outside `docs/` is `80b1621f`, so
+`git diff 80b1621f..HEAD -- ':!docs'` is empty and every measurement above was
+taken on that tree.
+
+```
+$ git ls-remote origin scoring/renderer-residuals scoring/forced-cue scoring/adversarial-2026-09-12
+```
+
+Run it rather than trusting a transcription: this branch and the two it stacks
+on are all pushed, and `origin/scoring/forced-cue` @ `089bec91` is the base
+every number in this report is measured against.
