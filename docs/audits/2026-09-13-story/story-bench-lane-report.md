@@ -207,6 +207,18 @@ anything it was calibrated on; §6 is about what it can and cannot see, and this
 row of six PASSes is the clearest demonstration in the report that a verdict is
 not an endorsement.
 
+**The one non-zero health in the table is the sharpest single observation in
+this run.** `the-long-way-round` scores 30 where the other five score 0, and
+the reason is not craft. Its compiled draft has **one** scene heading; its
+final draft has **two** (`the-long-way-round.compiled.fountain` vs
+`.final.fountain`, `INT. SCENE 1 - MOMENTS LATER` at line 13), because a
+revision pass invented a second heading that no committed scene backs. The
+doctor scored the document it was given — `sceneCount` 2 instead of 1 — and the
+health moved. That is the scene-count scarcity term the doctor's own
+measurement says carries AUC ~0.938 (`server/nvm/analyze/doctor.ts:2092-2093`),
+being moved by a rewriter typing a slugline. No new story exists; a heading
+does.
+
 ---
 
 ## 5. Two readings
