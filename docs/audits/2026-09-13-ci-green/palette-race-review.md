@@ -345,3 +345,139 @@ script be justified against a measured detach rather than a declared 0.14 s.
 Items 1-3 are the ones that decide the merge; 4-6 are corrections to the
 durable record and should ride along in the same round. Re-review will check
 these six against the new diff.
+
+---
+
+# Round 2 (`cb4b3c4d`)
+
+Re-check of the six round-1 items against `git diff a7232476..cb4b3c4d`
+(3 files: the scanner test, the lane report, and this review file, which the
+lane carried forward unchanged — verified: `git diff a7232476..cb4b3c4d --
+docs/audits/2026-09-13-ci-green/palette-race-review.md` is pure addition of
+round 1's text). No production or scoring-path file moved this round.
+
+## Re-run and re-mutated here
+
+| command / mutation | result |
+|---|---|
+| `node --experimental-strip-types tests/scripts/wait-for-function-options-position.test.ts` | **21/21, 4 suites, 0 fail** |
+| `npm run lint` (`tsc --noEmit`) | exit 0, no output (32 s) |
+| `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npm run verify:command-palette` | **exit 0, 17/17**, `[PASS] The palette itself closes after running an action` |
+| shipped `scripts/verify-e5-command-palette.mjs`, unmutated | 0 offenders |
+| **M1** — revert only the fixed assertion, lane's 20-line comment left in place (round 1's F1 mutation, verbatim) | **1 offender, line 151**, `paletteDialog.count().then((n) => n === 0)` |
+| **M2** — same line respelled as the split form (`const nPal = await paletteDialog.count(); … nPal === 0`) | **1 offender, line 152** |
+| **M3** — same line respelled `await paletteDialog.isHidden()` | **1 offender, line 151** |
+| **M4** — same line respelled `(await paletteDialog.count()) === 0` | **1 offender, line 151** |
+| **M5** — same bug on an inline locator never confirmed open | 0 offenders (documented design trade, see note N2) |
+
+M2-M4 are three of round 1's ten evasion spellings, re-applied by this
+reviewer to the real file rather than to a fixture, so they exercise the
+shipped scanner against the shipped script.
+
+## Per-item verdicts
+
+1. **F1 (major) — CLOSED.** The distance heuristic is gone; the scan now
+   tracks, per named locator and in file order, whether it was confirmed open
+   (a `.waitFor(` without a detached/hidden state) and whether its own close
+   was confirmed (`state: 'detached' | 'hidden'`, or `expectDetached(name, …)`),
+   with a re-open clearing an earlier close. The fixture reads the real
+   on-disk `scripts/verify-e5-command-palette.mjs`, asserts the fixed line is
+   still present verbatim (so the fixture goes stale loudly rather than
+   silently), applies exactly round 1's mutation and asserts exactly one
+   offender. Independently reproduced above: M1 flags line 151.
+2. **F2 (moderate) — CLOSED.** All ten spellings from round 1's matrix are
+   covered, and the 11-line and `.tap()` evasions are genuinely moot now that
+   no rule reads actions at all. The two `(await x.count()) === 0` existence
+   guards stay unflagged for the right reason — neither locator is ever
+   confirmed open — and that reason is asserted by its own fixture rather than
+   left to a comment. Repo-wide scan across `scripts/` and `scripts/lib/`
+   still reports zero under the widened rules, so the widening bought no false
+   positives.
+3. **F3 (minor) — CLOSED.** Both shapes are in the docstring. The
+   `waitForFunction(() => !document.querySelector(...))` pattern has its own
+   fixture asserting zero hits, with the reason stated (`evaluate` is not a
+   substring of `waitForFunction`, and the shape is a real wait). The vacuity
+   caveat is written down as a caveat the rule cannot enforce, which is the
+   honest disposition — text alone cannot separate "was shown, now gone" from
+   "never shown".
+4. **F4 (report accuracy) — CLOSED IN THE REPORT, NOT IN THE CODE.** §2 is
+   rewritten to the lazy `ShipPanel` first import with the per-run gap and
+   detach numbers, and the "runner is slower" premise is retracted explicitly.
+   §3 now marks the lost scratch harness as a LANE_STANDARD §7 gap and treats
+   the reproduced probe numbers as primary. The retraction did not reach the
+   comment at the assertion itself — see R2-1.
+5. **F5 (report accuracy) — NARROWED.** Every `0.14s` citation *in the report*
+   now carries the measured 212-293 ms detach, and §1 adds the argument round 1
+   asked for (the Settings check's 300 ms margin sat inside the measured
+   range, which is what justifies converting all three Escape-close checks).
+   The four citations in code do not — see R2-1.
+6. **F6 (trivial) — CLOSED as far as it can be.** The log block names
+   `a7232476` as round 1's tip; round 2's own SHA remains a placeholder for
+   the same unavoidable reason (a commit cannot name itself). Acceptable.
+
+## R2-1 — MODERATE, the only open item
+
+The comment block at `scripts/verify-e5-command-palette.mjs:134-153` — the
+first thing anyone reads when this assertion is next in question — still
+carries, verbatim, two claims round 2 retracted in the report and one that is
+the inverse of the lane's own finding:
+
+- `"on a loaded CI runner the Ship-panel wait above can itself eat into that
+  0.14s window"` (line 143) is the "runner is the slower, loaded machine"
+  premise that §2 now retracts by name.
+- `"reproduced deterministically under CPU throttling"` (line 147) inverts the
+  lane's own result. Throttling MASKS this race (the lane measured 10/10,
+  10/10, 7/8 passing under it, and §2 now explains why: throttling slows the
+  lazy chunk too). Nothing was reproduced under throttling; the reproduction
+  is the idle fast path. This sentence was wrong in round 1, survived round 2,
+  and now contradicts the report it cites two lines later.
+- `"stays mounted for the 0.14s AnimatePresence exit animation"` (line 137)
+  and `"stays mounted for that long"` (line 172), plus
+  `tests/core/command-palette-wiring.test.ts:216-217`, still present 0.14 s as
+  the window rather than the floor. The report's own sentence — "Every place
+  that used ~0.14s as the mounted-window evidence now also cites the measured
+  212-293ms detach time" — is true of the report and not of the code, which is
+  the "done for an item that was narrowed" shape LANE_STANDARD §5 names.
+
+This is comments only, it costs one edit in two files, and none of it touches
+behaviour, gates, or the scanner. It is held open rather than waived because
+the durable artifact that gets read first is the one still saying the opposite
+of the finding.
+
+## Notes, not blocking
+
+- **N1 (reviewer's correction of his own round-1 item).**
+  `expect(x).toHaveCount(0)` is Playwright's auto-retrying web-first
+  assertion: it polls until the expect timeout, so it is a correct wait, not
+  the defect. Round 1's F2 table listed it among the missed spellings and the
+  lane implemented it as asked. It is inert today — no suite in `scripts/`
+  imports `@playwright/test`'s `expect` — so nothing false-positives now, but
+  if a suite ever adopts it, that one pattern should come back out rather than
+  be worked around. Worth one clause in the docstring whenever the file is
+  next touched.
+- **N2.** M5 above: the same bug written against an inline locator that is
+  never confirmed open (`await page.getByRole('dialog', …).count().then((n) => n === 0)`)
+  is invisible to the scan. That is the deliberate price of the
+  ownership design — it is what keeps the two existence guards unflagged — and
+  the docstring explains the exemption, though not this consequence of it. A
+  sentence naming it would finish the thought.
+- **N3.** `verify-focus-traps.mjs:175`'s `.catch(() => {})` on its
+  detached-wait still swallows a timeout. Unchanged, out of this lane's scope,
+  and safe (it degrades into the following `activeElement` assertion failing).
+
+## VERDICT: REVISE
+
+1. **R2-1** — bring the comment at
+   `scripts/verify-e5-command-palette.mjs:134-153` into line with the report
+   round 2 just rewrote: delete the "on a loaded CI runner … eat into that
+   0.14s window" premise, delete or correct "reproduced deterministically
+   under CPU throttling" (throttling masked the race; the idle fast path
+   reproduces it), and state the mounted window as "0.14s declared, 212-293 ms
+   measured detach on this box" at lines 137, 172 and in
+   `tests/core/command-palette-wiring.test.ts:216-217`. Then either restate or
+   scope the report's "every place that cited 0.14s has been corrected"
+   sentence so it is true of the code too.
+
+Items 1, 2, 3 and 6 are closed and will not be re-checked. Item 4 and item 5
+are closed in the report and re-check only against R2-1. Nothing else from
+round 1 remains open; on R2-1 landing, this lane is a MERGE.
