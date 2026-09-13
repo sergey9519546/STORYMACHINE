@@ -423,23 +423,43 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
       convergeNotes.push(`scene ${target.sceneIdx}: converge failed — ${String(err.message).slice(0, 200)}`);
       continue;
     }
+    // WHICH IR GETS COMMITTED, and why it is not always `winner`.
+    // convergeScene returns `winner: null` whenever NO candidate passed Tier 1
+    // in the whole run (loop.ts's budget-exhausted return), while `ir` is
+    // always populated — the argmax, or a synthesised pass-through. The route
+    // hands back both, and POST /api/nvm/converge/commit RE-RUNS Tier 1 before
+    // committing, so offering `ir` when there is no winner is not smuggling a
+    // rejected candidate past a gate: the gate runs again, and a rejection is
+    // recorded as one. Taking only `winner` would have thrown away every scene
+    // of the first run for a reason the bench never wrote down.
     const winner = result?.winner;
-    if (!winner?.ir?.ops?.length) {
-      console.log(`no committable winner (${((Date.now() - beatStarted) / 1000).toFixed(0)}s)`);
-      convergeNotes.push(`scene ${target.sceneIdx}: converge returned no committable winner`);
+    const ir = winner?.ir ?? result?.ir;
+    const source = winner?.ir ? 'winner' : 'best-of-run (no Tier-1-passing candidate)';
+    if (!ir?.ops?.length) {
+      console.log(`no committable IR (${((Date.now() - beatStarted) / 1000).toFixed(0)}s)`);
+      convergeNotes.push(
+        `scene ${target.sceneIdx}: converge returned no committable IR `
+        + `(converged=${result?.converged} composite=${result?.finalComposite} candidates=${result?.candidates?.length ?? 0})`,
+      );
       continue;
+    }
+    if (!winner?.ir) {
+      convergeNotes.push(
+        `scene ${target.sceneIdx}: no Tier-1-passing candidate in ${result?.iterations} iteration(s) `
+        + `— committing the best-of-run IR instead (composite=${result?.finalComposite})`,
+      );
     }
     try {
       await post(base, '/api/nvm/converge/commit', {
         sessionId,
-        ops: winner.ir.ops,
+        ops: ir.ops,
         sceneIdx: target.sceneIdx,
         activeMechanisms: target.activeMechanisms,
-        preconditions: winner.ir.preconditions?.length ? winner.ir.preconditions : ['prior scene'],
+        preconditions: ir.preconditions?.length ? ir.preconditions : ['prior scene'],
         summary: (target.themeHint ?? '').slice(0, 200),
       });
       committed++;
-      console.log(`committed ${winner.ir.ops.length} ops (${((Date.now() - beatStarted) / 1000).toFixed(0)}s)`);
+      console.log(`committed ${ir.ops.length} ops from ${source} (${((Date.now() - beatStarted) / 1000).toFixed(0)}s)`);
     } catch (err) {
       console.log(`commit rejected (${((Date.now() - beatStarted) / 1000).toFixed(0)}s)`);
       convergeNotes.push(`scene ${target.sceneIdx}: commit rejected — ${String(err.message).slice(0, 240)}`);
