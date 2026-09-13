@@ -476,6 +476,30 @@ export async function probeOpenAICompatModels(
   }
 }
 
+// ── finish_reason → the @google/genai vocabulary ─────────────────────────
+// Emitting the OpenAI spelling verbatim is not "passing it through" — it is
+// handing a caller a word it does not recognise. The caller that matters is
+// server/nvm/revision/rewrite.ts's evaluateRewrite(), whose FIRST line is
+// `if (finishReason === 'MAX_TOKENS') return { accept: false, reason:
+// 'truncated' }`. The OpenAI dialect calls that same state 'length'. Left
+// unmapped, a rewrite the endpoint cut off mid-screenplay passes the
+// truncation check, clears the length ratio (it is long, just missing its
+// end), and is ACCEPTED — the pipeline commits a script whose last scene stops
+// mid-line. The adapter presents the Gemini shape; this is part of that shape.
+// The raw upstream word is kept in the openai_compat_call log line.
+function toGenAiFinishReason(raw: string | undefined): string | undefined {
+  switch (raw) {
+    case 'length':          return 'MAX_TOKENS';
+    case 'stop':            return 'STOP';
+    case 'content_filter':  return 'SAFETY';
+    case undefined:         return undefined;
+    // 'tool_calls', 'function_call' and anything a provider invents pass
+    // through unchanged: a word this function does not know is better
+    // surfaced than silently renamed to one that means something else.
+    default:                return raw;
+  }
+}
+
 // ── LLM adapter ──────────────────────────────────────────────────────────────
 // Uses params.model as the model name — set AI_MODEL / AI_FAST_MODEL so that
 // getModel() returns the right OpenAI-compat model name at call sites.
@@ -596,7 +620,7 @@ export function makeOpenAICompatLLMProvider(cfg: {
         promptTokens: data.usage?.prompt_tokens ?? 0,
         completionTokens: data.usage?.completion_tokens ?? 0,
         completionChars: text.length,
-        finishReason: choice?.finish_reason ?? '(none)',
+        finishReason: choice?.finish_reason ?? '(none)',   // the RAW upstream word
       });
 
       // RESPONSE SHAPE. Callers in this repository read BOTH shapes: the engine
@@ -611,7 +635,7 @@ export function makeOpenAICompatLLMProvider(cfg: {
         text,
         candidates: [{
           content: { role: 'model', parts: [{ text }] },
-          finishReason: choice?.finish_reason,
+          finishReason: toGenAiFinishReason(choice?.finish_reason),
         }],
         usageMetadata: {
           promptTokenCount:     data.usage?.prompt_tokens     ?? 0,

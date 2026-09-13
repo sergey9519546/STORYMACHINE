@@ -229,10 +229,54 @@ describe('openai-compat adapter — generation guards', () => {
       assert.equal((res as { text?: string }).text, 'INT. BAR - NIGHT\n\nShe waits.');
       // The @google/genai shape — what rewrite-llm.ts and llm-generator.ts read.
       assert.equal(res.candidates?.[0]?.content?.parts?.[0]?.text, 'INT. BAR - NIGHT\n\nShe waits.');
-      // finishReason — what evaluateRewrite() uses to reject a truncated rewrite.
-      assert.equal(res.candidates?.[0]?.finishReason, 'stop');
+      // finishReason — what evaluateRewrite() uses to reject a truncated
+      // rewrite, in the vocabulary that function actually reads.
+      assert.equal(res.candidates?.[0]?.finishReason, 'STOP');
       assert.equal(res.usageMetadata?.promptTokenCount, 11);
       assert.equal(res.usageMetadata?.candidatesTokenCount, 22);
+    } finally { await close(server); }
+  });
+
+  // ── Guard 4b: a TRUNCATED completion must be legible to evaluateRewrite ──
+  // The OpenAI dialect says 'length'; evaluateRewrite's first line tests for
+  // 'MAX_TOKENS'. Unmapped, a rewrite the endpoint cut off mid-screenplay is
+  // ACCEPTED — it is long enough to clear the length ratio and its truncation
+  // flag is a word nothing reads.
+  it('maps finish_reason "length" to MAX_TOKENS, so a truncated rewrite is rejected', async () => {
+    const original = 'INT. A - DAY\n\n' + 'Something happens here on the page. '.repeat(60);
+    const cut = 'INT. A - DAY\n\n' + 'Something happens here on the page. '.repeat(58) + 'Something happ';
+    const { url, server } = await listen((req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: cut }, finish_reason: 'length' }] }));
+    });
+    try {
+      const provider = makeOpenAICompatLLMProvider({ baseURL: url, apiKey: 'k' });
+      const res = await provider.generate(BASE_PARAMS());
+      assert.equal(res.candidates?.[0]?.finishReason, 'MAX_TOKENS');
+
+      // …and the consumer that word exists for must act on it. Without the
+      // mapping this rewrite is accepted: it is 96% of the original length, so
+      // the ratio check passes and only the finish reason could have caught it.
+      const { evaluateRewrite } = await import('../../server/nvm/revision/rewrite.ts');
+      const verdict = evaluateRewrite(cut, original.length, res.candidates?.[0]?.finishReason);
+      assert.equal(verdict.accept, false);
+      assert.equal(verdict.reason, 'truncated');
+      assert.equal(
+        evaluateRewrite(cut, original.length, 'length').accept, true,
+        'the unmapped word is invisible to evaluateRewrite — which is the bug this mapping closes',
+      );
+    } finally { await close(server); }
+  });
+
+  it('passes an unrecognised finish_reason through rather than renaming it', async () => {
+    const { url, server } = await listen((req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: 'ok' }, finish_reason: 'tool_calls' }] }));
+    });
+    try {
+      const provider = makeOpenAICompatLLMProvider({ baseURL: url, apiKey: 'k' });
+      const res = await provider.generate(BASE_PARAMS());
+      assert.equal(res.candidates?.[0]?.finishReason, 'tool_calls');
     } finally { await close(server); }
   });
 
