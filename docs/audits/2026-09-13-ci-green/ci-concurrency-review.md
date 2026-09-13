@@ -295,3 +295,178 @@ the defect, and a committed SHA that does not resolve.
 Finding 5 and the missing batch README are for the orchestrator at merge, not
 for this lane. Re-check on the new diff will be by the same reviewer against
 these five items only.
+
+---
+
+# Round 2 (`a343e034`)
+
+Re-checked object: `lane/ci-concurrency` tip **`a343e034`**
+(`a343e03493ee74d5ad49b0b83d9d60b626be3033`), three
+commits on the round-1 object `d48b39f4`: `8507e1e3` (items 1-6), `bfcaac44`
+(item 7), `a343e034` (Tip line). Same reviewer, warm context, re-checking only
+its own five items plus the lane's self-added item 7. Round-2 diff:
+`git diff d48b39f4..a343e034`. Worktree still held read-only; every mutation
+below ran against a fresh copy of `.github/workflows/`,
+`tests/core/ci-gates-intact.test.ts` and `package.json` under
+`<session scratch>/cireview/`.
+
+## Reproduced numbers (round 2)
+
+| What | Result |
+|---|---|
+| `node --experimental-strip-types tests/core/ci-gates-intact.test.ts` | **46 tests / 46 pass / 0 fail** [claimed 46/46 — matches] |
+| `node --experimental-strip-types tests/scripts/tap-failures.test.ts` | **8 tests / 8 pass / 0 fail** [claimed 8/8 — matches] |
+| `node scripts/tap-failures.mjs <synthetic 2-failure TAP>` | both failures printed with `location:` and `error:` (block scalar joined to one line, inline error verbatim), **exit 0** |
+| `node scripts/tap-failures.mjs <missing file>` | one explanatory line, **exit 0** — the `if: always()` step cannot itself fail a job |
+
+## Mutation matrix (round 2)
+
+Each is one edit to the copied tree; `R#` continues round 1's numbering.
+
+| # | Mutation | Expected | Test |
+|---|---|---|---|
+| R1 | round-1 M6 replayed: `cancel-in-progress: true` under a commented-out correct line | red | **45/46, red on exactly `ci.yml cancels superseded runs everywhere EXCEPT main`** ✓ |
+| R2 | round-1 M5 replayed: a second top-level `concurrency:` block later in the file | red | **45/46, red on `ci.yml declares exactly one top-level concurrency group`** ✓ |
+| R3 | round-1 M2 replayed: both values double-quoted | green | **46/46** ✓ (optional-quote group now accepted) |
+| R5 | the `github.sha` suffix deleted from the group key | red | **45/46, red on `…keyed on the workflow, ref, and (main-only) sha`** ✓ |
+| R6 | a synthetic `calibrate-voice-bound.yml` with no group dropped into `.github/workflows/` | red | **45/46, red on `every .github/workflows/*.yml file has a top-level … concurrency group`** ✓ |
+| R7b | `if: always()` removed from "Print test failure summary" | red | **45/46, red on that step's assertion** ✓ |
+| **R8** | the LIVE `set -o pipefail` line deleted from **both** `ci.yml` and `release.yml` | red | **46/46 — GREEN.** See Finding 10 |
+
+Round 1's M4 (flow-mapping form) still false-fails; the lane documents it as an
+accepted safe-direction limitation and I agree — a false fail costs a reader one
+minute, a false pass costs a gate.
+
+## Per-item verdicts
+
+**Item 1 — group key and the four prose sites. CLOSED.** The key is
+`${{ github.workflow }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || '' }}`.
+Checked the expression by hand in both directions: on `refs/heads/main`,
+`true && sha` yields the sha and `sha || ''` keeps it, so every main commit
+lands in a group no other run can enter — nothing cancelled, nothing dropped
+while pending; on any other ref, `false && sha` is `false` and `false || ''` is
+`''`, so the group is the old key plus a trailing hyphen — constant per ref,
+which is exactly what branch cancellation needs, and no two refs can collide
+because the full ref is still in the key. R5 proves the guard sees the suffix
+disappear. All four prose sites are rewritten and now claim only what the
+mechanism delivers. `security.yml` goes further than asked and names the one
+residual the suffix cannot remove — a `schedule` run firing at the same SHA a
+push run is already testing shares that group — and bounds it correctly (both
+runs would audit an identical tree, so the loss is a duplicate, not coverage).
+That is the right way to record a residual.
+
+**Item 2 — comment-blind block. CLOSED.** `topLevelConcurrencyBlock()` now
+drops comment lines from both the opening-line search and the body, and R1 goes
+red. The added synthetic regression test is self-contained — it builds its own
+shadowed fixture rather than depending on the real file's state, so it stays a
+guard after the real file changes. Good shape.
+
+**Item 3 — the unreachable Tip. CLOSED.** The round-1 Tip now reads
+`d48b39f4…`, with the old `1eed4dcf` retained as narrative ("originally stood
+here"), which is the right way to correct a record rather than erase it. The
+round-2 Tip names `bfcaac44`, which is reachable and pushed — it is the last
+substantive commit rather than the branch tip `a343e034`, but the defect I
+raised was unresolvability, not tip-identity, and the line says exactly which
+commit it means and why.
+
+**Item 4 — comment placement and `check-docs`. CLOSED.** The no-`paths-ignore`
+comment is now immediately above `on:` with one-line pointers inside both the
+`push:` and `pull_request:` blocks, so the edit that would add a `paths-ignore`
+passes a pointer at the line it would be typed on. `check-docs` is not only
+dropped from the list of docs checks that can fail the job — it is explicitly
+excluded by name with its reason, which is better than removal.
+
+**Item 5 — quotes, key count, LANE_STANDARD clause. CLOSED.** R3 and R2 above;
+the §7 half-clause is present and accurate ("a report that cites its own
+branch's CI run id must cite the run for the LAST push").
+
+**Item 6 — derived workflow list. CLOSED, and stronger than I asked for.** The
+list comes from `readdirSync('.github/workflows')` with an explicit
+`ALLOWED_NO_TOP_LEVEL_GROUP` carrying a written reason per entry, so a new
+workflow fails by default (R6 confirms it on a synthetic
+`calibrate-voice-bound.yml`). Two supporting tests keep the allowlist's stated
+reasons true rather than merely stated — `edge.yml` must keep its job-level
+`{group: edge-image, cancel-in-progress: true}`, and `release.yml` must keep
+its in-file explanation. An allowlist whose reasons are themselves asserted is
+the right answer to "an allowlist is a place to hide things".
+
+**Item 7 (the lane's own addition) — job-log-safe failure summary. ACCEPTED,
+with one cannot-fail (Finding 10).** The mechanism is right and I verified the
+parts the coordinator asked about:
+
+- `set -o pipefail` and the pipe are in the **same shell** — one `run: |`
+  block is one script, and the two lines are consecutive in it.
+- `shell:` is not set, and does not need to be: both `test` jobs are
+  `runs-on: ubuntu-latest` with no `container:`, where the default `run` shell
+  is `bash -e {0}`, which has `pipefail`. (Only a container image without bash
+  would fall back to `sh`, where `set -o pipefail` is not guaranteed; an
+  explicit `shell: bash` would make that impossible to regress into, and costs
+  one line.)
+- The stream really is TAP: `npm test` is `scripts/run-tests.mjs`, which
+  `spawnSync`s `node --test … ` with `stdio: 'inherit'`, so under `| tee`
+  stdout is a pipe, not a TTY, and node:test's reporter defaults to `tap`. It
+  also sets `process.exitCode` from the child's status, so with `pipefail` the
+  step's exit code is the suite's.
+- `tap-failures.mjs` drove correctly on a synthetic two-failure TAP (both
+  `not ok` blocks, `location` and `error` each), exit 0, and degrades to one
+  line and exit 0 on a missing file — so the `if: always()` step can never
+  convert a green job to red on its own.
+
+### Finding 10 — MODERATE (round 1's Finding 2, reintroduced in the new item-7 assertions)
+
+R8: deleting the live `set -o pipefail` line from **both** workflows leaves the
+suite at **46/46 green**. The assertion is
+`assert.match(stepBlock(src, 'Run tests …'), /set -o pipefail/)`, and
+`stepBlock()` — unlike `topLevelConcurrencyBlock()`, which this round taught to
+skip comments — still collects comment lines. The comment the lane wrote
+directly above the `run:` block opens with the words "`set -o pipefail` is
+explicit rather than assumed", so the regex matches the explanation of the line
+instead of the line. Verified with a YAML parser that the mutated step's real
+body is `'npm test 2>&1 | tee test-output.tap\n'` — no pipefail, a failing
+`npm test` would report `tee`'s exit code 0, and a red run would be reported
+green. That is precisely the failure item 7 exists to prevent, and it is the
+one thing its guard cannot see. (Removing the line from ci.yml alone is caught,
+but only incidentally, by the pre-existing "mirrored gate steps run the SAME
+commands" check — which is why deleting it from both files is the mutation that
+matters.)
+
+The same one-line fix already applied to the other helper closes it. I ran it:
+adding `if (line.trim().startsWith('#')) continue;` to `stepBlock()`'s loop
+keeps the unmutated tree at **46/46** and turns R8 into **44/46, red on exactly
+`ci.yml's "Run tests" step preserves its exit code through the tee (pipefail)`
+and its `release.yml` twin**. No other assertion changes state — the file's
+other block-scoped checks are `assert.doesNotMatch`, for which stripping
+comments is strictly safer.
+
+### Low notes (not blocking, no re-check needed)
+
+- `test-output.tap` is not in `.gitignore`. CI creates it in the workspace, and
+  anyone reproducing the CI invocation locally gets an untracked file a
+  `git add -A` would sweep in. One line.
+- `tap-failures.mjs`'s script-mode guard is
+  a comparison of `import.meta.url` against a `file://` URL built from
+  `process.argv[1]`, which is fine for the
+  runner's path but is not URL-encoding-safe in general.
+
+## VERDICT: REVISE
+
+Six of the six round-1 items are closed, and four of them are closed more
+thoroughly than the list asked (the sha-suffixed group rather than repaired
+prose; a self-contained regression fixture rather than a fixed file; an
+allowlist whose reasons are themselves asserted). Item 7 was found and fixed by
+the lane without being asked, and the mechanism is correct as shipped. What
+sends it back is one line, and it is the same defect as round 1's Finding 2
+one helper over:
+
+1. **Finding 10 (must).** Make `stepBlock()` skip comment lines (one line, in
+   the loop, verified above: 46/46 unmutated, red on R8). The live
+   `set -o pipefail` can currently be deleted from both workflows with the
+   suite green, which turns a red `npm test` into a green step — the exact
+   regression item 7 exists to prevent. A synthetic regression case for it, in
+   the shape of the one added for the M6 finding, would be welcome but is not
+   required.
+
+Optional, no re-check: `shell: bash` on the two "Run tests" steps; a
+`.gitignore` line for `test-output.tap`.
+
+Round-3 re-check is this one assertion only.
