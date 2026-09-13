@@ -10,7 +10,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { fountainToFdx } from '../../src/lib/fdx.ts';
 import { fdxToFountain } from '../../server/lib/fdx-import.ts';
-import { parseFountain } from '../../src/lib/fountain.ts';
+import { parseFountain, renderableText } from '../../src/lib/fountain.ts';
 
 describe('fdxToFountain — round trip through the Fountain→FDX exporter', () => {
   const SAMPLE_FOUNTAIN = [
@@ -96,6 +96,110 @@ describe('fdxToFountain — round trip through the Fountain→FDX exporter', () 
     const types = parseFountain(fountain).filter((b) => b.type !== 'empty').map((b) => b.type);
     assert.deepEqual(types, ['scene_heading', 'character', 'dialogue', 'character', 'dialogue'],
       'an imported Character paragraph must read back as a character cue whatever its name looks like');
+  });
+
+  it('a Transition that Fountain would not infer comes back as a transition, not as action', () => {
+    // formatTransition has forced a custom transition with "> " since it was
+    // written, so it would "survive the round trip instead of silently
+    // becoming a plain action line" (server/lib/fdx-import.ts). Until
+    // 2026-09-13 src/lib/fountain.ts had no forced-transition branch, so the
+    // marker made the line WORSE than the plain action it was meant to
+    // prevent: `> SMASH TO BLACK:` came back as an ACTION line carrying a
+    // literal ">" and printed that way from all four exporters. The escape
+    // worked only for the names the inferred heuristic would have caught
+    // anyway — i.e. the ones that did not need it.
+    const fdxXml = [
+      '<?xml version="1.0" encoding="UTF-8"?><FinalDraft><Content>',
+      '<Paragraph Type="Scene Heading"><Text>INT. OFFICE - DAY</Text></Paragraph>',
+      '<Paragraph Type="Action"><Text>Mary closes the file.</Text></Paragraph>',
+      '<Paragraph Type="Transition"><Text>CUT TO:</Text></Paragraph>',
+      '<Paragraph Type="Scene Heading"><Text>EXT. STREET - NIGHT</Text></Paragraph>',
+      '<Paragraph Type="Action"><Text>Rain falls.</Text></Paragraph>',
+      '<Paragraph Type="Transition"><Text>SMASH TO BLACK</Text></Paragraph>',
+      '</Content></FinalDraft>',
+    ].join('');
+    const { fountain } = fdxToFountain(fdxXml);
+
+    // The transition Fountain CAN infer is untouched — the marker is added
+    // only where it is needed, so every existing import is byte-identical.
+    assert.match(fountain, /^CUT TO:$/m);
+    assert.match(fountain, /^> SMASH TO BLACK:$/m);
+
+    // And the point of the marker: re-parsing the imported Fountain gives a
+    // transition for BOTH, where the custom one used to come back as action.
+    const types = parseFountain(fountain).filter((b) => b.type !== 'empty').map((b) => b.type);
+    assert.deepEqual(types, ['scene_heading', 'action', 'transition', 'scene_heading', 'action', 'transition'],
+      'an imported Transition paragraph must read back as a transition whatever its wording');
+
+    // The full circle: re-exporting carries the Final Draft type back, with no
+    // marker anywhere in the XML.
+    const reexported = fountainToFdx(fountain);
+    assert.ok(/<Paragraph Type="Transition">\s*<Text>SMASH TO BLACK:<\/Text>/.test(reexported),
+      'the custom transition must leave as a Final Draft Transition paragraph on the way back out');
+    assert.equal(reexported.includes('&gt;'), false, 're-export must not carry the forced-transition marker');
+  });
+
+  it('a script with a forced transition and a forced cue survives Fountain -> FDX -> Fountain', () => {
+    // The losslessness the exporters claim is at the ELEMENT level, not the
+    // byte level, and the two markers show the difference. `>CUT TO:` comes
+    // back WITHOUT its marker, because the bare line is an inferred transition
+    // and the importer only forces what it must. `@田中` comes back WITH it,
+    // because the bare name is not cue-shaped and dropping the marker would
+    // lose the element — which is the round trip working, not failing.
+    const SOURCE = [
+      'INT. TEA HOUSE - DAY', '', 'A kettle ticks as it cools.', '',
+      '>CUT TO:', '', 'EXT. STREET - NIGHT', '', 'Rain.', '',
+      '@田中', 'I already told you what I saw.', '',
+      'MARY', 'You told me what you wanted to have seen.', '',
+      '>MATCH DISSOLVE:', '',
+    ].join('\n');
+    const elements = (t: string) => parseFountain(t).filter((b) => b.type !== 'empty')
+      .map((b) => `${b.type}:${renderableText(b)}`);
+
+    const before = elements(SOURCE);
+    const { fountain: after, warnings } = fdxToFountain(fountainToFdx(SOURCE, 'Round Trip'));
+    assert.deepEqual(warnings, []);
+
+    assert.deepEqual(elements(after), before,
+      'every element type AND its printed text must survive the round trip — before 2026-09-13 the two `>` '
+      + 'lines left as transitions and came back as action');
+
+    // Neither marker may reappear where the element does not need it, and no
+    // marker may ever print.
+    assert.match(after, /^CUT TO:$/m, 'an inferred transition must come back unforced');
+    assert.match(after, /^> MATCH DISSOLVE:$/m, 'a custom transition must come back forced, or it is lost');
+    assert.match(after, /^@田中$/m, 'a caseless cue must come back forced, or its speech becomes action prose');
+    assert.deepEqual(before.filter((e) => e.includes('>') || e.includes('@')), [],
+      'no renderable text may carry a marker on either side of the trip');
+  });
+
+  it('KNOWN, and not a marker defect: the importer appends ":" to a transition that lacks one', () => {
+    // formatTransition (server/lib/fdx-import.ts) reads the spec's "ending in
+    // TO:" as a requirement to ENFORCE, so a Final Draft transition that does
+    // not end in a colon gains one — including `FADE OUT.`, which is one of
+    // Fountain's four canonical transitions and ends in a period by
+    // definition. That is a text mutation in the IMPORTER, present long before
+    // the forced-transition work and unrelated to it; what the 2026-09-13
+    // change does is stop the mutated line ALSO losing its element type. It is
+    // pinned here rather than left for the next reader to rediscover as news,
+    // and deliberately not fixed: changing it changes the imported text of
+    // every .fdx this repository accepts, which is an exports question with no
+    // measurement in this lane.
+    const fdxXml = [
+      '<?xml version="1.0" encoding="UTF-8"?><FinalDraft><Content>',
+      '<Paragraph Type="Scene Heading"><Text>INT. OFFICE - DAY</Text></Paragraph>',
+      '<Paragraph Type="Action"><Text>Mary closes the file.</Text></Paragraph>',
+      '<Paragraph Type="Transition"><Text>FADE OUT.</Text></Paragraph>',
+      '</Content></FinalDraft>',
+    ].join('');
+    const { fountain } = fdxToFountain(fdxXml);
+    assert.match(fountain, /^> FADE OUT\.:$/m, 'the appended colon is the behaviour being pinned');
+    // The element survives, which is the half this lane is responsible for.
+    assert.deepEqual(
+      parseFountain(fountain).filter((b) => b.type !== 'empty').map((b) => b.type),
+      ['scene_heading', 'action', 'transition'],
+      'before 2026-09-13 this last element was `action` and printed "> FADE OUT.:" verbatim',
+    );
   });
 
   it('is deterministic: converting the same FDX twice yields identical output', () => {

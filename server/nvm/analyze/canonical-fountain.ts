@@ -47,7 +47,7 @@
 // the job it was built for, on the surface it was built for.
 
 import { normalizeScreenplay, isCharacterCue } from './screenplay-normalizer.ts';
-import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
+import { isForcedTransitionLine, parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
 
 const HEADING_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
 const TRANSITION_RE = /^(CUT TO|FADE (IN|OUT|TO)|DISSOLVE( TO)?|SMASH CUT|MATCH CUT|IRIS (IN|OUT)|WIPE TO|BACK TO|INTERCUT|THE END|FADE)\b/i;
@@ -58,7 +58,15 @@ function isHeading(t: string): boolean {
   return HEADING_RE.test(t) || t.startsWith('.');
 }
 function isTransition(t: string): boolean {
-  return TRANSITION_RE.test(t) || (/[A-Z]\s*TO:\s*$/.test(t) && t === t.toUpperCase() && t.length <= 20);
+  // The FORCED transition is asked of src/lib/fountain.ts rather than spelled
+  // again here: `>` says what the line is, and this heuristic's two inferred
+  // clauses cannot reach a custom one (`>SMASH TO BLACK.` is neither one of
+  // the four fixed strings nor `... TO:`). Added 2026-09-13 with the parser's
+  // forced-transition branch — until then this function walked straight past
+  // the only marker whose whole job is to be unambiguous, and glued the line
+  // into the preceding action paragraph on a double-spaced document.
+  return isForcedTransitionLine(t)
+    || TRANSITION_RE.test(t) || (/[A-Z]\s*TO:\s*$/.test(t) && t === t.toUpperCase() && t.length <= 20);
 }
 function isParenthetical(t: string): boolean {
   return PURE_PAREN_RE.test(t);

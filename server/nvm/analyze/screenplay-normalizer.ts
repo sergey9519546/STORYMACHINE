@@ -22,7 +22,7 @@
 // structural element until the next one. Wrapped fragments inside a block are
 // joined into flowing text.
 
-import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS, parseFountain, type FountainBlock, type FountainBlockType } from '../../../src/lib/fountain.ts';
+import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS, isForcedTransitionLine, parseFountain, type FountainBlock, type FountainBlockType } from '../../../src/lib/fountain.ts';
 
 // Heading detection is kept BYTE-COMPATIBLE with src/lib/fountain.ts's
 // parseFountain (a scene_heading is `/^(INT|EXT|EST|I\/E)[. ]/i` OR any line
@@ -46,7 +46,15 @@ const CUE_BODY_RE = new RegExp(`^[${CUE_LETTER_CLASS}0-9 .,'&/#\\-]+$`, 'u');
 
 export function isHeading(t: string): boolean { return HEADING_RE.test(t) || t.startsWith('.'); }
 function isTransition(t: string): boolean {
-  return TRANSITION_RE.test(t) || (/[A-Z]\s*TO:\s*$/.test(t) && t === t.toUpperCase() && t.length <= 20);
+  // The FORCED transition is asked of src/lib/fountain.ts rather than spelled
+  // again here: `>` says what the line is, and this heuristic's two inferred
+  // clauses cannot reach a custom one (`>SMASH TO BLACK.` is neither one of
+  // the four fixed strings nor `... TO:`). Added 2026-09-13 with the parser's
+  // forced-transition branch — until then this function walked straight past
+  // the only marker whose whole job is to be unambiguous, and glued the line
+  // into the preceding action paragraph on a double-spaced document.
+  return isForcedTransitionLine(t)
+    || TRANSITION_RE.test(t) || (/[A-Z]\s*TO:\s*$/.test(t) && t === t.toUpperCase() && t.length <= 20);
 }
 function isParenthetical(t: string): boolean { return PURE_PAREN_RE.test(t); }
 
@@ -333,13 +341,22 @@ const FORCED_MARKERS: ForcedMarker[] = [
   // action line is an ellipsis, and parseFountain already (separately) types it
   // as a heading — that is a different defect and this must not touch it.
   { marker: '.', declares: ['scene_heading'], test: (t) => /^\.[^.]/.test(t), parserTypes: true },
-  // `>` ending in `<` is centering, not a transition — excluded above. The
-  // parser has no forced-transition branch, so `>CUT TO:` arrives typed
-  // `action` and is scored as action prose, `>` and all; removing the marker
-  // hands the line to the transition branch that was always meant to have it,
-  // and changes no other line's type (nothing in parseFountain's state
-  // depends on a transition block).
-  { marker: '>', declares: ['transition'], test: (t) => t.startsWith('>') && !t.endsWith('<'), parserTypes: false },
+  // `>` ending in `<` is centering, not a transition, and a bare `>` declares
+  // nothing — `isForcedTransitionLine` is the parser's own definition of the
+  // marker and is asked here rather than restated, so the seam and
+  // src/lib/fountain.ts cannot drift.
+  //
+  // THIS ENTRY CARRIED `parserTypes: false` UNTIL 2026-09-13, and the comment
+  // that went with it said "the parser has no forced-transition branch, so
+  // `>CUT TO:` arrives typed `action`". It now does have one. That sentence
+  // was the description of a split, not a design: the marker was stripped HERE
+  // and printed by every exporter, so one line had two answers. With the
+  // parser reading `>`, this is an ordinary redundant-marker strip like `!`,
+  // `.` and `@` — the line is already typed `transition`, removing the marker
+  // must leave it typed `transition`, and `parserTypes: true` is what stops a
+  // `>` the parser typed as something else (a `>` opening a line inside a
+  // speech, which stays dialogue) from being touched at all.
+  { marker: '>', declares: ['transition'], test: isForcedTransitionLine, parserTypes: true },
   // `@` declares a CHARACTER cue, and a `^` cue is retagged `dual_dialogue` by
   // the parser, so both types are what the marker may legitimately declare.
   // `parserTypes: true` is the guard that matters here: a `@` on a line the

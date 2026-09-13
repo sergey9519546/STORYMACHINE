@@ -79,6 +79,16 @@ function formatSceneHeading(text: string): string {
 // "ALL CAPS TO:" pattern) so a custom transition like "SMASH TO:" or
 // "MATCH CUT TO:" survives the round trip instead of silently becoming a
 // plain action line.
+//
+// THAT LAST SENTENCE WAS NOT TRUE UNTIL 2026-09-13. src/lib/fountain.ts had no
+// forced-transition branch, so the very marker this function adds to rescue a
+// custom transition was what condemned it: `> SMASH TO BLACK:` came back as an
+// ACTION line carrying a literal ">", i.e. strictly worse than the plain action
+// line the marker was meant to prevent, and it printed that way from all four
+// exporters. The escape only worked for names the heuristic would have caught
+// anyway — the cases that did not need it. The parser reads `>` now
+// (FORCED_TRANSITION_MARKER), so the claim above is a claim this file can keep;
+// tests/core/fdx-import.test.ts asserts the round trip in both directions.
 const AUTO_DETECTED_TRANSITION_RE = /^(FADE IN:|FADE OUT\.|CUT TO:|DISSOLVE TO:)$/;
 const GENERIC_TRANSITION_RE = /^[A-Z ]+ TO:$/;
 function formatTransition(text: string): string {

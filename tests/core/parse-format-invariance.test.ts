@@ -259,8 +259,13 @@ const FORMAT_TRANSFORMS: Array<[string, (t: string) => string, string]> = [
     + "scripts in the private corpus mark scenes this way (the normalizer's own header names Ratatouille, "
     + 'Coco and Up), so this is not a synthetic shape.'],
   ['a redundant forced-transition `>` on every transition line', redundantMarker('transition', '>'),
-    'the parser has no forced-transition branch at all, so `>CUT TO:` was scored as an ACTION LINE, `>` and '
-    + 'all. 5 of the 6 applicable scripts moved at 85273742, mean -4.080, largest -15.7 on room-12.'],
+    'the parser had no forced-transition branch at all, so `>CUT TO:` was scored as an ACTION LINE, `>` and '
+    + 'all. 5 of the 6 applicable scripts moved at 85273742, mean -4.080, largest -15.7 on room-12. Round 2 '
+    + 'closed the ANALYSIS half (stripForcedMarkers) and this row has asserted 0 of 32 since; 2026-09-13 '
+    + 'closed the other half — the parser reads `>` and renderableText drops it — so the row is now an '
+    + 'invariance assertion over one implementation rather than over a normaliser papering a parser gap. '
+    + 'The direction a redundant marker cannot reach (a `>` on a line the inferred grammar would NOT have '
+    + 'called a transition) is asserted in its own describe below, exactly as the `@` one is.'],
   ['a redundant forced-cue `@` on every character cue', redundantMarker('character', '@'),
     'the fourth marker and the LARGEST format sensitivity ever measured on this branch. Round 2 pinned it '
     + 'as a known gap rather than closing it, because the parser did not implement `@` at all — `@MARY` was '
@@ -539,5 +544,188 @@ describe('a forced cue `@` is a character cue everywhere (round 3)', () => {
     const action = 'INT. OFFICE - DAY\n\n@home he would have said nothing at all.\n\nEXT. LOT - DAY\n\nRain.\n';
     assert.equal(normalizeScreenplay(action).includes('@home'), true,
       'stripForcedMarkers must not touch a `@` the parser did not type a cue from');
+  });
+});
+
+// ── THE SECOND RENDERER RESIDUAL, CLOSED AT THE SAME SEAM (2026-09-13) ─────
+// forcedcue-lane-report.md §6.7 named it with its mechanism: the parser had no
+// forced-transition branch, so `>CUT TO:` was typed `action`, the ANALYSIS seam
+// stripped the marker anyway (stripForcedMarkers' `>` entry, `parserTypes:
+// false`) and every exporter printed `>CUT TO:` verbatim at the action indent.
+// One line, two answers — the same analyzer/renderer split the `@` work above
+// exists to close, and the last instance of it on this stack.
+//
+// The row in FORMAT_TRANSFORMS above cannot see any of this: a REDUNDANT `>`
+// only ever lands on a line the inferred grammar already called a transition,
+// so an analyzer that merely deleted the character would pass it while every
+// exporter still printed the marker. So the marker is checked in the direction
+// deletion cannot fake — a transition only `>` can express — across the
+// parser's element sequence, the analysis seam, and all four renderers.
+describe('a forced transition `>` is a transition everywhere (renderer residuals, 2026-09-13)', () => {
+  // `SMASH TO BLACK.` is a transition no inferred rule in this parser admits:
+  // it is not one of the four fixed strings and it does not end in `TO:`. Only
+  // the marker can say what it is, which is what makes it the right fixture.
+  const CUSTOM = 'INT. OFFICE - DAY\n\nMary closes the file.\n\n>SMASH TO BLACK.\n\nEXT. STREET - NIGHT\n\nRain.\n';
+  const types = (t: string) => parseFountain(t).filter((b) => b.type !== 'empty').map((b) => b.type).join(',');
+
+  it('the parser types a forced transition the inferred grammar cannot reach', () => {
+    assert.equal(
+      types(CUSTOM), 'scene_heading,action,transition,scene_heading,action',
+      'a `>` line with a body is a Transition (Fountain spec §Transition: any line can be forced to one by '
+      + 'beginning it with `>`). Until 2026-09-13 this read ...,action,... and the marker went into every '
+      + 'rule lexicon and word count as prose',
+    );
+    // The direction only the marker can express, and the reason a redundant
+    // transform cannot stand in for this test: WITHOUT the marker the same
+    // line is action, because the inferred grammar has no rule that reaches it.
+    assert.equal(
+      types(CUSTOM.replace('>SMASH', 'SMASH')), 'scene_heading,action,action,scene_heading,action',
+      'the bare line must NOT be a transition — if it were, this fixture would prove nothing about `>`',
+    );
+    // And the auto-detected form is unchanged, forced or not.
+    assert.equal(types('INT. A - DAY\n\nMary closes the file.\n\n>CUT TO:\n\nINT. B - DAY\n\nRain falls.\n'),
+      types('INT. A - DAY\n\nMary closes the file.\n\nCUT TO:\n\nINT. B - DAY\n\nRain falls.\n'),
+      '`>CUT TO:` and `CUT TO:` are the same element; the marker only ever declares');
+  });
+
+  it('the analysis seam and the page agree about the element — the split itself', () => {
+    // This is the assertion the residual was about. Before the fix,
+    // normalizeScreenplay + parseFountain said `transition` for `>CUT TO:`
+    // while parseFountain on the writer's own bytes said `action`, and the
+    // exporters followed the second. `>SMASH TO BLACK.` was worse: the seam
+    // could not strip the marker either (the bare line is not a transition),
+    // so it stayed ACTION PROSE carrying a literal `>`.
+    for (const doc of [CUSTOM, 'INT. A - DAY\n\nMary closes the file.\n\n>CUT TO:\n\nINT. B - DAY\n\nRain falls.\n']) {
+      assert.equal(types(normalizeScreenplay(doc)), types(doc),
+        'the element sequence the analyzer scores must be the element sequence the exporters print');
+    }
+  });
+
+  it('not one of the four renderers prints the marker, and the line is right-aligned', async () => {
+    const { layoutScreenplay } = await import('../../src/lib/screenplay-layout.ts');
+    const { fountainToFdx } = await import('../../src/lib/fdx.ts');
+    const { fountainToDocx } = await import('../../src/lib/docx.ts');
+    const { fountainToPdf } = await import('../../src/lib/pdf.ts');
+    const latin1 = (b: Uint8Array) => { let s = ''; for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return s; };
+
+    const lines = layoutScreenplay(CUSTOM).flatMap((p) => p.lines);
+    assert.deepEqual(
+      lines.map((l) => l.text).filter((t) => t.includes('>')), [],
+      'screenplay-layout.ts feeds the PDF writer; a marker reaching it is a marker on the page',
+    );
+    const laid = lines.find((l) => l.text === 'SMASH TO BLACK.');
+    assert.ok(laid, 'the transition must still be laid out, uppercased, without its marker');
+    // Right-aligned like any transition, not at the 1.5" action indent. The
+    // text band ends at 7.5" (72pt/inch), so a right-aligned line starts well
+    // past the action indent; an action line would sit exactly on 108pt.
+    const actionIndentPt = 1.5 * 72;
+    assert.ok(
+      laid!.xPt > actionIndentPt,
+      `the forced transition was laid out at x=${laid!.xPt}pt, the action indent is ${actionIndentPt}pt — `
+      + 'before the fix it printed ">SMASH TO BLACK." flush at the action indent',
+    );
+
+    const fdx = fountainToFdx(CUSTOM, 'Forced Transition');
+    assert.equal(fdx.includes('&gt;'), false, 'the FDX export still carries the marker');
+    assert.ok(
+      /<Paragraph Type="Transition">\s*<Text>SMASH TO BLACK\.<\/Text>/.test(fdx),
+      'the forced transition must leave as a Final Draft Transition paragraph, not an Action one',
+    );
+
+    const docx = latin1(fountainToDocx(CUSTOM, 'Forced Transition'));
+    assert.equal(
+      [...docx.matchAll(/<w:t xml:space="preserve">([\s\S]*?)<\/w:t>/g)].filter((m) => m[1].includes('&gt;')).length,
+      0, 'the DOCX export still carries the marker in a text run',
+    );
+    assert.ok(docx.includes('w:val="Transition"'), 'the forced transition must take the Transition style');
+
+    // The PDF is checked on its TEXT-SHOWING operators only: `>` is PDF
+    // dictionary syntax (`>>` closes one), so a naked `includes('>')` over the
+    // whole file can never be false and would be a test that cannot fail.
+    const pdf = latin1(fountainToPdf(CUSTOM, 'Forced Transition'));
+    const shown = [...pdf.matchAll(/\((.*?)\) Tj/g)].map((m) => m[1]);
+    assert.deepEqual(shown.filter((t) => t.includes('>')), [], 'the PDF still draws the marker');
+    assert.ok(shown.includes('SMASH TO BLACK.'), 'the PDF must still draw the transition itself');
+  });
+
+  it('the three shapes that are NOT a forced transition keep the character they typed', () => {
+    // `>text<` is §Centered Text and claims the same first character.
+    assert.equal(types('INT. A - DAY\n\nMary closes the file.\n\n> THE END <\n'), 'scene_heading,action,centered',
+      'centering must not be eaten by the transition branch — it is checked first, deliberately');
+    // A `>` line inside a speech stays dialogue. Unlike `!`, `.` and `~`, `>`
+    // does not break out of a dialogue block: that is this parser's existing
+    // rule (src/lib/fountain.ts, the dialogue-block comment) and the forced
+    // branch is placed after it, so a writer who drops the blank line before a
+    // transition keeps the speech intact rather than losing a dialogue line.
+    assert.equal(
+      types('INT. A - DAY\n\nMARY\nGoodbye.\n>CUT TO:\n\nINT. B - DAY\n\nRain falls.\n'),
+      'scene_heading,character,dialogue,dialogue,scene_heading,action',
+      'a `>` line with no blank line above it is inside the speech and stays dialogue',
+    );
+    // A bare `>` declares nothing — there is no element and stripping the
+    // marker would leave an empty line, so it stays action with the character on.
+    assert.equal(types('INT. A - DAY\n\n>\n'), 'scene_heading,action',
+      'a `>` with no body must not become an empty transition');
+    // …and the normaliser agrees, which is the property `parserTypes: true` buys.
+    assert.equal(normalizeScreenplay('INT. A - DAY\n\n>\n').includes('>'), true,
+      'stripForcedMarkers must not remove a `>` the parser did not type a transition from');
+  });
+});
+
+// ── THE OTHER RESIDUAL §6.7 NAMED, AND WHY IT IS NOT THE SAME DEFECT ───────
+// An `@` line that is not in cue position stays `action` and prints its marker.
+// That is a DECISION, not a leak, and the spec is what settles it — the full
+// statement lives beside FORCED_CUE_MARKER in src/lib/fountain.ts. What makes
+// it different from the `>` case above is the property asserted here: the
+// scored text and the printed page carry the same character, so there is no
+// analyzer/renderer split to close. These assertions are what would fail if
+// someone "fixed" the `@` by stripping it from action lines in renderableText.
+describe('an `@` out of cue position is literal text, and the analyzer agrees (2026-09-13)', () => {
+  const types = (t: string) => parseFountain(t).filter((b) => b.type !== 'empty').map((b) => b.type).join(',');
+
+  it('a `@` line with nothing under it is not a cue — the edge case the marker cannot rescue', () => {
+    // §Character requires the element to be followed by its speech ("without
+    // an empty line after it"); forcing overrides the UPPERCASE test, not the
+    // position ones, so a cue with no dialogue is not a cue in any reading.
+    assert.equal(types('INT. A - DAY\n\n@JIMMY\n\nHe never shows up.\n'), 'scene_heading,action,action',
+      'a forced cue with a blank line under it has no speech and is not a Character element');
+    assert.equal(types('INT. A - DAY\n\nMary closes the file.\n\n@JIMMY\n'), 'scene_heading,action,action',
+      'a forced cue as the last line of the draft has no speech either');
+    // The contrast that makes the rule visible: the forced TRANSITION above
+    // has no such requirement, because a Transition is a standalone element.
+    assert.equal(types('INT. A - DAY\n\nMary closes the file.\n\n>FADE OUT.\n'), 'scene_heading,action,transition',
+      'a forced transition as the last line IS a transition — the two markers differ here on purpose');
+  });
+
+  it('the analysis seam prints what the page prints: no split', async () => {
+    const { fountainToFdx } = await import('../../src/lib/fdx.ts');
+    const { renderableText } = await import('../../src/lib/fountain.ts');
+    const DOC = 'INT. OFFICE - DAY\n\n@handle is what he goes by now.\n\nEXT. LOT - DAY\n\nRain.\n';
+
+    // The parser leaves it action…
+    assert.equal(types(DOC), 'scene_heading,action,scene_heading,action');
+    // …the analysis seam keeps the character (stripForcedMarkers is gated on
+    // the parser having typed the line FROM the marker)…
+    assert.ok(normalizeScreenplay(DOC).includes('@handle'),
+      'the scored text must keep a `@` the parser did not type a cue from');
+    // …and so does the page. Same character both sides: that is the property.
+    const block = parseFountain(DOC).find((b) => b.text.includes('@handle'))!;
+    assert.ok(renderableText(block).startsWith('@handle'),
+      'the renderer must print the literal character the analyzer scored');
+    assert.ok(fountainToFdx(DOC, 'Literal At').includes('@handle'),
+      'the FDX export must carry it too — a marker the parser declined is not a marker');
+  });
+
+  it('an `@` inside a parenthetical or a speech stays exactly where it is', () => {
+    assert.equal(
+      types('INT. A - DAY\n\nMARY\n(@everyone, quietly)\nWe should go.\n'),
+      'scene_heading,character,parenthetical,dialogue',
+      'a parenthetical opening with `@` is still a parenthetical',
+    );
+    assert.equal(
+      types('INT. A - DAY\n\nMARY\nTell them all.\n@everyone, the meeting moved.\n'),
+      'scene_heading,character,dialogue,dialogue',
+      'a `@` line inside a speech is still dialogue',
+    );
   });
 });
