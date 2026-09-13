@@ -284,6 +284,174 @@ which `check-scoring-receipt main..HEAD` confirms by name.
    be a scoring change invented for a test); the ORDER-of-operations and the
    printed comparison are what the test pins.
 
-`Tip:` `lane/owner-measure` — the commit that adds this file, pushed to
-`origin/lane/owner-measure`. The three `scoring/*` branches and `main` are
+`Tip:` round 1 ended at `f198b60e`; the current tip is the commit that adds the
+Round 2 section below. The three `scoring/*` branches and `main` are untouched
+by this lane.
+
+---
+
+# Round 2 — after independent review
+
+Reviewed object: `f198b60e`. Review:
+`docs/audits/2026-09-13-owner-measure/owner-measure-review.md` (`fbf9555a`),
+VERDICT **REVISE**, items 1-5 blocking. Every item below is addressed, each
+with a test that fails on the round-1 behaviour.
+
+| # | disposition | where |
+|---|---|---|
+| 1 | **done** — recipe ids derived from the code that produced each number | `scripts/owner-measure.mjs:303` `detectMeasureRealRecipe`, `:335` `recipeComparison`; `scripts/lib/receipt-conversion.mjs` `fieldBody('Measured AUC-24')` |
+| 2 | **done** — the Command field is written from what ran | `scripts/lib/receipt-conversion.mjs:201` `probeCommandLines`; `scripts/owner-measure.mjs:704` the receipt-safe probe detail |
+| 3 | **done** — a `report` step is reported, never accepted | `scripts/owner-measure.mjs:1130`; plan row `adversarial-stack` is now `accept-reject` |
+| 4 | **done** — the entry is restructured, not patched | `scripts/lib/receipt-conversion.mjs:125` `AS_FILED_HEADING_PREFIX`, `:151` `assertNoPendingAssertionsAbove`, `convertEntry` |
+| 5 | **done** — fixture mode refuses three ways | `scripts/owner-measure.mjs:99` `FIXTURE_MARKER`, `:1015`-`:1040` the refusals |
+| 6 | **done** — the NUL byte is `\0`, the file is text | `scripts/lib/manifest-relock.mjs:49` |
+| 7 | **done** — the out dir is created after the pre-flight | `scripts/owner-measure.mjs:986` |
+| 8 | **done** — the two forgiven checks are named | `scripts/owner-measure.mjs:441` `FORGIVEN_LAYOUT_CHECKS` |
+| 9 | **done** — the ref moves by compare-and-swap or refuses | `scripts/owner-measure.mjs:1264` `moveBranchRef` |
+| 10 | **done** (three parts) | `:623` the command line carries node; `:683` probe stderr goes to the log, only its path is printed; `tests/scripts/owner-measure-e2e.test.ts:158` the fixture is a real one-line scoring change |
+
+## What each fix actually changed
+
+**1 — the recipe label.** Round 1 printed `BOTH numbers are on recipe
+shuffle-drop/v2` and wrote `recipe shuffle-drop/v2 … NOT comparable to the
+0.731` into the ledger. Both are inverted: `measure-real` computes its number
+with its own `/^(?=INT\.|EXT\.)/mi` split
+(`scripts/measure-real-script-discrimination.ts:272`), which IS the
+segmentation the 0.731 was measured on, and it is `lock-auc24`'s table that is
+not comparable to it. The id is no longer a constant in this script — it is
+read off the source in the tree being measured, so a migration of that script
+changes the label by itself. Both ids print side by side under
+`THESE TWO NUMBERS ARE ON DIFFERENT RECIPES AND ARE NOT COMPARABLE TO EACH
+OTHER`, the `vs AUC24_FLOOR` line says the floor was written for the other
+recipe, and the receipt carries the same statement. The invariant the review
+asked for is a test: while the source carries the legacy split, the reported
+id must not equal `AUC24_DEGRADATION_ID`; if it is ever migrated, the same test
+asserts the two DO agree.
+
+**2 — the Command field.** `facts.probes` is the run's own record: each side is
+`ran`, `skipped` or `unavailable` with its reason, and a step whose plan entry
+records no probe writes "no corpus-shape probe (the measurement plan records
+none for this step)". A second defect surfaced while testing it: the probe's
+summary carried the CSV's absolute path, so the first version of this fix put a
+local output path into a committed receipt. The record now carries a
+path-free `receiptDetail`; the path-bearing summary stays on stdout, where it
+is what the owner needs.
+
+**3 — the report gate.** `decision` is no longer initialised to `'accepted'`. A
+report step is `reported`: it does not set `accepted`, does not call
+`relockStep`, never becomes `lockRef`, and satisfies no `if-accepted:`.
+`--accept=<step id>` accepts one by name. The committed plan's
+`adversarial-stack` row was the one `report` step on the default path; it is
+`accept-reject` now, because the owner does decide on that tree.
+
+**4 — one story per entry.** The converted entry is rebuilt rather than
+patched: heading, banner, the five measured fields, the
+`- **Entry body as filed:**` bullet that bounds every field's value window, a
+`#### As filed, before this measurement (<date>)` heading, and then the
+entry's original body. The sentences the review quoted are still there, below a
+heading that says when they were written — they were true then, and mechanical
+surgery on arbitrary prose would be this script inventing claims.
+`assertNoPendingAssertionsAbove` refuses if one of them ever ends up above the
+boundary, and every pattern in it is shown firing on the sentence it names.
+
+**5 — the fixture guard.** Three refusals, each shown failing: no
+`--repo-root`; a `--repo-root` equal to the repository the script lives in; and
+a checkout with no `.owner-measure-throwaway` marker. The marker is the part
+that matters — a clone of this repository looks exactly like the original, so a
+path check alone would not have stopped the case the review described.
+
+## Round-2 numbers
+
+```
+$ node --experimental-strip-types tests/scripts/owner-measure-e2e.test.ts
+# tests 56  # pass 56  # fail 0     (~70 s; the pipeline runs FOUR times:
+                                     dry-run, accept+report, reject, plus the
+                                     stale-tip and refusal clones)
+$ node --experimental-strip-types tests/scripts/receipt-conversion.test.ts   # 43/43
+$ node --experimental-strip-types tests/scripts/owner-measure-plan.test.ts   # 30/30
+$ node --experimental-strip-types tests/scripts/manifest-relock.test.ts      # 16/16
+```
+
+The fixture is no longer degenerate. With a real one-line scoring change
+(`SCARCITY_SCALE` 140 → 152 on the accepted branch, → 133 on the reported one):
+
+Driven by hand in a throwaway clone, the same way the e2e builds one
+(`SCARCITY_SCALE` 140 → 152, `--corpus-fixture=public --accept-all`):
+
+```
+  probe (branch): 32 rows, the tree's own copy -> <run dir>/fx.probe-branch.csv
+  probe (base  ): skipped — this tree has no scripts/probe-corpus-shape.ts and the plan names no source
+  measure-real    : 32 scripts · shuffle-drop AUC-24 0.6880 · act-swap 0.434
+  AUC-24 reported : 0.6880  (recipe `shuffle-drop/legacy-int-ext-split`)
+  vs AUC24_FLOOR  : 0.622 — clears
+                    READ THAT COMPARISON WITH CARE: AUC24_FLOOR was written for
+                    `shuffle-drop/v2`, and this number is not on it.
+  vs baseline    : 0.6550 (+0.0330) — same recipe, same run, so this one IS a comparison
+  recipes         : THESE TWO NUMBERS ARE ON DIFFERENT RECIPES AND ARE NOT COMPARABLE …
+  receipt         : 1 pending-looking entry outside this range left untouched
+  receipt         : 1 PENDING entry converted by the three-scan recipe
+  verified        : <base>..HEAD — 1 entry, 0 problems (gate's own validateEntry)
+  manifest re-lock: 32 rows mapped IN PLACE, order preserved — 32 field(s) moved
+                    row  0 health: 76.3 -> 75.3
+```
+
+Round 1's same run printed `0.6550 (+0.0000)` and `0 field(s) moved`: the
+comment-only fixture made the branch and the baseline the same tree in every
+way that a number could see. In the e2e the second step (`report` gate, the
+same change in the other direction) prints:
+
+```
+  decision        : reported
+  manifest        : not re-locked — the re-lock follows acceptance, and this step was reported
+```
+
+The e2e asserts the delta is non-zero, that exactly one re-lock happened for
+two measured steps, that the reported branch's manifest differs from the
+accepted branch's, and that the lock ran on the accepted branch.
+
+## Round-2 gates
+
+| gate | exit |
+|---|---|
+| `tests/scripts/owner-measure-e2e.test.ts` | 0 — 56/56 |
+| `tests/scripts/receipt-conversion.test.ts` | 0 — 43/43 |
+| `tests/scripts/owner-measure-plan.test.ts` | 0 — 30/30 |
+| `tests/scripts/manifest-relock.test.ts` | 0 — 16/16 |
+| `tests/core/brain-coverage.test.ts` · `tests/core/claims-row-citations.test.ts` | 0 — 7/7 · 5/5 |
+| `npm run lint` | 0 |
+| `npm run check-no-console` | 0 |
+| `npm run check-docs` | 0 |
+| `npm run honesty-audit` | 0 (two `ARCHITECTURE.md` anchors re-numbered again — the round-2 paragraph moved them 4 lines) |
+| `node scripts/check-scoring-receipt.mjs main..HEAD` | 0 — "no scoring-path files changed" |
+| `npm run check-brain` | 0 |
+
+No second full `npm test`, per the cost rule. No browser suite (no surface).
+
+## Pushed back on, with the reason
+
+**Nothing from items 1-10 was declined.** Two judgement calls inside them:
+
+1. **Item 4, the as-filed prose is MOVED, not rewritten.** The review offered
+   "rewritten into past tense … or moved wholesale under a clearly bounded
+   section"; this takes the second. A table of regex rewrites over sentences
+   like "exits **1** on this entry, which is the intended state" would be the
+   script asserting things about a branch it has not read, and the failure mode
+   is silent. Under `#### As filed, before this measurement` every one of those
+   sentences is true as what it is: the entry as filed. The four PENDING
+   phrases are still re-tensed, because scan two reaches them wherever they sit.
+2. **Item 10's redaction half takes the second option.** `redact()` still masks
+   the corpus directory and not basenames under it; what changed is that the
+   one site echoing a foreign script's stderr no longer echoes it. Masking
+   arbitrary basenames means deciding which words in a foreign error message
+   are filenames, which is a guess; not printing it is not.
+
+**Still out of scope, unchanged from round 1 and endorsed by the review:**
+migrating `measure-real` onto `scripts/lib/auc.ts` (it moves a measured number
+and needs its own receipt), fixing `verify:corpus-layout` (needs the
+owner-local corpus migration), and `--resume`. The first is now IMPOSSIBLE to
+conflate, which was the point of item 1: the command names the recipe that
+produced each number and says they are not the same statistic.
+
+`Tip:` `lane/owner-measure` — the commit that adds this Round 2 section, pushed
+to `origin/lane/owner-measure`. `main` and every `scoring/*` branch are
 untouched by this lane.

@@ -598,7 +598,7 @@ async function measureTree(ctx, { label, ref, tree, probe }) {
   if (probe) {
     for (const [which, at] of [['branch', ref], ['base', probe.base]]) {
       const result = runProbe(ctx, { which, at, sourceRef: probe.sourceRef, label });
-      say(`  probe (${which.padEnd(6)}) : ${result.summary}`);
+      say(`  probe (${which.padEnd(6)}): ${result.summary}`);
       probes.push({ which, at, outcome: result.outcome, detail: result.receiptDetail ?? result.outcome });
       log.push(...result.log);
     }
