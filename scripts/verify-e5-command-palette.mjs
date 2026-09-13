@@ -131,7 +131,27 @@ async function main() {
   const shipPanelOpened = await page.locator('[aria-labelledby="ship-panel-title"]').waitFor({ timeout: timing.ms(5000) }).then(() => true).catch(() => false);
   record('Enter on the highlighted action runs it for real: the Ship panel opens', shipPanelOpened);
 
-  const paletteClosedAfterRun = await paletteDialog.count().then((n) => n === 0);
+  // CommandPalette's runAt() calls action.run() then onClose() back-to-back
+  // in the SAME synchronous handler (tests/core/command-palette-wiring.test.ts
+  // pins this) — the writer's Enter closes the palette immediately in React
+  // state terms. But the <dialog> node itself stays mounted for the 0.14s
+  // AnimatePresence exit animation this component declares (`exit={{
+  // duration: 0.14 }}`), same as the Escape-close case handled a few lines
+  // below with its own margin comment. A synchronous `.count()` read taken
+  // the instant the Ship panel becomes visible samples mid-animation and
+  // races the harness against React, not against the app: on a loaded CI
+  // runner the Ship-panel wait above can itself eat into that 0.14s window,
+  // so the count read below could land before the exit transition commits.
+  // 2026-09-13 (docs/audits/2026-09-13-ci-green/palette-race-lane-report.md):
+  // this is exactly what made CI fail 3/3 on main while staying 17/17 on an
+  // idle local box — reproduced deterministically under CPU throttling, see
+  // the audit report. Fix: wait for the dialog to actually detach (bounded,
+  // scaled by load) instead of sampling synchronously — this still fails a
+  // palette that never closes.
+  const paletteClosedAfterRun = await paletteDialog
+    .waitFor({ state: 'detached', timeout: timing.ms(3000) })
+    .then(() => true)
+    .catch(() => false);
   record('The palette itself closes after running an action', paletteClosedAfterRun);
 
   await page.screenshot({ path: `${OUT_DIR}/e5-ship-panel-from-palette.png` });
@@ -152,10 +172,15 @@ async function main() {
   // CommandPalette exits via AnimatePresence (0.14s fade/scale) — the
   // <dialog> node stays mounted for that long even after React state
   // flips paletteOpen false, so an immediate .count() check would
-  // (falsely) still see it. Same margin used after every other
-  // exit-animated close below.
-  await page.waitForTimeout(timing.ms(400));
-  const paletteClosedOnEscape = await paletteDialog.count().then((n) => n === 0);
+  // (falsely) still see it. `waitFor({ state: 'detached' })` waits for the
+  // actual unmount (bounded, scaled by load) instead of guessing a fixed
+  // margin — same fix, and the same reasoning, as the Enter-runs-an-action
+  // close check above. Same pattern used for every other exit-animated
+  // close below.
+  const paletteClosedOnEscape = await paletteDialog
+    .waitFor({ state: 'detached', timeout: timing.ms(3000) })
+    .then(() => true)
+    .catch(() => false);
   record('Escape closes the command palette', paletteClosedOnEscape);
   const focusRestoredToEditor = await page.evaluate(() => document.activeElement?.className?.includes('cm-') ?? false);
   record('Escape restores focus to the editor (where the writer was before Cmd/Ctrl+K)', focusRestoredToEditor);
@@ -174,8 +199,10 @@ async function main() {
   record('The shortcuts panel documents Cmd/Ctrl+K (the palette itself)', mentionsPalette > 0);
   await page.screenshot({ path: `${OUT_DIR}/e5-shortcuts-panel.png` });
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(timing.ms(400));
-  const shortcutDialogClosedOnEscape = await shortcutDialog.count().then((n) => n === 0);
+  const shortcutDialogClosedOnEscape = await shortcutDialog
+    .waitFor({ state: 'detached', timeout: timing.ms(3000) })
+    .then(() => true)
+    .catch(() => false);
   record('Escape closes the Keyboard Shortcuts panel (E5 fix — it had no Escape handling before this pass)', shortcutDialogClosedOnEscape);
 
   // ══════════════════════════════════════════════════════════════════════
@@ -205,8 +232,10 @@ async function main() {
   record('Settings dialog traps Tab — 25 presses never escape it', stayedInDialog);
 
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(timing.ms(300));
-  const settingsClosedOnEscape = await settingsDialog.count().then((n) => n === 0);
+  const settingsClosedOnEscape = await settingsDialog
+    .waitFor({ state: 'detached', timeout: timing.ms(3000) })
+    .then(() => true)
+    .catch(() => false);
   record('Escape closes the Settings dialog', settingsClosedOnEscape);
 
   await context.close();

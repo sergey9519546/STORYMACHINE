@@ -420,6 +420,63 @@ function handRolledStreamHolds(source: string): { line: number; text: string }[]
   return bad;
 }
 
+/**
+ * Find a "the dialog closed" check — `<locator>.count() === 0` (or the
+ * `.then((n) => n === 0)` form this repo also uses) — read within a few
+ * lines of a `.press(`/`.click(` action, where THAT SAME locator's own
+ * detachment/hidden state was never actually waited for first.
+ *
+ * ── Why (2026-09-13, palette-close-race lane) ────────────────────────────
+ * `scripts/verify-e5-command-palette.mjs`'s "the palette itself closes
+ * after running an action" assertion sampled `paletteDialog.count()`
+ * synchronously the instant an unrelated element (the Ship panel) became
+ * visible — CI failed it 3/3 on `main` while it stayed 17/17 on an idle
+ * local box (docs/audits/2026-09-13-ci-green/palette-race-lane-report.md).
+ * The dialog is CommandPalette, which exits through AnimatePresence (a
+ * 0.14s timed animation) — its unmount is not gated on the triggering
+ * action finishing, so a read taken right after the action can land before
+ * React actually removes the node. `waitFor({ state: 'detached' })` on
+ * that SAME locator is the fix; a fixed-duration `waitForTimeout` guess is
+ * the same defect with a bigger margin, not the fix, which is why the scan
+ * requires a real detached/hidden wait on the checked locator itself,
+ * not merely SOME wait somewhere upstream (the original bug had one — a
+ * `waitFor` for the Ship panel — between the action and the race).
+ *
+ * Deliberately narrow to reduce false positives on the rest of this
+ * battery: a `.count() > 0` appearance check is not in scope (a mount
+ * commits in the same React commit as the triggering event in every
+ * component this repo has — AnimatePresence only ever delays REMOVAL), and
+ * neither is a synchronous focus/DOM read (Tab and a ref's own `.focus()`
+ * call take effect within the same event dispatch, no animation between
+ * the action and the read). Only an absence check — the one shape that
+ * really can be racing an exit transition — is flagged.
+ */
+function unwaitedCloseChecks(source: string): { line: number; text: string }[] {
+  const bad: { line: number; text: string }[] = [];
+  const ACTION = /\.(?:press|click)\(/;
+  const CLOSE_CHECK = /\b([A-Za-z_$][\w.$]*)\.count\(\)\s*(?:\.then\(\s*\(?\s*n\s*\)?\s*=>\s*n\s*===\s*0\s*\)|(?:===|==)\s*0)/;
+  const lines = source.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const m = CLOSE_CHECK.exec(lines[i]);
+    if (!m) continue;
+    const name = m[1];
+    let sawAction = false;
+    for (let j = Math.max(0, i - 10); j < i; j++) {
+      if (ACTION.test(lines[j])) { sawAction = true; break; }
+    }
+    if (!sawAction) continue; // a stable read with no triggering action nearby
+    const escaped = name.replace(/[.$]/g, '\\$&');
+    const detachedWaitRe = new RegExp(`${escaped}\\s*\\.waitFor\\(\\s*\\{[^)]*state:\\s*['"](?:detached|hidden)['"]`);
+    let waitedOwnClose = false;
+    for (let j = Math.max(0, i - 40); j < i; j++) {
+      if (detachedWaitRe.test(lines[j])) { waitedOwnClose = true; break; }
+    }
+    if (waitedOwnClose) continue;
+    bad.push({ line: i + 1, text: lines[i].trim().slice(0, 140) });
+  }
+  return bad;
+}
+
 describe('doctor-verdict waits go through the one shared helper', () => {
   // ── Why (2026-09-12, round 3) ───────────────────────────────────────────
   // A bare `/RECOMMEND|CONSIDER|PASS/` poll of `innerText` is satisfied by the
@@ -728,6 +785,70 @@ describe('waitForFunction option position', () => {
       offenders,
       [],
       'waitForFunction takes its options THIRD — pass `undefined` as the arg:\n  ' + offenders.join('\n  '),
+    );
+  });
+});
+
+describe('a "closed" check waits for its OWN locator to detach, not a nearby action', () => {
+  it('the scanner finds the defect it is meant to find (fail-first, verbatim shape)', () => {
+    // scripts/verify-e5-command-palette.mjs before the 2026-09-13 fix,
+    // trimmed to the load-bearing three lines.
+    const unfixed = "await page.keyboard.press('Enter');\n"
+      + "const shipPanelOpened = await page.locator('[aria-labelledby=\"ship-panel-title\"]').waitFor({ timeout: 5000 }).then(() => true).catch(() => false);\n"
+      + 'const paletteClosedAfterRun = await paletteDialog.count().then((n) => n === 0);';
+    const hits = unwaitedCloseChecks(unfixed);
+    assert.equal(hits.length, 1, 'a wait for a DIFFERENT locator between the action and the check must not exempt it');
+    assert.match(hits[0].text, /paletteDialog\.count\(\)/);
+
+    // The `=== 0` spelling is the same offender.
+    assert.equal(
+      unwaitedCloseChecks("await page.keyboard.press('Escape');\nconst n = someDialog.count() === 0;").length,
+      1,
+    );
+  });
+
+  it('the fix — waitFor({ state: "detached" }) on the SAME locator — clears it', () => {
+    const fixed = "await page.keyboard.press('Enter');\n"
+      + "await page.locator('[aria-labelledby=\"ship-panel-title\"]').waitFor({ timeout: 5000 }).then(() => true).catch(() => false);\n"
+      + "const paletteClosedAfterRun = await paletteDialog.waitFor({ state: 'detached', timeout: 3000 }).then(() => true).catch(() => false);";
+    assert.equal(unwaitedCloseChecks(fixed).length, 0);
+  });
+
+  it('an appearance check (count() > 0) is out of scope — mounting is never animation-gated', () => {
+    assert.equal(
+      unwaitedCloseChecks("await exportMenuBtn.click();\nconst itemVisible = await item.count() > 0;").length,
+      0,
+    );
+  });
+
+  it('a count()===0 read with no triggering action nearby is a stable baseline, not this defect', () => {
+    assert.equal(
+      unwaitedCloseChecks('await page.goto(BASE);\nconst flashBefore = await page.locator(".x").count();\nconst none = flashBefore === 0;').length,
+      0,
+    );
+  });
+
+  it('a prior wait for a DIFFERENT locator\'s detached state does not exempt this one', () => {
+    const stillBad = "await other.waitFor({ state: 'detached', timeout: 3000 });\n"
+      + "await page.keyboard.press('Escape');\n"
+      + 'const closed = paletteDialog.count().then((n) => n === 0);';
+    assert.equal(unwaitedCloseChecks(stillBad).length, 1, 'only THIS locator\'s own detached wait may clear it');
+  });
+
+  it('none of the browser suites re-introduces the defect this lane fixed', () => {
+    const offenders: string[] = [];
+    for (const file of scriptFiles()) {
+      const source = readFileSync(file, 'utf8');
+      for (const hit of unwaitedCloseChecks(source)) {
+        offenders.push(`${path.relative(REPO, file)}:${hit.line} — ${hit.text}`);
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      'a dialog-closed check must waitFor({ state: \'detached\' | \'hidden\' }) on its OWN locator, not sample '
+        + '.count() right after a keyboard/click action (docs/audits/2026-09-13-ci-green/'
+        + 'palette-race-lane-report.md):\n  ' + offenders.join('\n  '),
     );
   });
 });

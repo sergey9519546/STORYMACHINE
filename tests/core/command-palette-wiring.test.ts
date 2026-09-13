@@ -205,6 +205,37 @@ describe("CommandPalette.tsx — dialog wiring", () => {
     assert.doesNotMatch(source, /addEventListener\(["']keydown["'].*Escape/s);
     assert.doesNotMatch(source, /e\.key === ["']Escape["']/);
   });
+
+  // 2026-09-13 (docs/audits/2026-09-13-ci-green/palette-race-lane-report.md):
+  // `runAt` must call `action.run()` and `onClose()` back-to-back,
+  // synchronously, in the SAME tick a keypress handles — not after an
+  // await, a promise, or a timeout. This is the fact the CI-failure
+  // investigation hinged on: the writer presses Enter, the palette closes
+  // immediately (React state flips within the same handler); any perceived
+  // delay before the <dialog> node actually leaves the DOM is
+  // AnimatePresence's own 0.14s exit animation (see this file's `exit={{
+  // duration: 0.14 }}` above), not the app waiting on the action. A
+  // verify-e5-command-palette.mjs assertion that samples `.count()` the
+  // instant the Ship panel appears was racing that animation, not this
+  // handler — see scripts/verify-e5-command-palette.mjs's fix. If `runAt`
+  // ever becomes `async` and awaits `action.run()` before closing, this
+  // guard fails and it should: that would be a real behavior change (the
+  // palette staying open through the action's own work), not just a
+  // slower browser-test read.
+  it("runAt calls action.run() then onClose() synchronously — not after an await", () => {
+    const runAtBlock = source.match(/const runAt = \(index: number\) => \{[\s\S]*?\n {2}\};/);
+    assert.ok(runAtBlock, "expected a runAt function body");
+    const body = runAtBlock![0];
+    assert.doesNotMatch(body, /\basync\b/, "runAt must not be async");
+    assert.doesNotMatch(body, /\bawait\b/, "runAt must not await anything before closing");
+    // run() then onClose(), in that order, with nothing but the early
+    // disabled-guard return between the function's start and them.
+    const runIdx = body.indexOf("action.run();");
+    const closeIdx = body.indexOf("onClose();");
+    assert.ok(runIdx !== -1, "expected action.run() in runAt");
+    assert.ok(closeIdx !== -1, "expected onClose() in runAt");
+    assert.ok(runIdx < closeIdx, "action.run() must run before onClose()");
+  });
 });
 
 describe("FountainEditor.tsx — Typewriter Focus is really wired (not a dead prop)", () => {
