@@ -5,7 +5,11 @@
 
 ```
 $ git log --oneline main..HEAD
-<filled in below, at the tip this report was written on>
+54af254d docs(owner): the command in README, ARCHITECTURE, the manifest README and the gate report
+e33a5b77 test(owner): the whole pipeline end to end, in a clone, with no corpus
+478d48a5 test(owner): the conversion and the re-lock, each guard shown failing first
+3ddb278b feat(owner): one command for the owner's blocking measurement — the plan, the conversion, the re-lock
+<this report's own commit>
 ```
 
 ## 1. What the thing IS
@@ -229,7 +233,7 @@ backticks is read by the gate as a **cited git object** and failed the entry
 | check-scoring-receipt | `node scripts/check-scoring-receipt.mjs main..HEAD` | 0 — "no scoring-path files changed" |
 | gates | `npm run gates` | 0 |
 | brain | `npm run check-brain` | 0 |
-| full suite | `npm test` | see the tip commit's own line below |
+| full suite | `npm test` | 0 — **13,920 tests, 13,828 pass, 0 fail, 91 skipped, 1 todo, 6 m 45 s**, run ONCE on the final tree |
 
 No browser suite: this lane adds no surface a writer drives. No
 `test:metamorphic` and no output-identity run: no scoring-path file is touched,
@@ -280,4 +284,6 @@ which `check-scoring-receipt main..HEAD` confirms by name.
    be a scoring change invented for a test); the ORDER-of-operations and the
    printed comparison are what the test pins.
 
-`Tip:` see the final line of this file at the reviewed commit.
+`Tip:` `lane/owner-measure` — the commit that adds this file, pushed to
+`origin/lane/owner-measure`. The three `scoring/*` branches and `main` are
+untouched by this lane.
