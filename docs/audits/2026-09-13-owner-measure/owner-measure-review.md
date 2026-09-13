@@ -398,3 +398,90 @@ Out of scope, and correctly left: migrating `measure-real` onto
 
 Items 1-5 block the merge. Items 6-10 are cheap and should land in the same
 round.
+
+---
+
+# Round 2 (`7b05a943`)
+
+Re-checked object: `lane/owner-measure` @ `7b05a943`, round-2 diff
+`f198b60e..7b05a943` (two commits: `c15ed954` the fix, `7b05a943` the report).
+Warm re-check of this reviewer's ten items only, per §6 — no battery re-run.
+
+**VERDICT: MERGE.**
+
+All ten items are fixed, several past what was asked. The three that mattered
+most are fixed at the root rather than at the symptom: the recipe id is now
+DERIVED from the source that computes the number, so it corrects itself the day
+`measure-real` is migrated; the probe outcome is a REQUIRED fact the converter
+refuses to run without, so the Command field cannot go back to being a
+template; and a `report` step now has its own decision value that no code path
+treats as acceptance.
+
+## Per item
+
+| # | round-1 finding | verdict | how it was checked |
+|---|---|---|---|
+| 1 | recipe id stamped on the wrong number | **fixed** | `detectMeasureRealRecipe('/home/user/wt-owner')` → `{ id: 'shuffle-drop/legacy-int-ext-split', migrated: false, evidence: 'scripts/measure-real-script-discrimination.ts:272 still splits scenes on /^(?=INT\\.\|EXT\\.)/mi' }`; I read that line — it is the legacy split. `AUC24_DEGRADATION_ID` is `shuffle-drop/v2`. `recipeComparison` prints "THESE TWO NUMBERS ARE ON DIFFERENT RECIPES AND ARE NOT COMPARABLE TO EACH OTHER", names both ids with the evidence, and says the reported number is on the same segmentation as the 0.731. The receipt now says "**IT IS NOT THE RECIPE `lock-auc24` WRITES**" and "Floor `AUC24_FLOOR` 0.622, for reference only where the recipes differ". Deriving the id from source instead of hardcoding a second constant is stronger than the item asked for, and the e2e invariant (suite 7) pins both directions |
+| 2 | Command field attests to a probe that did not run | **fixed** | `probes` is a hard `requireFacts` check (`Array.isArray`, with the review number in the message); `probeCommandLines` writes one line per side — `on the branch tree RAN (72 rows, the tree's own copy);` — and, for an empty list, "no corpus-shape probe (the measurement plan records none for this step)". Rendered on the real `scoring/renderer-residuals` entry and read. The e2e fixture now carries a probe its base tree lacks |
+| 3 | `gate: "report"` silently accepted | **fixed** | `decision = 'reported'` (owner-measure.mjs:1130): no `accepted`, no `relockStep`, never `lockRef`, satisfies no `if-accepted:`, and the printed copy says all four. `--accept=<id>` is the deliberate override. The plan's `adversarial-stack` row is now `accept-reject`. Driven: the e2e adds a second `gate: 'report'` step and asserts the reported step's manifest differs from the accepted one's and that the lock tip is the accepted step; a rejected step is driven through stdin (suite 2) |
+| 4 | converted entry passed the gate while its prose denied the measurement | **fixed** | Converted the REAL `scoring/renderer-residuals` ledger with the round-2 code: `pendingReason` → `null`, `validateEntry` → `[]`. Structure is now heading / banner / five fields / window-bounding bullet / `#### As filed, before this measurement (2026-09-13)` / original body. Read as a producer it tells ONE story — the fields are this run, the fenced section is the filing — and the fence's own copy says "Sentences there describe the state AT FILING and several are no longer true". The three sentences I quoted in round 1 are now unambiguously below the fence and read as history. `assertNoPendingAssertionsAbove` refuses any entry where such a sentence survives above the boundary, shown throwing and then not throwing. The wholesale move rather than per-sentence re-tensing is the right judgement and is stated as one: re-tensing "exits **1** on this entry, which is the intended state" would have required the converter to invent prose, which is exactly what it must not do |
+| 5 | `--corpus-fixture=public` destructive | **fixed** | Ran two of the three: with no `--repo-root` → exit 1, naming what it would overwrite and printing the `git clone --shared` recipe; with `--repo-root=/home/user/wt-owner` → exit 1. The third is a `.owner-measure-throwaway` marker requirement |
+| 6 | NUL byte made the file binary in git | **fixed** | 0 NUL bytes; `file` → "JavaScript source, Unicode text, UTF-8 text"; source reads `` `${row.id ?? ''}\0${row.file ?? ''}` ``. The round-2 diff still renders as `Bin` only because the OLD blob is binary; from here it diffs as text |
+| 7 | "Nothing was written" was false | **fixed** | `mkdirSync(ctx.outDir)` is gone from before the pre-flight; the directory is created lazily by `writeArtifact` inside it. Verified: `rm -rf <dir>` then the no-corpus run → exit 1 and `<dir>` does not exist. The test now asserts `!existsSync` rather than matching the sentence |
+| 8 | `/migrated schema/i` forgave a second check | **fixed** | `FORGIVEN_LAYOUT_CHECKS` is a frozen two-element list of exact labels, each with the reason it is forgiven — including the honest note that the second one is forgiven only because the per-file checks under it do not run at all, with the pre-flight's row-resolution check standing in. `classifyLayout` uses `.includes()`. Driven in e2e suite 8 |
+| 9 | `update-ref` failure swallowed | **fixed** | `moveBranchRef` throws a `Refusal` naming the branch, the stale old value, and where the conversion commit is safe. Driven in e2e suite 9 against a throwaway repo |
+| 10 | execPath dropped; foreign stderr echoed; degenerate fixture | **fixed** | `commandLine` carries the full argv. Probe stderr is written to `<label>.probe-<side>.error.log` and only the path printed, with the reason quoted at the site. The fixture branch is a real `SCARCITY_SCALE` 140 → 152 change (a second tree at 133), so the AUC comparison and the re-lock are no longer no-ops |
+
+## Also found and fixed by the lane, not by this review
+
+The probe summary carried the CSV's **absolute local path** into a committed
+receipt. `receiptDetail` now carries no path at all, and the e2e asserts that
+neither the commit message nor the receipt diff contains the output directory.
+That is the right instinct applied unprompted, and it is the same class as F11.
+
+## Reproduced numbers, round 2
+
+```
+$ node --experimental-strip-types tests/scripts/owner-measure-e2e.test.ts
+# tests 56  # pass 56  # fail 0  # duration_ms 73180.35      (lane: 56/56, ~70 s)
+
+$ node --experimental-strip-types tests/scripts/receipt-conversion.test.ts
+# tests 43  # pass 43  # fail 0                              (lane: 43/43)
+
+$ node --experimental-strip-types scripts/owner-measure.mjs --plan            # exit 0
+$ owner-measure.mjs --corpus-fixture=public                                    # exit 1, refuses
+$ owner-measure.mjs --corpus-fixture=public --repo-root=/home/user/wt-owner    # exit 1, refuses
+$ (no REAL_SCRIPT_CORPUS_DIR) owner-measure.mjs --out-dir=<dir>                # exit 1, <dir> absent
+```
+Conversion of the real `scoring/renderer-residuals` ledger through the gate's
+own exports: 27 entries, 4 flagged pending, 3 out of scope, **1 converted**,
+`pendingReason` → `null`, `validateEntry` → `[]`.
+Recipe detection on this tree: reported `shuffle-drop/legacy-int-ext-split`
+(evidence `…measure-real-script-discrimination.ts:272`) vs locked
+`shuffle-drop/v2` (`scripts/lib/auc.ts`).
+
+## Residual nits — NOT a third round
+
+None of these blocks the merge; fold them into whatever touches these files
+next.
+
+1. `scripts/lib/receipt-conversion.mjs:210` has a no-op ternary,
+   `${i === probes.length - 1 ? '' : ''}` — both branches are empty. Dead code
+   from an abandoned last-item separator; delete it.
+2. `commandLine` embeds the absolute `process.execPath` and is printed to
+   stdout unredacted, so an owner's console shows their node install path. It
+   never reaches the receipt (checked: `commandLine` is bound to no `facts`
+   key), so this is cosmetic — but `redact()` would mask it to `~/…` for free.
+3. `scoreManifestRows`' failure path (owner-measure.mjs:481) still echoes a
+   redacted stderr tail. It is safe because `scripts/lib/score-corpus-rows.mjs`
+   deliberately reports rows by content hash and never by name; the same
+   two-line comment `runProbe` now carries would make that a property a reader
+   can see rather than one they have to go and check.
+4. Round 1's advisory item (d) is still open by design: the plan pins `tip`
+   only, so a review commit on a scoring branch stops the owner's run until two
+   documents are corrected together. Recording the branch's last scoring-path
+   commit beside `tip` would make "moved for code" and "moved for an audit
+   file" distinguishable at a glance. Deliberate, defensible, and not this
+   lane's job to change now.
+
+**VERDICT: MERGE**
