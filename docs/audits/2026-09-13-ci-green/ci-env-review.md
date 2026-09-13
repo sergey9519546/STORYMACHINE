@@ -264,3 +264,129 @@ well as adds are the same instinct applied twice more.
 Optional, not blocking, but worth a paragraph in the report's §5: the remaining
 inherited-env spawn sites listed in §5 above (with the grep that actually finds
 them), and the two small `test-ci-env.mjs` nits in finding 6.
+
+---
+
+# Round 2 (4c92674f)
+
+Reviewed object: `lane/ci-env-failures` @ `4c92674f2b4a…` (`4c92674f`), diff
+`git diff 156a1ca6..4c92674f`. Warm re-check of the four round-1 items by the
+same reviewer, per LANE_STANDARD §6. Everything below was re-measured here, not
+read off the lane's report.
+
+**VERDICT: REVISE (1 item, documentation).** All four code items are done, and
+done at the right level — every fix is now pinned by a test that fails without
+it, isolated one line at a time, and every number in the lane's round-2 gate
+table reproduces exactly. The one blocker is in the report: item 1's evidence
+block contains two contradictory readings of the same command, and the one
+that would be read first is false.
+
+## Per-item verdicts
+
+| # | round-1 item | round-2 verdict |
+|---|---|---|
+| 1 | Pin the `refExists()` fix with a test that fails without it | **DONE.** The new test sets `GITHUB_EVENT_PATH` deliberately (via `runGuard`, not leakage) to a payload whose `before` is a valid-but-absent 40-hex SHA and asserts the guard's own text — `NO BASE REF`, `FAILING because CI is set` — plus `doesNotMatch(/Invalid revision range\|git diff failed/)`, which is the right assertion: the old crash was also exit 1, so an exit-code-only test would have passed for the wrong reason. Reverting only `${ref}^{commit}` → `ref` on the round-2 tree: **24/26, exactly tests 8 and 9 red**, everything else green. |
+| 2 | Don't let an unresolvable `before` fall through to `origin/main...HEAD` | **DONE, and wider than asked.** `if (!refExists(before)) return null;` in the push branch. Reverting only that line back to the round-1 shape (keeping `^{commit}`): **25/26, exactly test 9 red** — the isolation is clean. Re-driving my round-1 case B (throwaway repo, `origin/main == HEAD`, real unreceipted `doctor.ts` change, unresolvable wired `before`): **exit 1 with `NO BASE REF … FAILING because CI is set`**, where round 1 printed `no scoring-path files changed. OK.` and exited 0. The non-hex `before` case (case D, the pre-existing hole I flagged as *not* this lane's fault) is now closed too: exit 1 on the same input that was green on `main` and on round 1. |
+| 3 | Make `test:ci-env` subtract as well as add | **DONE.** `DELETE_FROM_RUNNER_ENV` carries all six keys I named (`PUSH_BEFORE_SHA`, `GEMINI_API_KEY`, `REAL_SCRIPT_CORPUS_DIR`, `HONESTY_AUDIT_REPO`, `GITHUB_TOKEN`, `GH_TOKEN`), each with its own reason, and the tool prints what it actually removed. Live in this sandbox: `removed from the caller's env (the runner does not carry these): GITHUB_TOKEN, GH_TOKEN`. Checked against `.github/workflows/ci.yml`: the `Run tests` step's `env:` block is exactly `RUN_E2E` + `GIT_SHA`; `GEMINI_API_KEY` appears only on `Build`, `HONESTY_AUDIT_REPO`/`GITHUB_TOKEN` only on `Honesty string audit`, `PUSH_BEFORE_SHA` only on the receipt step — the subtraction list matches the workflow. Finding 6 folded in: scratch dir removed in a `finally` (verified `ls -d /tmp/ci-env-repro-*` = 0 before and after a run), and `GITHUB_REF` no longer embeds a raw SHA. |
+| 4 | Close the same-class site in the edited file | **DONE.** `tests/scripts/report-unverified-gates.test.ts:660` builds from `CLEAN_GATE_ENV`. The 18-file spawn/exec audit in the report matches my own enumeration file for file, and each disposition I spot-checked is accurate. |
+
+## Reproduced numbers (round 2, this reviewer)
+
+| run | result |
+|---|---|
+| `tests/core/scoring-receipt-guard.test.ts` + `tests/scripts/report-unverified-gates.test.ts` + `tests/core/check-scoring-receipt.test.ts`, plain sandbox env | **76/76**, exit 0 |
+| `npm run test:ci-env -- <the two target files>` | exit 0, **68/68**; removal line printed; `HEAD` still on `lane/ci-env-failures`, `git status --porcelain` 0 lines; `/tmp/ci-env-repro-*` count 0 before and 0 after |
+| `^{commit}` reverted, nothing else (item 1 fail-first) | **26 tests / 24 pass / 2 fail** — `not ok 8`, `not ok 9` |
+| only `return null` reverted to the round-1 shape (item 2 fail-first) | **26 / 25 / 1** — `not ok 9` only |
+| pristine `4c92674f` | **26 / 26 / 0** |
+| guard driven: unresolvable `before` + unreceipted `doctor.ts` change | exit 1, `NO BASE REF` — round 1 was exit 0 `… no scoring-path files changed. OK.` |
+| guard driven: real `before`, same repo (control) | exit 1, `SCORING-PATH CHANGE WITHOUT A VALID MEASUREMENT RECEIPT` — still catches it |
+| guard driven: all-zeros sentinel (`before` = 40 zeros) | `range "origin/main...HEAD" … OK.` exit 0 — **unchanged**, the branch-creating push stays lenient |
+| guard driven: `pull_request` event with the same payload | `origin/main...HEAD`, exit 0 — the PR path is untouched |
+| `npm run lint` | exit 0 |
+
+## The one blocker
+
+### R2-1 (MUST FIX, report only) — item 1's evidence block contradicts itself, and the first reading is false
+
+`ci-env-lane-report.md` §"Round 2 / 1. Pinned `refExists()`…" prints:
+
+```
+$ node --experimental-strip-types --test tests/core/scoring-receipt-guard.test.ts   # ^{commit} reverted
+# tests 26 / # pass 26 / # fail 0
+```
+
+followed by "(26, not the reviewer's 24 … both included, **both green on the
+reverted line**…)". Twenty lines later the same file prints the same command
+with the same revert as `# tests 26 / # pass 24 / # fail 2`, tests 8 and 9 red.
+
+The second block is the true one — I measured it independently (24/26, exactly
+those two). The first block, taken at face value, says the two new tests pass
+with the fix reverted, which would mean item 1 did not pin anything; it reads
+like the pristine run mislabelled. LANE_STANDARD §5 makes the report part of
+the deliverable, and this contradiction sits inside the fail-first evidence for
+the exact item the round was about. Fix: delete or correct that block and its
+parenthetical so the section states one number — on the round-2 tree with
+`^{commit}` reverted, 24/26, tests 8 and 9 red — and, if the round-1-tree
+reproduction (24/24 green, the reviewer's number, before the new tests existed)
+is worth keeping, label it as the round-1 tree explicitly.
+
+## Not blocking, but worth folding in if the file is reopened
+
+- **The `NO BASE REF` copy now renders in a state it does not describe.** The
+  message says "no push range, no origin/main, no main, no prior commit" and
+  advises "fix the checkout (fetch-depth: 0)". In the new null case, verified
+  above, `origin/main` exists and the checkout is already `fetch-depth: 0` —
+  the real cause is that the push's recorded `before` is not an object in this
+  checkout (rewritten history, a force-push after `gc`, a stale
+  `PUSH_BEFORE_SHA`). One `console.error` naming the unresolved SHA before
+  returning `null` would make the sentence true in every state that renders it
+  (LANE_STANDARD §2). Not a blocker: the gate's *behaviour* is now right and
+  loud, and the message is no worse than `main`'s (which crashes with a stack
+  trace on the same input).
+- **Posture note for the orchestrator, not a defect:** after this change a push
+  whose `before` cannot be resolved fails the receipt step by design. That is
+  not a regression against `main` — the same input crashes there, also exit 1 —
+  but it does mean a force-pushed branch (a rebase pushed with `--force`) can
+  now go red with `NO BASE REF` on a push that carries no scoring change at
+  all. A strictly stronger version would refuse only when the fall-through
+  range would be degenerate (`origin/main == HEAD`, i.e. a push to main) and
+  otherwise use `origin/main...HEAD`, which for a rebased lane branch is the
+  honest, checkable range. Out of scope for this lane; worth a line in the
+  decision log if force-pushes are part of the merge flow.
+
+## The two out-of-scope latent risks do not block — why
+
+Neither can flip a CI verdict today, and the test that would notice if they
+ever could now exists:
+
+- `tests/core/check-scoring-receipt.test.ts:94` spawns the same guard with
+  `{ ...process.env, CI: '' }`. Every one of its call sites passes an explicit
+  `range` argument, and `main()` uses `explicitRange || resolveDefaultRange()`
+  — so the leaked `GITHUB_EVENT_NAME`/`GITHUB_SHA`/`GITHUB_EVENT_PATH` are
+  never read at all on that path, and `CI: ''` is falsy so the CI branch is
+  dead too. No assertion in the file has an outcome any ambient variable can
+  change. Verified green here under the replicated runner env (part of the
+  76/76 above).
+- `tests/core/honesty-audit-claims.test.ts:35` spawns `honesty-audit.mjs` with
+  no `env`. That script reads exactly three variables: `HONESTY_AUDIT_REPO`
+  (which gates the entire repo-metadata lane) and, only inside that lane,
+  `GITHUB_TOKEN`/`GH_TOKEN`. `HONESTY_AUDIT_REPO` is set on ci.yml's honesty
+  step alone, never on `Run tests`, and is unset in this sandbox — so the lane
+  never runs and the token is never read. The leak is real but unreachable.
+
+Both are one env var from becoming live, which is precisely what `test:ci-env`
+now covers: it subtracts `HONESTY_AUDIT_REPO`, `GITHUB_TOKEN` and `GH_TOKEN`,
+so even on the owner's machine a green run there cannot be hiding them.
+Recording them in the report's disposition table, as this round does, is the
+right disposition — a lane should not grow to cover files neither the brief nor
+the review named.
+
+## VERDICT: REVISE
+
+1. **R2-1 — correct item 1's contradictory evidence block in
+   `ci-env-lane-report.md`** so the section reports the measured number once
+   (`^{commit}` reverted on the round-2 tree = 24/26, tests 8 and 9 red), and
+   label the round-1-tree 24/24 reproduction as such if it is kept. No code
+   change is requested; the four code items are all MERGE-grade and verified
+   above.
