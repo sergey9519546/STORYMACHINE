@@ -189,15 +189,39 @@ headline, and the per-scene records say exactly why:
 | the-long-way-round | 5 | 5 | 2 |
 | cold-open | 6 | 6 | 1 |
 
-**ContinuityProof rejected 33 of the 39 scenes that were not committed.** It is
-a Tier 1 proof, so it blocks: after `applyStoryOps`, no two facts may share a
-`(subject, predicate)` with overlapping validity and different objects
-(`server/nvm/proof/tier1/continuity.ts`). From scene two onward the candidate
-generator re-asserts pairs the committed scenes already fixed, with different
-values, and the commit is refused. The generator is never told the existing
-`(subject, predicate)` pairs in a form it respects — `buildSystemPreamble`
-reports a FACT COUNT, not the facts — so this is not a flaky rejection; it is
-the shape of the loop.
+**ContinuityProof rejected 33 of the 39 scenes that were not committed — and
+the facts that collided were never the model's.** *(Corrected in round 2; the
+first statement of this paragraph blamed the prompt context, and would have
+pointed the next lane at the wrong component.)*
+
+Every one of the 74 `llm_generator_partial_parse` lines in this run has
+`stubbed === returned`: **not one model-authored candidate survived `parseOp`,
+in any scene, of any premise.** With 11 `llm_generator_failed` beside them,
+**zero model-authored ops reached a committed scene in the whole 114.7-minute
+run.** So every commit after scene one was a STUB colliding with scene one's
+stub. `stubIR` (`server/nvm/generate/llm-generator.ts`) hard-codes
+`ADD_FACT { subject:'scene', predicate:'contains', object:'event_<idx>' }`, and
+ContinuityProof (`server/nvm/proof/tier1/continuity.ts`) blocks two facts
+sharing a `(subject, predicate)` over overlapping validity with different
+objects — which two stubs of different candidate index, committed in different
+scenes, always are. The proof behaved exactly as specified, on input the bench
+itself generated.
+
+**The cause is the JSON-schema seam, and it costs one call to see.**
+`IR_SCHEMA` declared `ops.items` as `{properties:{op},required:['op']}` — one
+property, no payload — and a structured decoder honours that literally.
+Measured live on this endpoint, same prompt, two schemas:
+
+| schema | latency | ops returned | ops carrying any field besides `op` |
+|---|---|---|---|
+| the shipped `IR_SCHEMA` | 6,054 ms | 4 | **0 of 4** — `[{"op":"ADD_FACT"},{"op":"UPDATE_BELIEF"},{"op":"SEED_CLUE"},{"op":"RAISE_CLOCK"}]` |
+| `anyOf`, one branch per op kind | 15,575 ms | 4 | **4 of 4**, full `AtomicFact` / `Belief` payloads |
+
+`parseOp` returns null for a payload-less op, `parseIR` falls back to `stubIR`,
+and the warn line fires. Telling the generator the existing `(subject,
+predicate)` pairs — which is what the first version of this paragraph proposed
+— would have changed nothing at all while the schema kept asking for no
+payload. Fixed in round 2 (`9d392911`), and §4b is the re-run.
 
 **Every premise also had zero Tier-1-passing candidates** (`noWinner` equals
 the ContinuityProof count in every row): the bench committed the best-of-run IR
@@ -209,25 +233,49 @@ but its ops failed `parseOp` in `server/nvm/generate/llm-generator.ts` and the
 candidate degraded to a structural stub. A stub scores composite 0, which is what every
 `composite=0` note in the run records.
 
-**The generative half is now demonstrably alive, which it was not at the start
-of this lane.** 83 calls reached the provider, none returned an empty
-completion, 487,073 tokens were spent, and 9 of 84 revision passes changed the
-text. Before the call-site fix in `4c2a8a92`, that column would have read 0/14
-on all six rows and the table would have been six FAILED runs.
+**The REVISION step is now demonstrably alive. The candidate generator is
+not.** *(Narrowed in round 2; the first statement claimed "the generative half"
+and the table could not show which half.)* 83 calls reached the provider, none
+returned an empty completion, and 487,073 tokens were spent — those three
+numbers prove the TRANSPORT works. What they do not prove is generation: of the
+83 calls, the candidate-generation ones contributed **zero ops to zero
+committed scenes**, and the only model-authored text anywhere in this run is
+whatever 9 of 84 revision passes changed. Before the call-site fix in
+`1a5af829` even that would have read 0/84.
 
-**The health column is not a result to read as quality.** Five of six scripts
-score health 0 and every one of the six returns verdict **PASS** — on a
-one-scene, sub-150-word fragment. The doctor was handed a document far outside
-anything it was calibrated on; §6 is about what it can and cannot see, and this
-row of six PASSes is the clearest demonstration in the report that a verdict is
-not an endorsement.
+The table grew the column that decides this, so the rows say it without a
+paragraph: **`model scenes`**, committed scenes whose IR is not a stub
+(`ir.provenance.model !== 'stub'`, a field already on every IR). On the v1 run
+it is **0/1 in all six rows**.
+
+**The health column is not a result to read as quality — but the verdict
+column is the doctor getting it right.** *(Corrected in round 2. The first
+statement of this paragraph read PASS as an endorsement. It is the opposite.)*
+`verdictFor` (`server/nvm/analyze/doctor.ts:860`) is three lines: `health >= 85
+&& sceneCount >= 8 → RECOMMEND`; `health < 60 → PASS`; else `CONSIDER`. In
+coverage vocabulary **PASS is a reader passing ON the script** — the harshest
+of the three. Health 0 on a 60-word fragment therefore produces exactly the
+right verdict, by the shortest path in the file, and six PASSes is the doctor
+rejecting six fragments rather than blessing them.
+
+The doctor also said so in words, and the first version of this bench threw the
+sentence away. `excerptNote` (`doctor.ts:900-910`, wired at `doctor.ts:2308`)
+reads, on these scripts: *"This reads like an excerpt (1 scene analyzed):
+scores and verdicts are computed the same way as for a full script, but with
+this little material they should be read as feedback on the pages, not coverage
+of a feature."* The readout writer kept only health, verdict, sceneCount,
+contentHash and ten findings — so an instrument built to report what the doctor
+can and cannot see discarded the doctor's own disclosure. It is kept now, with
+`pageEstimate` and a `verdictMeaning` line beside the verdict.
 
 **The one non-zero health in the table is the sharpest single observation in
 this run.** `the-long-way-round` scores 30 where the other five score 0, and
 the reason is not craft. Its compiled draft has **one** scene heading; its
 final draft has **two** (`the-long-way-round.compiled.fountain` vs
 `.final.fountain`, `INT. SCENE 1 - MOMENTS LATER` at line 13), because a
-revision pass invented a second heading that no committed scene backs. The
+revision pass invented a second heading that no committed scene backs — and
+`the-long-way-round.calls.json` records exactly one pass that changed text on
+that script, **`intention`**. The
 doctor scored the document it was given — `sceneCount` 2 instead of 1 — and the
 health moved. That is the scene-count scarcity term the doctor's own
 measurement says carries AUC ~0.938 (`server/nvm/analyze/doctor.ts:2092-2093`),
@@ -270,9 +318,12 @@ changed between them. There is no turn anywhere on the page, because there is
 no event: the last thing that happens is at line 6, where TOMAS hides the
 letter, and the remaining 23 lines describe a room.
 
-**`event_0` is printed in the finished screenplay, three times** — lines 25 and
-29 carry the raw internal op identifier in the prose the writer would read
-(`"the scene holds event_0"`, `"As event_0 lingers"`). It came from the stub
+**`event_0` is printed in the finished screenplay** — lines 25 and 29 carry the
+raw internal op identifier in the prose the writer would read (`"the scene
+holds event_0"`, `"As event_0 lingers"`). **Twice in this screenplay, three
+times across the run** (harbor-lights 2, counterweight 1, the other four 0);
+the first statement of this sentence said three times here, and in a report
+about honest counting that is worth correcting. It came from the stub
 generator's `object: 'event_0'` and survived fourteen revision passes.
 
 **Line 27 is not a sentence.** "Silence thick here."
@@ -280,7 +331,9 @@ generator's `object: 'event_0'` and survived fourteen revision passes.
 **And the title page is gone.** The compiled draft opens with `Title: HARBOR
 LIGHTS` / `Credit: Written by STORYMACHINE`
 (`harbor-lights.compiled.fountain:1-2`); the final draft starts at the scene
-heading. Some pass dropped the title page and no pass noticed.
+heading. Two passes changed this script and `harbor-lights.calls.json` names
+them — **`intention` and `rhythm`** — so the title page went out under one of
+those two, and neither of the twelve that followed noticed.
 
 **What the doctor said about it:** health **0**, verdict **PASS**, sceneCount
 1 (`harbor-lights.doctor.json`). The top finding is `PASSIVE_ESCALATION`
@@ -351,6 +404,19 @@ They do not measure, and nothing in this repository measures:
 - whether a scene ends on a turn rather than stopping;
 - whether a reader would keep going after page two;
 - whether the premise was worth telling.
+
+**What it DOES say about a fragment, and the bench used to throw away.**
+`excerptNote` (`server/nvm/analyze/doctor.ts:900-910`, wired at
+`doctor.ts:2308`) fires below the RECOMMEND floor of 8 scenes and reads, on
+every script in this run: *"This reads like an excerpt (1 scene analyzed):
+scores and verdicts are computed the same way as for a full script, but with
+this little material they should be read as feedback on the pages, not coverage
+of a feature."* The doctor is not silent about thinness; the first version of
+this bench's readout writer dropped the field, and then the readings reported
+its absence as a finding. It is kept now, with `pageEstimate`. And `verdictFor`
+(`doctor.ts:860`) returns **PASS for `health < 60`** — the rejection verdict, a
+reader passing ON the script — so on these fragments the doctor's verdict is
+correct, not credulous.
 
 This is not a gap to close with a cleverer rule. By the doctor's own
 measurement (`server/nvm/analyze/doctor.ts:2092-2093`) the entire weighted-rule
