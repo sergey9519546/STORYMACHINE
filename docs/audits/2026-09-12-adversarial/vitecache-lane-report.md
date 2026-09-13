@@ -88,7 +88,11 @@ membership, and silent on the front-end split.
 
 ## 2. What was built
 
-### Item 1 — one cache per repository path (`vite.config.ts`, `scripts/lib/vite-cache-dir.mjs`)
+### Item 1 — one cache per repository path (`vite.config.ts`, `vite-cache-dir.mjs`)
+
+*(Round 1 put that module at `scripts/lib/vite-cache-dir.mjs`. It moved to the
+repository root in round 2 — see §6, item 1, for the measurement that forced
+it. Everything else in this section stands.)*
 
 `vite.config.ts` now sets
 
@@ -102,7 +106,7 @@ string (resolved against the repo root, as Vite resolves a relative
 `<os.tmpdir()>/storymachine-vite/<basename>-<sha256(realpath)[0:12]>/default`.
 
 **Why `os.tmpdir()` and not `<repo>/.vite-cache`** (the brief offered both; the
-full argument is in `scripts/lib/vite-cache-dir.mjs`'s header):
+full argument is in `vite-cache-dir.mjs`'s header):
 
 1. An in-repo cache has to be `.gitignore`d, and an ignore rule is only as
    good as the next person who copies the tree without it. A directory outside
@@ -222,7 +226,7 @@ so a symlinked checkout is one cache. Plus the wiring: `vite.config.ts` sets
   miscounted as such, and a pointer to the cache fix.
 - `scripts/smoke-p0-live-flow.mjs` header: the paragraph describing the shared
   cache as a live hazard now says it is fixed at the source, names
-  `vite.config.ts`'s `cacheDir` / `scripts/lib/vite-cache-dir.mjs` /
+  `vite.config.ts`'s `cacheDir` / `vite-cache-dir.mjs` /
   `bootKeylessServer`'s `allocateViteCacheSlot`, quotes the measured
   before/after, and says why the gate still serves `dist/` anyway (that reason
   was about what gets published, not about the optimizer).
@@ -512,8 +516,219 @@ four test files that pin `browser-verify.mjs`
    ceiling only bounds lock-file litter. No cleanup of old slot directories is
    implemented — they are reused, not accumulated, so the steady state is
    "as many slots as the most concurrent boots that repository ever saw".
+9. **A lock this process cannot PARSE is held forever** (round 2; review
+   finding 7). `lockHolderAlive` treats an unreadable lock as held —
+   deliberately, since every ambiguous answer must cost a slot rather than risk
+   a shared directory — and nothing ever reclaims it. The same is true of a
+   lock left by a machine restart whose pid has since been reused. `/tmp`
+   surviving a sandbox rebuild that erases worktrees is exactly the shape that
+   produces this. It is never a correctness violation (the overflow branch is
+   unshared) and it is bounded at 64 slots, but item 8's "they are reused, not
+   accumulated" is too rosy for these two cases, and this is the correction.
+   The lock already records an `at` timestamp that nothing reads; an age cutoff
+   would close both, and is the obvious next change if slot litter is ever seen
+   in practice.
+10. **Four post-spawn throw paths leave an orphaned server holding a slot's
+    directory** (round 2; review finding 8). `bootKeylessServer` throws on boot
+    timeout, on a missing `server_started`, on `assertKeylessAiConfig`, and on
+    a `serveModeOf` mismatch without killing `serverProc` and without returning
+    it, so the caller cannot `shutdown()` it. The gate then exits, the exit
+    hook frees the lock, and the *next* boot claims that slot while the orphan
+    is still serving out of it. The orphan leak is pre-existing and outside this
+    lane, but it is a second route into the hazard §6 item 2 is about, and it is
+    why the `shutdown()` comment no longer reasons from "nothing else can be
+    using it".
+
+
 
 ---
 
-Tip: `4b475582c97f3edc6e77095864535f44fa132406` (the one commit after it is this
-line).
+## 6. Round 2 — the review's five blocking items
+
+Review: `docs/audits/2026-09-12-adversarial/vitecache-review.md`, REVISE on
+`b8adfcfc`. The reviewer reproduced +46/−44, +0/−0 and 248/248, could not make
+the fixed tree 504 across three cold concurrent boots from one worktree, and
+established that the shape-guard CPU failure §4 flagged passes on both trees on
+a quiet box (16.96 s lane / 18.95 s main) — so that was load, as reported, and
+the earlier red is retired rather than left hanging.
+
+### Item 1 (BLOCKING) — the Docker builder stage could not build this tree
+
+**The defect, reproduced before the fix.** `.dockerignore` is deny-by-default
+and does not allowlist `scripts/`; `Dockerfile:13-14` is `COPY . .` +
+`RUN npm run build`, and `release.yml:302` / `edge.yml:105` build with
+`context: .`. Round 1's `vite.config.ts:5` imported
+`./scripts/lib/vite-cache-dir.mjs`. Assembling a context from exactly the nine
+allowlisted roots and building it:
+
+```
+$ cd <session scratch>/ctx-before && npm run build
+[UNRESOLVED_IMPORT] Could not resolve './scripts/lib/vite-cache-dir.mjs' in vite.config.ts
+exit 1
+```
+
+**The decision: the module moved to the repository root, it was not
+allowlisted in place.** The brief and the review both offered either. I tried
+the allowlist first — `!scripts/`, `!scripts/lib/`,
+`!scripts/lib/vite-cache-dir.mjs` — and the new scope test I wrote alongside it
+failed:
+
+```
+not ok 6 - does not admit the rest of scripts/ — only the one build input
+   scripts/verify-vite-cache-isolation.mjs must stay out of the Docker context
+   false !== true
+```
+
+Under the ordered Moby semantics `tests/core/docker-context.test.ts` models, a
+pattern may match a path **or a parent** (`patternMatches`, `:62-74`). So the
+`!scripts/` traversal exception Docker needs before it will descend also
+un-denies every other file under `scripts/` — the whole tree of browser gates,
+corpus tooling and the rulebook generator enters the build context. Narrowing
+it back needs a re-deny/re-allow sequence (`scripts/lib/**` then
+`!scripts/lib/vite-cache-dir.mjs`, plus something to re-deny `scripts/*`)
+whose correctness depends on pattern order and on which rules happen to match
+directories rather than files; I traced one that works today and would rot the
+first time someone adds a directory under `scripts/`.
+
+At the repository root it is **one line**, with no parent to traverse and no
+subtree to re-deny, and it sits beside the `vite.config.ts` it configures.
+`scripts/` stays fully denied. The reasoning is written into `.dockerignore`
+itself, and the parent-matching fact is pinned as an assertion so that if it
+ever stops being true the note is flagged as stale rather than quietly wrong.
+
+**Fail, then pass**, on contexts assembled from the allowlist:
+
+| context | contents | result |
+|---|---|---|
+| `ctx-before` | the nine roots the allowlist admitted at `f79b47ec` | `[UNRESOLVED_IMPORT] Could not resolve './vite-cache-dir.mjs' in vite.config.ts`, **exit 1** |
+| `ctx-after` | the same, plus exactly what the new `!vite-cache-dir.mjs` line admits | `✓ built in 1.33s`, **exit 0** |
+
+**And the test now derives the requirement instead of remembering it.**
+`tests/core/docker-context.test.ts` walks `vite.config.ts`'s relative imports
+transitively (`buildTimeImports`, resolving extension-less specifiers, dynamic
+`import()` and bare specifiers correctly) and adds every one to
+`requiredContextPaths`. Four new assertions, three of which exist to stop this
+from becoming another test that cannot fail:
+
+- the walker is pinned against a temp fixture (static + dynamic + transitive
+  imports found; bare specifiers ignored; a specifier resolving to nothing is
+  not a requirement) — so a broken regex cannot make the policy check vacuous;
+- the derivation is non-vacuous in both directions: it must find imports if and
+  only if `vite.config.ts` has relative imports;
+- **the fail direction is a test, not a sentence**: for each derived import,
+  remove the `.dockerignore` exception that admits it and assert the policy
+  check goes red. That is the shape the allowlist had at `f79b47ec`;
+- `scripts/` is asserted to remain fully denied.
+
+7/7, and it fails on the round-1 tree.
+
+### Item 2 — release after the death, not after the signal
+
+`shutdown()` now `await waitForChildExit(serverProc, SERVER_EXIT_WAIT_MS)`
+before `releaseViteCacheSlot()` (`scripts/lib/browser-verify.mjs`). The
+reviewer was right that `4b475582` shrank the window rather than closing it:
+`kill()` returns when the signal is queued, and `graceMs = 0` is the default
+that `verify:ui-polish`, `verify:local-safety-net`, `verify:command-palette`
+and `verify:production`'s dev instance all use, so the `graceMs > 0` sleep that
+incidentally covered the others was luck, not a mechanism.
+
+The wait is bounded at 5 s and its timer is `unref`'d and cleared on exit — an
+unref'd-but-pending 5 s handle would add five seconds to every gate's teardown,
+which is how a correctness fix gets reverted. On timeout the slot is freed
+anyway: a wedged server holding a cache directory forever is worse than a small
+overlap. The comment now says all of that instead of claiming the window is
+closed. Pinned by a test that asserts the release appears *after* the wait in
+the function body and that the bound exists.
+
+### Item 3 — signals, and the reclaim path that always carried the guarantee
+
+`process.once('exit', …)` does not run on SIGTERM/SIGINT. The hooks moved out
+of `bootKeylessServer` and into `vite-cache-dir.mjs`, which owns the lock:
+`installExitHooks()` registers `'exit'` plus SIGINT/SIGTERM/SIGHUP once per
+process, on first allocation, and releases every slot the process holds.
+
+It re-raises the signal so the process still dies the way the sender asked —
+**but only when nothing else is listening**. Stealing another component's
+graceful shutdown to tidy a cache directory would be a worse bug than the
+litter. My first test fixture proved this matters: a holder with its own no-op
+SIGTERM listener hung, because the hook correctly declined to re-raise over it.
+Both paths are now tested.
+
+Measured, before and after, same probe:
+
+| tree | lock after `kill -TERM` | holder exit |
+|---|---|---|
+| `b8adfcfc` (`process.once('exit')` only) | **`slot-0.lock` still on disk** | 143 |
+| this tree | **gone** | 143 |
+| this tree, holder has its own SIGTERM handler | **gone** | 7 (its own choice, not hijacked) |
+
+And the comment now names the mechanism that always did the real work:
+`lockHolderAlive`'s pid reclaim on the *next* allocation is the backstop that
+covers SIGKILL, a power cut and a sandbox rebuild — none of which run any
+handler. The signal hooks only make the lock file disappear promptly rather
+than at the next allocation.
+
+### Item 4 — the assertion that could not fail
+
+`tests/scripts/vite-cache-dir.test.ts` compared `repoCacheKey(REPO)` with
+`repoCacheKey(path.join(REPO, 'src', '..'))`; `path.join` normalizes before the
+call, so both arguments were the byte-identical string and the assertion held
+for any deterministic function, `realpathSync` deleted included. It now makes a
+real symlink in the temp directory the test was already creating and
+discarding, asserts the two paths are genuinely different strings *and*
+different basenames first, checks the key and the full `resolveViteCacheDir`
+agree through the link, and checks that two genuinely different trees still
+separate.
+
+### Item 5 — the lock state machine, both directions, mutation-checked
+
+Four new tests in `describe('the lock state machine')`. Each behavioural case
+is asserted twice: against the real module, and against a **mutant** built by
+replacing exactly one condition in the module's own source and importing it.
+
+| case | real module | mutant (condition inverted) |
+|---|---|---|
+| live holder's lock respected | slot 1 | `if (lockHolderAlive(…)) return false;` → `if (false)`: takes slot 0 |
+| dead holder's lock reclaimed | slot 0 | `return …code === 'EPERM';` → `return true;`: moves to slot 1 |
+| unparseable lock treated as held | slot 1 | `catch { return true; }` → `catch { return false; }`: takes slot 0 |
+| the lock records pid + timestamp, and `release()` removes it | asserted | — |
+
+A mutant that passed would mean the assertion above it measures nothing. The
+dead pid is a real one: a child spawned and already exited.
+
+### Non-blocking, folded in
+
+`tests/core/ci-gates-intact.test.ts` was titled *"verify:browser really runs
+all six browser suites"* and pinned six of the eight, so `verify:a11y` and
+`verify:production` could have been dropped from the battery with that gate
+green — the exact bypass it exists to prevent. Now eight, with the **count**
+asserted as well as the membership, so a ninth suite added without being pinned
+reopens nothing. The review is right about why round 1 missed it: the grep was
+`--include=*.md` and this is a `.ts` file saying "six".
+
+Findings 7 and 8 are recorded in §5 below (items 9 and 10).
+
+### Round 2 gates
+
+| gate | exit |
+|---|---|
+| `tests/core/docker-context.test.ts` (7/7, was 3/3 and could not fail) | 0 |
+| `tests/core/ci-gates-intact.test.ts` (30/30) | 0 |
+| `tests/core/brain-coverage.test.ts` (7/7) · `tests/core/documentation-truth.test.ts` (8/8) | 0 |
+| `tests/scripts/vite-cache-dir.test.ts` (21/21, was 15/15) | 0 |
+| `smoke-gate-serve-mode` (10/10) · `browser-verify-timing` (23/23) · `keyless-browser-certification` (2/2) | 0 |
+| `npm run lint` | 0 |
+| `npm run check-no-console` | 0 |
+| `npm run build` | 0 |
+| `npm run check-docs` · `brain` · `check-brain` | 0 |
+| `npm run honesty-audit` | 0 |
+| `node scripts/check-scoring-receipt.mjs main..HEAD` | 0 |
+| `npm run verify:vite-cache` (harness still passes with the module at the root) | 0 |
+| `npm run verify:surfaces` (248/248, and no lock file left behind) | 0 |
+
+No second full `npm test` — the orchestrator runs it at merge, per the cost
+rule for this round.
+
+---
+
+Tip: `<TIP2>`

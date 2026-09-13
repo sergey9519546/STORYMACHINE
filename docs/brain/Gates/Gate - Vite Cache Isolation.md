@@ -55,7 +55,7 @@ against a `.dockerignore` that is deny-by-default. The module lived under
 exit 1, on the context the allowlist actually produces. Allowlisting it in
 place does not work narrowly: under the ordered Moby semantics this policy
 uses, a pattern may match a path OR A PARENT, so the `!scripts/` traversal
-exception Docker needs in order to descend also un-denies every other file
+exception Docker needs before it will descend also un-denies every other file
 under `scripts/`. At the root it is one allowlist line with no parent to
 traverse and no subtree to re-deny, and `scripts/` stays fully denied.
 `tests/core/docker-context.test.ts` now derives the requirement from

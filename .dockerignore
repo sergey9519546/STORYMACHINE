@@ -31,7 +31,7 @@
 # it there does not work narrowly. Under the ordered Moby semantics this
 # policy uses — and which `tests/core/docker-context.test.ts` models — a
 # pattern may match a path OR A PARENT, so the `!scripts/` traversal exception
-# that Docker needs in order to descend at all ALSO un-denies every other file
+# that Docker needs before it will descend at all ALSO un-denies every other file
 # under `scripts/`. Measured with that model: with
 # `!scripts/`, `!scripts/lib/`, `!scripts/lib/vite-cache-dir.mjs` in place,
 # `scripts/honesty-audit.mjs` and `scripts/verify-vite-cache-isolation.mjs`
