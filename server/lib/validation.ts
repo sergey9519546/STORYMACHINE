@@ -678,6 +678,55 @@ const VOICE_ELIGIBLE_MIN_WORDS = 30;
 // REJECTED) and that bypass B and every other pinned DoS fixture still
 // rejects.
 export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 675_000;
+// ── Voice-eligibility CAST bound (2026-09-13, CI derivation) ───────────────
+// A SECOND, orthogonal cost bound on the same path: once every distinct
+// character clears VOICE_ELIGIBLE_MIN_WORDS, the COUNT of those characters
+// must not exceed this — independently of the weight product above.
+//
+// WHY A SECOND BOUND RATHER THAN A SMALLER FIRST ONE. On 2026-09-13 the first
+// real GitHub Actions run since 2026-09-02 (run 34736306670 attempt 2, main @
+// 996e27a0) failed the security suite's cost assertion for the bound above:
+// the worst shape 675,000 admits (150 speakers at the 30-word floor) cost
+// 19,713 ms of CPU — 21,133 ms on a re-run — against the 15,000 ms half-budget
+// target the derivation promises. The 2026-09-12 derivation was not wrong
+// about its own machine; it recorded its timings as "this box" and "the
+// reviewer's box", and neither box was the GitHub runner, which is the machine
+// that ENFORCES the derivation and is roughly 1.7x slower under the parallel
+// `npm test` the assertion runs inside.
+//
+// Lowering the weight bound until the runner clears it does not work, and the
+// arithmetic says so before any measurement: the realistic ensembles this
+// bound exists to keep serving weigh 457,200 (30-cast) and 609,600 (40-cast)
+// on the committed probe-cast generator, so a weight bound below 613,470
+// rejects an ordinary 40-character feature — reopening adversarial finding 10,
+// the regression the 2026-09-12 work was fixing — while the runner needs
+// something near 400,000. Those two constraints have no overlap. A scalar
+// bound on (distinct x pooled words) cannot separate them, because the two
+// shapes are equally heavy by that measure and 1.9x apart in cost.
+//
+// What actually drives the cost is analyzeVoices's O(distinct²) Burrows's-Delta
+// pair count, and that is what this bound names directly. Adding it REMOVES
+// NOTHING: the weight bound above is untouched, every payload it rejected it
+// still rejects (it is evaluated first, so their rejection messages are
+// unchanged), and this only ever turns an ACCEPT into a REJECT. The
+// documents it newly rejects are those with more than this many characters who
+// EACH speak enough to be individually voice-scored while still weighing under
+// 675,000 — the 121-150-speaker uniform-ish shapes, which is precisely the
+// range the neighbouring MAX_FOUNTAIN_FREQUENT_CUE_LINES comment already calls
+// out as something no real script does ("dozens ... not HUNDREDS").
+//
+// DERIVED, not chosen: it is the largest cast whose worst measured
+// runScriptDoctor CPU stays under half DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS less a
+// 15% margin, measured on ubuntu-latest by
+// .github/workflows/calibrate-voice-bound.yml, against the heaviest document
+// the weight bound still admits at that cast (scripts/lib/voice-bound.ts's
+// `max-admitted` shape — d speakers each carrying floor(675,000 / d²) words,
+// which at d=60 is 186 words each, not the 30 the uniform-min shape gives it).
+// The table is committed at tests/fixtures/voice-bound-derivation.json and
+// tests/core/voice-bound-derivation.test.ts re-derives this constant from it,
+// so editing it without a fresh measurement fails the suite. Reproduce with
+// `npm run measure-voice-bound`.
+export const MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 65;
 // 2026-09-06 review round 7 follow-up, non-blocking — RESIDUAL accepted
 // worst case, recorded here rather than left unstated: a document sitting
 // at the analyzer's own 400-scene ceiling, with a genuine (not hand-model-
@@ -1596,6 +1645,12 @@ export function legacyVoiceEligibleWeightRejectionReason(text: string): string |
       if (voiceEligibleWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) {
         return `has too large a cast where every named character speaks enough to be individually voice-scored (more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in distinct speaking characters × their total pooled dialogue words) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
       }
+      // Mirrors the production cast bound (2026-09-13) over this retired
+      // approximation, so the ROUND 7 equivalence proof keeps comparing the
+      // two DATA SOURCES rather than two different sets of bounds.
+      if (nonZeroVoiceWordCounts.length > MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT) {
+        return `has more speaking characters who each speak enough to be individually voice-scored than this server analyzes in one pass (${nonZeroVoiceWordCounts.length}, more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT}) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`;
+      }
     }
   }
   return null;
@@ -1869,6 +1924,14 @@ function realVoiceEligibleWeightRejectionReason(text: string, cueLineOccurrences
         // payload, trips exactly this branch) — say so, not just the bound
         // name.
         return `has too large a cast where every named character speaks enough to be individually voice-scored (more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in distinct speaking characters × their total pooled dialogue words) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
+      }
+      // The cast bound is checked SECOND, deliberately: every payload the
+      // weight bound already rejected keeps the message it has always had (the
+      // pinned DoS/bypass fixtures carry 200-520 speakers and would otherwise
+      // all start answering with this one), so this branch only ever speaks for
+      // a document the weight bound admits.
+      if (nonZeroWordCounts.length > MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT) {
+        return `has more speaking characters who each speak enough to be individually voice-scored than this server analyzes in one pass (${nonZeroWordCounts.length}, more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT}) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`;
       }
     }
   }

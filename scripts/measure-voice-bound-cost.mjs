@@ -67,7 +67,7 @@
 
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { machineFingerprint, formatMachineFingerprint } from './lib/machine-fingerprint.ts';
@@ -81,9 +81,9 @@ const REPO_ROOT = path.resolve(path.dirname(HERE), '..');
  *  ensembles the bound must keep accepting (finding 10's own targets, the
  *  largest few-big cast the 2026-09-12 bound admitted at 44, and the 60 it
  *  newly rejected). */
-const DEFAULT_UNIFORM_MIN = [120, 140, 150, 160];
-const DEFAULT_MAX_ADMITTED = [40, 50, 60, 70, 80, 90, 100, 120];
-const DEFAULT_PROBE_CAST = [20, 30, 40];
+const DEFAULT_UNIFORM_MIN = [150];
+const DEFAULT_MAX_ADMITTED = [50, 60, 65, 70, 75, 80, 85, 90, 100];
+const DEFAULT_PROBE_CAST = [20, 30, 40, 44];
 
 function parseArgs(argv) {
   const opts = {
@@ -94,6 +94,7 @@ function parseArgs(argv) {
     conditions: ['idle', 'loaded'],
     json: null,
     child: null,
+    lockFrom: null,
   };
   for (const arg of argv) {
     const [key, rawValue] = arg.startsWith('--') ? arg.slice(2).split('=') : [arg, undefined];
@@ -106,6 +107,7 @@ function parseArgs(argv) {
       case 'conditions': opts.conditions = (rawValue ?? '').split(',').map((c) => c.trim()).filter(Boolean); break;
       case 'json': opts.json = rawValue ?? ''; break;
       case 'measure': opts.child = rawValue ?? ''; break;
+      case 'lock-from': opts.lockFrom = rawValue ?? ''; break;
       case 'help': opts.help = true; break;
       default:
         throw new Error(`unknown argument "${arg}" — see this file's USAGE header`);
@@ -263,6 +265,16 @@ async function main() {
     return;
   }
   if (opts.child !== null) return runChildMeasurement(opts.child);
+  if (opts.lockFrom) {
+    // Re-indent a lock file copied out of a CI log. Pure formatting: it parses
+    // the file and writes the same object back with two-space indentation, so a
+    // copied line becomes a reviewable diff.
+    const target = path.resolve(REPO_ROOT, opts.lockFrom);
+    const parsed = JSON.parse(readFileSync(target, 'utf8'));
+    writeFileSync(target, `${JSON.stringify(parsed, null, 2)}\n`);
+    process.stderr.write(`re-indented ${path.relative(REPO_ROOT, target)}\n`);
+    return;
+  }
 
   const { DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS } = await import('../server/lib/doctor-budget.ts');
   const { MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT } = await import('../server/lib/validation.ts');
@@ -310,7 +322,7 @@ async function main() {
     const payload = {
       _comment:
         'Locked by `node --experimental-strip-types scripts/measure-voice-bound-cost.mjs --json=…`. '
-        + 'tests/core/voice-bound-derivation.test.ts re-derives MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT from these rows; '
+        + 'tests/core/voice-bound-derivation.test.ts re-derives MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT from these rows; '
         + 'editing the constant without a fresh table fails that test.',
       generatedAt: new Date().toISOString(),
       machine,
@@ -332,9 +344,13 @@ async function main() {
       // is how a runner's table reaches the repository: the sandbox that edits
       // the bound cannot run on a GitHub runner, and this workflow uploads no
       // artifacts, so the lock file has to be copyable verbatim out of the log.
-      process.stdout.write('\n```json\n');
-      process.stdout.write(serialized);
-      process.stdout.write('```\n');
+      // COMPACT, on one line, deliberately: a CI log viewer stamps every line
+      // with a timestamp, so a pretty-printed 900-line object cannot be copied
+      // back out without stripping 900 prefixes by hand — which is a
+      // transcription, which is the thing this flag exists to avoid.
+      // `npm run measure-voice-bound -- --lock-from=<file>` re-indents it.
+      process.stdout.write('\nLOCK-FILE (copy the single line below verbatim into tests/fixtures/voice-bound-derivation.json, then `npm run measure-voice-bound -- --lock-from=tests/fixtures/voice-bound-derivation.json` to re-indent it):\n');
+      process.stdout.write(`${JSON.stringify(payload)}\n`);
     } else {
       const out = path.resolve(REPO_ROOT, opts.json);
       mkdirSync(path.dirname(out), { recursive: true });
