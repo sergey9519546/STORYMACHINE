@@ -390,3 +390,59 @@ the review named.
    label the round-1-tree 24/24 reproduction as such if it is kept. No code
    change is requested; the four code items are all MERGE-grade and verified
    above.
+
+---
+
+# Round 3 (4fbc9921)
+
+Reviewed object: `lane/ci-env-failures` @ `4fbc9921`, diff
+`git diff 4c92674f..4fbc9921` — two files, no test changes.
+
+**R2-1 (the one blocker): CLOSED.** The item-1 block in
+`ci-env-lane-report.md` now reads "**on the ROUND-1 TREE** (`156a1ca6`, 24
+tests — before either of this round's two new tests existed) … 24/24 green",
+with the command comment changed to `# 156a1ca6, ^{commit} reverted`, and the
+false parenthetical ("both green on the reverted line") replaced by a sentence
+that says what the 24/24 actually means: nothing in the round-1 tree could fail
+on the reverted line, which is the gap the section closes. The round-2-tree
+`24/26` block is now the sole fail-first evidence for the pin, and the two
+numbers no longer describe the same command. That matches what I measured in
+round 2 (round-1 tree 24/24; round-2 tree 24/26, tests 8 and 9 red).
+
+**The non-blocking copy note was taken, and taken correctly.** Both strings in
+`scripts/check-scoring-receipt.mjs` now name the unresolvable-`before` cause
+beside the shallow-checkout one, without asserting which applies — driven here
+against the same throwaway repo as rounds 1 and 2 (push event, unresolvable
+`before`, real unreceipted `doctor.ts` change), exit 1:
+
+```
+check-scoring-receipt: NO BASE REF to diff against (no push range, no origin/main, no main,
+no prior commit, or the push's own recorded `before` does not resolve in this checkout) —
+nothing could be checked. This is not a pass; it is an absent check. On CI this usually means
+the checkout lacks full history (needs fetch-depth: 0), the event payload was unavailable, or
+the pushed `before` SHA is not reachable here (rewritten history, a force-push after gc, a
+stale PUSH_BEFORE_SHA).
+check-scoring-receipt: FAILING because CI is set. A misconfigured checkout, or a push whose own
+recorded `before` cannot be resolved here, must not produce a green build — fix the checkout
+(fetch-depth: 0), verify the pushed `before` SHA is reachable, or pass an explicit range.
+```
+
+"usually means" is the right hedge for a message that cannot know which cause
+applies, and both sentences are now true in every state that renders them. The
+two anchor substrings the round-2 tests assert on — `NO BASE REF` and `FAILING
+because CI is set` — are preserved, so the pin still holds; confirmed by
+re-running the suite rather than by reading:
+
+| run | result |
+|---|---|
+| `tests/core/scoring-receipt-guard.test.ts` @ `4fbc9921`, plain env | **26 tests / 26 pass / 0 fail** |
+| guard driven, unresolvable `before` + unreceipted `doctor.ts` change | exit 1, new copy above |
+
+The posture note from round 2 (a force-pushed branch can now go red with NO
+BASE REF on a push carrying no scoring change) still stands as recorded — it is
+a property of item 2's fix, not a defect, and this round's rewording is exactly
+what makes that outcome legible to whoever hits it. Nothing else in the diff:
+no scoring-path behaviour changed, no test changed, `resolveDefaultRange()`
+untouched since `4c92674f`.
+
+## VERDICT: MERGE
