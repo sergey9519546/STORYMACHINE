@@ -1,6 +1,6 @@
 ---
 type: branch
-updated: 2026-09-12
+updated: 2026-09-13
 sources: [docs/audits/2026-09-12-adversarial/forcedcue-lane-report.md, docs/audits/2026-09-12-adversarial/forcedcue-review.md]
 status: ready-for-owner
 ---
@@ -35,9 +35,12 @@ with ROUND 9 tests in both suites; the reviewer measured the wider
 disjunct against a 1,050-line grammar product (0 base-true lines went
 false) and against a realistic document (accepted, same count).
 
-**Still open, named:** `>` forced transitions print `>` from every exporter
-(the parser has no forced-transition branch); `@`-opened action lines
-render the `@` literally. `npm run probe-corpus-shape` carries an `@cue`
+**The two residuals this note used to name as open** — `>` forced transitions
+printing `>` from every exporter, and `@`-opened action lines rendering the
+`@` — are closed and decided respectively by [[Branch - Renderer Residuals]]
+(`scoring/renderer-residuals` @ `56b96765`, stacked on this branch): the first
+was a defect and is fixed at the parser seam; the second is the spec-correct
+behaviour, now written down beside `FORCED_CUE_MARKER` and pinned both ways. `npm run probe-corpus-shape` carries an `@cue`
 column so the owner can see which private drafts this touches (0 of 32 on
 the committed corpus).
 
