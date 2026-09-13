@@ -2,7 +2,7 @@
 
 - **Worktree:** `/home/user/wt-bound`
 - **Branch:** `lane/voice-bound-ci-derivation` (branched from `main` @ `996e27a0`, rebased onto `68d05192`)
-- **Tip:** `48585b18` (pushed to `origin/lane/voice-bound-ci-derivation`, rebased onto `main` @ `68d05192`).
+- **Tip:** round 1 `48585b18`, round 2 `52303fe1` (pushed to `origin/lane/voice-bound-ci-derivation`, rebased onto `main` @ `68d05192`).
 - **Calibration branches (delete after review):** `calibrate/voice-bound-2026-09-13`,
   `…-13b`, `…-13c`, `…-13d` — push-triggered runs of the calibration workflow,
   which cannot be `workflow_dispatch`ed before the workflow reaches the default
@@ -377,4 +377,4 @@ non-blocking.
 | `npm run check-brain` | exit 0 — 113 notes, 441 links |
 | full `npm test` | **not re-run** — the round-2 diff is comments, docs, one fixture column and five guard-only subtests; the cost rule for this round says the touched files only. Round 1's full run (13,824 / 0 fail) stands on the same tree plus these. |
 
-`Tip: <round-2 tip>`
+`Tip: 52303fe1` (round 2)
