@@ -70,7 +70,9 @@ decision, repo visibility. Each has its own note under `Owner/`; start at
   [[Gate - Receipt Gate]]. For the generated-artifact freshness check on the
   rule catalog, see [[Gate - Rulebook Freshness]]; for the raw-text cost
   bounds every route enforces before analysis, see
-  [[Gate - Fountain Shape Guard]].
+  [[Gate - Fountain Shape Guard]]; for the isolation that keeps two lanes'
+  dev servers out of one Vite dependency-optimizer cache, see
+  [[Gate - Vite Cache Isolation]].
 - **"What does surface X actually show, and where does the number come
   from?"** → `Surfaces/` — start at [[Surface - Script Doctor Panel]].
   When a number appears on more than one surface, the note for the shared

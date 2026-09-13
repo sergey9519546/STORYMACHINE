@@ -223,6 +223,12 @@
       "path": "docs/brain/Gates/Gate - Rulebook Freshness.md"
     },
     {
+      "id": "docs/brain/Gates/Gate - Vite Cache Isolation.md",
+      "type": "gate",
+      "title": "Gate — Vite Cache Isolation",
+      "path": "docs/brain/Gates/Gate - Vite Cache Isolation.md"
+    },
+    {
       "id": "docs/brain/Glossary.md",
       "type": "glossary",
       "title": "Glossary",
@@ -711,6 +717,10 @@
     {
       "from": "docs/brain/00 Home.md",
       "to": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
+      "from": "docs/brain/00 Home.md",
+      "to": "docs/brain/Gates/Gate - Vite Cache Isolation.md"
     },
     {
       "from": "docs/brain/00 Home.md",
@@ -1239,6 +1249,14 @@
     {
       "from": "docs/brain/Gates/Gate - Rulebook Freshness.md",
       "to": "docs/brain/Surfaces/Surface - Root Cause Pipeline.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Vite Cache Isolation.md",
+      "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Vite Cache Isolation.md",
+      "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
     },
     {
       "from": "docs/brain/Glossary.md",
