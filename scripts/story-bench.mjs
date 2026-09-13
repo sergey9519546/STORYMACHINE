@@ -171,17 +171,67 @@ export function summariseCalls(entries) {
 }
 
 /**
- * A run is FAILED, not a story, when the generative half never produced
- * anything: no LLM call landed, or every revision pass fell back to the
- * unchanged draft. The bench must label that rather than print a health score
- * next to it as if a story had been written.
+ * What a run produced, as a STRUCTURAL label. No prose judgement is made here
+ * and none may be added: NORTH_STAR §1's no-LLM-as-judge rule applies to the
+ * bench's own vocabulary as much as to the product's.
+ *
+ * ORDER MATTERS. The first two clauses are the original rule, unchanged and
+ * still first, because `docs/CLAIMS_REGISTER.md` row 117 states exactly that
+ * behaviour — "a run in which every revision pass fell back to the unchanged
+ * draft is labelled FAILED, not reported as a story" — and it must stay
+ * literally true.
+ *
+ * The three clauses after them were added in round 2 because `status: ok` was
+ * the first thing a reader saw on six runs that committed 1 scene of 7 or 8 and
+ * shipped 60-to-142-word fragments. `ok` is now what it sounds like:
+ *
+ *   FAILED    no LLM call reached the provider
+ *           | every revision pass fell back to the unchanged draft
+ *           | nothing committed, or NO committed scene's IR came from the model
+ *   FRAGMENT  fewer than half the requested scenes committed, or fewer than 3
+ *   DEGRADED  at least half committed, but not all of them
+ *   ok        every requested scene committed, and a pass changed the text
  */
-export function classifyRun({ llmCalls, revisionPassesWithChanges, revisionPassCount }) {
-  if (llmCalls === 0) return { ok: false, label: 'FAILED — no LLM call reached the provider' };
+export function classifyRun({
+  llmCalls,
+  revisionPassesWithChanges,
+  revisionPassCount,
+  committedScenes,
+  requestedScenes,
+  committedNonStub,
+}) {
+  if (llmCalls === 0) return { ok: false, status: 'FAILED', label: 'FAILED — no LLM call reached the provider' };
   if (revisionPassCount > 0 && revisionPassesWithChanges === 0) {
-    return { ok: false, label: 'FAILED — every revision pass fell back to the unchanged draft' };
+    return { ok: false, status: 'FAILED', label: 'FAILED — every revision pass fell back to the unchanged draft' };
   }
-  return { ok: true, label: 'ok' };
+  // Everything below needs the scene accounting; a caller that does not supply
+  // it gets the original two-clause behaviour and nothing else, so the rule
+  // claim 117 registers is unaffected by the widening.
+  if (typeof committedScenes !== 'number' || typeof requestedScenes !== 'number') {
+    return { ok: true, status: 'ok', label: 'ok' };
+  }
+  if (committedScenes === 0) {
+    return { ok: false, status: 'FAILED', label: 'FAILED — no scene was committed' };
+  }
+  if (typeof committedNonStub === 'number' && committedNonStub === 0) {
+    return {
+      ok: false, status: 'FAILED',
+      label: 'FAILED — no committed scene carried a model-authored op (every candidate stubbed)',
+    };
+  }
+  if (committedScenes < 3 || committedScenes * 2 < requestedScenes) {
+    return {
+      ok: false, status: 'FRAGMENT',
+      label: `FRAGMENT — ${committedScenes} of ${requestedScenes} scenes committed`,
+    };
+  }
+  if (committedScenes < requestedScenes) {
+    return {
+      ok: false, status: 'DEGRADED',
+      label: `DEGRADED — ${committedScenes} of ${requestedScenes} scenes committed`,
+    };
+  }
+  return { ok: true, status: 'ok', label: 'ok' };
 }
 
 /** Word count of Fountain body text, excluding the title page block. */
@@ -190,12 +240,52 @@ export function scriptWordCount(fountain) {
   return body.split(/\s+/).filter(Boolean).length;
 }
 
+/**
+ * The directory this run writes to. `<date>/` for the first run of a day, then
+ * `<date>-run2/`, `-run3/` ... `--out <name>` names one explicitly. Never
+ * returns a directory that already holds a summary.json, so no run can destroy
+ * another run's record. `--packet` reads the NEWEST such directory.
+ */
+export function nextRunDir(root, date, exists, explicit) {
+  if (explicit) return path.join(root, explicit);
+  const base = path.join(root, date);
+  if (!exists(path.join(base, 'summary.json'))) return base;
+  for (let n = 2; n < 1000; n++) {
+    const candidate = path.join(root, `${date}-run${n}`);
+    if (!exists(path.join(candidate, 'summary.json'))) return candidate;
+  }
+  throw new Error(`more than 999 runs under ${root} for ${date}`);
+}
+
+function allocateRunDir(argv) {
+  const root = path.join(REPO, 'data', 'story-bench');
+  const explicit = argv.includes('--out') ? argv[argv.indexOf('--out') + 1] : null;
+  return nextRunDir(root, runDirName(), (f) => existsSync(f), explicit);
+}
+
+/** Every run directory under data/story-bench, oldest first. */
+export function listRunDirs(names) {
+  return names
+    .filter((d) => /^\d{4}-\d{2}-\d{2}(-run\d+)?$/.test(d))
+    .sort((a, b) => {
+      const key = (d) => {
+        const m = /^(\d{4}-\d{2}-\d{2})(?:-run(\d+))?$/.exec(d);
+        return [m[1], Number(m[2] ?? 1)];
+      };
+      const [da, na] = key(a); const [db, nb] = key(b);
+      return da === db ? na - nb : (da < db ? -1 : 1);
+    });
+}
+
 /** Fixed-width table renderer — the one artefact the lane report quotes. */
 export function renderTable(rows) {
   const cols = [
     ['premise', (r) => r.id],
     ['shape', (r) => r.shape],
     ['scenes', (r) => `${r.committedScenes ?? r.scenes}/${r.requestedScenes ?? r.scenes}`],
+    // model scenes = committed scenes whose IR is NOT a stub. 0/N here means
+    // the run measured the stub generator, whatever the other columns say.
+    ['model scenes', (r) => `${r.committedNonStub ?? 0}/${r.committedScenes ?? 0}`],
     ['words', (r) => String(r.words)],
     ['health', (r) => (r.health === null ? '—' : String(r.health))],
     ['verdict', (r) => r.verdict ?? '—'],
@@ -448,6 +538,8 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
   // could not say which without this.
   const blockingProofs = {};
   let scenesWithoutTier1Winner = 0;
+  let committedNonStub = 0;
+  let modelAuthoredOps = 0;
   for (const target of targets) {
     // Progress is printed per beat on purpose. One converge call against a
     // reasoning model measured 15-78 s here (n=6, median ~26 s), so a premise
@@ -507,7 +599,22 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
         summary: (target.themeHint ?? '').slice(0, 200),
       });
       committed++;
-      console.log(`committed ${opsToCommit.length} ops from ${source} (${((Date.now() - beatStarted) / 1000).toFixed(0)}s)`);
+      // THE NUMBER THAT DECIDES WHAT A RUN MEASURED. Every IR carries
+      // provenance.model, and parseIR sets it to 'stub' when the candidate
+      // degraded. A committed scene whose IR is a stub contains no
+      // model-authored op at all — it is the fixed template rendering of
+      // stubIR's own ops — so a run in which every committed scene is a stub
+      // measured the transport and the stub generator, not generation. The
+      // first run of this bench was exactly that, in all six premises, and the
+      // table could not show it.
+      const fromModel = ir?.provenance?.model !== undefined && ir.provenance.model !== 'stub';
+      if (fromModel) committedNonStub++;
+      modelAuthoredOps += fromModel ? ir.ops.length : 0;
+      console.log(
+        `committed ${opsToCommit.length} ops from ${source}`
+        + `${fromModel ? '' : ' [STUB IR — no model-authored op]'}`
+        + ` (${((Date.now() - beatStarted) / 1000).toFixed(0)}s)`,
+      );
     } catch (err) {
       const failures = Array.isArray(err?.body?.failures) ? err.body.failures : [];
       for (const f of failures) {
@@ -558,6 +665,9 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
     llmCalls: calls.llmCalls,
     revisionPassesWithChanges: revision?.passesWithChanges ?? 0,
     revisionPassCount: passResults.length,
+    committedScenes: committed,
+    requestedScenes: targets.length,
+    committedNonStub,
   });
 
   const report = doctor?.report ?? doctor ?? null;
@@ -574,8 +684,10 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
     wallMs,
     promptTokens: calls.promptTokens,
     completionTokens: calls.completionTokens,
-    status: classification.ok ? 'ok' : 'FAILED',
+    status: classification.status,
     committedScenes: committed,
+    committedNonStub,
+    modelAuthoredOps,
     requestedScenes: targets.length,
     blockingProofs,
     scenesWithoutTier1Winner,
@@ -588,14 +700,27 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
   writeFileSync(path.join(outDir, `${premise.id}.final.fountain`), finalFountain);
   writeFileSync(path.join(outDir, `${premise.id}.doctor.json`), JSON.stringify({
     health: report?.health ?? null,
+    // PASS is the REJECTION verdict, not an endorsement: verdictFor
+    // (server/nvm/analyze/doctor.ts:860) is `health >= 85 && sceneCount >= 8 ->
+    // RECOMMEND; health < 60 -> PASS; else CONSIDER`, and PASS is a reader
+    // passing ON the script. Recorded here so nobody reads this file the way
+    // this bench's own first report read it.
     verdict: report?.verdict ?? null,
+    verdictMeaning: 'PASS = the doctor rejects it (health < 60); CONSIDER = middle; RECOMMEND = health >= 85 AND >= 8 scenes',
     sceneCount: report?.sceneCount ?? null,
     contentHash: report?.contentHash ?? null,
+    // excerptNote and pageEstimate are the two things the doctor DOES say about
+    // a thin document, and this writer used to drop both — so an instrument
+    // built to report what the doctor can and cannot see discarded the doctor's
+    // own disclosure, and the first run's readings then reported its absence as
+    // a finding. Kept.
+    excerptNote: report?.excerptNote ?? null,
+    pageEstimate: report?.pageEstimate ?? null,
     topFindings: (report?.topPriorities ?? report?.issues ?? []).slice(0, 10),
   }, null, 2));
   writeFileSync(path.join(outDir, `${premise.id}.calls.json`), JSON.stringify({
     classification, committedScenes: committed, requestedScenes: targets.length,
-    blockingProofs, scenesWithoutTier1Winner,
+    blockingProofs, scenesWithoutTier1Winner, committedNonStub, modelAuthoredOps,
     notes: convergeNotes,
     revision: {
       passCount: passResults.length,
@@ -627,8 +752,16 @@ async function runBench(argv) {
     return 2;
   }
 
-  const outDir = path.join(REPO, 'data', 'story-bench', runDirName());
+  // NON-DESTRUCTIVE RUN DIRECTORIES (round 2, review MEDIUM 6). This used to
+  // write table.md and summary.json into `<date>/` unconditionally, so
+  // `--only <id>` after a six-premise run replaced the six-row table and
+  // summary with a ONE-row one, overwrote that premise's four artifacts, and
+  // turned --packet into a one-script packet — no warning, no backup. The
+  // reviewer hit it reproducing a single row and had to restore 29 files by
+  // hand. A run now gets its own directory and never touches an earlier one.
+  const outDir = allocateRunDir(argv);
   mkdirSync(outDir, { recursive: true });
+  console.log(`[story-bench] writing this run to ${path.relative(REPO, outDir)}`);
 
   // Reachability first: a run that discovers a dead endpoint 40 LLM calls in
   // has spent the budget and measured nothing.
@@ -760,10 +893,12 @@ export function packetFrontMatter(rows, runDate) {
 async function runPacket() {
   const root = path.join(REPO, 'data', 'story-bench');
   if (!existsSync(root)) throw new Error('no data/story-bench — run `npm run story:bench` first');
-  const dirs = readdirSync(root).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const dirs = listRunDirs(readdirSync(root));
   if (dirs.length === 0) throw new Error('no dated run directory under data/story-bench');
-  const runDate = dirs[dirs.length - 1];
-  const outDir = path.join(root, runDate);
+  const runName = dirs[dirs.length - 1];
+  const runDate = runName.slice(0, 10);
+  const outDir = path.join(root, runName);
+  console.log(`[story-bench] packet from ${runName} (the newest run directory of ${dirs.length})`);
   const summary = JSON.parse(readFileSync(path.join(outDir, 'summary.json'), 'utf8'));
 
   const parts = [packetFrontMatter(summary.rows, runDate)];

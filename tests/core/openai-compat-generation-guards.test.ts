@@ -22,7 +22,7 @@ import {
   OpenAICompatUnavailableError,
 } from '../../server/lib/ai-providers/openai-compat.ts';
 import { applyConfig } from '../../server/lib/ai-config.ts';
-import { getLLMProvider, setLLMProvider, resetLLMProvider, withRetry } from '../../server/engine/ai.ts';
+import { getLLMProvider, getGenerativeProvider, setLLMProvider, resetLLMProvider, withRetry, geminiProvider } from '../../server/engine/ai.ts';
 
 function listen(handler: http.RequestListener): Promise<{ url: string; server: http.Server }> {
   return new Promise((resolve) => {
@@ -125,11 +125,17 @@ describe('openai-compat adapter — generation guards', () => {
   //   404 {"detail":"Function '<uuid>': Not found for account '<acct>'"}
   // — a body that names an opaque UUID and never the model the caller asked
   // for. A retired model answers 410 "has reached its end of life".
-  for (const [status, body] of [
-    [404, '{"status":404,"title":"Not Found","detail":"Function \'00bdd0a7-e38f\': Not found for account \'acct\'"}'],
-    [410, '{"title":"Gone","status":410,"detail":"The model has reached its end of life on 2026-08-07"}'],
-    [401, 'unauthorized'],
-  ] as Array<[number, string]>) {
+  // All four permanent statuses, including the two the first round left
+  // untested (400 and 403), and each with the WORDING that fits it: a 400 is
+  // about the request, a 401/403 about the credential, a 404/410 about the
+  // model. `expect` is the phrase that must appear in the message.
+  for (const [status, body, expect] of [
+    [404, '{"status":404,"title":"Not Found","detail":"Function \'00bdd0a7-e38f\': Not found for account \'acct\'"}', 'is not available from this endpoint'],
+    [410, '{"title":"Gone","status":410,"detail":"The model has reached its end of life on 2026-08-07"}', 'is not available from this endpoint'],
+    [401, 'unauthorized', 'refused the credential'],
+    [403, 'forbidden', 'refused the credential'],
+    [400, '{"error":{"message":"messages: too many tokens"}}', 'rejected the request'],
+  ] as Array<[number, string, string]>) {
     it(`surfaces HTTP ${status} as a non-retryable error naming the model, and withRetry does not retry it`, async () => {
       let requests = 0;
       const { url, server } = await listen((req, res) => {
@@ -148,6 +154,13 @@ describe('openai-compat adapter — generation guards', () => {
             assert.equal((err as OpenAICompatUnavailableError).nonRetryable, true);
             // The MODEL must be in the message — the upstream body never is.
             assert.match((err as Error).message, /test\/model-x/);
+            // …and the message must describe the RIGHT thing. Reporting a 400
+            // as "model not available" sends a reader to check their model id
+            // when the request body is what was refused.
+            assert.ok(
+              (err as Error).message.includes(expect),
+              `HTTP ${status} message should say "${expect}", got: ${(err as Error).message}`,
+            );
             return true;
           },
         );
@@ -317,6 +330,14 @@ describe('openai-compat adapter — generation guards', () => {
 // CONSTANT rather than the seam, so a deployment configured for an
 // OpenAI-compatible endpoint took its no-key fallback on every call. These two
 // tests fail against that code: the wired provider is never consulted.
+/** Drop the stand-in and re-select, so sibling files see the manager as before. */
+function resetAllProvidersForTest(manager: unknown): void {
+  const m = manager as { providers: Map<string, unknown>; currentProvider: unknown; autoSelectProvider: () => void };
+  m.providers.delete('freeride');
+  m.currentProvider = null;
+  m.autoSelectProvider();
+}
+
 describe('generative call sites use the configured provider, not the Gemini constant', () => {
   after(() => { resetLLMProvider(); applyConfig({ provider: 'gemini' }, {}); });
 
@@ -421,6 +442,63 @@ describe('generative call sites use the configured provider, not the Gemini cons
     const irs = await generate(spec, 2);
     assert.equal(irs.length, 2);
     assert.ok(irs.every((ir) => ir.provenance.model === 'stub'), 'the keyless fallback must be unchanged');
+  });
+
+  // ── The provider POLICY for these two surfaces (round 2, review MEDIUM 5) ──
+  // aiProviderManager.autoSelectProvider()'s priority is freeride > gemini, so
+  // re-pointing the call sites at the raw seam quietly routed the only prose
+  // step to the legacy OpenRouter bridge on any deployment with
+  // OPENROUTER_API_KEY set — a bridge ai-config.ts's llmReady() explicitly
+  // refuses to count as ready for these surfaces. Both directions are pinned.
+  it('a Gemini-keyed deployment keeps the provider it had before the fix', () => {
+    resetLLMProvider();               // no explicit wiring, no manager entry here
+    assert.equal(
+      getGenerativeProvider(), geminiProvider,
+      'with nothing auto-selected the generative seam is the Gemini provider — exactly what both call sites used before this lane',
+    );
+  });
+
+  it('an explicitly configured openai-compat provider IS used', async () => {
+    const { url, server } = await listen((req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content: 'configured' } }] }));
+    });
+    try {
+      applyConfig({ provider: 'openai-compat', baseUrl: url, model: 'local-model' }, {});
+      const res = await getGenerativeProvider().generate(BASE_PARAMS());
+      assert.equal((res as { text?: string }).text, 'configured',
+        'an explicit configuration must always win — the FreeRide carve-out must not swallow it');
+    } finally { await close(server); applyConfig({ provider: 'gemini' }, {}); }
+  });
+
+  it('an AUTO-SELECTED FreeRide bridge is never chosen for these two surfaces', async () => {
+    const { aiProviderManager } = await import('../../server/engine/ai-provider.ts');
+    // A stand-in with the manager's own id; registering a real FreeRideProvider
+    // would need a key and would reach OpenRouter.
+    let freeRideCalls = 0;
+    const fake = {
+      id: 'freeride', name: 'FreeRide (stand-in)', tier: 'free' as const,
+      generate: async () => { freeRideCalls++; return { text: 'from freeride' } as never; },
+    };
+    aiProviderManager.registerProvider('freeride', fake as never);
+    aiProviderManager.setProvider('freeride');
+    try {
+      resetLLMProvider();
+      // The raw accessor sees it — that is its job, and other callers may want it.
+      assert.notEqual(getLLMProvider(), geminiProvider, 'the raw seam does hold the auto-selected provider');
+      // The generative seam does not.
+      assert.equal(
+        getGenerativeProvider(), geminiProvider,
+        'an auto-selected FreeRide must not serve the prose rewriter or candidate generation',
+      );
+      // geminiProvider.generate THROWS synchronously without a key, so this
+      // needs a try/catch rather than a rejected-promise handler.
+      try { await getGenerativeProvider().generate(BASE_PARAMS()); } catch { /* no key: expected */ }
+      assert.equal(freeRideCalls, 0, 'the FreeRide bridge must not receive a generative call');
+    } finally {
+      resetAllProvidersForTest(aiProviderManager);
+      resetLLMProvider();
+    }
   });
 
   it('getLLMProvider returns whatever ai-config last wired', async () => {

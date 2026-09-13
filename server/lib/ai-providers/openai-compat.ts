@@ -416,20 +416,37 @@ function buildMessages(
 // match a bare 404/410 today, so this class is belt-and-braces rather than the
 // only guard — but it is the guard that survives someone widening isTransient(),
 // and `nonRetryable` is what withRetry() reads. 401/403 join them: a rejected
-// credential is not a transient condition either.
+// credential is not a transient condition either. So does 400, which is about
+// the REQUEST rather than the model and is worded accordingly (reasonFor
+// below) — all four are permanent, only three of them are about the model.
 export class OpenAICompatUnavailableError extends Error {
   readonly nonRetryable = true;
   readonly status: number;
   readonly model: string;
   constructor(status: number, model: string, detail: string) {
-    super(
-      `OpenAI-compat model "${model}" is not available from this endpoint `
-      + `(HTTP ${status}). Upstream said: ${detail || '(no detail)'}`,
-    );
+    super(`${reasonFor(status, model)} (HTTP ${status}). Upstream said: ${detail || '(no detail)'}`);
     this.name = 'OpenAICompatUnavailableError';
     this.status = status;
     this.model = model;
   }
+}
+
+/**
+ * The four statuses in this set do not all mean the same thing, and saying they
+ * do sends a reader to the wrong place (round 2, review LOW 9). A 400 is the
+ * one status here that is usually about the REQUEST — a malformed body, an
+ * over-long context — so reporting it as "model X is not available" invites
+ * someone to go and check their model id. All four are still non-retryable:
+ * none of them succeeds on a second identical attempt.
+ */
+function reasonFor(status: number, model: string): string {
+  if (status === 400) {
+    return `OpenAI-compat rejected the request for model "${model}" as invalid`;
+  }
+  if (status === 401 || status === 403) {
+    return `OpenAI-compat refused the credential for model "${model}"`;
+  }
+  return `OpenAI-compat model "${model}" is not available from this endpoint`;
 }
 
 /** HTTP statuses that mean "this request can never succeed as issued". */

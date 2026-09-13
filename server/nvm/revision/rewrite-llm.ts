@@ -26,7 +26,7 @@
 
 import { logger } from '../../lib/logger.ts';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
-import { getLLMProvider, modelForTask } from '../../engine/ai.ts';
+import { getGenerativeProvider, modelForTask } from '../../engine/ai.ts';
 import { buildCraftPromptSection, looksLikeAnimationGenre } from '../generate/craft-spec.ts';
 import type { ApprovedSpan } from './passes/types.ts';
 import {
@@ -121,7 +121,7 @@ async function llmRewrite(input: RewriteInput): Promise<RewriteResult> {
 
     // ── Try LLM ───────────────────────────────────────────────────────────────
   try {
-    // The ACTIVE provider, not the Gemini constant (2026-09-13). This read
+    // The GENERATIVE seam, not the Gemini constant (2026-09-13). This read
     // `getAI(); ... geminiProvider.generate(...)`, which meant a deployment
     // configured for an OpenAI-compatible endpoint threw 'Gemini provider not
     // available (GEMINI_API_KEY not set)' on every one of the 14 passes and
@@ -129,8 +129,11 @@ async function llmRewrite(input: RewriteInput): Promise<RewriteResult> {
     // there, reported as 14 clean no-op passes. Keyless behaviour is
     // unchanged: with no provider configured the seam still holds
     // geminiProvider, whose generate() still throws without a key, and the
-    // catch below still falls back to the unchanged draft.
-    const provider = getLLMProvider();
+    // catch below still falls back to the unchanged draft. It is
+    // getGenerativeProvider() rather than getLLMProvider() because an
+    // AUTO-SELECTED FreeRide bridge must not serve this surface — see that
+    // function's comment and ai-config.ts's llmReady().
+    const provider = getGenerativeProvider();
 
     // Budget output tokens to comfortably exceed the input so the model can return
     // the full screenplay without truncation. Roughly 1 token ≈ 4 chars; add 50%

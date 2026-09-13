@@ -233,6 +233,10 @@ export const geminiTTSProvider: TTSProvider = {
 // Default to multi-provider system if available, fall back to Gemini
 
 let _provider:          LLMProvider       = geminiProvider;
+// Whether `_provider` is the manager's AUTO-SELECTED provider (true) or was
+// wired explicitly by ai-config/setLLMProvider (false). getGenerativeProvider()
+// below is the only reader; see its comment for why the distinction matters.
+let _providerIsManagerSelected = false;
 let _embeddingProvider: EmbeddingProvider = geminiEmbeddingProvider;
 let _imageProvider:     ImageProvider     = geminiImageProvider;
 let _ttsProvider:       TTSProvider       = geminiTTSProvider;
@@ -241,30 +245,75 @@ let _ttsProvider:       TTSProvider       = geminiTTSProvider;
 if (aiProviderManager.hasProvider()) {
   const activeProvider = aiProviderManager.getProvider();
   _provider = makeDelegatingProvider(activeProvider);
+  _providerIsManagerSelected = true;
 }
 
-export function setLLMProvider(p: LLMProvider): void         { _provider = p; }
+export function setLLMProvider(p: LLMProvider): void         { _provider = p; _providerIsManagerSelected = false; }
 /**
- * The ACTIVE LLM provider — whatever server/lib/ai-config.ts last wired
- * (openai-compat when AI_PROVIDER says so, Gemini otherwise).
+ * The LLM provider the two GENERATIVE call sites use —
+ * server/nvm/revision/rewrite-llm.ts (the 14-pass prose rewriter) and
+ * server/nvm/generate/llm-generator.ts (NVM candidate generation).
  *
- * Added 2026-09-13 (story-bench lane). Two generative call sites reached for
- * the exported `geminiProvider` constant instead of this seam —
- * server/nvm/revision/rewrite-llm.ts and server/nvm/generate/llm-generator.ts —
- * so with AI_PROVIDER=openai-compat and no GEMINI_API_KEY they threw
- * 'Gemini provider not available' on every call and took their documented
- * fallback (the unchanged draft; a structural stub). The fallbacks are
- * correct and still apply when there is genuinely no provider; what was wrong
- * is that a fully configured non-Gemini deployment could never get past them.
+ * WHY IT EXISTS (2026-09-13, story-bench lane). Both sites reached for the
+ * exported `geminiProvider` CONSTANT instead of the seam, so with
+ * AI_PROVIDER=openai-compat and no GEMINI_API_KEY they threw 'Gemini provider
+ * not available' on every call and took their documented fallback (the
+ * unchanged draft; a structural stub). Those fallbacks are correct and still
+ * apply when there is genuinely no provider; what was wrong is that a fully
+ * configured non-Gemini deployment could never get past them.
+ *
+ * WHY IT IS NOT SIMPLY `_provider` (round 2, review MEDIUM 5). The seam is NOT
+ * "openai-compat when AI_PROVIDER says so, Gemini otherwise", which is what an
+ * earlier version of this comment claimed. `resetLLMProvider()` defers to
+ * `aiProviderManager`, whose `autoSelectProvider()` priority is
+ * **freeride > gemini** — so on any deployment that sets OPENROUTER_API_KEY,
+ * with or without a Gemini key, `_provider` is the legacy FreeRide bridge.
+ * server/lib/ai-config.ts's llmReady() deliberately refuses to count
+ * OPENROUTER_API_KEY as ready for exactly these surfaces, because that bridge
+ * "is not yet response-compatible with the ScriptIDE routes ... would send a
+ * writer's draft to a provider and return an empty or invalid result". Routing
+ * the only prose step there would have crossed that policy silently, and as a
+ * side effect of a bug fix.
+ *
+ * So: an EXPLICIT configuration (ai-config's openai-compat wiring, or a test's
+ * setLLMProvider) is always honoured; an AUTO-SELECTED FreeRide is not, and
+ * these sites fall back to Gemini — which is exactly what they used before the
+ * fix, so a FreeRide-only deployment keeps the behaviour it already had.
+ * `getLLMProvider()` stays the raw accessor for callers that want whatever is
+ * wired; tests/core/openai-compat-generation-guards.test.ts pins both
+ * directions.
  */
 export function getLLMProvider(): LLMProvider               { return _provider; }
+
+/**
+ * True when `_provider` is the manager's auto-selected FreeRide bridge rather
+ * than something explicitly wired. Duck-typed on the manager's own id so this
+ * file keeps no new import edge, and re-read at call time because the manager's
+ * selection can change.
+ */
+function activeProviderIsAutoSelectedFreeRide(): boolean {
+  if (!_providerIsManagerSelected) return false;
+  try {
+    return aiProviderManager.hasProvider()
+      && (aiProviderManager.getProvider() as { id?: string }).id === 'freeride';
+  } catch {
+    return false;
+  }
+}
+
+/** The seam the generative call sites use. See getLLMProvider's comment. */
+export function getGenerativeProvider(): LLMProvider {
+  return activeProviderIsAutoSelectedFreeRide() ? geminiProvider : _provider;
+}
 export function resetLLMProvider(): void                     { 
   // Reset to multi-provider system if available, otherwise Gemini
   if (aiProviderManager.hasProvider()) {
     const activeProvider = aiProviderManager.getProvider();
     _provider = makeDelegatingProvider(activeProvider);
+    _providerIsManagerSelected = true;
   } else {
     _provider = geminiProvider;
+    _providerIsManagerSelected = false;
   }
 }
 export function setEmbeddingProvider(p: EmbeddingProvider): void { _embeddingProvider = p; }
@@ -277,8 +326,10 @@ export function resetAllProviders(): void {
   if (aiProviderManager.hasProvider()) {
     const activeProvider = aiProviderManager.getProvider();
     _provider = makeDelegatingProvider(activeProvider);
+    _providerIsManagerSelected = true;
   } else {
     _provider = geminiProvider;
+    _providerIsManagerSelected = false;
   }
   _embeddingProvider = geminiEmbeddingProvider;
   _imageProvider     = geminiImageProvider;
