@@ -484,6 +484,23 @@ export function coerceNecessityCertificate(raw: unknown): NecessityCertificate |
   return sawAnyField ? out : null;
 }
 
+/**
+ * True when all four answers are blank — an untouched form, not an attempt.
+ *
+ * The distinction matters at the storage seam: a writer who never opened the
+ * necessity fields must not end up with a stored certificate that then
+ * "fails" four times over, and a UI that renders four empty textareas must
+ * not turn that into an answer. A PARTLY filled certificate is NOT blank: it
+ * is a real, incomplete attempt, and the form check is what says so.
+ */
+export function necessityIsBlank(cert: NecessityCertificate | null | undefined): boolean {
+  if (!cert) return true;
+  return NECESSITY_FIELDS.every(field => {
+    const value = cert[field];
+    return typeof value !== 'string' || value.trim().length === 0;
+  });
+}
+
 // ── Prompt injection ────────────────────────────────────────────────────────
 
 /**

@@ -22,6 +22,7 @@ import {
   NECESSITY_QUESTIONS,
   checkNecessity,
   coerceNecessityCertificate,
+  necessityIsBlank,
   buildNecessityPromptBlock,
   type NecessityCertificate,
 } from '../../server/lib/necessity-certificate.ts';
@@ -294,6 +295,21 @@ test('coerceNecessityCertificate: keeps the four fields and flattens newlines th
   assert.ok(partial);
   assert.equal(partial.whyHere, '');
   assert.equal(checkNecessity(partial).ok, false);
+});
+
+// ── necessityIsBlank ────────────────────────────────────────────────────────
+
+test('necessityIsBlank: an untouched form is blank; a partly filled one is not', () => {
+  assert.equal(necessityIsBlank(null), true);
+  assert.equal(necessityIsBlank(undefined), true);
+  assert.equal(
+    necessityIsBlank({ beatId: 'b', whyNow: '', whyHere: '   ', whyThem: '\t', forcingFunction: '' }),
+    true,
+  );
+  // One answered question is an attempt, not an untouched form — the form
+  // check, not this predicate, is what reports the other three.
+  assert.equal(necessityIsBlank(validCert({ whyHere: '', whyThem: '', forcingFunction: '' })), false);
+  assert.equal(necessityIsBlank(validCert()), false);
 });
 
 // ── buildNecessityPromptBlock ───────────────────────────────────────────────

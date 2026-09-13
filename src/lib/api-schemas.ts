@@ -16,6 +16,22 @@ import { z } from 'zod';
 // that never matched the route, so schema validation of a real response
 // would have thrown or silently produced beats DirectorPanel's own
 // OutlineBeat-typed state couldn't accept.
+//
+// `necessity` (2026-09-13) is the Necessity Certificate the beat carries
+// (server/lib/necessity-certificate.ts). It is declared here because zod's
+// .parse() STRIPS unknown keys: without this field, DirectorPanel would load
+// a beat, silently drop the certificate the server just stored, and destroy
+// it on the writer's next "Save to Engine". Optional, because a beat the
+// writer has not answered for carries none — the POST handler stores no
+// certificate for an untouched form.
+export const NecessityCertificateSchema = z.object({
+  beatId: z.string(),
+  whyNow: z.string(),
+  whyHere: z.string(),
+  whyThem: z.string(),
+  forcingFunction: z.string(),
+});
+
 export const OutlineBeatSchema = z.object({
   phase: z.enum(['Setup', 'Turn', 'Prestige']),
   turn_start: z.number(),
@@ -23,6 +39,7 @@ export const OutlineBeatSchema = z.object({
   goal: z.string(),
   constraint: z.string(),
   avoid: z.string(),
+  necessity: NecessityCertificateSchema.optional(),
 });
 
 // Mirrors the actual GET /api/story-config response

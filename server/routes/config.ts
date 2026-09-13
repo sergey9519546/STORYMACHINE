@@ -17,7 +17,7 @@ import {
   NecessityCheckBodySchema,
 } from '../lib/validation.ts';
 import {
-  checkNecessity, coerceNecessityCertificate, necessityBeatId,
+  checkNecessity, coerceNecessityCertificate, necessityBeatId, necessityIsBlank,
   NECESSITY_CHECK_DISCLAIMER, NECESSITY_QUESTIONS,
   type NecessityCertificate,
 } from '../lib/necessity-certificate.ts';
@@ -509,7 +509,10 @@ router.post('/api/outline', gameLimiter, validate(OutlineBodySchema), withSessio
     // STAMPED from the beat itself rather than trusted from the client — that
     // is what makes a later beatIdMismatch mean "this certificate was moved",
     // not "the client sent a different string".
-    const rawNecessity = coerceNecessityCertificate(beat.necessity);
+    const coerced = coerceNecessityCertificate(beat.necessity);
+    // An untouched form (four blank answers) is not an attempt — storing it
+    // would give the beat a certificate that then fails four times over.
+    const rawNecessity = necessityIsBlank(coerced) ? null : coerced;
     const necessity: NecessityCertificate | undefined = rawNecessity
       ? {
           ...rawNecessity,

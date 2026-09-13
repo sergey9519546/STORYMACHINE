@@ -2,6 +2,14 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { motion } from "motion/react";
 import { GameState, Choice, DefenseMechanism } from "../types";
 import type { OutlineBeat } from "../../server/engine/types";
+import {
+  NECESSITY_FIELDS,
+  NECESSITY_QUESTIONS,
+  NECESSITY_CHECK_DISCLAIMER,
+  type NecessityCertificate,
+  type NecessityField,
+  type WithNecessity,
+} from "../../server/lib/necessity-certificate.ts";
 import { OutlineResponseSchema, StoryConfigSchema } from "../lib/api-schemas";
 import { useModalFocusTrap } from "../lib/use-modal-focus-trap";
 import {
@@ -27,6 +35,33 @@ import {
   Hash,
   BookOpen,
 } from "lucide-react";
+
+// ─── Necessity Certificate (outline beats) ───────────────────────────────────
+// The four questions a scene must answer before it is generated. The beat
+// carries the answers (server/lib/necessity-certificate.ts) and the engine
+// checks only that they were ANSWERED — never whether an answer is good.
+
+type BeatWithNecessity = WithNecessity<OutlineBeat>;
+
+/** Shape of POST /api/outline/necessity-check's response (server/routes/config.ts). */
+interface NecessityCheckResponse {
+  ok: boolean;
+  failed: NecessityField[];
+  fields: Record<NecessityField, { ok: boolean; reasons: string[]; detail: string[] }>;
+  disclaimer: string;
+}
+
+const EMPTY_CERTIFICATE: NecessityCertificate = {
+  beatId: "", whyNow: "", whyHere: "", whyThem: "", forcingFunction: "",
+};
+
+/** Writer-facing label for each field — short enough for a 375px column. */
+const NECESSITY_LABELS: Record<NecessityField, string> = {
+  whyNow: "Why now",
+  whyHere: "Why here",
+  whyThem: "Why them",
+  forcingFunction: "Forcing function",
+};
 
 // ─── Mini sparkline ───────────────────────────────────────────────────────────
 
@@ -235,8 +270,12 @@ export default function DirectorPanel({
   );
   const [newQualityKey, setNewQualityKey] = useState("");
   const [newQualityValue, setNewQualityValue] = useState("0");
-  const [outlineBeats, setOutlineBeats] = useState<OutlineBeat[]>([]);
+  const [outlineBeats, setOutlineBeats] = useState<BeatWithNecessity[]>([]);
   const [outlineSaved, setOutlineSaved] = useState<boolean | null>(null);
+  // Necessity Certificate form-check results, keyed by beat index. Null means
+  // "not checked yet" — never "passed", so the UI can tell the two apart.
+  const [necessityChecks, setNecessityChecks] = useState<Record<number, NecessityCheckResponse | null>>({});
+  const [necessityChecking, setNecessityChecking] = useState<number | null>(null);
   const [pacingTarget, setPacingTarget] = useState<'slow' | 'medium' | 'fast'>('medium');
   const [pacingSaved, setPacingSaved] = useState<boolean | null>(null);
   const [storyStructure, setStoryStructure] = useState<string>('');
@@ -527,6 +566,46 @@ export default function DirectorPanel({
   const updateOutlineBeat = (idx: number, field: keyof OutlineBeat, value: string | number) => {
     setOutlineBeats(prev => prev.map((b, i) => i === idx ? { ...b, [field]: value } : b));
   };
+
+  // One of the four necessity answers changed. The previous check result for
+  // that beat is dropped: a verdict that no longer describes what is in the
+  // boxes would be a copy that lies.
+  const updateNecessity = (idx: number, field: NecessityField, value: string) => {
+    setOutlineBeats(prev => prev.map((b, i) => (
+      i === idx
+        ? { ...b, necessity: { ...(b.necessity ?? EMPTY_CERTIFICATE), [field]: value } }
+        : b
+    )));
+    setNecessityChecks(prev => (prev[idx] ? { ...prev, [idx]: null } : prev));
+  };
+
+  // Ask the server's form check (one implementation — the browser does not
+  // re-implement the rules). Keyless and deterministic: this route makes no
+  // model call, so it answers the same way with or without an API key.
+  const checkBeatNecessity = useCallback(async (idx: number) => {
+    const beat = outlineBeats[idx];
+    if (!beat) return;
+    setNecessityChecking(idx);
+    try {
+      const res = await fetch("/api/outline/necessity-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          certificate: { ...EMPTY_CERTIFICATE, ...(beat.necessity ?? {}) },
+          // The scene's own heading and goal: an answer that only repeats them
+          // has restated the question rather than answered it.
+          context: [beat.goal, beat.constraint].filter(Boolean),
+        }),
+      });
+      if (!res.ok) { setNecessityChecks(prev => ({ ...prev, [idx]: null })); return; }
+      const body = await res.json() as NecessityCheckResponse;
+      setNecessityChecks(prev => ({ ...prev, [idx]: body }));
+    } catch {
+      setNecessityChecks(prev => ({ ...prev, [idx]: null }));
+    } finally {
+      setNecessityChecking(null);
+    }
+  }, [outlineBeats]);
 
   const removeOutlineBeat = (idx: number) => {
     setOutlineBeats(prev => prev.filter((_, i) => i !== idx));
@@ -1452,6 +1531,67 @@ export default function DirectorPanel({
                           placeholder="e.g. Do not let Bob speak; keep the setting indoors"
                         />
                       </div>
+
+                      {/* Necessity Certificate — the four questions this scene must answer */}
+                      <fieldset className="border-[2px] border-[var(--sm-hair)] p-3 space-y-3">
+                        <legend className="px-1 text-[10px] font-bold uppercase tracking-widest text-[var(--sm-ink-faint)]">
+                          Necessity — why this scene exists
+                        </legend>
+                        <p className="text-[10px] font-mono text-[var(--sm-ink-mute)] leading-relaxed">
+                          {NECESSITY_CHECK_DISCLAIMER} Answers you give are sent to the generator as constraints on the scene.
+                        </p>
+                        {NECESSITY_FIELDS.map((field) => {
+                          const fieldResult = necessityChecks[idx]?.fields?.[field];
+                          return (
+                            <div key={field}>
+                              <label
+                                htmlFor={`beat-${idx}-necessity-${field}`}
+                                className="text-[var(--sm-ink-faint)] text-[10px] uppercase font-bold tracking-widest"
+                              >
+                                {NECESSITY_LABELS[field]}
+                              </label>
+                              <textarea
+                                id={`beat-${idx}-necessity-${field}`}
+                                aria-label={`Beat ${idx + 1} ${NECESSITY_LABELS[field]} — ${NECESSITY_QUESTIONS[field]}`}
+                                aria-describedby={fieldResult && !fieldResult.ok ? `beat-${idx}-necessity-${field}-reason` : undefined}
+                                value={beat.necessity?.[field] ?? ""}
+                                onChange={(e) => updateNecessity(idx, field, e.target.value)}
+                                className={textareaClass}
+                                rows={2}
+                                placeholder={NECESSITY_QUESTIONS[field]}
+                              />
+                              {fieldResult && !fieldResult.ok && (
+                                <p
+                                  id={`beat-${idx}-necessity-${field}-reason`}
+                                  className="mt-1 text-[10px] font-mono text-[var(--sm-stamp)] leading-relaxed"
+                                >
+                                  {fieldResult.detail.join(" ")}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => { void checkBeatNecessity(idx); }}
+                            disabled={necessityChecking === idx}
+                            className="flex-1 py-1.5 sm-btn border-[2px] border-[var(--sm-ink)] hover:bg-[var(--sm-panel)] transition-colors uppercase font-bold tracking-widest text-[10px] disabled:opacity-60"
+                          >
+                            {necessityChecking === idx ? "Checking…" : "Check answers"}
+                          </button>
+                          <span role="status" aria-live="polite" className="text-[10px] font-bold uppercase tracking-widest">
+                            {necessityChecks[idx]?.ok === true && (
+                              <span className="text-[var(--sm-ok-on-light)]">All four answered ✓</span>
+                            )}
+                            {necessityChecks[idx]?.ok === false && (
+                              <span className="text-[var(--sm-stamp)]">
+                                {necessityChecks[idx]!.failed.length} unanswered
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </fieldset>
                     </div>
                   ))}
                 </div>
