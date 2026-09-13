@@ -47,7 +47,7 @@
 // the job it was built for, on the surface it was built for.
 
 import { normalizeScreenplay, isCharacterCue } from './screenplay-normalizer.ts';
-import { isForcedTransitionLine, parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
+import { isCenteredLine, isForcedTransitionLine, parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
 
 const HEADING_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
 const TRANSITION_RE = /^(CUT TO|FADE (IN|OUT|TO)|DISSOLVE( TO)?|SMASH CUT|MATCH CUT|IRIS (IN|OUT)|WIPE TO|BACK TO|INTERCUT|THE END|FADE)\b/i;
@@ -126,8 +126,12 @@ function repairSingleSpaced(text: string): string {
     const t = line.trim();
     if (t === '') { out.push(''); continue; }
 
+    // `isCenteredLine` joined this list 2026-09-13 for the reason the
+    // normaliser's twin did: a `>text<` line in PACKED input got no blank lines
+    // around it, so parseFountain — which needs the adjacency — could not see
+    // the centering this pass exists to make visible.
     const structural =
-      isHeading(t) || isTransition(t) || isParenthetical(t) || isCharacterCue(line);
+      isHeading(t) || isTransition(t) || isCenteredLine(t) || isParenthetical(t) || isCharacterCue(line);
 
     if (structural) {
       // Ensure blank line BEFORE this structural element (unless at start or already preceded by blank)
@@ -136,7 +140,7 @@ function repairSingleSpaced(text: string): string {
       // For a character cue, ensure the NEXT non-blank line is its dialogue
       // (no blank between cue and dialogue — that's the Fountain rule). For
       // headings and transitions, a blank AFTER is conventional and harmless.
-      if (isHeading(t) || isTransition(t)) out.push('');
+      if (isHeading(t) || isTransition(t) || isCenteredLine(t)) out.push('');
       // character cue & parenthetical: do NOT push blank after — dialogue must follow immediately
     } else {
       out.push(t);

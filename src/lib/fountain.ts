@@ -197,9 +197,25 @@ export const FORCED_TRANSITION_MARKER = '>';
  *  server/nvm/analyze/screenplay-normalizer.ts both ask this function, so the
  *  seam and the page cannot disagree about what a marker is. */
 export function isForcedTransitionLine(trimmed: string): boolean {
-  return trimmed.startsWith(FORCED_TRANSITION_MARKER)
-    && !trimmed.endsWith('<')
+  return trimmed.startsWith(FORCED_TRANSITION_MARKER) && !isCenteredLine(trimmed)
     && trimmed.slice(FORCED_TRANSITION_MARKER.length).trim() !== '';
+}
+
+/** True when `trimmed` is Fountain's CENTERED text — §Centered Text: "Text
+ *  constrained by > and < will be centered". It claims the same first
+ *  character as the forced transition, so the two predicates are written
+ *  together and `isForcedTransitionLine` is defined by excluding this one.
+ *
+ *  IT IS EXPORTED FOR THE SAME REASON (2026-09-13, round 2). The round-1
+ *  review found `>THE END<` still being glued into the preceding action
+ *  paragraph by the normaliser's double-spaced reconstruction — the identical
+ *  defect the forced transition had, one shape over, in the same function,
+ *  because that reconstruction's structural-line tests are heading / transition
+ *  / parenthetical / cue and centering was in none of them. A shape the parser
+ *  knows and the seam does not is an analyzer/renderer split whatever the
+ *  shape is, so the seam asks this function too. */
+export function isCenteredLine(trimmed: string): boolean {
+  return trimmed.startsWith(FORCED_TRANSITION_MARKER) && trimmed.endsWith('<');
 }
 const CUE_EXTENSION_ALTERNATION = CUE_EXTENSIONS
   .map((e) => `\\(${e.replace(/[.]/g, '\\.')}\\)`)
@@ -415,7 +431,7 @@ export function parseFountain(text: string): FountainBlock[] {
       type = 'note';
     } else if (trimmed.startsWith('~')) {
       type = 'lyrics';
-    } else if (trimmed.startsWith('>') && trimmed.endsWith('<')) {
+    } else if (isCenteredLine(trimmed)) {
       type = 'centered';
     } else if (isForcedTransitionLine(trimmed)) {
       // Fountain's FORCED TRANSITION — see FORCED_TRANSITION_MARKER above for

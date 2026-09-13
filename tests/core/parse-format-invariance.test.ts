@@ -32,7 +32,7 @@ import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 import type { ScriptDoctorReport } from '../../server/nvm/analyze/types.ts';
 import { parseFountain } from '../../src/lib/fountain.ts';
 import { analyzeFountainText } from '../../server/nvm/analyze/fountain-analyzer.ts';
-import { normalizeScreenplay } from '../../server/nvm/analyze/screenplay-normalizer.ts';
+import { isDoubleSpacedText, normalizeScreenplay } from '../../server/nvm/analyze/screenplay-normalizer.ts';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
@@ -586,6 +586,52 @@ describe('a forced transition `>` is a transition everywhere (renderer residuals
     assert.equal(types('INT. A - DAY\n\nMary closes the file.\n\n>CUT TO:\n\nINT. B - DAY\n\nRain falls.\n'),
       types('INT. A - DAY\n\nMary closes the file.\n\nCUT TO:\n\nINT. B - DAY\n\nRain falls.\n'),
       '`>CUT TO:` and `CUT TO:` are the same element; the marker only ever declares');
+  });
+
+  // ROUND 2. The round-1 review's §6: the seam-agrees-with-the-page property
+  // was written for the POSITIVE fixture only, and applied to the three
+  // negatives this file already had it finds the defect in one run. It did:
+  // `>THE END<` was glued into the preceding action paragraph by the
+  // normaliser's double-spaced reconstruction, so the seam scored
+  // `action:"Rain falls hard. >THE END<"` while the page centered it. Same
+  // split, one shape over, same function. Fixed; this is the assertion that
+  // would have caught it, generalised over every shape the suite knows.
+  it('the seam agrees with the page on EVERY shape, not only the one that motivated the fix', () => {
+    const DOUBLE_SPACED = [
+      'INT. OFFICE - DAY', '', 'Mary closes the file.', '',
+      'She looks up at the window.', '', '>SMASH TO BLACK.', '',
+      'EXT. STREET - NIGHT', '', 'Rain falls hard.', '', '>THE END<', '',
+    ].join('\n');
+    // Double-spaced is not incidental: it is the shape that routes through the
+    // reconstruction branch, which is where the defect lived. Assert that
+    // first, so a future change that stops the document taking that path turns
+    // this into a test about nothing.
+    assert.equal(isDoubleSpacedText(DOUBLE_SPACED), true,
+      'this fixture must take the reconstruction branch or it proves nothing');
+    const page = parseFountain(DOUBLE_SPACED).filter((b) => b.type !== 'empty');
+    const seam = parseFountain(normalizeScreenplay(DOUBLE_SPACED)).filter((b) => b.type !== 'empty');
+    // Consecutive runs of one type are collapsed before comparing, and that is
+    // a real weakening stated rather than hidden: REJOINING wrapped action into
+    // one paragraph is what the reconstruction branch exists to do, the words
+    // are identical either way, and every exporter re-wraps anyway. What the
+    // property still forbids is a type DISAPPEARING from the seam or appearing
+    // there — which is exactly what the defect did: `centered` vanished and its
+    // words were swallowed by the action block above it.
+    const shape = (bs: typeof page) => bs.map((b) => b.type).filter((t, i, a) => t !== a[i - 1]);
+    assert.deepEqual(
+      shape(seam), shape(page),
+      'the element sequence the analyzer scores must be the element sequence the exporters print. '
+      + `Page: ${JSON.stringify(page.map((b) => `${b.type}:${b.text.trim()}`))}; `
+      + `seam: ${JSON.stringify(seam.map((b) => `${b.type}:${b.text.trim()}`))}`,
+    );
+    // And the centered line specifically, by text, because a type sequence
+    // alone would pass if the words had been folded into a NEIGHBOURING
+    // centered block.
+    assert.ok(
+      seam.some((b) => b.type === 'centered' && b.text.trim() === '>THE END<'),
+      'the centered line must survive the seam intact — it used to arrive as '
+      + '`action:"Rain falls hard. >THE END<"`, marker and all, in actionLines and every rule lexicon',
+    );
   });
 
   it('the analysis seam and the page agree about the element — the split itself', () => {

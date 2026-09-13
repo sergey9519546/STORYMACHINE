@@ -22,7 +22,7 @@
 // structural element until the next one. Wrapped fragments inside a block are
 // joined into flowing text.
 
-import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS, isForcedTransitionLine, parseFountain, type FountainBlock, type FountainBlockType } from '../../../src/lib/fountain.ts';
+import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS, isCenteredLine, isForcedTransitionLine, parseFountain, type FountainBlock, type FountainBlockType } from '../../../src/lib/fountain.ts';
 
 // Heading detection is kept BYTE-COMPATIBLE with src/lib/fountain.ts's
 // parseFountain (a scene_heading is `/^(INT|EXT|EST|I\/E)[. ]/i` OR any line
@@ -58,13 +58,27 @@ function isTransition(t: string): boolean {
 }
 function isParenthetical(t: string): boolean { return PURE_PAREN_RE.test(t); }
 
+// ── CENTERING IS A STRUCTURAL LINE TOO (2026-09-13, round 2) ───────────────
+// The reconstruction below classifies each line as heading / transition /
+// parenthetical / cue / plain text, and centering was in none of them, so
+// `>THE END<` fell through to "plain text" and was JOINED into the preceding
+// action paragraph. Measured on a double-spaced-shaped document: the page laid
+// the line out centered while the seam scored
+// `action:"Rain falls hard. >THE END<"` — the marker and the centered words
+// reaching actionLines, the word count and every rule lexicon as prose. That is
+// the same analyzer/renderer split the forced transition had, one shape over
+// and in this same function; the round-1 review found it because the forced
+// transition's own fix could not reach it (`isForcedTransitionLine` excludes
+// the `<`-terminated shape by construction). The predicate is the parser's own.
+const isCentered = isCenteredLine;
+
 /** Character-cue detector. Conservative on the two real false-positive sources:
  *  ALL-CAPS action emphasis ("THE DOOR BURSTS OPEN") and SUNG LYRICS — both
  *  tend to be sentence-like (>4 words) or end in sentence punctuation, whereas
  *  a cue is a bare 1–4-word name. */
 export function isCharacterCue(rawLine: string): boolean {
   const t = rawLine.trim();
-  if (!t || isHeading(t) || isTransition(t) || isParenthetical(t)) return false;
+  if (!t || isHeading(t) || isTransition(t) || isCentered(t) || isParenthetical(t)) return false;
   const bare = t.replace(PAREN_TAIL_RE, '').trim();
   if (!bare) return false;
   // must be all-caps (letters that appear are uppercase; digits/&/./'/- allowed)
@@ -690,6 +704,15 @@ function normalizeScreenplayUncached(raw: string): string {
     if (isTransition(t)) {
       flush(); mode = 'none';
       out.push(t.toUpperCase()); out.push('');
+      continue;
+    }
+    if (isCentered(t)) {
+      // Verbatim, and NOT uppercased: `>text<` is a centering instruction, not
+      // an uppercase element — src/lib/screenplay-layout.ts's SPEC gives
+      // `centered` no `uppercase` flag, and the seam must not print what the
+      // page does not.
+      flush(); mode = 'none';
+      out.push(t); out.push('');
       continue;
     }
     if (isCharacterCue(line)) {
