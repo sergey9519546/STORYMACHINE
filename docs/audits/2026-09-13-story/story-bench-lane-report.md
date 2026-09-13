@@ -391,7 +391,7 @@ helpers and never boots a server or makes a call.
 
 ---
 
-`Tip:` `7a8b92c6` on `lane/story-bench` (pushed), rebased onto `origin/main`
+`Tip:` `d5d58f56` on `lane/story-bench` (pushed), rebased onto `origin/main`
 `91c369c5`. `npm test` 13,955 pass / 0 fail on that exact tree. The run's six
 scripts, six doctor readouts, six call logs, `packet.fountain` and `packet.pdf`
 are in `data/story-bench/2026-09-13/`, which is gitignored — they are on this
