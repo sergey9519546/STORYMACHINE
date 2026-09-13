@@ -292,17 +292,19 @@ this lane's own fix — round 1's `refExists()` change — introduced).
 Round 1's `baseGuardEnv()` hardening stripped the only condition
 (`GITHUB_EVENT_PATH`) that had ever exercised the bug, so with round 1's
 production line reverted (`${ref}^{commit}` → `ref`) and everything else
-kept, the file was 24/24 green — the reviewer's exact reproduction, verified
-independently here first:
+kept, **on the ROUND-1 TREE** (`156a1ca6`, 24 tests — before either of this
+round's two new tests existed), the file was 24/24 green — the reviewer's
+exact round-1 reproduction, verified independently here first:
 
 ```
-$ node --experimental-strip-types --test tests/core/scoring-receipt-guard.test.ts   # ^{commit} reverted
-# tests 26 / # pass 26 / # fail 0
+$ node --experimental-strip-types --test tests/core/scoring-receipt-guard.test.ts   # 156a1ca6, ^{commit} reverted
+# tests 24 / # pass 24 / # fail 0
 ```
 
-(26, not the reviewer's 24, because round 2 had already added two new tests
-by the time this was run — see below; both included, both green on the
-reverted line, which is itself the bug this section fixes.)
+That 24/24 is exactly the gap this section closes: nothing in the round-1
+tree could fail on the reverted line. The two tests added below are what
+change that — see the round-2-tree measurement immediately after them, which
+is the real fail-first evidence for this item.
 
 Added `tests/core/scoring-receipt-guard.test.ts`: "a syntactically valid but
 ABSENT 40-hex `before` fails loudly instead of being treated as real" — sets

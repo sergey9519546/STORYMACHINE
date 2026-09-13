@@ -771,11 +771,21 @@ function main() {
     // Loud, not casual: "nothing to check" is what the old empty-range bug
     // printed on every push to main. If this line appears in a CI log on a
     // normal run, the checkout is misconfigured, not clean.
+    // 2026-09-13 round 2 (docs/audits/2026-09-13-ci-green/ci-env-review.md,
+    // non-blocking copy note): this null also renders for a push whose own
+    // recorded `before` does not resolve here (rewritten history, a
+    // force-push after `git gc`, a stale `PUSH_BEFORE_SHA`) — a state where
+    // `origin/main` exists and the checkout already has full history, so the
+    // original wording ("the checkout lacks history … needs fetch-depth: 0")
+    // was false in exactly that case. Reworded to cover both causes rather
+    // than asserting which one applies.
     const message =
       'check-scoring-receipt: NO BASE REF to diff against (no push range, no origin/main, no main, '
-      + 'no prior commit) — nothing could be checked. This is not a pass; it is an absent check. '
-      + 'On CI this means the checkout lacks history (needs fetch-depth: 0) or the event payload '
-      + 'was unavailable.';
+      + 'no prior commit, or the push\'s own recorded `before` does not resolve in this checkout) — '
+      + 'nothing could be checked. This is not a pass; it is an absent check. On CI this usually '
+      + 'means the checkout lacks full history (needs fetch-depth: 0), the event payload was '
+      + 'unavailable, or the pushed `before` SHA is not reachable here (rewritten history, a '
+      + 'force-push after gc, a stale PUSH_BEFORE_SHA).';
     if (process.env.CI) {
       // 2026-09-02: on CI this used to print the sentence above and exit 0 —
       // an absent check that renders as a green build, which is precisely the
@@ -790,8 +800,10 @@ function main() {
       // route around the guard.
       console.error(message);
       console.error(
-        'check-scoring-receipt: FAILING because CI is set. A misconfigured or shallow checkout must '
-        + 'not produce a green build — fix the checkout (fetch-depth: 0) or pass an explicit range.',
+        'check-scoring-receipt: FAILING because CI is set. A misconfigured checkout, or a push whose '
+        + 'own recorded `before` cannot be resolved here, must not produce a green build — fix the '
+        + 'checkout (fetch-depth: 0), verify the pushed `before` SHA is reachable, or pass an '
+        + 'explicit range.',
       );
       process.exit(1);
     }
