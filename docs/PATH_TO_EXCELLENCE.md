@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-12, main @ 143ad651 (nine session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-13, main @ ce093a0c (nine session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -35,7 +35,7 @@ browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
 
-**2026-09-12 — the adversarial review: ten lanes, twenty-seven review
+**2026-09-12 — the adversarial review: twelve lanes, thirty-one review
 rounds, no lane through on its first pass.** The owner asked for a
 principal-level adversarial review of the current features and logic, run as
 an orchestrator over Sonnet and Opus subagents, with the objective of finding
@@ -157,6 +157,50 @@ parser seam and in every renderer, and found that the parser change itself
 opened a ninth shape-guard bypass class (every cue-shaped disjunct began at
 a cased capital, which `@` escapes), closed with a fourth disjunct whose
 safety is now a property test. Two renderer residuals are named, not fixed.
+
+**The ninth lane, 2026-09-13:** `lane/vite-cache-isolation` (ce093a0c,
+REVISE → MERGE) — the smoke gate had escaped Vite's shared dep-optimizer
+cache by moving to the built bundle; the seven other boot sites still
+optimised into the one `node_modules/.vite` every worktree reaches through
+its symlinked `node_modules`, and nine aborted `deps_temp_*` directories sat
+there as the evidence. Each boot now gets its own slot under a per-repo
+cache root, claimed by an atomic lock, released after the child is actually
+dead and on SIGINT/SIGTERM/SIGHUP, with pid-liveness reclaim as the backstop
+for a kill the hooks cannot see. The proof is a harness that boots two
+dev-middleware servers from two repo paths at once: on main's config each
+optimiser rewrote every file of the other's live cache (+46/−44 both ways);
+on this tree +0/−0, and the reviewer could not make it 504 with three cold
+boots from one worktree. The review's first item was a real break the lane's
+own gates had passed: the new config import lived outside the Docker build
+context's allowlist, so the builder stage could not build the tree, and the
+context test had not noticed because its required paths were hardcoded. The
+module moved to the repository root and the test now derives its paths by
+walking the config's imports. Two more items were promises the code did not
+keep (the slot released on signal, not on death; the exit hook never firing
+on SIGTERM), one was an assertion that compared a value with itself, and the
+lock's three states had no test in either direction; all five were built and
+each new test shown to fail against a mutant. ARCHITECTURE's "seven suites"
+became eight browser suites and seven dev-middleware boot sites, with the
+count asserted.
+
+**The last of the three scoring branches,** `scoring/renderer-residuals`
+(56b96765, REVISE 6 → MERGE, READY-FOR-OWNER, stacked on `scoring/forced-cue`),
+closes the two residuals forced-cue named. The first was a defect: the
+parser had no forced-transition branch, so `>CUT TO:` was typed action and
+every exporter printed the marker; it is now one definition at the parser
+seam, typed and right-aligned everywhere, with `>text<` centering read as a
+structural line at the analysis seam after the review found it absorbed
+into the preceding paragraph exactly as the transition had been. The second
+was a decision the spec settles: an `@` out of cue position is a character
+the writer typed, not a marker, and printing it is correct — written down
+beside the constant and pinned both ways. One case rule now holds across
+layout, PDF and DOCX while FDX preserves the writer's bytes; the PDF
+importer's round-trip claim, false in the same way the FDX importer's had
+been, is fixed; `canonical-fountain.ts` has its first test suite. All six
+public-benchmark statistics and the 45-fixture output identity were re-run
+after every scoring-path commit and did not move; no committed fixture
+carries either marker, so the probe gained a `>tr` column the owner reads on
+the private corpus before any AUC. One PENDING receipt.
 
 **What the process learned, all recorded:** two lanes numbered their claims
 register rows from the same base and both were reviewed MERGE, so for a day

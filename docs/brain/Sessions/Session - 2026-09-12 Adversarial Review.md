@@ -1,21 +1,21 @@
 ---
 type: session
-updated: 2026-09-12
+updated: 2026-09-13
 sources: [docs/PATH_TO_EXCELLENCE.md, docs/audits/2026-09-12-adversarial/README.md, docs/LANE_STANDARD.md]
 status: active
 ---
 
 # Session — 2026-09-12: The Adversarial Review
 
-**Heading:** "2026-09-12 — the adversarial review: ten lanes, twenty-seven
+**Heading:** "2026-09-12 — the adversarial review: twelve lanes, thirty-one
 review rounds, no lane through on its first pass." The owner asked for a
 principal-level adversarial review of the current features and logic, run as
 an orchestrator over subagents, aimed at the best achievable version of this
-product. Three read-only investigators chose the direction; ten build lanes
+product. Three read-only investigators chose the direction; twelve build lanes
 followed ([[Audit - 2026-09-12 Adversarial Review]]), every one reviewed
 independently before merge and none passing on its first pass.
 
-**What landed on main (c087a6ca → 9d0b832d):**
+**What landed on main (c087a6ca → ce093a0c):**
 
 - `verify-covers-tier` — one claim set behind both exporters and both
   verifiers; nine more verified fields; the forgery limit stated with its
@@ -41,7 +41,9 @@ independently before merge and none passing on its first pass.
 **Owner-gated:** [[Branch - Adversarial 2026-09-12]] — READY-FOR-OWNER at
 4cf5b2f3 after four review rounds, with `npm run probe-corpus-shape` as the
 owner's first instruction; [[Branch - Forced Cue]] stacked on it,
-READY-FOR-OWNER at 089bec91 after two.
+READY-FOR-OWNER at 089bec91 after two; [[Branch - Renderer Residuals]]
+stacked on that, READY-FOR-OWNER at 56b96765 after two (2026-09-13), the
+last of the three the owner measures in order.
 
 - `p0-flow-race` — the smoke gate's earliest-instant race was a gate race,
   not a product defect; both windows (MOUNT, IN FLIGHT) are now pinned rather
@@ -51,6 +53,11 @@ READY-FOR-OWNER at 089bec91 after two.
   it serves; `public/` joined the audited build-input set after the review
   showed an edited favicon certified "current"
   (`docs/audits/2026-09-12-adversarial/smokegate-lane-report.md`).
+- `vite-cache-isolation` (2026-09-13) — one dependency-optimizer cache per
+  worktree and per boot, slot-locked and released on death and on signal;
+  the review found the Docker builder stage could no longer build the tree
+  and the context test had not noticed. See [[Gate - Vite Cache Isolation]]
+  (`docs/audits/2026-09-12-adversarial/vitecache-lane-report.md`).
 
 **What the process learned:** a claims-register row collision between two
 MERGE-reviewed lanes, fixed by renumbering at merge and a citation test that
