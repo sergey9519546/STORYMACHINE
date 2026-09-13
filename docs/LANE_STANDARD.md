@@ -106,9 +106,14 @@ follow from that, each already cheap:
    orchestrator still merges only `--ff-only` and only on MERGE; the
    branch is deleted from origin after the merge. Since 2026-09-13
    `.github/workflows/ci.yml` and `security.yml` carry a `concurrency` group
-   keyed on the ref that cancels a branch's own superseded run (never
-   main's), so pushing after every commit costs one CI run in flight per
-   branch, not one run per commit left running to completion.
+   keyed on the ref that cancels a branch's own superseded run — main is
+   isolated into its own group per commit (a `github.sha` suffix), never
+   sharing a group with any other run, so nothing about main can be
+   cancelled or dropped — so pushing after every commit costs one CI run in
+   flight per branch, not one run per commit left running to completion. One
+   consequence: a report that cites its own branch's CI run id must cite the
+   run for the LAST push, not an earlier one — an earlier push's run on the
+   same branch is exactly the one the next push's run cancels.
 2. A reviewer writes its review INTO the repository —
    `docs/audits/<date>-<batch>/<lane>-review.md`, scratch paths replaced by
    `<session scratch>` — before returning its verdict, and the orchestrator

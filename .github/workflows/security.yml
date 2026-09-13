@@ -21,19 +21,29 @@ on:
     # Every Monday 06:00 UTC — catches new advisories on unchanged code.
     - cron: "0 6 * * 1"
 
-# Same reasoning and same expression as ci.yml's group (see that file's
-# comment for the measured incident): a PR that gets pushed again while its
-# dependency-review/npm-audit/codeql run is still going should have the
-# earlier run replaced, not run beside it. `github.ref` for a `pull_request`
-# event is the stable per-PR merge ref, so this cancels only that PR's own
-# stale run, never a different PR's. `main`'s push runs are excluded from
-# cancellation for the same reason as ci.yml — its own record must never be
-# interrupted — and the weekly schedule run also resolves to
-# `refs/heads/main`, so a scheduled advisory sweep is never cancelled either;
-# at most it queues behind a concurrent main push in the same group, which is
-# the safe outcome here (serialized, not lost).
+# Same reasoning and same group shape as ci.yml (see that file's comment for
+# the measured incident and for why `cancel-in-progress: false` alone is not
+# enough): a PR that gets pushed again while its dependency-review/npm-audit/
+# codeql run is still going should have the earlier run replaced, not run
+# beside it. `github.ref` for a `pull_request` event is the stable per-PR
+# merge ref, so this cancels only that PR's own stale run, never a different
+# PR's.
+#
+# `main`'s push runs get the same per-commit group (the `github.sha` suffix)
+# as ci.yml, for the identical reason: `cancel-in-progress: false` only
+# protects a RUNNING run, and a second push to main while one is still
+# running would put the first push's run into PENDING and then cancel it the
+# moment a third queued — dropped, not "serialized". The weekly schedule run
+# (`schedule` events resolve `github.ref` to the default branch,
+# `refs/heads/main`) gets the same sha-suffixed group as any other main
+# commit, so it is isolated the same way — EXCEPT in the one case the suffix
+# cannot separate: a schedule run firing at the exact same commit a push run
+# is also testing shares that group and can still queue/cancel against it.
+# That is accepted, not fixed here — both runs would be auditing the
+# identical dependency tree and code, so a dropped one loses no code-state
+# coverage, only a duplicate advisory check of a commit already covered.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:

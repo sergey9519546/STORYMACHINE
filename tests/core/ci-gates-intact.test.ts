@@ -41,19 +41,46 @@ const releaseYml = path.join(root, '.github/workflows/release.yml');
  * at column 0, not a job-level one nested under a job — e.g. edge.yml's
  * `publish-edge` job has its own indented `concurrency:` a reader should not
  * mistake for this one). Returns null if no top-level key by that name exists.
+ *
+ * Comment lines (leading whitespace then `#`) are dropped from both the
+ * search for the opening `concurrency:` line and from the collected block
+ * body. Without this, a live `cancel-in-progress: true` sitting next to a
+ * commented-out `# cancel-in-progress: ${{ github.ref != 'refs/heads/main'
+ * }}` — the exact bypass shape this file's header exists to catch, applied
+ * to this newer guard instead of an older one — makes the later regex match
+ * the CORRECT text that is dead in a comment while the LIVE line stays
+ * broken. Dropping comment lines first means only the live value can ever
+ * satisfy the regex.
  */
 function topLevelConcurrencyBlock(source: string): string | null {
   const lines = source.split('\n');
-  const startIdx = lines.findIndex((l) => l === 'concurrency:');
+  const isComment = (l: string) => l.trim().startsWith('#');
+  const startIdx = lines.findIndex((l) => !isComment(l) && l === 'concurrency:');
   if (startIdx === -1) return null;
   const out = [lines[startIdx]];
   for (let i = startIdx + 1; i < lines.length; i++) {
     const line = lines[i];
-    if (line.trim() === '') { out.push(line); continue; }
+    if (line.trim() === '') continue;
+    if (isComment(line)) continue;
     if (line.search(/\S/) === 0) break; // dedent back to another top-level key
     out.push(line);
   }
   return out.join('\n');
+}
+
+/**
+ * How many top-level `concurrency:` keys a workflow declares (comment lines
+ * excluded, same rule as above). A second one later in the file wins for a
+ * real YAML loader — later keys shadow earlier ones — but
+ * `topLevelConcurrencyBlock` above reads only the FIRST, so a correct first
+ * block plus a broken second block would read as correct here while the
+ * broken one actually governs the running workflow. This must stay at 1.
+ */
+function topLevelConcurrencyKeyCount(source: string): number {
+  return source
+    .split('\n')
+    .filter((l) => !l.trim().startsWith('#') && l === 'concurrency:')
+    .length;
 }
 
 /** Every `- name: …` step in a workflow, in file order. */
@@ -289,8 +316,42 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
   // a later push cancel its own branch's in-flight run instead of running
   // beside it; main is excluded because its run record must never be
   // interrupted (CLAUDE.md cites main's runs specifically).
+  // The group key: `${{ github.workflow }}-${{ github.ref }}` for the
+  // branch/PR-cancellation half, with a `-${{ github.ref == 'refs/heads/main'
+  // && github.sha || '' }}` suffix so every main commit gets its OWN group
+  // (empty suffix on every other ref, leaving those groups exactly as
+  // before). This is round 2: round 1 keyed on workflow+ref alone and relied
+  // on `cancel-in-progress: false` to keep main safe, which a review showed
+  // does not hold — that flag stops a RUNNING run from being cancelled, but
+  // a run left PENDING in a shared group is still cancelled when a third run
+  // queues behind it, so two quick pushes to main could drop the middle run's
+  // conclusion. The sha suffix removes the shared group entirely for main
+  // rather than merely asking the group not to cancel it. An optional
+  // surrounding quote is allowed in both regexes below — `group: ${{ … }}`
+  // and `group: "${{ … }}"` are the same YAML scalar, and round 1's
+  // unquoted-only regex went red on the quoted-but-equivalent form the
+  // lane's own report rendered it as.
+  const GROUP_KEY_RE =
+    /group:\s*(['"]?)\$\{\{\s*github\.workflow\s*\}\}-\$\{\{\s*github\.ref\s*\}\}-\$\{\{\s*github\.ref\s*==\s*'refs\/heads\/main'\s*&&\s*github\.sha\s*\|\|\s*''\s*\}\}\1/;
+  const CANCEL_EXCEPT_MAIN_RE =
+    /cancel-in-progress:\s*(['"]?)\$\{\{\s*github\.ref\s*!=\s*'refs\/heads\/main'\s*\}\}\1/;
+
   for (const [file, src] of [['ci.yml', ci], ['security.yml', security]] as const) {
-    it(`${file} declares a workflow-level concurrency group keyed on the workflow and ref`, () => {
+    it(`${file} declares exactly one top-level concurrency group`, () => {
+      // A second `concurrency:` block later in the file wins for a real YAML
+      // loader (later keys shadow earlier ones) but topLevelConcurrencyBlock
+      // reads only the first, so a correct first block plus a broken second
+      // one would read as correct here while the broken one actually governs
+      // the workflow GitHub runs.
+      assert.equal(
+        topLevelConcurrencyKeyCount(src),
+        1,
+        `${file} must declare exactly one top-level \`concurrency:\` key — a second one added later in the `
+        + 'file silently wins over this one for YAML while this test would still be reading the first',
+      );
+    });
+
+    it(`${file} declares a workflow-level concurrency group keyed on the workflow, ref, and (main-only) sha`, () => {
       const block = topLevelConcurrencyBlock(src);
       assert.ok(
         block,
@@ -300,9 +361,10 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
       );
       assert.match(
         block!,
-        /group:\s*\$\{\{\s*github\.workflow\s*\}\}-\$\{\{\s*github\.ref\s*\}\}/,
-        `${file}'s concurrency group must be keyed on \`github.workflow\`-\`github.ref\`, matching per `
-        + 'workflow and per branch/PR-head rather than colliding across unrelated refs',
+        GROUP_KEY_RE,
+        `${file}'s concurrency group must be keyed on \`github.workflow\`-\`github.ref\`, with a `
+        + "github.sha suffix when the ref is refs/heads/main so every main commit gets its own group and "
+        + 'never shares one with any other run',
       );
     });
 
@@ -311,13 +373,106 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
       assert.ok(block, `${file} must declare a top-level \`concurrency:\` group`);
       assert.match(
         block!,
-        /cancel-in-progress:\s*\$\{\{\s*github\.ref\s*!=\s*'refs\/heads\/main'\s*\}\}/,
+        CANCEL_EXCEPT_MAIN_RE,
         `${file}'s \`cancel-in-progress\` must be the expression \`\${{ github.ref != 'refs/heads/main' }}\` `
         + '— true for a lane/PR ref (safe to cancel a superseded run) and false for refs/heads/main '
         + "(main's run record must never be cancelled, per CLAUDE.md)",
       );
     });
   }
+
+  // Round-1 review Finding 2: `topLevelConcurrencyBlock` used to collect
+  // COMMENT lines into the block text along with live ones, so the block's
+  // raw string could contain the CORRECT expression dead in a `# was: …`
+  // comment sitting right next to a LIVE, broken value — exactly the #236-241
+  // shape (a comment claiming the true behavior while the real line does
+  // something else), aimed at this newer guard instead of an older one. A
+  // synthetic case here — not dependent on the real files staying broken or
+  // fixed — pins the fix as a permanent regression guard.
+  it('a commented-out correct cancel-in-progress line cannot shadow a live incorrect one (the M6 finding)', () => {
+    const shadowed = [
+      'concurrency:',
+      "  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || '' }}",
+      "  # was: cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}",
+      '  cancel-in-progress: true',
+      '',
+      'jobs:',
+    ].join('\n');
+    const block = topLevelConcurrencyBlock(shadowed);
+    assert.ok(block, 'sanity: the block itself must still be found');
+    assert.doesNotMatch(
+      block!,
+      CANCEL_EXCEPT_MAIN_RE,
+      'a live `cancel-in-progress: true` with the correct expression left behind only as a comment must NOT '
+      + 'satisfy this check — a naive implementation that keeps comment text in the block string passes this '
+      + 'input at 34/34 (round-1 review, Finding 2)',
+    );
+    // The group line in this fixture IS correct and live (not commented), so
+    // it should still match — this test is about the cancel-in-progress
+    // line specifically, not a claim that comment-stripping breaks everything.
+    assert.match(block!, GROUP_KEY_RE, 'sanity: the live, correct group line must still match');
+  });
+
+  // Round-1 review Finding 5 / orchestrator note: a fifth workflow can land
+  // in the same batch (calibrate-voice-bound.yml, on
+  // lane/voice-bound-ci-derivation, not yet on main) with no concurrency
+  // group and nothing here would notice, because this file's workflow list
+  // used to be the two hardcoded files above. Deriving the list from the
+  // directory means a new workflow file fails this check by default unless
+  // it either declares a group or is added to the allowlist below with a
+  // reason a reviewer sees in the diff.
+  it('every .github/workflows/*.yml file has a top-level (or, if allowlisted, job-level) concurrency group', () => {
+    const workflowsDir = path.join(root, '.github/workflows');
+    const files = fs.readdirSync(workflowsDir).filter((f) => f.endsWith('.yml'));
+    assert.ok(files.length > 0, '.github/workflows must contain at least one workflow file');
+
+    const ALLOWED_NO_TOP_LEVEL_GROUP: Record<string, string> = {
+      'release.yml':
+        'tag/dispatch-triggered Docker publish to a shared registry tag — cancelling `publish` mid-push '
+        + 'could leave a half-built or missing image, worse than a rare duplicate run (documented in the '
+        + 'file itself, next to its `on:` block)',
+      'edge.yml':
+        "already has a JOB-level group (publish-edge: concurrency: {group: edge-image, cancel-in-progress: "
+        + "true}) — correct for its shape, since it always builds main's tip and a superseded edge build is "
+        + 'safe to replace; verified separately below rather than assumed',
+    };
+
+    const missing: string[] = [];
+    for (const file of files) {
+      if (file in ALLOWED_NO_TOP_LEVEL_GROUP) continue;
+      const src = fs.readFileSync(path.join(workflowsDir, file), 'utf8');
+      if (!topLevelConcurrencyBlock(src)) missing.push(file);
+    }
+    assert.deepEqual(
+      missing,
+      [],
+      `workflow file(s) with no top-level concurrency group and not on the allowlist: ${missing.join(', ')}. `
+      + 'Either add a group (see ci.yml/security.yml for the shape) or add the file to '
+      + 'ALLOWED_NO_TOP_LEVEL_GROUP above with the reason — a new workflow silently missing this is the exact '
+      + 'gap a review found calibrate-voice-bound.yml sitting in.',
+    );
+  });
+
+  it("edge.yml's allowlisted job-level concurrency group still exists (the allowlist reason above must stay true)", () => {
+    const edgePath = path.join(root, '.github/workflows/edge.yml');
+    const edgeSrc = fs.readFileSync(edgePath, 'utf8');
+    assert.match(
+      edgeSrc,
+      /concurrency:\s*\n\s+group:\s*edge-image\s*\n\s+cancel-in-progress:\s*true/,
+      "edge.yml must keep its job-level `{group: edge-image, cancel-in-progress: true}` — if this ever "
+      + 'changes, the workflow-list allowlist above is citing a reason that is no longer true',
+    );
+  });
+
+  it('release.yml documents, in-file, why it has no concurrency group', () => {
+    assert.match(
+      release,
+      /DELIBERATELY NO `concurrency:` group/,
+      'release.yml must keep an explicit comment explaining the omission — a silent gap here looks identical '
+      + 'to an oversight, which is the thing the workflow-list allowlist test above exists to catch on a '
+      + 'FUTURE file',
+    );
+  });
 
   it('release.yml keeps the registry write token out of the test job', () => {
     // Workflow-level `packages: write` is inherited by EVERY job, so the test

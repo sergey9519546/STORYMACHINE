@@ -1,36 +1,48 @@
 name: CI
 
+# Deliberately NO `paths-ignore` filter on either trigger below, and none
+# should be added later without reading this: the test job's honesty-audit
+# and check-brain steps, plus the brain-coverage and claims-register-citation
+# suites that run inside `npm test`, are DOCS checks that can fail on a
+# documentation-only push (a broken wikilink, a stale brain export, an
+# overclaim string, a missing register row). `check-docs` is NOT part of this
+# argument — it is `continue-on-error: true` below and cannot fail the job;
+# the checks that do gate docs are the ones just named. Skipping the job by
+# path would skip the checks that actually catch a docs regression.
 on:
   push:
     branches: ["**"]
+    # See the no-paths-ignore comment above `on:` before adding one here.
   pull_request:
     branches: ["**"]
+    # Same — see above.
 
 # Cancel a superseded run instead of running beside it. Before this, three
-# quick pushes to one lane branch (docs-only commits included — see the
-# no-paths-ignore note below) started three full runs of both jobs at once:
-# measured 2026-09-13 on lane/voice-bound-ci-derivation, runs 34741882322 /
-# 34741923678 / 34741928418, all in progress simultaneously at 06:05-06:06
-# UTC for three commits whose last two touched only a report's Tip line
-# (test job ~7 min + browser job ~5 min, each run). The group is keyed on the
-# ref, so pushes to DIFFERENT branches never collide, only a branch (or PR
-# head) against its own earlier run. `main` is the one ref excluded from
-# cancellation: CLAUDE.md's CI record cites main's own runs specifically, and
-# a run that gets cancelled leaves no conclusion to cite — a push to main is
-# also not the multi-commit-per-minute pattern this exists to fix, since the
-# orchestrator merges once per lane, --ff-only.
+# quick pushes to one lane branch (docs-only commits included) started three
+# full runs of both jobs at once: measured 2026-09-13 on
+# lane/voice-bound-ci-derivation, runs 34741882322 / 34741923678 /
+# 34741928418, all in progress simultaneously at 06:05-06:06 UTC for three
+# commits whose last two touched only a report's Tip line (test job ~7 min +
+# browser job ~5 min, each run). The group is keyed on the ref, so pushes to
+# DIFFERENT branches never collide, only a branch (or PR head) against its
+# own earlier run.
+#
+# `main` gets its OWN group per commit (the `github.sha` suffix below),
+# rather than merely being excluded from `cancel-in-progress`: a false value
+# there stops GitHub cancelling a RUNNING run, but a second rule still
+# applies to a group — a run queued while one is already in progress becomes
+# PENDING, and any run already pending in that group is cancelled to make
+# room. Two pushes to main inside one CI window (running + pending) plus a
+# third queuing would silently drop the pending one with no conclusion to
+# cite, `cancel-in-progress: false` notwithstanding. Giving every main commit
+# its own group (via the sha suffix) means no other run — running or
+# pending — is ever in it, so nothing about main can be cancelled OR dropped,
+# full stop, not merely "not cancelled while running". `cancel-in-progress`
+# is still keyed on `!= main` for branches/PRs, where a shared group and
+# real cancellation are exactly what this exists to do.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.sha || '' }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
-# Deliberately NO `paths-ignore` for docs-only commits, and none should be
-# added here later: the test job's check-docs, honesty-audit, check-brain and
-# claims-register assertions are DOCS checks that run as part of THIS job, so
-# a documentation-only push can fail them (a broken wikilink, a stale brain
-# export, an overclaim string, a missing register row). Skipping the job by
-# path would skip the one job that actually gates docs correctness. The
-# concurrency group above already gives frequent small pushes their real fix
-# — one run in flight per branch, not zero runs for docs commits.
 
 # Least privilege, declared explicitly. Without a `permissions:` block a
 # workflow inherits the repository/organization default, which on many repos is
