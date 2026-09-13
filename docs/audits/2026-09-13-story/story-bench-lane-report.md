@@ -4,7 +4,25 @@
 **Branch:** `lane/story-bench`, from `main @ 7663df1f`. Pushed after every commit.
 **Brief:** build the first instrument for the owner's 2026-09-13 direction — "let's mainly work on the storymachine ability to actually generate good and quality stories that people will value and be entertained by" — by MEASURING the existing pipeline, not tuning it.
 
-<!-- LOG -->
+```
+git log --oneline origin/main..HEAD      # rebased onto origin/main 91c369c5
+```
+
+    7a8b92c6 feat(bench): the first six-premise run, the packet, and the CLI-order bug it found
+    365cfa42 fix(bench): the two Tier 1 proofs that were silently eating every scene
+    5a9dfc2b fix(ai): map finish_reason "length" to MAX_TOKENS, and commit the best-of-run IR
+    d552d270 fix(bench): the converge route's 180 s budget is not a bench budget
+    1453ba4f docs(bench): the method doc, and two claims-register rows for its two absolutes
+    3687ac65 feat(bench): npm run story:bench — the story-generation measurement instrument
+    1a5af829 feat(ai): harden the openai-compat adapter and point generation at the active seam
+
+The pre-rebase objects were `9ad66f76 5713e6fc b70cfc10 7c9676ce 3a829cd8
+e389422d 4c2a8a92`; each was pushed to `origin/lane/story-bench` as it was
+made, per LANE_STANDARD §7.1. The rebase resolved two conflicts, both against
+work `main` landed while this lane ran: `docs/brain/GRAPH.md` (regenerated with
+`npm run brain`) and `docs/CLAIMS_REGISTER.md`, where `main` had taken row 116,
+so this lane's two rows were renumbered to **117 and 118** and their line
+anchors re-pointed.
 
 ---
 
@@ -93,7 +111,7 @@ response; one TCP hop is replaced.
 | 3 | Run it for real, 6 × 1 | see §4 and §5. |
 | 4 | Reading packet | **done.** `--packet` → `packet.fountain` + `packet.pdf` under the run directory, front matter with the five-question rubric, a blank grid, and the sentence that six scored scripts is the SEED of Decision #3's ~30-case set and satisfies none of its condition. **Deviation, stated:** through `src/lib/pdf.ts`'s `fountainToPdf()`, not `POST /api/export/pdf` — that route does not exist (§1e). |
 | 5 | Honesty boundaries | **done.** No LLM-reader column was added — the optional one is described and not built. No quality claim anywhere; §6 of the method doc states what the doctor cannot see. Nothing the bench produces reaches a user-visible surface. |
-| 6 | Docs, brain, ROADMAP, Decision, claims | **done.** `docs/story-generation/STORY_BENCH_2026-09-13.md`; brain notes `Generation - Story Bench`, `Decision 8 - …`, `Audit - 2026-09-13 Story Bench Lane`, linked from `00 Home`; ROADMAP P2 and P4 amendments that add the track WITHOUT touching the Labs gate or Decision #3's condition; `DECISION_LOG.md` Decision #8; claims rows 116–117. `npm run brain` + `check-brain` fresh; brain-coverage green. |
+| 6 | Docs, brain, ROADMAP, Decision, claims | **done.** `docs/story-generation/STORY_BENCH_2026-09-13.md`; brain notes `Generation - Story Bench`, `Decision 8 - …`, `Audit - 2026-09-13 Story Bench Lane`, linked from `00 Home`; ROADMAP P2 and P4 amendments that add the track WITHOUT touching the Labs gate or Decision #3's condition; `DECISION_LOG.md` Decision #8; claims rows 117–118. `npm run brain` + `check-brain` fresh; brain-coverage green. |
 
 ---
 
@@ -294,7 +312,47 @@ contains a single scene.
 
 ## 6. Gates
 
-<!-- GATES -->
+All run on the final rebased tree (`lane/story-bench` on `origin/main`
+`91c369c5`), in the foreground, exit codes as reported by the shell.
+
+| gate | command | exit |
+|---|---|---|
+| files touched — adapter guards | `node --experimental-strip-types tests/core/openai-compat-generation-guards.test.ts` | **0** (17 pass, 0 fail) |
+| files touched — bench helpers | `node --experimental-strip-types tests/scripts/story-bench.test.ts` | **0** (19 pass, 0 fail) |
+| files touched — core boundary | `node --experimental-strip-types tests/core/pure-core-boundary.test.ts` | **0** |
+| files touched — brain coverage | `node --experimental-strip-types tests/core/brain-coverage.test.ts` | **0** (7 pass) |
+| files touched — claims rows | `node --experimental-strip-types tests/core/claims-row-citations.test.ts` | **0** (5 pass) |
+| files touched — claims lane | `node --experimental-strip-types tests/core/honesty-audit-claims.test.ts` | **0** (15 pass) |
+| lint | `npm run lint` | **0** |
+| console grep | `npm run check-no-console` | **0** (307 files, 24 quarantine entries) |
+| server reachability | `npm run check-server-reachability` | **0** |
+| build | `npm run build` | **0** |
+| docs quality | `npm run check-docs` | **0** |
+| honesty audit | `npm run honesty-audit` | **0** (465 files, 518 markdown, 118 claims rows) |
+| scoring receipt | `node scripts/check-scoring-receipt.mjs main..HEAD` | **0** — *"no scoring-path files changed"* |
+| unverified-gate report | `npm run gates` | **0** |
+| brain graph | `npm run brain` then `npm run check-brain` | **0** — 118 notes, 468 links, fresh |
+| full suite | `npm test` | **0** — 14,047 tests, **13,955 pass / 0 fail**, 91 skipped, 1 todo, 341 s, once on the final rebased tree |
+
+**`check-scoring-receipt` agrees that generation is not the scoring path**, as
+the brief asked me to confirm: the range reports *no scoring-path files
+changed*. That is the correct answer and not a loophole — the four files this
+lane touches under `server/` are the provider adapter, the engine seam, and the
+two generative call sites, and `server/nvm/revision/rewrite-llm.ts` was
+deliberately split out of `doctor.ts`'s import graph on 2026-09-03 for exactly
+this reason. `tests/core/pure-core-boundary.test.ts` passes, so that split still
+holds after this lane.
+
+**The browser suites were not run** — this lane changes no user-visible
+surface. Stated again in §7 rather than left to be noticed.
+
+**The bench itself skips cleanly in CI.** `npm run story:bench` is not part of
+`npm test` (`scripts/run-tests.mjs` sweeps `tests/**`, and the bench is a
+`scripts/` entry point with its own npm script), it is named in no workflow,
+and with no provider configured it prints *"Nothing was measured. This is not a
+result."* and exits 2. What DOES run in CI is
+`tests/scripts/story-bench.test.ts`, which imports the module for its pure
+helpers and never boots a server or makes a call.
 
 ---
 
@@ -333,4 +391,18 @@ contains a single scene.
 
 ---
 
-`Tip:` <!-- TIP -->
+`Tip:` `7a8b92c6` on `lane/story-bench` (pushed), rebased onto `origin/main`
+`91c369c5`. `npm test` 13,955 pass / 0 fail on that exact tree. The run's six
+scripts, six doctor readouts, six call logs, `packet.fountain` and `packet.pdf`
+are in `data/story-bench/2026-09-13/`, which is gitignored — they are on this
+machine only, and only numbers were copied into this report.
+
+**What the reviewer should attack first:** the `scenes` column. Every premise
+committed exactly one scene of the seven or eight it asked for, so every number
+to the right of it — words, health, verdict, the readings — describes a
+fragment, not a screenplay, and the honest question is whether an instrument
+that produces six one-scene fragments has measured generation at all or has
+only measured `ContinuityProof`. Second: `classifyRun` called all six runs
+`ok`, because its rule is "did any revision pass change the text" and 1–2 of 14
+did. A rule that lets a 1-of-8-scene run report `ok` is arguably too generous,
+and it is the honesty rule this lane registered as claim 117.
