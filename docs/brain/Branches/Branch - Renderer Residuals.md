@@ -89,6 +89,23 @@ all 32 **+0.028**, largest **+3.1**, largest the other way **-1.5**, zero
 verdict flips and zero scene-count changes. The direction is not uniformly
 favourable, which is what a correctness fix looks like.
 
+## Round 2 (independent review)
+
+`residuals-review.md` returned REVISE on `0944b4f9` with six items; all six are
+addressed and the branch's numbers did not move. Two were the reason for the
+verdict, and both were brief item C being reported as done when it was not:
+`>text<` centering was still absorbed into the preceding action paragraph at the
+ANALYSIS seam (fixed — `isCenteredLine` is exported and both structural-line
+lists ask it), and centered text does not survive the FDX round trip (pinned as
+an expected loss with the mechanism; `centered → 'Action'` because Final Draft
+has no Centered paragraph type). The other four: one case rule for a mixed-case
+forced transition across all four exporters, `server/lib/pdf-import.ts`'s
+identical false round-trip claim fixed, a first test suite for
+`canonical-fountain.ts`, and the receipt's scoring-path file list made to agree
+with the gate. **All six public-benchmark statistics and the 45-fixture output
+identity were re-run after each scoring-path commit and are unchanged to the
+digit.**
+
 ## Receipt
 
 One PENDING entry, 2026-09-13 "RENDERER RESIDUALS", in

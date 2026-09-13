@@ -2884,9 +2884,14 @@ they arrive in. Read them. Do not move `AUC24_FLOOR`.
 
 **Branch:** `scoring/renderer-residuals`, stacked on `scoring/forced-cue` @
 `089bec91`, which is stacked on `scoring/adversarial-2026-09-12` @ `4cf5b2f3`.
-**This is a scoring-path change** (`src/lib/fountain.ts`,
-`server/nvm/analyze/screenplay-normalizer.ts`,
-`server/nvm/analyze/canonical-fountain.ts`) **and its AUC-24 is not known.**
+**This is a scoring-path change** — `node scripts/check-scoring-receipt.mjs
+089bec91..HEAD` names TWO files, `src/lib/fountain.ts` and
+`server/nvm/analyze/screenplay-normalizer.ts` — **and its AUC-24 is not
+known.** (This sentence listed a third, `canonical-fountain.ts`, until round 2.
+That file is changed on this branch but is NOT reachable from `doctor.ts`, so
+the gate does not count it and neither does the lane report; the two documents
+now say what the command says. `src/lib/docx.ts` and `server/lib/pdf-import.ts`,
+also changed in round 2, are off the scoring path for the same reason.)
 `node scripts/check-scoring-receipt.mjs 089bec91..HEAD` exits **1** on this
 entry, which is the intended state: the entry is an honest ledger row, not a
 receipt. No AUC-24 number is stated, implied or projected anywhere on this
@@ -2977,6 +2982,33 @@ branch.
   command that ran in this worktree, and I read its output; nothing in this
   entry stands in for a run that did not happen. The AUC-24 for this range
   **has not been run** and is the owner's step.
+- **ROUND 2 (2026-09-13), after independent review — three further changes on
+  the scoring path, and the same two measurements re-run after each.** The
+  round-1 numbers above all still hold, to the digit:
+  1. **Centering is a structural line at the analysis seam.** `>text<` was
+     still being absorbed into the preceding action paragraph by the
+     normaliser's double-spaced reconstruction, so the seam scored
+     `action:"Rain falls hard. >THE END<"` while the page centered it — the
+     same analyzer/renderer split as the forced transition, one shape over, in
+     the same function. `isCenteredLine` is exported from `src/lib/fountain.ts`
+     and both structural-line lists ask it.
+  2. **`isInferredTransitionLine` hoisted out of `parseFountain` and exported**
+     so `server/lib/pdf-import.ts` can ask the parser whether a phrase will read
+     back as a transition rather than restating the grammar. A pure hoist: the
+     regexes are byte-for-byte the ones that were inline.
+  3. Two changes OFF the scoring path, recorded for completeness:
+     `src/lib/docx.ts` gained the `uppercase` flag its Transition style was
+     missing, and `server/lib/pdf-import.ts` now forces `THE END.` /
+     `TIME CUT:` / `INTERCUT WITH:` with `> `.
+
+  **Re-measured after each of 1 and 2**, both against the same
+  `git archive 089bec91` baseline and with `GIT_SHA=batterypin` pinned:
+  `npm run benchmark:public` gives **0.8438 / 0.7896 · 0.5938 / 0.5234 ·
+  1.0000 / 0.9814**, identical to the digit and to round 1; output identity is
+  **PASS — all 45 reports byte-identical**. No floor moved, `--lock` is still
+  never run, and `AUC24_FLOOR` is still untouched at 0.622. The 32 committed
+  scripts still carry no line beginning `>` or `@`, which is why a seam change
+  of this size moves nothing here and equally why nothing here could catch it.
 - **What the owner reads first.** `npm run --silent probe-corpus-shape --` on
   the private corpus, and specifically its **`>tr`** column — the same
   instrument round 3 added as `@cue`, for the same reason. A draft whose `>tr`

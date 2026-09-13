@@ -8,7 +8,169 @@ below is measured against `089bec91`, not against `main`.
 **Last code commit:** `80b1621f` — `git diff 80b1621f..HEAD -- ':!docs'` is
 empty, so every measurement in this report was taken on that tree and the
 commits after it are the receipt and this report. The tip is named in
-`## Tip and origin` at the end.
+`## Round 2
+
+Six items from `residuals-review.md` (verdict REVISE, reviewed SHA `0944b4f9`),
+grouped into four commits. Items A, B, D and M were DONE at round 1 and nothing
+below changes their meaning; the review's own verdict line says items 1 and 2
+are why it was REVISE rather than MERGE, and both were about brief item C being
+reported as done when it was not.
+
+```
+$ git log --oneline 0944b4f9..HEAD      # taken while writing this section
+93af2377 fix(pdf-import): a recognised transition is emitted as one — review item 4
+4b5fc14f fix(docx)+test: one case rule for a forced transition, and the centered round-trip pinned as the loss it is
+d50b41cd fix(seam): centering is a structural line too — review items 1 and 5
+91185749 docs(audit): residuals-review round 1 (0944b4f9) — REVISE
+```
+
+### 1. Centering at the analysis seam — FIXED
+
+The reviewer is right, and the finding is worth more than the line it corrects.
+`>THE END<` was still being glued into the preceding action paragraph by the
+normaliser's double-spaced reconstruction, so `THE END` reached `actionLines`,
+the word count and every rule lexicon as `Rain falls hard. >THE END<` while the
+page centered it. The same split, one shape over, in the same function — and
+round 1's own fix could not reach it, because `isForcedTransitionLine` excludes
+the `<`-terminated shape by construction.
+
+`isCenteredLine` is now exported from `src/lib/fountain.ts:217` beside its twin
+(the parser's centered branch asks it, so there is still ONE definition), and
+three places learn it: the reconstruction pushes the line verbatim in its own
+block, `isCharacterCue` excludes it, and `canonical-fountain.ts`'s packed pass
+gives it blank lines like any other structural line. It is deliberately NOT
+uppercased at the seam — `SPEC.centered` in `screenplay-layout.ts:50` carries no
+`uppercase` flag, and the seam must not print what the page does not.
+
+Measured, the review's own fixture, `<session scratch>/centered.mjs`:
+
+| | at `0944b4f9` | here |
+|---|---|---|
+| page | `…, action:"Rain falls hard.", centered:">THE END<"` | same |
+| seam | `…, action:"Rain falls hard. >THE END<"` | `…, action:"Rain falls hard.", centered:">THE END<"` |
+
+### 2. The FDX round trip for centered text — PINNED, not fixed
+
+`src/lib/fdx.ts:29` maps `centered → 'Action'`, because Final Draft has no
+Centered paragraph TYPE; it carries centering as an alignment property on an
+Action paragraph. So the element is gone before the importer sees it.
+`tests/core/fdx-import.test.ts` now asserts the loss explicitly, with the
+mechanism, the remedy (`Alignment="Center"` both ways) and the two weaker
+properties that DO hold — the words survive, no marker reappears. Both halves
+are in §9, and **brief item C now reads NARROWED** in §1's own terms rather than
+done. This test passes on `0944b4f9` too, which is stated in its commit message:
+it pins pre-existing behaviour and is not a catch.
+
+### 3. The mixed-case forced transition — ONE RULE, all four pinned
+
+Reproduced exactly (`<session scratch>/mixed.mjs`), on `> Burn to White.`:
+
+| exporter | at `0944b4f9` | here |
+|---|---|---|
+| layout | `BURN TO WHITE.` | `BURN TO WHITE.` |
+| PDF | `BURN TO WHITE.` | `BURN TO WHITE.` |
+| DOCX | **`Burn to White.`** | **`BURN TO WHITE.`** |
+| FDX | `Burn to White.` | `Burn to White.` |
+
+The rule, now written beside `FORCED_TRANSITION_MARKER`: **the three renderers
+that draw a PAGE apply the element's uppercase convention; the interchange
+format preserves the writer's bytes.** DOCX was simply missing the flag its own
+table already gives `scene_heading`, `character`, `dual_dialogue`, `shot` and
+`section` (`docx.ts:41`) — a gap nothing could reach before this branch, because
+an inferred transition is uppercase by its own grammar. FDX uppercases nothing
+anywhere, `server/lib/fdx-import.ts` is what uppercases on the way back IN, and
+the spec's one statement on the subject asks for exactly that (a forced
+Character keeps its mixed case). All four are pinned in one test. The
+`@McCLANE` twin is named at the same place and left alone with its reason.
+
+### 4. `server/lib/pdf-import.ts` — FIXED
+
+Its header claimed a transition "round-trips identically regardless of which
+importer produced it", the identical false claim this branch corrected in the
+FDX sibling. RECOGNITION there is deliberately wider than the parser's inferred
+grammar (`OTHER_TRANSITION_RE` adds `THE END.`, `TIME CUT:`, `INTERCUT WITH:`)
+and EMISSION pushed every recognised transition unforced, so the importer
+identified a transition and wrote Fountain the parser read back as action.
+Being wider was never the bug; emitting the wider set with no marker was, and
+there was no marker to emit until this branch taught the parser `>`.
+
+`formatTransitionLine` forces with `> ` exactly when the bare line would not
+read back as a transition, and asks the parser's own test to decide —
+`isInferredTransitionLine`, hoisted out of `parseFountain`'s chain and exported.
+That is two of the review's five spellings folded into one; §9 names the three
+that remain and which two differ on purpose. It deliberately does not append `:`
+the way `formatTransition` does, which would make `THE END.` into `THE END.:`.
+
+| phrase | at `0944b4f9` | here |
+|---|---|---|
+| `THE END.` | emitted bare, re-parses `scene_heading,action,action` | `> THE END.`, re-parses `…,transition`, renders `THE END.` |
+| `TIME CUT:` | same | `> TIME CUT:`, `…,transition` |
+| `INTERCUT WITH:` | same | `> INTERCUT WITH:`, `…,transition` |
+| `CUT TO:` / `FADE OUT.` / `SMASH TO:` | emitted bare, `…,transition` | **byte-identical** — no marker where none is needed |
+
+### 5. `canonical-fountain.ts` — a suite, five cases
+
+`server/nvm/analyze/canonical-fountain.test.ts` is new; the file had none and
+nothing under `npm test` reached `formatCanonicalFountain`. It covers the packed
+archetype this module handles alone: the forced transition surviving the repair,
+the inferred-transition control, centering getting its own block, the three
+shapes that are NOT a forced transition, and one measured consequence of the
+round-1 widening that looks like a contradiction and is not — in PACKED input a
+`>` after a dialogue line is pulled out of the speech exactly as an inferred
+`CUT TO:` always has been (verified on `089bec91`: inferred pulled out, forced
+not), while on spaced text both stay dialogue.
+
+### 6. Receipt and report agreement — FIXED
+
+The receipt listed three scoring-path files; the gate and §8 say two.
+`canonical-fountain.ts` is changed but is not reachable from `doctor.ts`, and
+round 2 adds two more files in the same position (`src/lib/docx.ts`,
+`server/lib/pdf-import.ts`). Both documents now say what
+`check-scoring-receipt 089bec91..HEAD` says, and name the off-path files rather
+than dropping them silently.
+
+### Round-2 fail-first
+
+| file | on a `git archive 0944b4f9` export | here |
+|---|---|---|
+| `tests/core/parse-format-invariance.test.ts` | **2 fail** — the generalised seam property (item 1) and the mixed-case rule (item 3) | **75 / 75** |
+| `server/nvm/analyze/canonical-fountain.test.ts` | **1 fail** — the centered block (item 1) | **5 / 5** |
+| `tests/core/pdf-import.test.ts` | **1 fail** — the three forced phrases (item 4) | **20 / 20** |
+| `server/nvm/analyze/canonical-fountain.test.ts` on a `git archive 089bec91` export | **4 of 5 fail** — the suite guards the round-1 widening too | — |
+
+Two round-2 assertions pass on BOTH trees and are named rather than counted:
+the centered round-trip loss (item 2, pinning pre-existing behaviour) and the
+two DOES-NOT-FIRE pdf-import cases.
+
+### Round-2 gates
+
+Per the cost rule: the tests for every file touched, plus the gates those files
+affect. No second full `npm test`.
+
+| gate | command | exit |
+|---|---|---|
+| touched tests | `parse-format-invariance` 75 · `fdx-import` 13 · `canonical-fountain` 5 · `screenplay-normalizer` · `unicode-character-cues` — one run, **122 pass** | 0 |
+| | `tests/core/pdf-import.test.ts` (20 pass) | 0 |
+| | `core-01`/`core-02`/`core-03`/`corpus-shape-fields`/`page-estimate` (1,180 pass) | 0 |
+| | `export-fdx-docx-parity`/`export-producer`/`export-coverage`/`export-xml-wellformed`/`coverage-html` (104 pass) | 0 |
+| | `tests/routes/fountain-shape-guard-cue-bypass.test.ts` (59 pass) | 0 |
+| lint | `npm run lint` | 0 |
+| console | `npm run check-no-console` — 305 files, 24 quarantine entries | 0 |
+| reachability | `npm run check-server-reachability` | 0 |
+| docs | `npm run check-docs` | 0 |
+| honesty | `npm run honesty-audit` — 458 files, 478 markdown, 93 claims | 0 |
+| benchmark | `npm run benchmark:public`, re-run after EACH scoring-path commit — **0.8438 / 0.7896 · 0.5938 / 0.5234 · 1.0000 / 0.9814**, identical to the digit and to round 1 | 0 |
+| identity | `--compare` against the same `089bec91` baseline, `GIT_SHA=batterypin` — **PASS, 45/45 byte-identical**, after each | 0 |
+| receipt | `node scripts/check-scoring-receipt.mjs 089bec91..HEAD` — still exactly ONE problem, the PENDING entry | 1 |
+| brain | `npm run check-brain` | 0 |
+
+`AUC24_FLOOR` untouched; `--lock` still never run;
+`git diff 089bec91..HEAD -- scripts/lib/auc.ts tests/fixtures/public-corpus-manifest.json tests/fixtures/public-benchmark-split.json`
+still empty.
+
+---
+
+## Tip and origin` at the end.
 **Answers:** `forcedcue-lane-report.md` §6.7 (both residuals, with the
 mechanism it names) and `forcedcue-review.md` §5 and non-blocking 3.
 
@@ -360,7 +522,11 @@ they are not mistaken for tests that cannot fail.
 `node scripts/check-scoring-receipt.mjs 089bec91..HEAD` exits **1** reporting
 exactly one problem — that entry, as a PENDING entry — which is the intended
 state. Two scoring-path files are listed as changed
-(`server/nvm/analyze/screenplay-normalizer.ts`, `src/lib/fountain.ts`).
+(`server/nvm/analyze/screenplay-normalizer.ts`, `src/lib/fountain.ts`). Round 2
+changes three more files — `server/nvm/analyze/canonical-fountain.ts`,
+`src/lib/docx.ts`, `server/lib/pdf-import.ts` — and none of them is reachable
+from `doctor.ts`, so the gate still names two and the receipt now says the same
+(round-2 review finding 5: it had listed three).
 
 One correction was needed to get there. The attestation first read "No number in
 this entry is simulated, estimated, extrapolated or projected" — true, and
@@ -386,6 +552,39 @@ have to disambiguate.
   still dialogue.** That is this parser's existing rule and the brief's own
   negative fixture, and it is pinned — but `!`, `.` and `~` DO break out there,
   so the asymmetry is real and is named rather than smoothed over.
+* **Centered text does not survive Fountain → FDX → Fountain** (round-2 review
+  finding 1b). `src/lib/fdx.ts` maps `centered → 'Action'`, because Final Draft
+  has no Centered paragraph TYPE — it carries centering as an alignment
+  property on an Action paragraph — so the element is gone before the importer
+  sees it and `>THE END<` comes back as an action line reading `THE END`. The
+  words survive and no marker reappears; the element does not. PINNED as an
+  expected-loss assertion in `tests/core/fdx-import.test.ts` with the remedy
+  named (emit and read `Alignment="Center"`), not fixed: that changes
+  `buildParagraphs`, the exporter's entry shape and the importer's paragraph
+  reader, which is an exports change with no measurement in this lane. **Brief
+  item C is therefore NARROWED, not done** — "centered stays centered" holds at
+  the parser and now at the analysis seam, and fails through the FDX round trip.
+* **The inferred transition grammar still has three spellings.** Round 2 folded
+  the parser's and `server/lib/pdf-import.ts`'s onto one exported
+  `isInferredTransitionLine`. What remains: `server/lib/fdx-import.ts`'s pair
+  (`AUTO_DETECTED_TRANSITION_RE` / `GENERIC_TRANSITION_RE`), and the two
+  deliberately LOOSER heuristics in `screenplay-normalizer.ts` and
+  `canonical-fountain.ts` (both add a `<= 20` length clause and a laxer
+  `[A-Z]\s*TO:` tail, because they guess at messy scraped imports rather than
+  parse). The first is a genuine third copy and the next lane's work; the other
+  two differ on purpose and folding them in would make the repair pass blind to
+  the shapes it exists to repair. The FORCED marker has one definition; the
+  inferred one does not yet.
+* **`@McCLANE` prints `MCCLANE` from layout/PDF/DOCX and `McCLANE` from FDX.**
+  Round 2 decided and pinned that rule for the forced TRANSITION (page
+  renderers uppercase, the interchange format preserves the writer's bytes).
+  The cue twin follows the same rule, but it is reachable on the base, so
+  aligning it would change shipped output with no measurement here. Named at
+  `FORCED_TRANSITION_MARKER`.
+* **`server/lib/pdf-import.ts` still recognises a wider transition set than the
+  parser infers.** That is deliberate and is now safe (the extra phrases are
+  forced), but the two sets are still written separately, which is how the
+  defect arose.
 * **The private corpus cannot be read from here**, so how many of the 761 drafts
   carry a forced transition is unknown. The `>tr` column is the instrument that
   answers it in one run; this lane provides the instrument and claims no reading
@@ -396,16 +595,17 @@ have to disambiguate.
 
 ## Tip and origin
 
-**Tip: `f1c66f7b`, plus the one commit that writes this line.** A line inside a
-file cannot name the commit that writes it, so the SHA above is this section's
-parent and the tip is one past it; that last commit touches only this file and
-nothing else, which is checkable with
-`git diff f1c66f7b..HEAD --stat`. `git ls-remote origin scoring/renderer-residuals`
-gives the tip at any moment and is the authority.
+**Tip (round 2): one past `93af2377`** — the commit that writes this line and
+the receipt beside it. A line inside a file cannot name the commit that writes
+it, so what is pinned here instead is where the CODE stops: `93af2377` is the
+last commit touching anything outside `docs/`, `git diff 93af2377..HEAD --
+':!docs'` is empty, and every number in this report was measured on that tree.
+`git ls-remote origin scoring/renderer-residuals` gives the tip itself at any
+moment and is the authority.
 
-The last commit touching anything outside `docs/` is `80b1621f`, so
-`git diff 80b1621f..HEAD -- ':!docs'` is empty and every measurement above was
-taken on that tree.
+**Round 1's tip was `0944b4f9`**, which is the SHA `residuals-review.md`
+examined, and round 1's last code commit was `80b1621f`. Both are kept here so
+the reviewed object stays resolvable after this round.
 
 ```
 $ git ls-remote origin scoring/renderer-residuals scoring/forced-cue scoring/adversarial-2026-09-12
