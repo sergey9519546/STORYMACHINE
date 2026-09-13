@@ -1,0 +1,88 @@
+name: Calibrate voice bound
+
+# MANUAL ONLY. This workflow measures; it does not gate. It exists because
+# MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT (server/lib/validation.ts) is derived from
+# measured `runScriptDoctor` cost, the assertion that holds that derivation
+# honest runs in `ci.yml` on ubuntu-latest, and until 2026-09-13 nobody had ever
+# measured the cost on ubuntu-latest. The 2026-09-12 derivation's own record
+# says "this box" and "the reviewer's box"; the box that enforces a bound is the
+# one it has to hold on, and that box is this one.
+#
+# Run it from the Actions tab (Run workflow) on the branch whose bound you are
+# deriving, read the job summary, and lock the numbers into
+# tests/fixtures/voice-bound-derivation.json with
+# `node --experimental-strip-types scripts/measure-voice-bound-cost.mjs --json=…`
+# (or paste the printed rows). tests/core/voice-bound-derivation.test.ts
+# re-derives the constant from that file, so a bound edited without a fresh
+# table fails the suite.
+#
+# No artifacts are uploaded and nothing is written back to the repository: the
+# payloads are synthetic generated Fountain (scripts/lib/voice-bound.ts), carry
+# no corpus text, and the whole result is a table of numbers that belongs in the
+# log and in a reviewed commit, not in an artifact nobody reads.
+
+on:
+  workflow_dispatch:
+    inputs:
+      uniform_min:
+        description: "uniform-min casts to sweep (comma-separated) — the worst-case shape the bound is derived from"
+        required: false
+        default: "60,80,90,100,110,120,130,140,150,160"
+      probe_cast:
+        description: "probe-cast ensembles to sweep (comma-separated) — the realistic shape the bound must keep accepting"
+        required: false
+        default: "20,30,40,44,60"
+      repeats:
+        description: "measurements per row (each in its own process)"
+        required: false
+        default: "2"
+      conditions:
+        description: "idle, loaded, or idle,loaded — 'loaded' spins (parallelism - 1) sibling processes, the company the real assertion keeps under npm test"
+        required: false
+        default: "idle,loaded"
+
+# Least privilege, same as ci.yml: this job only reads the checkout.
+permissions:
+  contents: read
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    # A full default sweep is ~40 measurements of up to ~25 s each plus the
+    # loaded pass; 60 minutes is comfortable headroom without letting a runaway
+    # sweep hold a runner for the six-hour default.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Deliberately no GEMINI_API_KEY, matching ci.yml: runScriptDoctor's
+      # deterministic analysis path is what is being timed, and a key would add
+      # live HTTPS calls to the measurement.
+      # Inputs go through env, never through string interpolation into the
+      # shell: `${{ inputs.x }}` spliced into a `run:` block is the standard
+      # Actions script-injection hole, and a workflow that measures a security
+      # guard should not open one. The script validates each value itself
+      # (parseArgs throws on anything that is not a positive-number list or a
+      # known condition name).
+      - name: Measure
+        env:
+          UNIFORM_MIN: ${{ inputs.uniform_min }}
+          PROBE_CAST: ${{ inputs.probe_cast }}
+          REPEATS: ${{ inputs.repeats }}
+          CONDITIONS: ${{ inputs.conditions }}
+        run: |
+          node --experimental-strip-types --no-warnings \
+            scripts/measure-voice-bound-cost.mjs \
+            "--uniform-min=$UNIFORM_MIN" \
+            "--probe-cast=$PROBE_CAST" \
+            "--repeats=$REPEATS" \
+            "--conditions=$CONDITIONS" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
