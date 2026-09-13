@@ -336,3 +336,104 @@ note findings 7 and 8 in the lane report's §5 so the boundaries are recorded
 rather than implied.
 
 Re-review on the new diff will re-check these five items only.
+
+---
+
+# Round 2 (`fe92429f`) — re-check of the five items
+
+Reviewed object: `fe92429f` on `lane/vite-cache-isolation` (code lands at
+`836f4727`); round-2 diff `git diff b8adfcfc..fe92429f`, 13 files,
++1200/−49. Warm re-check by the same reviewer, scoped to the five revision
+items and the non-blocking count, per §6. The browser battery and the full
+`npm test` were deliberately not re-run.
+
+## Per-item verdicts
+
+| # | round-1 item | verdict | what I checked, not what the report says |
+|---|---|---|---|
+| 1 | Docker builder stage | **FIXED — better than the fix I proposed** | Rebuilt the assembled context myself, both ways. Without the module: `[UNRESOLVED_IMPORT] Could not resolve './vite-cache-dir.mjs' in vite.config.ts`, **exit 1**. Same context plus that one file: **exit 0, `✓ built in 1.28s`**. `scripts/` appears in no active `.dockerignore` rule, so it stays denied by `**`. |
+| 2 | release after the child is dead | **FIXED** | `shutdown()` now `await waitForChildExit(serverProc, SERVER_EXIT_WAIT_MS)` inside the try, release after it, outside the try; `waitForChildExit` short-circuits on `exitCode`/`signalCode`, `unref`s its timer and clears it on exit, and returns `'timeout'` rather than hanging. Ordering pinned by index comparison in `tests/scripts/vite-cache-dir.test.ts`. |
+| 3 | the exit-hook comment | **FIXED, and measured by me** | At `b8adfcfc` a `kill -TERM`'d holder left `slot-0.lock`. On this tree, same holder, same signal: **no lock file, holder exits 143**. The hook now lives in `vite-cache-dir.mjs`, installed once and only after a slot is actually taken, and the header names pid-liveness reclaim as the SIGKILL/power-cut backstop rather than claiming `'exit'` covers it. |
+| 4 | the assertion that could not fail | **FIXED** | Real `symlinkSync` in a temp dir; asserts the two paths are different strings *and* different basenames before comparing keys, checks the property through `resolveViteCacheDir` as well as `repoCacheKey`, and adds a third tree that must key differently. It is no longer `f(x) === f(x)`. |
+| 5 | the lock state machine | **PINNED, with real mutants** | Live / dead / unparseable, each asserted against the module **and** against a mutant with exactly that condition inverted, where the mutant must produce the *opposite* slot. The mutants are genuine inversions (`if (lockHolderAlive(…)) return false` → `if (false) …`; the `EPERM` result → `true`; the JSON `catch { return true }` → `false`), and `loadMutant` asserts its anchor still exists, so a rename cannot turn the mutation into a silent no-op. `deadPid()` uses an already-exited child rather than a guessed number. 15 → **21 assertions**. |
+| — | non-blocking: stale "six suites" | **FIXED** | `ci-gates-intact.test.ts` now says eight, pins all eight names, **and** asserts the count of `verify:` tokens in the battery, so a ninth suite added without being pinned reopens nothing quietly. |
+
+## Gates I ran on this tree
+
+```
+npm run lint                                        exit 0
+tests/scripts/vite-cache-dir.test.ts                21/21
+tests/core/docker-context.test.ts                    7/7
+tests/core/ci-gates-intact.test.ts                  30/30
+tests/core/brain-coverage.test.ts                    7/7
+npm run verify:vite-cache        +0/-0 both ways, 0 x 504, exit 0
+npm run honesty-audit      465 files, 115 rows, clean, exit 0
+npm run check-brain        111 notes, 423 links, fresh, exit 0
+npm run check-no-console   307 files under server/, exit 0
+```
+
+## Judging the move to the repository root
+
+I asked what the move breaks or hides, since the lane's own round-1 argument
+cited `distStaleness`'s root-level pattern pickup as a reason to keep things
+out of the root.
+
+- **The `!scripts/` claim is real, not a modelling artifact.** Moby matches a
+  path *or any parent* when deciding exclusion — which is why this policy's
+  own `!server/` + `!server/**` pair works — so a `!scripts/` traversal
+  exception genuinely un-denies the subtree. The lane pinned that as an
+  assertion rather than a comment: if the semantics ever change, the note goes
+  red instead of stale. Getting back to one file would need an order-dependent
+  re-deny/re-allow sequence. The move is the better call.
+- **`tsc --noEmit`** has no `include` and `allowJs: true`, so the root `.mjs`
+  is type-checked exactly as it was under `scripts/lib/` — lint exit 0.
+- **`check-no-console`** is scoped to `server/**` and never saw the file in
+  either location; it contains no `console.*` anyway.
+- **`honesty-audit`** reports the same 465 files as round 1 — moved, not added.
+- **`distStaleness`** does *not* pick it up: `DIST_BUILD_CONFIG_RE` requires the
+  literal `vite.config.`, and `vite-cache-dir.mjs` does not match. The round-1
+  argument is not contradicted — it was about a *high-churn cache directory*
+  becoming a build input, and a static module is not that. See observation (b).
+- **No live reference to the old path survives.** The four remaining mentions
+  are narrative (two comments in the context test, one modelling assertion, one
+  brain-note sentence) and are correct as history.
+
+A build-config helper beside the `vite.config.ts` it configures, with the
+reason written into the `.dockerignore` line that admits it, is an acceptable
+root-level file.
+
+## Observations (non-blocking, no action required to merge)
+
+(a) **The new `shutdown()` comment is off by one.** It names four `graceMs = 0`
+suites "(`verify:ui-polish`, `verify:local-safety-net`, `verify:command-palette`,
+and `verify:production`'s dev instance)". Three of those are right; the fourth
+is not — `verify-production-build.mjs:505` tears its dev instance down inline
+(`kill('SIGTERM')` / sleep / `SIGKILL`) and never calls `shutdown()`, so that
+boot gets neither the new wait nor the release and holds its slot until the gate
+exits. Harmless (the prod boot simply takes the next slot, and both are freed at
+exit), but it is the same shape as the two comments this round corrected.
+
+(b) **A build-time import that `distStaleness` does not count.**
+`vite.config.ts` imports `vite-cache-dir.mjs`, and `DIST_BUILD_CONFIG_RE` does
+not match it, so editing that module does not mark `dist/` stale. Benign today
+— it only chooses `cacheDir` and cannot change `dist/` bytes — but the
+`buildTimeImports` walker this round added to `tests/core/docker-context.test.ts`
+is exactly the derivation `DIST_BUILD_INPUTS` would need to close it.
+
+(c) **The signal handler is installed once and never re-installed.** After it
+fires it removes itself, so a gate with its own *non-exiting* SIGTERM handler
+that allocates a slot after the first signal leaves that lock in place on a
+second signal — measured. No residual hazard: the process is alive and
+legitimately holding the slot, and pid-liveness reclaim covers it once it dies.
+
+## VERDICT: MERGE
+
+All five revision items are fixed, and three of them are fixed with evidence
+stronger than the list asked for: the context requirement is now *derived* from
+the config's import graph with the walker itself pinned against a fixture and a
+fail-direction test (3/3 → 7/7); the lock state machine is pinned by mutation
+rather than by assertion alone (15 → 21); and the SIGTERM behaviour is driven
+end to end in both the plain and the own-handler variant instead of described.
+The non-blocking count item was fixed with a count assertion on top of the
+membership. Nothing in the round-2 diff touches the scoring path. Observations
+(a)–(c) are for the lane report or a later lane, not for another round.
