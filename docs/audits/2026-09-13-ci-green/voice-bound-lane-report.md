@@ -253,8 +253,12 @@ about everything the analyzer accepts, and a reviewer should read it that way.
 | 34740951649 (`calibrate/…-13d`) | **the lock run** — the table committed to `tests/fixtures/voice-bound-derivation.json` |
 | (requested) | CI on the lane branch after the re-derivation |
 
-The four `calibrate/*` branches are deleted from `origin` once this report cites
-their run ids; the record is the run id, not the branch.
+The four `calibrate/*` branches could NOT be deleted from this sandbox:
+`git push origin --delete calibrate/voice-bound-2026-09-13d` answers
+`RPC failed; HTTP 403` and disconnects — the agent proxy refuses ref deletions
+the same way it refuses tag pushes (`docs/LANE_STANDARD.md` §7.3). The
+orchestrator deletes them; every run id they produced is recorded above, and the
+record is the run id, not the branch.
 
 ## 9. Left undone, and why
 
