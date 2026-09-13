@@ -471,3 +471,99 @@ Items 1, 4, 5, 6 and 7 are comment and document edits with no code change.
 Item 2 needs one machine identity read out of a log the lane already produced.
 Item 3 needs one paragraph. The reviewer will re-check these items against the
 new diff.
+
+---
+
+# Round 2 — reviewed object `ccf2680b`
+
+- **Reviewed SHA:** `ccf2680b` (substantive commit `52303fe1`), on top of round
+  1's `026c0948`. Diff read: `git diff 026c0948..ccf2680b` (16 files,
+  +837 / −78).
+- Warm re-check of the round-1 items only, per `docs/LANE_STANDARD.md` §6 — the
+  same reviewer, not a fresh read. Same machine as round 1
+  (`local: Intel(R) Xeon(R) @ 2.10GHz x4, node v22.22.2`, load 1.93).
+
+## Per-item dispositions
+
+| # | Round-1 item | Round-2 verdict |
+|---|---|---|
+| 1 | "less a 15% margin" contradicts `DERIVATION_MARGIN_FRACTION = 0.20` | **RESOLVED, and better than asked.** The percentage is not corrected, it is **deleted**: `validation.ts:735-739` now names `DERIVATION_MARGIN_FRACTION` and states no number, with the reason ("a number in prose beside a number in code is how the 2026-09-12 derivation drifted in the first place"). That removes the class of defect, not the instance. |
+| 2 | the 13.8% proxy correction is cross-machine and the CPU of run 34739080950 is unrecorded | **RESOLVED — and the underlying number turns out to have been sound.** I read the CPU out of that run's own log: `AMD EPYC 9V74 80-Core Processor x4 … run 34739080950`, printed by the lane's own diagnostic beside `cpu 21133ms (141% of the 15000ms half-budget target)`. The same machine as the 24,052 ms proxy sweep (run 34739790205), so the 13.8% WAS same-condition-pair arithmetic after all. My round-1 finding was about the record, and it was correct about the record: nothing in the tree said so, and an unattributed correction is not evidence. The lane withdrew the inference rather than repair it and replaced it with a direct end-to-end measurement — conservative beyond what I asked, and the right trade. |
+| 3 | the rule derives nothing on the slower runner; the lock was taken from the machine where it yields an answer | **RESOLVED IN SUBSTANCE, with one placement gap** — see the single item below. The margin is now scoped honestly as a fleet-transfer allowance applied to the LOCKED table only, with the double-count named ("on the EPYC 9V74 sweep the 12,000 ms ceiling clears no swept cast at all … `deriveCast` returns null"), the EPYC check stated as the raw half-budget (14,724 ms, 2% clear), and a new "CAN THE ASSERTION STILL GO RED?" block that says yes, says no value of this bound fixes it (cast 40 already reads 12,442 ms there), and says a red build is a machine report. That is the honest wording I asked for. |
+| 4 | "the heaviest document BOTH bounds admit" is false by 1.87x | **RESOLVED.** Subtest renamed to "the worst shape on the ELIGIBLE-SPEAKER dimension these two bounds govern"; the 398-action-scene measurement is recorded in the test comment, the constant's comment, the gate note and the lane report, with the point that `analyzeVoices` does not abstain there so the residual note does not cover it. The lane's independent reproduction (14,334 vs 7,800 ms, 1.84x) agrees with mine (14,371 / 14,497 vs 7,688 ms, 1.87x) inside sampling noise. |
+| 5 | "121-150" understates the narrowing by forty casts | **RESOLVED, and taken out of prose.** The comment now states 81-150 with the five weights, and says the range "is checked against the guard itself … rather than restated in prose again". Five new subtests do that. Ran them: `uniform-min N=81/90/110/150` rejected via `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`, each first asserting the weight bound alone would have admitted it; `N=80` still ACCEPTED. |
+| 6 | the fixture's `guard` column was measured under `DISTINCT = 65` and read REJECT for the derived row | **RESOLVED, with a guard against recurrence.** `guardEvaluatedAgainst: {"weight":675000,"distinct":80}` is now recorded, the column reads ACCEPT for 50-80 and REJECT for 85+, and new subtest 7 re-runs the live guard over every primary row. Fail-first verified: flipping N=80's verdict to REJECT in the fixture gives `not ok 7 - the table's guard column is the verdict THIS tree gives, not the one the sweep's tree gave` (8 tests, 7 pass, 1 fail); fixture restored, tree clean. |
+| 7 | the named "real fix" is a lossy pair cap; the real one is bit-identical | **RESOLVED in all four places** — the constant's comment, item (d) of the 2026-09-12 derivation (corrected in place, dated record left standing), `Branch - Feature-Length Defects`, and the Owner R5 row, which now tells the owner to point a scoring lane at the hoist *first*. The lane reproduced it independently on a third corpus (435 pairs, 1,070 → 24 ms, 43.8x, `maxDeltaDiff = 0`), which is the right way to accept a reviewer's number. `scripts/check-scoring-receipt.mjs`'s stale "voice-delta.ts is unwired" claim is fixed and now cites `computeReachableSet`. |
+| 8 | optional: `PATH_TO_EXCELLENCE:84`, "MANUAL ONLY", no `concurrency` | **RESOLVED.** The session record now names its box and the runner's 19.7-21.1 s; the workflow header says what it actually does; `concurrency: calibrate-voice-bound-${{ github.ref }}` with `cancel-in-progress`, and the comment gives the right reason (a stale sweep's numbers "look lockable"). |
+
+## Reproduced, round 2
+
+```
+node --experimental-strip-types tests/core/voice-bound-derivation.test.ts
+# tests 8  # pass 8  # fail 0      (was 7/7; subtest 7 is the new guard-column check)
+# fixture N=80 guard flipped to REJECT -> not ok 7, 7 pass / 1 fail; restored
+
+node --experimental-strip-types tests/security/fountain-shape-guard-cue-parity.test.ts
+# tests 667  # pass 667  # fail 0  (was 662; the five new band subtests all pass)
+# voice-bound worst-case cost: max-admitted N=80 (102 words/speaker) cpu 7374ms
+#   (49% of the 15000ms half-budget target), wall 7268ms — local: Intel(R) Xeon(R) ...
+```
+
+Read from the Actions API, not from the lane report: run `34739080950`'s failing
+assertion text is
+
+> used 21133ms — the bound's 2x-headroom derivation no longer holds on this
+> machine: github-actions: **AMD EPYC 9V74 80-Core Processor x4** (parallelism 4,
+> 16 GiB), node v22.23.2, linux/x64, runner Linux/X64/ubuntu24/20260907.300.1,
+> run 34739080950
+
+which confirms the round-2 comment's CPU attribution is a read number, not an
+assumption — the thing round 1 asked for.
+
+## The one remaining item, and why it is not blocking
+
+The round-3 disclosure is in `server/lib/validation.ts`'s comment. **A reader of
+a red build does not read a comment; they read the assertion message**, and that
+message is unchanged from round 1:
+
+> the bound's 2x-headroom derivation no longer holds on this machine: `<machine>`.
+> Re-derive with `npm run measure-voice-bound` on THIS machine (and
+> .github/workflows/calibrate-voice-bound.yml for the runner), then re-lock
+> tests/fixtures/voice-bound-derivation.json — do not raise the fraction
+
+Re-deriving is exactly the action the new disclosure says cannot help in the case
+the disclosure is about: on the EPYC 9V74 under the saturating proxy, no swept
+cast clears the ceiling at all, so a re-derivation there yields `null` or a cast
+that rejects ordinary features. The new block's own closing sentence — "the
+failure message names the machine and says to re-derive" — is therefore half
+true, and the two texts disagree with each other.
+
+The fix is one clause in one string: point at the `CAN THE ASSERTION STILL GO
+RED?` note before the re-derive instruction, and drop "the bound's 2x-headroom
+derivation no longer holds", which the same round-2 work has now established was
+never a promise this guard could make on the runner for ordinary features.
+
+It is not blocking. The state it misdirects in is now MEASURED not to occur —
+the assertion's own end-to-end reading on the slowest machine it has actually
+landed on is 12,319 ms of 15,000 (run `34741928418`, AMD EPYC 7763, 82%), and the
+same EPYC 9V74 ratio that made the 13.8% valid puts the proxy's 14,724 ms at
+about 12.9 s in the real condition, agreeing with that measurement. Holding a
+merge for a string that only renders in a state the tree now measures against
+costs more than it catches (§4's own reasoning). It should be picked up by
+whoever next touches that assertion.
+
+## VERDICT: MERGE
+
+Eight of eight items addressed; seven closed outright, one closed in substance
+with a one-clause follow-up recorded above and not required before merge. Two of
+the fixes are better than the revision asked for: item 1 deletes the duplicated
+number instead of correcting it, and item 5 replaces a prose range with five
+assertions against the guard. Item 2's disposition is worth keeping visible in
+the record — the withdrawn 13.8% was, on the evidence I could only reach after
+the fact, a true number; it was withdrawn because the tree could not show that it
+was, which is the correct standing rule and the reason this lane existed.
+
+**Round-2 follow-up (non-blocking), for whoever next edits that assertion:** add
+the pointer to `CAN THE ASSERTION STILL GO RED?` into the CPU assertion's failure
+message in `tests/security/fountain-shape-guard-cue-parity.test.ts`, and correct
+the closing sentence of that block so the disclosure and the message agree.
