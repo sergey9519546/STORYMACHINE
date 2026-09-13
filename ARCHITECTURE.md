@@ -478,18 +478,45 @@ backs up a real session, destroys it, restores it, and asserts the round trip.
 Browser-level proof runs **in CI** as of 2026-09-02 (`playwright` is a pinned
 devDependency; the `browser` job in `.github/workflows/ci.yml` installs
 Chromium and runs `npm run verify:browser`, and `publish` in `release.yml`
-blocks on the same job). The seven suites are `scripts/smoke-p0-live-flow.mjs`,
-`verify-p2-p3-surfaces.mjs` (surface/Labs gating + a static dead-UI tripwire),
-`verify-focus-traps.mjs`, `verify-ui-polish-affordances.mjs`,
-`verify-e4-local-safety-net.mjs`, `verify-e5-command-palette.mjs`, and
-`verify-a11y.mjs` (2026-09-04 — the systematic accessibility pass: an
+blocks on the same job). There are **eight** suites — the eight
+`npm run verify:browser` runs — and they do not all drive the same front end.
+
+`server/app.ts:279` picks one of two: `NODE_ENV !== 'production'` mounts Vite
+dev middleware, `NODE_ENV === 'production'` serves the built `dist/`. Which
+one a suite certifies is now an argument it passes and an assertion read back
+off the wire (`bootKeylessServer`'s `serve`), not an accident of the ambient
+environment:
+
+| suite | front end |
+|---|---|
+| `verify-p2-p3-surfaces.mjs` (surface/Labs gating + a static dead-UI tripwire) | Vite dev middleware |
+| `verify-focus-traps.mjs` | Vite dev middleware |
+| `verify-ui-polish-affordances.mjs` | Vite dev middleware |
+| `verify-e4-local-safety-net.mjs` | Vite dev middleware |
+| `verify-e5-command-palette.mjs` | Vite dev middleware |
+| `verify-a11y.mjs` | Vite dev middleware |
+| `verify-production-build.mjs` | BOTH — it boots one of each and compares them |
+| `smoke-p0-live-flow.mjs` | the built `dist/`, in both of its boots |
+
+`verify-a11y.mjs` (2026-09-04) is the systematic accessibility pass: an
 axe-core sweep of every primary surface in both themes, gated on zero
-serious/critical violations outside one named, deliberately-unfixed
-exception, plus an explicitly-asserted keyboard-only run of the primary
-journey); their shared boot/launch/console-capture/report-wait machinery
-lives once in `scripts/lib/browser-verify.mjs`. `scripts/load-test-doctor.mjs`
-(concurrent doctor load) stays on demand — it is a measurement, not a
-pass/fail gate.
+serious/critical violations outside one named, deliberately-unfixed exception,
+plus an explicitly-asserted keyboard-only run of the primary journey.
+`smoke-p0-live-flow.mjs` moved to the built bundle on 2026-09-12 — it is the
+gate that blocks `publish` in `release.yml`, and the artifact that gets
+published is the built bundle (that file's header has the full reasoning).
+Their shared boot/launch/console-capture/report-wait machinery lives once in
+`scripts/lib/browser-verify.mjs`, which also gives every boot its own Vite
+dependency-optimizer cache (`scripts/lib/vite-cache-dir.mjs`;
+`npm run verify:vite-cache` is the proof) — without that, two worktrees sharing
+one symlinked `node_modules` shared ONE optimizer cache and one of them served
+`504 (Outdated Optimize Dep)` mid-run.
+
+Two neighbours are NOT browser suites and are listed here because they have
+been miscounted as such: `verify-corpus-layout.mjs` is a corpus manifest
+pre-flight check (no server, no browser) and `smoke-llm-providers.mjs` is a
+provider smoke check. `scripts/load-test-doctor.mjs` (concurrent doctor load)
+stays on demand — it is a measurement, not a pass/fail gate.
 
 Until 2026-09-02 those suites ran on exactly one developer's machine, and this
 section said so. That was a self-imposed limitation, not a fact about CI, and

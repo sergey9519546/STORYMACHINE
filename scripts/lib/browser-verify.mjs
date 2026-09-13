@@ -33,6 +33,7 @@ import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { assertKeylessAiConfig, keylessBrowserServerEnv } from './keyless-browser-certification.mjs';
+import { VITE_CACHE_DIR_ENV, allocateViteCacheSlot } from './vite-cache-dir.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHARED TIMING POLICY — the fix for "passed alone, flaked under load."
@@ -455,6 +456,13 @@ function newestMtime(target) {
  * fix the staleness (a build that silently produced nothing, a `dist/` written
  * somewhere else), and it always says which branch it took.
  *
+ * `viteCacheDir`, when given, is handed to the build as `VITE_CACHE_DIR` so
+ * that a build kicked off by a gate uses the SAME isolated optimizer cache as
+ * the boot that asked for it, rather than the per-repository default. See
+ * ./vite-cache-dir.mjs — `node_modules/.vite` is shared between worktrees
+ * through the symlinked `node_modules` and must never be written by two
+ * processes at once.
+ *
  * Returns `{ built, reason, distMs, newestInput, cached }`.
  */
 /**
@@ -501,8 +509,8 @@ export function distStaleness({ repo } = {}) {
  *  below writes it after re-checking, never before. */
 const verifiedDists = new Map();
 
-/** @param {{ repo?: string, logPrefix?: string }} [options] */
-export function ensureBuiltDist({ repo, logPrefix = 'verify' } = {}) {
+/** @param {{ repo?: string, logPrefix?: string, viteCacheDir?: string }} [options] */
+export function ensureBuiltDist({ repo, logPrefix = 'verify', viteCacheDir } = {}) {
   const cwd = repo ?? process.cwd();
   const rel = (p) => path.relative(cwd, p) || p;
   const staleness = () => distStaleness({ repo: cwd });
@@ -526,7 +534,12 @@ export function ensureBuiltDist({ repo, logPrefix = 'verify' } = {}) {
 
   console.log(`[${logPrefix}] dist/ is stale — ${before.reason}; running \`npm run build\`...`);
   try {
-    execFileSync('npm', ['run', 'build'], { cwd, stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8' });
+    execFileSync('npm', ['run', 'build'], {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf8',
+      env: viteCacheDir ? { ...process.env, [VITE_CACHE_DIR_ENV]: viteCacheDir } : process.env,
+    });
   } catch (e) {
     const out = `${e.stdout ?? ''}${e.stderr ?? ''}`.trim().split('\n').slice(-12).join('\n');
     throw new Error(`\`npm run build\` failed, so this gate cannot be served from dist/:\n${out}`);
@@ -587,8 +600,11 @@ export async function serveModeOf(baseUrl, fetchImpl = fetch) {
  * which front end it came up serving.
  *
  * `serve` names the front end this caller intends to certify:
- *   'vite-dev-middleware' (default) — app.ts's dev branch, what seven of the
- *       eight browser suites drive and what `npm run dev` gives a developer.
+ *   'vite-dev-middleware' (default) — app.ts's dev branch, what six of the
+ *       eight browser suites drive outright (verify:surfaces, verify:a11y,
+ *       verify:focus-traps, verify:ui-polish, verify:local-safety-net,
+ *       verify:command-palette) plus the dev half of verify:production, and
+ *       what `npm run dev` gives a developer.
  *   'built-dist' — `NODE_ENV=production` against the built `dist/`, the same
  *       static bundle the Dockerfile CMD and the published image serve.
  *       `ensureBuiltDist()` runs first, so the bytes are this tree's.
@@ -601,6 +617,15 @@ export async function serveModeOf(baseUrl, fetchImpl = fetch) {
  * `NODE_ENV`, so a caller can still set its own SESSION_DB_DIR or budget —
  * and if it contradicts `serve`, the read-back assertion below says so.
  *
+ * EVERY BOOT GETS ITS OWN VITE DEPENDENCY-OPTIMIZER CACHE. `vite.config.ts`
+ * already keys the cache by repository root, which separates two worktrees;
+ * this separates two boots of the SAME worktree, which a path key cannot.
+ * Without it, two gates running side by side share one `deps/` directory and
+ * one of them serves `504 (Outdated Optimize Dep)` mid-run — measured, not
+ * feared: docs/audits/2026-09-12-adversarial/p0flow-lane-report.md:94, :217.
+ * A caller that has already set `VITE_CACHE_DIR` (in this process's
+ * environment or in `extraEnv`) owns the decision and is left alone.
+ *
  * Returns the ChildProcess. Callers keep it so they can hand it to
  * `shutdown()`.
  */
@@ -611,17 +636,29 @@ export async function bootKeylessServer({ repo, port, baseUrl, logPrefix = 'veri
   if (serve !== SERVE_VITE_DEV && serve !== SERVE_BUILT_DIST) {
     throw new Error(`bootKeylessServer: unknown serve mode ${JSON.stringify(serve)} (expected '${SERVE_VITE_DEV}' or '${SERVE_BUILT_DIST}')`);
   }
-  if (serve === SERVE_BUILT_DIST) ensureBuiltDist({ repo: cwd, logPrefix });
+  // Reserved BEFORE the build below, so a gate that has to rebuild `dist/`
+  // optimizes into the same isolated directory its server will use.
+  const cache = allocateViteCacheSlot({ repoRoot: cwd, env: { ...process.env, ...(extraEnv ?? {}) } });
+  // Released when this gate process exits, however it exits — a gate killed
+  // by CI must not leave a slot looking held. `release()` is idempotent, so
+  // `shutdown()` calling it first is free.
+  process.once('exit', cache.release);
+  if (serve === SERVE_BUILT_DIST) ensureBuiltDist({ repo: cwd, logPrefix, viteCacheDir: cache.dir });
   console.log(`[${logPrefix}] booting keyless server on port ${port}...`);
   const serverProc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
     cwd,
     env: {
       ...keylessBrowserServerEnv(process.env, port),
+      [VITE_CACHE_DIR_ENV]: cache.dir,
       ...(serve === SERVE_BUILT_DIST ? { NODE_ENV: 'production' } : {}),
       ...(extraEnv ?? {}),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+  // `shutdown({ serverProc })` frees the slot for the next boot in this
+  // process; the exit hook above is the backstop for everything else.
+  serverProc.viteCacheDir = cache.dir;
+  serverProc.releaseViteCacheSlot = cache.release;
   let booted = false;
   const bootTimeoutMs = timing.ms(30000);
   const bootTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error(`server boot timeout (${bootTimeoutMs}ms)`)), bootTimeoutMs));
@@ -651,6 +688,11 @@ export async function bootKeylessServer({ repo, port, baseUrl, logPrefix = 'veri
     `[${logPrefix}] serving: ${served.mode === SERVE_BUILT_DIST
       ? `the BUILT dist/ under NODE_ENV=production (${served.evidence}) — the same static bundle the Dockerfile CMD serves; no Vite dev middleware in this run`
       : `Vite dev middleware with NODE_ENV unset (${served.evidence}) — dist/ is NOT used by this run`}.`,
+  );
+  console.log(
+    `[${logPrefix}] vite cache: ${cache.dir} (${cache.source === 'caller'
+      ? `VITE_CACHE_DIR from the caller`
+      : `per-boot ${cache.source} directory`}) — never node_modules/.vite, which every worktree shares through the symlinked node_modules.`,
   );
   console.log(`[${logPrefix}] server booted (keyless).`);
   return serverProc;
@@ -1133,6 +1175,11 @@ export function createRecorder({
  */
 export async function shutdown({ browser, serverProc, graceMs = 0 } = {}) {
   try { if (browser) await browser.close(); } catch { /* already closed */ }
+  // Free the Vite cache slot this server held, so a second boot in the same
+  // gate reuses the warm directory instead of claiming a second one. Before
+  // the kill: releasing a slot whose server is still up is harmless (nothing
+  // else can be using it), losing the release to a throw is not.
+  try { serverProc?.releaseViteCacheSlot?.(); } catch { /* nothing to free */ }
   try {
     if (serverProc) {
       if (graceMs > 0) {

@@ -40,12 +40,32 @@
 //     exists there (a CSP that blocks a dynamic import, a chunk that fails to
 //     resolve under hashed URLs) was invisible to every assertion below.
 //   * Vite dev middleware brought a failure mode that is not the product's:
-//     its dep-optimizer cache lives in `node_modules/.vite`, which concurrent
+//     its dep-optimizer cache lived in `node_modules/.vite`, which concurrent
 //     worktrees share through a symlinked `node_modules`, and a 504 "Outdated
-//     Optimize Dep" then takes the run down with a missing "Try sample
+//     Optimize Dep" then took the run down with a missing "Try sample
 //     coverage" button and three console errors. Measured on this tree at
 //     `50bdc589`: 1 red in 6 consecutive dev-mode runs, zero in 6 served from
 //     dist/. NODE_ENV=production does not run the optimizer at all.
+//
+//     THAT HAZARD IS FIXED AT THE SOURCE AS OF 2026-09-13, and this gate is no
+//     longer the only thing standing between it and a red run. `vite.config.ts`
+//     now sets `cacheDir` from `scripts/lib/vite-cache-dir.mjs`
+//     (`resolveViteCacheDir`), which keys the optimizer cache to the
+//     repository root outside `node_modules` entirely, and
+//     `scripts/lib/browser-verify.mjs`'s `bootKeylessServer` reserves a
+//     per-boot directory under it (`allocateViteCacheSlot`) and logs the one
+//     it resolved beside the "serving:" line. Two worktrees, or two boots of
+//     one worktree, can no longer write one `deps/`. Measured with
+//     `npm run verify:vite-cache` (two dev-middleware servers, one shared
+//     `node_modules`): on the unfixed config, one server's optimizer deleted
+//     and rewrote EVERY file of the other's live cache, in both directions
+//     (44 -> 46 files, +46/-44 one way; 46 -> 46, +46/-46 the other); on this
+//     one, +0/-0 in both directions and zero 504s.
+//
+//     This gate STILL serves `dist/`, for the first reason above — which is
+//     about what gets published, not about the optimizer — and because the
+//     dev-middleware suites (see ARCHITECTURE.md §9) are the right place to
+//     certify the dev front end.
 //
 // The dev-middleware path is still covered — `verify:surfaces` (P3) and
 // `verify:a11y` both drive "Try sample coverage" with NODE_ENV unset — and

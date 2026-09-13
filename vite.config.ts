@@ -2,10 +2,33 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig } from 'vite';
+import { resolveViteCacheDir } from './scripts/lib/vite-cache-dir.mjs';
 
 export default defineConfig(({ mode: _mode }) => {
   return {
     plugins: [react(), tailwindcss()],
+    // WHERE THE DEPENDENCY-OPTIMIZER CACHE GOES, AND WHY IT IS NOT THE DEFAULT.
+    //
+    // Vite's default `cacheDir` is `<root>/node_modules/.vite`. Every lane in
+    // this repository runs from a `git worktree` whose `node_modules` is a
+    // SYMLINK to the main checkout's, so that default is ONE directory shared
+    // by every concurrent worktree — two dep optimizers scanning, writing
+    // `deps_temp_<hash>/` and renaming onto `deps/` under each other. It took
+    // a browser gate down on 2026-09-12 with `504 (Outdated Optimize Dep)`
+    // (docs/audits/2026-09-12-adversarial/p0flow-lane-report.md:94, :217) and
+    // left nine abandoned `deps_temp_*` directories behind as receipts.
+    //
+    // Setting it HERE — rather than at each of the places that start a Vite —
+    // is what makes `server/app.ts`'s dev middleware, `npm run dev` and
+    // `vite build` agree by construction: all three read this config. The
+    // resolution itself, the `VITE_CACHE_DIR` override, and the reason the
+    // default lives in `os.tmpdir()` instead of in the repository are all in
+    // scripts/lib/vite-cache-dir.mjs's header.
+    //
+    // `__dirname` (the directory of THIS file), not `process.cwd()`: the key
+    // has to be the worktree the config belongs to, whatever directory a
+    // caller happened to be standing in.
+    cacheDir: resolveViteCacheDir({ repoRoot: __dirname }),
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

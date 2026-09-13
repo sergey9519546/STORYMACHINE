@@ -46,6 +46,7 @@
     "verify:local-safety-net": "node scripts/verify-e4-local-safety-net.mjs",
     "verify:command-palette": "node scripts/verify-e5-command-palette.mjs",
     "verify:corpus-layout": "node scripts/verify-corpus-layout.mjs",
+    "verify:vite-cache": "node scripts/verify-vite-cache-isolation.mjs",
     "verify:llm-providers": "node scripts/smoke-llm-providers.mjs",
     "verify:a11y": "node scripts/verify-a11y.mjs",
     "verify:production": "node scripts/verify-production-build.mjs",

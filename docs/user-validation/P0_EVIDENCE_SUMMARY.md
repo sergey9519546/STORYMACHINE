@@ -90,7 +90,7 @@ Playwright/browser install (verified absent at the time — Playwright was not
 then a dependency, and there were no cached browser binaries), so no actual
 browser rendered StartScreen, the CodeMirror editor, or the ScriptDoctorPanel.
 *(Dated correction, 2026-09-02: `playwright` is now a pinned devDependency and
-the six browser suites run in CI's `browser` job — see `ARCHITECTURE.md` §9.
+the eight browser suites run in CI's `browser` job — see `ARCHITECTURE.md` §9.
 The paragraph below stands as the record of what this particular run proved;
 the dependency claim in it is no longer true of the repository.)* The table above proves every endpoint the
 live flow depends on returns correct, reproducible data and that the frontend
