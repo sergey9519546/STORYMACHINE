@@ -49,7 +49,7 @@
 //
 //     THAT HAZARD IS FIXED AT THE SOURCE AS OF 2026-09-13, and this gate is no
 //     longer the only thing standing between it and a red run. `vite.config.ts`
-//     now sets `cacheDir` from `scripts/lib/vite-cache-dir.mjs`
+//     now sets `cacheDir` from `vite-cache-dir.mjs` at the repository root
 //     (`resolveViteCacheDir`), which keys the optimizer cache to the
 //     repository root outside `node_modules` entirely, and
 //     `scripts/lib/browser-verify.mjs`'s `bootKeylessServer` reserves a

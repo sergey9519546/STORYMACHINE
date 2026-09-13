@@ -200,6 +200,63 @@ function claimLock(lockPath) {
   }
 }
 
+// ── Releasing a slot when the holder is killed ─────────────────────────────
+//
+// `process.on('exit')` covers a normal return and an uncaught throw. It does
+// NOT run on SIGTERM or SIGINT unless something has installed a handler for
+// them — Node's default disposition for those signals terminates the process
+// without ever emitting `'exit'`. That matters here because SIGTERM is exactly
+// how CI stops a hung gate, and it is the case a lane report claimed was
+// covered. Measured before this existed: after `kill -TERM` on a holder,
+// `slot-N.lock` was still on disk.
+//
+// Two mechanisms, and the second is the one that has always actually worked:
+//
+//   1. THIS. Release every slot this process holds when it exits, including
+//      on SIGINT/SIGTERM/SIGHUP. After releasing we re-raise the signal so the
+//      process still dies the way the sender asked (exit status 128+n) — but
+//      only if nothing else was listening for it, because stealing another
+//      component's graceful shutdown to tidy a cache directory would be a
+//      worse bug than the litter.
+//   2. `lockHolderAlive` on the NEXT allocation. A lock whose recorded pid is
+//      no longer running is reclaimed by whoever wants the slot. This is the
+//      real backstop: it covers SIGKILL, a power cut, and a sandbox rebuild,
+//      none of which run any handler at all. Mechanism 1 only makes the lock
+//      file disappear promptly instead of at the next allocation.
+//
+// So a slot is never held forever by a dead process, and after this change it
+// is usually not even held briefly. What neither mechanism covers is a lock
+// this process cannot parse — see `lockHolderAlive`.
+
+/** Release callbacks for every slot this process currently holds. */
+const heldSlots = new Set();
+
+/** Installed at most once, and only once a slot has actually been taken. */
+let exitHooksInstalled = false;
+
+function releaseHeldSlots() {
+  for (const release of [...heldSlots]) {
+    try { release(); } catch { /* teardown is best-effort by definition */ }
+  }
+}
+
+function installExitHooks() {
+  if (exitHooksInstalled) return;
+  exitHooksInstalled = true;
+  process.once('exit', releaseHeldSlots);
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+    const handler = () => {
+      releaseHeldSlots();
+      process.off(signal, handler);
+      // Nobody else is listening, so Node's default disposition (terminate)
+      // is what the sender expected: restore it by re-raising. If another
+      // listener exists, it owns the shutdown and we stay out of its way.
+      if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
+    };
+    process.on(signal, handler);
+  }
+}
+
 /**
  * @typedef {object} ViteCacheSlot
  * @property {string} dir            absolute cache directory for this boot
@@ -243,8 +300,11 @@ export function allocateViteCacheSlot({ repoRoot, env = process.env, maxSlots = 
     const release = () => {
       if (released) return;
       released = true;
+      heldSlots.delete(release);
       try { unlinkSync(lockPath); } catch { /* already gone */ }
     };
+    heldSlots.add(release);
+    installExitHooks();
     return { dir, source: 'pooled', slot, release };
   }
   return { dir: mkdtempSync(path.join(base, 'overflow-')), source: 'overflow', slot: null, release: () => {} };

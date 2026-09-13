@@ -507,7 +507,7 @@ gate that blocks `publish` in `release.yml`, and the artifact that gets
 published is the built bundle (that file's header has the full reasoning).
 Their shared boot/launch/console-capture/report-wait machinery lives once in
 `scripts/lib/browser-verify.mjs`, which also gives every boot its own Vite
-dependency-optimizer cache (`scripts/lib/vite-cache-dir.mjs`;
+dependency-optimizer cache (`vite-cache-dir.mjs`;
 `npm run verify:vite-cache` is the proof) — without that, two worktrees sharing
 one symlinked `node_modules` shared ONE optimizer cache and one of them served
 `504 (Outdated Optimize Dep)` mid-run.

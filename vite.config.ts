@@ -2,7 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig } from 'vite';
-import { resolveViteCacheDir } from './scripts/lib/vite-cache-dir.mjs';
+import { resolveViteCacheDir } from './vite-cache-dir.mjs';
 
 export default defineConfig(({ mode: _mode }) => {
   return {
@@ -23,7 +23,7 @@ export default defineConfig(({ mode: _mode }) => {
     // `vite build` agree by construction: all three read this config. The
     // resolution itself, the `VITE_CACHE_DIR` override, and the reason the
     // default lives in `os.tmpdir()` instead of in the repository are all in
-    // scripts/lib/vite-cache-dir.mjs's header.
+    // vite-cache-dir.mjs's header.
     //
     // `__dirname` (the directory of THIS file), not `process.cwd()`: the key
     // has to be the worktree the config belongs to, whatever directory a

@@ -22,8 +22,8 @@
 //
 // Two shadow roots in a temp directory, each one a directory of symlinks into
 // this repository — `node_modules`, `src`, `public`, `scripts`, `index.html`,
-// `tsconfig.json`, `package.json` — plus a REAL COPY of the Vite config under
-// test. They are two distinct repository paths sharing one dependency tree:
+// `tsconfig.json`, `package.json`, `vite-cache-dir.mjs` — plus a REAL COPY of
+// the Vite config under test. They are two distinct repository paths sharing one dependency tree:
 // the lane topology, with none of the cost of a second worktree.
 //
 // Each gets its own `scripts/lib/vite-dev-probe.mjs`, which boots Vite through
@@ -132,8 +132,14 @@ const KEEP = flag('keep');
 const COLD = !flag('warm');
 const ALLOW_REPO_RESET = flag('allow-repo-cache-reset');
 
-/** Files a shadow root links to, in the order Vite will want them. */
-const LINKED = ['node_modules', 'src', 'public', 'scripts', 'index.html', 'tsconfig.json', 'package.json'];
+/** Files a shadow root links to, in the order Vite will want them.
+ *  `vite-cache-dir.mjs` is here because `vite.config.ts` imports it: a shadow
+ *  root without it cannot load the config under test at all — the same
+ *  dependency that broke the Docker builder stage (see `.dockerignore`). */
+const LINKED = [
+  'node_modules', 'src', 'public', 'scripts', 'index.html', 'tsconfig.json', 'package.json',
+  'vite-cache-dir.mjs',
+];
 
 /**
  * A dependency each shadow root imports and the other does not.

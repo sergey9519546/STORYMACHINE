@@ -1,7 +1,7 @@
 ---
 type: gate
 updated: 2026-09-13
-sources: [scripts/verify-vite-cache-isolation.mjs, scripts/lib/vite-dev-probe.mjs, scripts/lib/vite-cache-dir.mjs, vite.config.ts, scripts/lib/browser-verify.mjs, tests/scripts/vite-cache-dir.test.ts, package.json]
+sources: [scripts/verify-vite-cache-isolation.mjs, scripts/lib/vite-dev-probe.mjs, vite-cache-dir.mjs, vite.config.ts, scripts/lib/browser-verify.mjs, tests/scripts/vite-cache-dir.test.ts, tests/core/docker-context.test.ts, .dockerignore, package.json]
 status: active
 ---
 
@@ -37,7 +37,7 @@ physical directories, neither was written by the other, and nothing answered
 
 **What the fix is:** `vite.config.ts` sets `cacheDir` from
 `resolveViteCacheDir({ repoRoot: __dirname })`
-(`scripts/lib/vite-cache-dir.mjs`), which keys the cache to the repository
+(`vite-cache-dir.mjs`, at the repository root — see below), which keys the cache to the repository
 root under `os.tmpdir()` — outside `node_modules` and outside the repository,
 for three reasons given in that file's header. Because the config is the one
 place all of them read, the dev middleware, `npm run dev` and `vite build`
@@ -46,6 +46,21 @@ adds the second half: an exclusive-lock slot (`allocateViteCacheSlot`) per
 boot, so two boots of the SAME worktree cannot share one either, with slot 0
 free whenever nothing else is running so the ordinary single-gate run keeps a
 warm cache. The resolved directory is logged beside the `serving:` line.
+
+**Why the module sits at the repository root:** `vite.config.ts` imports
+`./vite-cache-dir.mjs`, and `Dockerfile:13-14` is `COPY . .` + `npm run build`
+against a `.dockerignore` that is deny-by-default. The module lived under
+`scripts/` first and the builder stage could not resolve it —
+`[UNRESOLVED_IMPORT] Could not resolve './scripts/lib/vite-cache-dir.mjs'`,
+exit 1, on the context the allowlist actually produces. Allowlisting it in
+place does not work narrowly: under the ordered Moby semantics this policy
+uses, a pattern may match a path OR A PARENT, so the `!scripts/` traversal
+exception Docker needs in order to descend also un-denies every other file
+under `scripts/`. At the root it is one allowlist line with no parent to
+traverse and no subtree to re-deny, and `scripts/` stays fully denied.
+`tests/core/docker-context.test.ts` now derives the requirement from
+`vite.config.ts`'s own relative-import graph rather than from a hand-written
+list, so the next build-time import is caught there instead of in a release.
 
 **Where it lives:** `scripts/verify-vite-cache-isolation.mjs`, a standalone
 script — deliberately NOT composed into `verify:browser`'s battery
@@ -79,10 +94,13 @@ the built `dist/` for that reason among others).
 - `scripts/verify-vite-cache-isolation.mjs` (protocol, the cold-start
   requirement, and the two ways this harness could pass for the wrong reason)
 - `scripts/lib/vite-dev-probe.mjs` (the boot, diffed against `server/app.ts`)
-- `scripts/lib/vite-cache-dir.mjs` (resolution, the slot lock, and why the
+- `vite-cache-dir.mjs` (resolution, the slot lock, and why the
   default is in `os.tmpdir()` rather than in the repository)
 - `vite.config.ts` (`cacheDir`), `scripts/lib/browser-verify.mjs`
   (`bootKeylessServer`)
 - `tests/scripts/vite-cache-dir.test.ts`
-- `docs/audits/2026-09-12-adversarial/vitecache-lane-report.md`
+- `.dockerignore` and `tests/core/docker-context.test.ts` (the build-context
+  half, and the derivation that makes it self-maintaining)
+- `docs/audits/2026-09-12-adversarial/vitecache-lane-report.md` and
+  `vitecache-review.md`
 - `package.json` (`verify:vite-cache` script entry)

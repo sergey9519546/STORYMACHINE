@@ -33,7 +33,7 @@ import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { assertKeylessAiConfig, keylessBrowserServerEnv } from './keyless-browser-certification.mjs';
-import { VITE_CACHE_DIR_ENV, allocateViteCacheSlot } from './vite-cache-dir.mjs';
+import { VITE_CACHE_DIR_ENV, allocateViteCacheSlot } from '../../vite-cache-dir.mjs';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHARED TIMING POLICY — the fix for "passed alone, flaked under load."
@@ -459,7 +459,7 @@ function newestMtime(target) {
  * `viteCacheDir`, when given, is handed to the build as `VITE_CACHE_DIR` so
  * that a build kicked off by a gate uses the SAME isolated optimizer cache as
  * the boot that asked for it, rather than the per-repository default. See
- * ./vite-cache-dir.mjs — `node_modules/.vite` is shared between worktrees
+ * ../../vite-cache-dir.mjs — `node_modules/.vite` is shared between worktrees
  * through the symlinked `node_modules` and must never be written by two
  * processes at once.
  *
@@ -639,10 +639,13 @@ export async function bootKeylessServer({ repo, port, baseUrl, logPrefix = 'veri
   // Reserved BEFORE the build below, so a gate that has to rebuild `dist/`
   // optimizes into the same isolated directory its server will use.
   const cache = allocateViteCacheSlot({ repoRoot: cwd, env: { ...process.env, ...(extraEnv ?? {}) } });
-  // Released when this gate process exits, however it exits — a gate killed
-  // by CI must not leave a slot looking held. `release()` is idempotent, so
-  // `shutdown()` calling it first is free.
-  process.once('exit', cache.release);
+  // No exit hook here: `allocateViteCacheSlot` installs its own, covering a
+  // normal return, an uncaught throw AND SIGINT/SIGTERM/SIGHUP — `'exit'`
+  // alone does not run on a signal, which is exactly how CI stops a hung
+  // gate. A SIGKILL'd gate still leaves the lock file, and it is reclaimed
+  // there by pid liveness on the next allocation. Both mechanisms, and which
+  // one really carries the guarantee, are written out in
+  // ../../vite-cache-dir.mjs.
   if (serve === SERVE_BUILT_DIST) ensureBuiltDist({ repo: cwd, logPrefix, viteCacheDir: cache.dir });
   console.log(`[${logPrefix}] booting keyless server on port ${port}...`);
   const serverProc = spawn(process.execPath, ['--experimental-strip-types', 'server.ts'], {
@@ -1167,6 +1170,35 @@ export function createRecorder({
   return { results, record, failures, printSummary };
 }
 
+/** How long `shutdown()` waits for a killed server to actually exit before
+ *  freeing its Vite cache slot. Long enough for `vite.close()` plus an
+ *  in-flight optimizer rename on a loaded box; short enough that a wedged
+ *  child cannot turn teardown into a hang. */
+const SERVER_EXIT_WAIT_MS = 5000;
+
+/**
+ * Resolve once `proc` has really exited, or after `timeoutMs`, whichever comes
+ * first. Returns 'already-exited' | 'exited' | 'timeout' so a caller can say
+ * which happened.
+ *
+ * The timer is `unref`'d and cleared on exit: a 5 s handle left pending would
+ * keep the event loop alive and add five seconds to every gate's teardown,
+ * which is the kind of cost that gets a correctness fix reverted.
+ *
+ * @param {import('node:child_process').ChildProcess} proc
+ * @param {number} timeoutMs
+ * @returns {Promise<'already-exited' | 'exited' | 'timeout'>}
+ */
+export function waitForChildExit(proc, timeoutMs) {
+  if (proc.exitCode !== null || proc.signalCode !== null) return Promise.resolve('already-exited');
+  return new Promise((resolve) => {
+    const onExit = () => { clearTimeout(timer); resolve('exited'); };
+    const timer = setTimeout(() => { proc.off('exit', onExit); resolve('timeout'); }, timeoutMs);
+    timer.unref?.();
+    proc.once('exit', onExit);
+  });
+}
+
 /**
  * Close the browser and stop the server, tolerating anything already gone.
  * `graceMs > 0` gives the server a SIGTERM window before SIGKILL (the pattern
@@ -1184,18 +1216,28 @@ export async function shutdown({ browser, serverProc, graceMs = 0 } = {}) {
       } else {
         serverProc.kill();
       }
+      await waitForChildExit(serverProc, SERVER_EXIT_WAIT_MS);
     }
   } catch { /* already exited */ }
   // Free the Vite cache slot this server held, so a second boot in the same
   // gate reuses the warm directory instead of claiming a second one.
   //
-  // AFTER the kill, not before, and not inside the try above. Releasing while
-  // the server is still up would let a second boot in the same process claim
-  // slot 0 and start an optimizer in a directory the dying server has not
-  // finished with — a smaller copy of the defect this whole change exists to
-  // close. Nothing is lost by waiting: `kill()` returns immediately, so the
-  // slot is still warm and still free for the next boot. Outside the try so a
-  // kill that throws (a process that already exited) cannot skip it; the exit
-  // hook in `bootKeylessServer` is the backstop if this is never reached.
+  // AFTER THE CHILD IS DEAD, not after the signal is sent. `kill()` returns as
+  // soon as the signal is queued, so releasing here without the wait above
+  // would hand slot N to a second boot while the first server was still
+  // running `vite.close()` — possibly mid-rename of `deps_temp_<hash>` onto
+  // `deps/`. That is a smaller copy of the defect this whole change exists to
+  // close, and it is reachable at the `graceMs = 0` default that four suites
+  // use (`verify:ui-polish`, `verify:local-safety-net`,
+  // `verify:command-palette`, and `verify:production`'s dev instance). The
+  // `graceMs > 0` callers were incidentally covered by their own sleep; that
+  // was luck, not a mechanism.
+  //
+  // Outside the try so a kill that throws (a process that already exited)
+  // cannot skip it, and bounded so a child that never dies delays teardown by
+  // at most SERVER_EXIT_WAIT_MS instead of hanging the gate. If the wait times
+  // out the slot is still freed — a wedged server holding a cache directory
+  // forever is worse than a small overlap — and the exit/signal hooks in
+  // ../../vite-cache-dir.mjs are the backstop if this is never reached.
   try { serverProc?.releaseViteCacheSlot?.(); } catch { /* nothing to free */ }
 }

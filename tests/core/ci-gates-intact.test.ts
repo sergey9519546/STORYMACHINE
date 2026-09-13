@@ -413,25 +413,43 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
     }
   });
 
-  it('verify:browser really runs all six browser suites (a shortened battery is a quiet bypass)', () => {
+  it('verify:browser really runs all eight browser suites (a shortened battery is a quiet bypass)', () => {
     // `npm run verify:browser` is what CI executes. Shortening that one line
-    // in package.json would silently stop gating three of the six suites
-    // while every workflow check above stayed green — the same shape as a
-    // hardcoded gate list someone quietly trims.
+    // in package.json would silently stop gating suites while every workflow
+    // check above stayed green — the same shape as a hardcoded gate list
+    // someone quietly trims.
+    //
+    // It said SIX and pinned six until 2026-09-13, by which time the battery
+    // had grown to eight: `verify:a11y` (2026-09-04) and `verify:production`
+    // were unpinned, so either could have been dropped from `verify:browser`
+    // with this gate green — precisely the bypass it exists to prevent. Found
+    // by the vite-cache-isolation review, which noticed the lane's
+    // `grep "seven suites" --include=*.md` could not see a `.ts` file saying
+    // "six". ARCHITECTURE.md §9 is the narrative copy of this list.
     const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as {
       scripts: Record<string, string>;
       devDependencies: Record<string, string>;
     };
     const battery = pkg.scripts['verify:browser'];
     assert.ok(battery, 'package.json must keep a verify:browser script');
-    for (const suite of [
+    const pinned = [
       'verify:p0-flow',
       'verify:focus-traps',
       'verify:surfaces',
       'verify:ui-polish',
       'verify:local-safety-net',
       'verify:command-palette',
-    ]) {
+      'verify:a11y',
+      'verify:production',
+    ];
+    // The count is asserted as well as the membership: a ninth suite added to
+    // the battery without being pinned here reopens the same hole.
+    assert.equal(
+      battery.split(/\s+/).filter(token => token.startsWith('verify:')).length,
+      pinned.length,
+      `verify:browser composes a different number of suites than this test pins (${battery})`,
+    );
+    for (const suite of pinned) {
       assert.ok(
         battery.includes(suite),
         `verify:browser must run ${suite} — CI runs this one script, so a suite missing from it runs nowhere`,

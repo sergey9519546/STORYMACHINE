@@ -18,6 +18,35 @@
 !public/
 !public/**
 
+# WHY THIS MODULE SITS AT THE REPOSITORY ROOT AND NOT IN scripts/.
+#
+# `vite.config.ts` imports `./vite-cache-dir.mjs` (it decides where Vite's
+# dependency-optimizer cache goes, which cannot be `node_modules/.vite` — see
+# that file's header), so the builder stage's `npm run build` cannot resolve
+# the config without it. `Dockerfile:13-14` is `COPY . .` + `RUN npm run
+# build`, and release.yml / edge.yml build with `context: .`, so this file is
+# what decides whether that succeeds.
+#
+# The module lived at `scripts/lib/vite-cache-dir.mjs` first, and allowlisting
+# it there does not work narrowly. Under the ordered Moby semantics this
+# policy uses — and which `tests/core/docker-context.test.ts` models — a
+# pattern may match a path OR A PARENT, so the `!scripts/` traversal exception
+# that Docker needs in order to descend at all ALSO un-denies every other file
+# under `scripts/`. Measured with that model: with
+# `!scripts/`, `!scripts/lib/`, `!scripts/lib/vite-cache-dir.mjs` in place,
+# `scripts/honesty-audit.mjs` and `scripts/verify-vite-cache-isolation.mjs`
+# both come back NOT excluded. Getting back to one file needs a re-deny/
+# re-allow sequence whose correctness depends on pattern order and on which
+# rules happen to match directories rather than files — a rule that works
+# today and rots silently.
+#
+# At the root it is one line, with no parent to traverse and no subtree to
+# re-deny, and it sits beside the `vite.config.ts` it configures. `scripts/`
+# stays fully denied: it is maintainer tooling (browser gates, corpus
+# measurement, the rulebook generator, the honesty audit) and none of it is a
+# build input.
+!vite-cache-dir.mjs
+
 # Defense in depth for confidential, generated, and runtime state. These
 # remain excluded even if a future allow rule is added above.
 .env

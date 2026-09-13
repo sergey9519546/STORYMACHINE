@@ -26,16 +26,18 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   VITE_CACHE_DIR_ENV,
   allocateViteCacheSlot,
   repoCacheBase,
   repoCacheKey,
   resolveViteCacheDir,
-} from '../../scripts/lib/vite-cache-dir.mjs';
+} from '../../vite-cache-dir.mjs';
 import { distStaleness } from '../../scripts/lib/browser-verify.mjs';
 
 const REPO = path.resolve(import.meta.dirname, '../..');
@@ -99,11 +101,40 @@ describe('resolveViteCacheDir', () => {
   });
 
   it('keys off the RESOLVED path, so a symlinked checkout is one cache, not two', () => {
+    // THE EARLIER VERSION OF THIS TEST COULD NOT FAIL. It compared
+    // `repoCacheKey(REPO)` with `repoCacheKey(path.join(REPO, 'src', '..'))`,
+    // and `path.join` normalizes `src/..` away before the call — so both
+    // arguments were the byte-identical string and the assertion was
+    // `f(x) === f(x)`, true for any deterministic f, including one with
+    // `realpathSync` deleted (2026-09-13 review, finding 4). A real symlink is
+    // the only input that distinguishes resolution from normalization.
     const scratch = mkdtempSync(path.join(tmpdir(), 'vite-cache-key-'));
     try {
-      // The repository reached through its own realpath and through `..`
-      // gymnastics is one tree and must key once.
-      assert.equal(repoCacheKey(REPO), repoCacheKey(path.join(REPO, 'src', '..')));
+      const real = path.join(scratch, 'real-checkout');
+      const link = path.join(scratch, 'link-to-checkout');
+      const other = path.join(scratch, 'other-checkout');
+      mkdirSync(real);
+      mkdirSync(other);
+      symlinkSync(real, link);
+
+      // The two paths really are different strings — otherwise this test is
+      // the tautology it replaced.
+      assert.notEqual(path.resolve(link), path.resolve(real));
+      assert.notEqual(path.basename(link), path.basename(real));
+
+      assert.equal(
+        repoCacheKey(link),
+        repoCacheKey(real),
+        'one checkout reached through a symlink must key once — two caches for one tree is a cold cache on every second run',
+      );
+      assert.equal(
+        resolveViteCacheDir({ repoRoot: link, env: {} }),
+        resolveViteCacheDir({ repoRoot: real, env: {} }),
+        'the same must hold end to end, not only in the key helper',
+      );
+      // …and two genuinely different trees still separate, which is the
+      // property the whole change exists for.
+      assert.notEqual(repoCacheKey(other), repoCacheKey(real));
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
@@ -152,6 +183,140 @@ describe('allocateViteCacheSlot', () => {
   });
 });
 
+// ── The lock state machine ─────────────────────────────────────────────────
+//
+// `claimLock` / `lockHolderAlive` are the whole safety mechanism: they decide
+// whether two live dependency optimizers can end up in one directory. Nothing
+// tested them in either direction until the 2026-09-13 review said so
+// (finding 5) — `allocateViteCacheSlot` was exercised only by three
+// simultaneous allocations in one process, which never reaches the EEXIST
+// branch's reclaim path at all.
+//
+// Each case below is asserted twice: once against the real module, and once
+// against a MUTANT of it with the single condition under test inverted. If the
+// mutant passes too, the assertion is not measuring what it claims to.
+
+/** The module's own source with one condition replaced, loaded as a module. */
+async function loadMutant(anchorText: string, replacement: string) {
+  const source = readFileSync(path.join(REPO, 'vite-cache-dir.mjs'), 'utf8');
+  assert.ok(
+    source.includes(anchorText),
+    `mutation anchor is no longer in vite-cache-dir.mjs, so this test is measuring nothing: ${anchorText}`,
+  );
+  const dir = mkdtempSync(path.join(tmpdir(), 'vite-cache-mutant-'));
+  const file = path.join(dir, 'mutant.mjs');
+  writeFileSync(file, source.replace(anchorText, replacement));
+  const mod = await import(pathToFileURL(file).href);
+  return { mod, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+}
+
+/** A cache base for `repoRoot` holding exactly one planted `slot-0.lock`. */
+function plantLock(repoRoot: string, contents: string): string {
+  const base = repoCacheBase({ repoRoot });
+  rmSync(base, { recursive: true, force: true });
+  mkdirSync(base, { recursive: true });
+  writeFileSync(path.join(base, 'slot-0.lock'), contents);
+  return base;
+}
+
+/** A pid that is certainly not running: a child that has already exited. */
+function deadPid(): number {
+  const done = spawnSync(process.execPath, ['-e', ''], { encoding: 'utf8' });
+  assert.equal(done.status, 0);
+  assert.ok(typeof done.pid === 'number' && done.pid > 0);
+  return done.pid as number;
+}
+
+const liveLock = () => JSON.stringify({ pid: process.pid, at: new Date().toISOString() });
+
+describe('the lock state machine', () => {
+  it('respects a LIVE holder\'s lock, and does not once the liveness check is removed', async () => {
+    const repoRoot = path.join(tmpdir(), `vite-cache-live-${process.pid}`);
+    const base = plantLock(repoRoot, liveLock());
+    const { mod, cleanup } = await loadMutant(
+      'if (lockHolderAlive(lockPath)) return false;',
+      'if (false) return false;',
+    );
+    try {
+      const real = allocateViteCacheSlot({ repoRoot, env: {} });
+      assert.equal(real.slot, 1, 'slot 0 is held by a living process, so the allocator must move on — sharing it is the defect');
+      real.release();
+
+      plantLock(repoRoot, liveLock());
+      const mutant = mod.allocateViteCacheSlot({ repoRoot, env: {} });
+      assert.equal(mutant.slot, 0, 'the mutant must steal the live lock; if it does not, the assertion above cannot fail');
+      mutant.release();
+    } finally {
+      cleanup();
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('reclaims a DEAD holder\'s lock, and does not once liveness always answers yes', async () => {
+    const repoRoot = path.join(tmpdir(), `vite-cache-dead-${process.pid}`);
+    const gone = deadPid();
+    const base = plantLock(repoRoot, JSON.stringify({ pid: gone, at: new Date().toISOString() }));
+    const { mod, cleanup } = await loadMutant(
+      "    return /** @type {NodeJS.ErrnoException} */ (err).code === 'EPERM';",
+      '    return true;',
+    );
+    try {
+      const real = allocateViteCacheSlot({ repoRoot, env: {} });
+      assert.equal(real.slot, 0, 'a lock whose process is gone must be reclaimed, or a crashed gate strands a slot forever');
+      real.release();
+
+      plantLock(repoRoot, JSON.stringify({ pid: gone, at: new Date().toISOString() }));
+      const mutant = mod.allocateViteCacheSlot({ repoRoot, env: {} });
+      assert.equal(mutant.slot, 1, 'with every pid reading as alive the dead lock is never reclaimed — which is what the real one must not do');
+      mutant.release();
+    } finally {
+      cleanup();
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('treats an UNPARSEABLE lock as held, and does not once the catch answers no', async () => {
+    // The fail-safe direction: an extra slot costs a cold optimize, sharing a
+    // directory costs a 504. A lock this process cannot read must never be
+    // assumed free.
+    const repoRoot = path.join(tmpdir(), `vite-cache-garbage-${process.pid}`);
+    const base = plantLock(repoRoot, 'not json at all\n');
+    const { mod, cleanup } = await loadMutant(
+      'try { pid = JSON.parse(raw).pid; } catch { return true; }',
+      'try { pid = JSON.parse(raw).pid; } catch { return false; }',
+    );
+    try {
+      const real = allocateViteCacheSlot({ repoRoot, env: {} });
+      assert.equal(real.slot, 1, 'an unreadable lock is ambiguous, and every ambiguous answer must be "held"');
+      real.release();
+
+      plantLock(repoRoot, 'not json at all\n');
+      const mutant = mod.allocateViteCacheSlot({ repoRoot, env: {} });
+      assert.equal(mutant.slot, 0, 'the mutant must take the garbage lock; if it does not, the assertion above cannot fail');
+      mutant.release();
+    } finally {
+      cleanup();
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('records the pid it is claiming on behalf of — the reclaim path reads it', () => {
+    const repoRoot = path.join(tmpdir(), `vite-cache-pidfile-${process.pid}`);
+    const base = repoCacheBase({ repoRoot });
+    rmSync(base, { recursive: true, force: true });
+    try {
+      const slot = allocateViteCacheSlot({ repoRoot, env: {} });
+      const written = JSON.parse(readFileSync(path.join(base, `slot-${slot.slot}.lock`), 'utf8'));
+      assert.equal(written.pid, process.pid);
+      assert.match(written.at, /^\d{4}-\d{2}-\d{2}T/);
+      slot.release();
+      assert.equal(existsSync(path.join(base, `slot-${slot.slot}.lock`)), false, 'release() removes the lock file');
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('the wiring, not just the helper', () => {
   it('vite.config.ts sets cacheDir from the resolver, keyed to its own directory', () => {
     const config = read('vite.config.ts');
@@ -161,17 +326,99 @@ describe('the wiring, not just the helper', () => {
       'vite.config.ts must set cacheDir from resolveViteCacheDir({ repoRoot: __dirname }) — '
         + 'it is the single place the dev middleware, `npm run dev` and `vite build` agree',
     );
-    assert.match(config, /from '\.\/scripts\/lib\/vite-cache-dir\.mjs'/);
+    assert.match(config, /from '\.\/vite-cache-dir\.mjs'/,
+      'the module is imported from the repository ROOT — .dockerignore cannot narrowly admit one file out of scripts/, '
+        + 'see that file and tests/core/docker-context.test.ts');
   });
 
   it('bootKeylessServer allocates a per-boot cache, passes it to the server, and logs it', () => {
     const helper = read('scripts/lib/browser-verify.mjs');
-    assert.match(helper, /allocateViteCacheSlot\(\{ repoRoot: cwd/, 'every keyless boot allocates its own cache directory');
+    assert.match(helper, /allocateViteCacheSlot\(\{/, 'every keyless boot allocates its own cache directory');
     assert.match(helper, /\[VITE_CACHE_DIR_ENV\]: cache\.dir/, 'the allocated directory reaches the server process');
     assert.match(helper, /vite cache: \$\{cache\.dir\}/, 'the resolved cache dir is logged on boot, beside the "serving:" line');
     assert.match(helper, /serverProc\.releaseViteCacheSlot/, 'shutdown() frees the slot for the next boot');
-    // `extraEnv` last: a suite that pins its own cache must win over the pool.
-    assert.match(helper, /allocateViteCacheSlot\(\{ repoRoot: cwd, env: \{ \.\.\.process\.env, \.\.\.\(extraEnv \?\? \{\}\) \} \}\)/);
+    // `extraEnv` merged into what the allocator sees, so a suite that pins its
+    // own VITE_CACHE_DIR wins over the pool. Matched loosely on purpose: the
+    // earlier version pinned the exact spelling including the local name
+    // `cwd`, so a rename reddened it while a semantic regression that kept the
+    // spelling passed (2026-09-13 review, §5).
+    const allocCall = helper.match(/allocateViteCacheSlot\(\{[^}]*\{[^}]*\}[^)]*\)/)?.[0] ?? '';
+    assert.match(allocCall, /process\.env/, 'the allocator must see the process environment');
+    assert.match(allocCall, /extraEnv/, 'and extraEnv, so a caller-set VITE_CACHE_DIR is honoured rather than pooled over');
+  });
+
+  it('shutdown() waits for the server to actually exit before freeing the slot', () => {
+    // `kill()` returns when the signal is queued, not when the child is gone.
+    // Releasing in between hands the directory to the next boot while the
+    // dying server may still be renaming deps_temp_<hash> onto deps/ — which
+    // is reachable at the graceMs = 0 default four suites use (2026-09-13
+    // review, finding 2).
+    const helper = read('scripts/lib/browser-verify.mjs');
+    const body = helper.slice(helper.indexOf('export async function shutdown'));
+    const waitAt = body.indexOf('waitForChildExit(serverProc');
+    const releaseAt = body.indexOf('releaseViteCacheSlot?.()');
+    assert.ok(waitAt > 0, 'shutdown() must wait for the child to exit');
+    assert.ok(releaseAt > waitAt, 'the release must come AFTER the wait, not before it');
+    assert.match(helper, /const SERVER_EXIT_WAIT_MS = \d+;/, 'and the wait must be bounded, or a wedged child hangs teardown');
+  });
+
+  it('a killed gate releases its slot — including on SIGTERM, which is what CI sends', () => {
+    // `process.on('exit')` does not run on a signal. The lane shipped a
+    // comment claiming it did; measured, the lock file survived a SIGTERM
+    // (2026-09-13 review, finding 3). This drives the real thing: a child
+    // takes a slot, gets SIGTERM'd, and must leave no lock behind — in both
+    // the ordinary case and the case where the gate has a SIGTERM handler of
+    // its own, which the release must not hijack.
+    for (const variant of ['no-handler', 'own-handler'] as const) {
+      const repoRoot = path.join(tmpdir(), `vite-cache-sigterm-${variant}-${process.pid}`);
+      const base = repoCacheBase({ repoRoot });
+      rmSync(base, { recursive: true, force: true });
+      const dir = mkdtempSync(path.join(tmpdir(), 'vite-cache-holder-'));
+      try {
+        const holder = path.join(dir, 'holder.mjs');
+        writeFileSync(
+          holder,
+          `import { allocateViteCacheSlot } from ${JSON.stringify(pathToFileURL(path.join(REPO, 'vite-cache-dir.mjs')).href)};\n`
+            + `const s = allocateViteCacheSlot({ repoRoot: ${JSON.stringify(repoRoot)}, env: {} });\n`
+            + 'process.stdout.write(s.dir);\n'
+            + (variant === 'own-handler'
+              // A gate with its own graceful shutdown: ours must release and
+              // then step aside rather than re-raising over it.
+              ? "process.on('SIGTERM', () => process.exit(7));\n"
+              : '')
+            + 'setInterval(() => {}, 1000);\n',
+        );
+        const supervisor = path.join(dir, 'supervisor.mjs');
+        writeFileSync(
+          supervisor,
+          "import { spawn } from 'node:child_process';\n"
+            + `const child = spawn(process.execPath, [${JSON.stringify(holder)}], { stdio: ['ignore', 'pipe', 'inherit'] });\n`
+            + 'await new Promise((r) => child.stdout.once("data", r));\n'
+            + "child.kill('SIGTERM');\n"
+            + 'const [code, signal] = await new Promise((r) => child.once("exit", (c, sg) => r([c, sg])));\n'
+            + 'process.stdout.write(JSON.stringify({ code, signal }));\n',
+        );
+        const run = spawnSync(process.execPath, [supervisor], { encoding: 'utf8', timeout: 20000 });
+        assert.equal(run.status, 0, `supervisor (${variant}) did not finish: ${run.stderr}`);
+        const outcome = JSON.parse(run.stdout) as { code: number | null; signal: string | null };
+
+        assert.deepEqual(
+          existsSync(base) ? readdirSync(base).filter(e => e.endsWith('.lock')) : [],
+          [],
+          `a SIGTERM-killed holder (${variant}) must leave no lock file behind`,
+        );
+        if (variant === 'no-handler') {
+          assert.equal(outcome.signal, 'SIGTERM',
+            'with nobody else listening the signal is re-raised, so the process still dies the way the sender asked');
+        } else {
+          assert.equal(outcome.code, 7,
+            "a gate's own SIGTERM handler still decides the exit — releasing a cache slot must not hijack someone else's shutdown");
+        }
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+        rmSync(base, { recursive: true, force: true });
+      }
+    }
   });
 
   it('the cache directory is not a dist/ build input', () => {
