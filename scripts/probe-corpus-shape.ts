@@ -73,7 +73,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runScriptDoctor } from '../server/nvm/analyze/doctor.ts';
 import { analyzeFountainText } from '../server/nvm/analyze/fountain-analyzer.ts';
-import { parseFountain, FORCED_CUE_MARKER } from '../src/lib/fountain.ts';
+import { parseFountain, FORCED_CUE_MARKER, FORCED_TRANSITION_MARKER } from '../src/lib/fountain.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -106,11 +106,14 @@ interface Row {
   critical: number;
   major: number;
   minor: number;
-  /** Cue lines the writer FORCED with Fountain's `@` — see countForcedCues. */
+  /** Cue lines the writer FORCED with Fountain's `@` — see countForcedMarkers. */
   forcedCues: number;
+  /** Transition lines the writer FORCED with Fountain's `>` — same function. */
+  forcedTransitions: number;
 }
 
-/** How many of this document's character cues are forced with `@`.
+/** How many of this document's character cues are forced with `@`, and how
+ *  many of its transitions are forced with `>`.
  *
  *  Round 3 taught the parser Fountain's forced cue, and this column is how the
  *  owner sees which of the 761 drafts that change can possibly have touched:
@@ -119,23 +122,38 @@ interface Row {
  *  have moved because of that change — and a corpus of all-zero counts settles
  *  the question for the whole corpus in one column.
  *
+ *  The `>` half was added 2026-09-13 with the parser's forced-transition
+ *  branch, and answers the same question for it: before that change `>CUT TO:`
+ *  was scored as an ACTION LINE with the marker glued to its first word, and
+ *  `>SMASH TO BLACK.` — a transition no inferred rule reaches — stayed action
+ *  prose even after the analysis seam ran. A script whose `>tr` count is 0
+ *  cannot have moved because of that change either.
+ *
  *  It counts BLOCKS the parser typed as a cue, not lines matching `/^@/`, so an
  *  `@` opening an action line or sitting inside a speech (a handle, an address)
  *  is not counted — those are exactly the lines the change deliberately leaves
  *  alone, and a regex would have reported them as affected.
+ *
+ *  Both counts come out of ONE parse, so the second column costs nothing on
+ *  top of the first.
  *
  *  COST: one extra `parseFountain` per script. Against the two full analyses
  *  each row already pays (`runScriptDoctor` + `analyzeFountainText`) it is
  *  inside the run-to-run noise — `npm run probe-corpus-shape -- --public`,
  *  three consecutive runs each way on one machine: 2162 / 2157 / 2235 ms with
  *  the column, 2191 / 2146 / 2122 ms with the call replaced by a constant. */
-function countForcedCues(text: string): number {
-  let n = 0;
+function countForcedMarkers(text: string): { cues: number; transitions: number } {
+  let cues = 0;
+  let transitions = 0;
   for (const b of parseFountain(text)) {
-    if (b.type !== 'character' && b.type !== 'dual_dialogue') continue;
-    if (b.text.trim().startsWith(FORCED_CUE_MARKER)) n++;
+    const t = b.text.trim();
+    if (b.type === 'character' || b.type === 'dual_dialogue') {
+      if (t.startsWith(FORCED_CUE_MARKER)) cues++;
+    } else if (b.type === 'transition') {
+      if (t.startsWith(FORCED_TRANSITION_MARKER)) transitions++;
+    }
   }
-  return n;
+  return { cues, transitions };
 }
 
 function walk(dir: string): string[] {
@@ -202,6 +220,7 @@ for (const full of files) {
   // not exist and arrive as undefined, which every consumer below handles.
   const analysis = analyzeFountainText(text) as { wordCount: number; submittedWordCount?: number; isDoubleSpaced?: boolean };
   const report = await runScriptDoctor(text);
+  const forced = countForcedMarkers(text);
   rows.push({
     file: path.relative(base, full).replace(/\\/g, '/'),
     doubleSpaced: analysis.isDoubleSpaced,
@@ -216,7 +235,8 @@ for (const full of files) {
     critical: report.bySeverity.critical,
     major: report.bySeverity.major,
     minor: report.bySeverity.minor,
-    forcedCues: countForcedCues(text),
+    forcedCues: forced.cues,
+    forcedTransitions: forced.transitions,
   });
 }
 
@@ -233,13 +253,13 @@ const REPORTED = rows.filter((r) => r.submitted !== undefined);
 const UNREPORTED = rows.length - REPORTED.length;
 
 if (CSV) {
-  console.log('file,isDoubleSpaced,submittedWordCount,wordCount,notScreenplayWords,notScreenplayPct,health,verdict,sceneCount,critical,major,minor,forcedCueLines');
+  console.log('file,isDoubleSpaced,submittedWordCount,wordCount,notScreenplayWords,notScreenplayPct,health,verdict,sceneCount,critical,major,minor,forcedCueLines,forcedTransitionLines');
   for (const r of rows) {
     const g = gapOf(r);
     console.log([
       JSON.stringify(r.file), r.doubleSpaced ?? '', r.submitted ?? '', r.words,
       g ? g.gap : '', g ? g.share.toFixed(2) : '',
-      r.health, r.verdict, r.scenes, r.critical, r.major, r.minor, r.forcedCues,
+      r.health, r.verdict, r.scenes, r.critical, r.major, r.minor, r.forcedCues, r.forcedTransitions,
     ].join(','));
   }
   process.exit(0);
@@ -252,7 +272,7 @@ console.log(`Corpus: ${label}`);
 console.log(`Scripts read: ${rows.length}${skippedShort ? ` (${skippedShort} skipped: under ${MIN_LINES} lines)` : ''}`);
 console.log('Nothing was written to disk and no screenplay text is printed.\n');
 
-const head = `${'script'.padEnd(38)} ${'2x'.padEnd(3)} ${'submitted'.padStart(9)} ${'words'.padStart(7)} ${'gap'.padStart(7)} ${'gap%'.padStart(6)} ${'health'.padStart(6)} ${'verdict'.padEnd(10)} ${'sc'.padStart(4)} ${'c/m/n'.padStart(12)} ${'@cue'.padStart(5)}`;
+const head = `${'script'.padEnd(38)} ${'2x'.padEnd(3)} ${'submitted'.padStart(9)} ${'words'.padStart(7)} ${'gap'.padStart(7)} ${'gap%'.padStart(6)} ${'health'.padStart(6)} ${'verdict'.padEnd(10)} ${'sc'.padStart(4)} ${'c/m/n'.padStart(12)} ${'@cue'.padStart(5)} ${'>tr'.padStart(4)}`;
 console.log(head);
 console.log('-'.repeat(head.length));
 for (const r of rows) {
@@ -264,7 +284,7 @@ for (const r of rows) {
     + `${(g ? String(g.gap) : '—').padStart(7)} `
     + `${(g ? pct(g.gap, r.submitted!) : '—').padStart(6)} ${r.health.toFixed(1).padStart(6)} ${r.verdict.padEnd(10)} `
     + `${String(r.scenes).padStart(4)} ${`${r.critical}/${r.major}/${r.minor}`.padStart(12)} `
-    + `${String(r.forcedCues).padStart(5)}`,
+    + `${String(r.forcedCues).padStart(5)} ${String(r.forcedTransitions).padStart(4)}`,
   );
 }
 
@@ -298,6 +318,10 @@ for (const [name, group] of [
   console.log(`  scripts with a forced cue  ${forced.length} of ${group.length}`
     + (forced.length === 0 ? '  (so round 3\'s `@` change cannot have moved one of them)'
       : `, ${group.reduce((a, r) => a + r.forcedCues, 0)} cue lines in total, max ${Math.max(...group.map((r) => r.forcedCues))} in one script`));
+  const forcedTr = group.filter((r) => r.forcedTransitions > 0);
+  console.log(`  scripts with a forced transition  ${forcedTr.length} of ${group.length}`
+    + (forcedTr.length === 0 ? '  (so the 2026-09-13 `>` change cannot have moved one of them)'
+      : `, ${group.reduce((a, r) => a + r.forcedTransitions, 0)} transition lines in total, max ${Math.max(...group.map((r) => r.forcedTransitions))} in one script`));
 }
 
 console.log(`
@@ -313,6 +337,12 @@ console.log(`
     and cue-extension fold (either row, wherever a draft carries a forced
     marker or a non-canonical extension — the 32 committed scripts carry
     neither, which is why no benchmark could catch them).
+  * The >tr column is the same instrument for the 2026-09-13 forced-transition
+    change: \`>CUT TO:\` used to be scored as an action line with the marker on
+    it, and a custom \`>SMASH TO BLACK.\` stayed action prose even after the
+    analysis seam ran. A 0 there means that script cannot have moved because
+    of it. It counts BLOCKS the parser typed as a transition from the marker,
+    so a \`>\` inside a speech or a \`>text<\` centering is correctly not counted.
   * The @cue column is which scripts round 3's forced-cue change can have
     touched, and it is the whole answer for that change: \`@NAME\` used to be
     action prose and its speech with it, so a 0 there means that script's
