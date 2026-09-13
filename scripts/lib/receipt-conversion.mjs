@@ -74,12 +74,40 @@ export const PENDING_PHRASE_REWRITES = Object.freeze({
  *  the gate REQUIRES are marked; `Measured AUC-24` is not required by the gate
  *  but is the whole point of the run, so it is filled too. */
 const CONVERTED_FIELDS = [
-  { label: 'Command', required: true },
-  { label: 'Measured AUC-24', required: false },
-  { label: 'Corpus fingerprint', required: true },
-  { label: 'Git SHA', required: true },
-  { label: 'Runner attestation', required: true },
+  { label: 'Command', insertIfMissing: true },
+  { label: 'Measured AUC-24', insertIfMissing: true },
+  { label: 'Corpus fingerprint', insertIfMissing: true },
+  { label: 'Git SHA', insertIfMissing: true },
+  // `Baseline used` is the gate's ALTERNATIVE spelling of the Git SHA
+  // requirement (`REQUIRED_FIELDS`'s "Git SHA (or Baseline used)"), and
+  // `pendingReason` tries both patterns. An entry that carries it and keeps a
+  // PENDING marker in it would stay pending however clean the Git SHA field
+  // is, so it is rewritten WHEN PRESENT — and never inserted, because an entry
+  // that measured at HEAD has no baseline tree to name.
+  { label: 'Baseline used', insertIfMissing: false },
+  { label: 'Runner attestation', insertIfMissing: true },
 ];
+
+/** The bullet that BOUNDS every rewritten field's value window.
+ *
+ * THE PROBLEM IT SOLVES, which is the note's scan three in its hardest form: a
+ * field's value runs from its own `- **` line to the NEXT `- **` bullet, so a
+ * trailing field's window swallows every paragraph below it to the end of the
+ * entry — and a bare `PENDING` in that swallowed prose keeps the entry pending
+ * no matter how the field itself is written. Mangling the prose to remove the
+ * word would be the wrong fix (it is the entry's own account of why it was
+ * filed pending, and it was true when written). Ending the WINDOW is the right
+ * one: this bullet is a `- **` line, so every field above it stops here, and
+ * it says in its own words what the prose below it is.
+ */
+function terminatorLines(facts) {
+  return [
+    `- **Entry body as filed:** everything below this line is this entry as it was`,
+    `  written before the measurement, with its pre-measurement tense corrected where`,
+    `  it described the absence of a run. Its original bytes are at`,
+    `  \`${facts.filedAtSha.slice(0, 8)}\`. The fields above are the run's own record.`,
+  ];
+}
 
 function labelPattern(label) {
   return new RegExp(`^\\s*(?:[-*]\\s+)?\\*\\*\\s*${label.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&').replace(/\s+/g, '\\s+')}\\s*:?\\s*\\*\\*`, 'i');
@@ -240,6 +268,15 @@ function fieldBody(label, facts) {
         `\`${facts.filedAtSha}\` — the tip of \`${facts.branch}\` this was measured on,`,
         'the commit this conversion is written on top of.',
       ]);
+    case 'Baseline used':
+      return bullet([
+        facts.baselineRef && facts.baselineAuc24 !== null && facts.baselineAuc24 !== undefined
+          ? `\`${facts.baselineRef}\`, measured in the SAME run on recipe \`${facts.degradationId}\`:`
+          : 'the tree this branch was compared against, measured in the same run:',
+        facts.baselineRef && facts.baselineAuc24 !== null && facts.baselineAuc24 !== undefined
+          ? `AUC-24 **${facts.baselineAuc24.toFixed(4)}**, against this branch's ${facts.auc24 === null ? '(none)' : facts.auc24.toFixed(4)}.`
+          : 'see the Measured AUC-24 field above.',
+      ]);
     case 'Runner attestation':
       return bullet([
         `I ran the command above myself on ${facts.date}, on my own machine`,
@@ -261,58 +298,89 @@ function fieldBody(label, facts) {
 function convertEntry(lines, span, facts) {
   const edits = [];
   const out = lines.slice();
+  // The entry's end MOVES as the body grows. Every span below is recomputed
+  // against this, never against the caller's original `span.end` — the first
+  // version of this function used the stale bound and spliced an inserted
+  // field into the middle of another field's paragraph, which the
+  // "fields in document order" fixture in
+  // tests/scripts/receipt-conversion.test.ts now pins.
+  let end = span.end;
+  const grow = (delta) => { end += delta; };
+
   const newHeading = convertHeading(span.heading, facts);
   if (newHeading !== span.heading) {
     edits.push({ scan: 'one (heading)', before: span.heading, after: newHeading });
     out[span.start] = newHeading;
   }
 
-  // Fields, rewritten from the bottom up so earlier spans stay valid.
-  const located = [];
-  for (const field of CONVERTED_FIELDS) {
-    const para = fieldParagraph(out, span.start, span.end, field.label);
-    located.push({ field, para });
-  }
-  let insertAt = null;
-  for (let i = located.length - 1; i >= 0; i--) {
-    const { field, para } = located[i];
-    const body = fieldBody(field.label, facts);
-    if (para) {
-      edits.push({
-        scan: `field **${field.label}**`,
-        before: out.slice(para.start, para.end).join('\n'),
-        after: body.join('\n'),
-      });
-      out.splice(para.start, para.end - para.start, ...body);
-      insertAt = insertAt ?? para.start;
-    }
-  }
-  // A field the entry never carried is INSERTED — beside the other bullets if
-  // there are any, else directly under the banner. A missing required field is
-  // its own gate failure ("missing required field **X**"), so a converter that
-  // silently skipped it would hand the owner a commit that cannot pass.
+  // Replace the fields the entry already carries, from the BOTTOM OF THE
+  // DOCUMENT upwards — by position, not by the order of CONVERTED_FIELDS. A
+  // real entry writes them in whatever order it likes (the renderer-residuals
+  // entry has Command, Git SHA, Measured AUC-24, … Corpus fingerprint, Runner
+  // attestation), so replacing them in list order invalidates every span below
+  // the one just edited.
+  const located = CONVERTED_FIELDS
+    .map((field) => ({ field, para: fieldParagraph(out, span.start, end, field.label) }))
+    .filter((l) => l.para)
+    .sort((a, b) => b.para.start - a.para.start);
   for (const { field, para } of located) {
-    if (para) continue;
-    const anchor = fieldParagraph(out, span.start, span.end, 'Command')
-      ?? fieldParagraph(out, span.start, span.end, 'Git SHA');
-    const at = anchor ? anchor.end : span.start + 1;
+    const body = fieldBody(field.label, facts);
+    edits.push({
+      scan: `field **${field.label}**`,
+      before: out.slice(para.start, para.end).join('\n'),
+      after: body.join('\n'),
+    });
+    out.splice(para.start, para.end - para.start, ...body);
+    grow(body.length - (para.end - para.start));
+  }
+
+  // A field the entry never carried is INSERTED after the last field it does
+  // carry. A missing required field is its own gate failure ("missing required
+  // field **X**"), so a converter that silently skipped one would hand the
+  // owner a commit that cannot pass.
+  for (const field of CONVERTED_FIELDS) {
+    if (!field.insertIfMissing) continue;
+    if (fieldParagraph(out, span.start, end, field.label)) continue;
+    const at = lastFieldEnd(out, span.start, end);
     const body = fieldBody(field.label, facts);
     edits.push({ scan: `field **${field.label}** (inserted — the entry had none)`, before: '', after: body.join('\n') });
     out.splice(at, 0, ...body);
+    grow(body.length);
   }
 
+  // Bound every rewritten field's value window (see terminatorLines).
+  const terminator = terminatorLines(facts);
+  edits.push({ scan: 'three (the field value window, bounded)', before: '', after: terminator.join('\n') });
+  out.splice(lastFieldEnd(out, span.start, end), 0, ...terminator);
+  grow(terminator.length);
+
   // Scan two, over the whole entry body: re-tense, never delete.
-  const bodyStart = span.start + 1;
-  const bodyEnd = span.end + (out.length - lines.length);
-  const bodyText = out.slice(bodyStart, bodyEnd).join('\n');
+  const bodyText = out.slice(span.start + 1, end).join('\n');
   const { text: retensed, hits } = retensePhrases(bodyText);
   if (hits.length > 0) {
-    edits.push({ scan: 'two (pending phrases, re-tensed)', before: hits.join(' · '), after: hits.map((h) => PENDING_PHRASE_REWRITES[h.toLowerCase()] ?? '(re-tensed)').join(' · ') });
-    out.splice(bodyStart, bodyEnd - bodyStart, ...retensed.split('\n'));
+    edits.push({
+      scan: 'two (pending phrases, re-tensed)',
+      before: hits.join(' · '),
+      after: hits.map((h) => PENDING_PHRASE_REWRITES[h.toLowerCase()] ?? '(re-tensed)').join(' · '),
+    });
+    const replacement = retensed.split('\n');
+    out.splice(span.start + 1, end - (span.start + 1), ...replacement);
+    grow(replacement.length - (end - (span.start + 1)));
   }
 
   out.splice(span.start + 1, 0, ...bannerLines(facts));
-  return { lines: out, edits };
+  return { lines: out, edits, newHeading };
+}
+
+/** One past the last line of the last CONVERTED_FIELDS paragraph in the entry,
+ *  or the line after the heading when it carries none. */
+function lastFieldEnd(lines, start, end) {
+  let at = start + 1;
+  for (const field of CONVERTED_FIELDS) {
+    const para = fieldParagraph(lines, start, end, field.label);
+    if (para && para.end > at) at = para.end;
+  }
+  return at;
 }
 
 /**
@@ -325,24 +393,50 @@ function convertEntry(lines, span, facts) {
  *         does not commit — which is the whole contract: this either produces
  *         a tree the real CLI exits 0 on, or it produces nothing.
  */
-export function convertPendingEntries(receiptText, facts) {
+export function convertPendingEntries(receiptText, facts, { only = null } = {}) {
   requireFacts(facts);
   let lines = receiptText.split('\n');
   const converted = [];
-  const unchanged = [];
+  const outOfScope = [];
+
+  // SCOPE IS THE RANGE, NOT THE FILE — and that is not a nicety.
+  //
+  // MEASURED 2026-09-13: `pendingReason` flags FOUR entries in the ledger as it
+  // stands on `scoring/renderer-residuals`, and only three of them are the
+  // branch stack's. The fourth is the 2026-09-06 P3 VERIFY-REPORT CLI entry,
+  // long since merged to main: its Runner-attestation field window runs past
+  // its own bullets and swallows prose that mentions the pending branches, so
+  // scan three sees the word. The real CLI never validates it, because it
+  // validates only entries the RANGE ADDS (`checkReceiptForRange`) — history is
+  // never re-validated, deliberately, so that the ledger's own honest
+  // correction entries do not fail the build years later. A converter that
+  // rewrote every pending-looking entry in the file would edit merged history
+  // to fix a problem nothing reports. `only` is the caller's set of in-range
+  // headings, taken from the gate's own `addedReceiptLines` + `extractEntries`.
+  const inScope = (heading) => (only === null ? true : only.has(heading));
 
   // Work from the LAST pending entry backwards: every conversion changes the
   // line count, and a later span computed before an earlier edit is wrong.
   const pending = findEntries(lines).filter((span) => {
     const entry = { heading: span.heading, lines: lines.slice(span.start + 1, span.end) };
-    return pendingReason(entry) !== null;
+    if (pendingReason(entry) === null) return false;
+    if (inScope(span.heading)) return true;
+    outOfScope.push(span.heading);
+    return false;
   });
   for (const span of [...pending].reverse()) {
     const result = convertEntry(lines, span, facts);
     lines = result.lines;
-    converted.unshift({ heading: span.heading, edits: result.edits });
+    converted.unshift({ heading: span.heading, newHeading: result.newHeading, edits: result.edits });
   }
+  // Verify by the entry's NEW heading. The first version of this loop compared
+  // the post-conversion spans against the entries' OLD headings — which scan
+  // one has just rewritten — so it matched nothing and the guard never ran:
+  // a converter whose own "did this work?" check could not fail. The
+  // "cannot be closed" case in tests/scripts/receipt-conversion.test.ts is the
+  // input that caught it.
   for (const span of findEntries(lines)) {
+    if (!converted.some((c) => c.newHeading === span.heading)) continue;
     const entry = { heading: span.heading, lines: lines.slice(span.start + 1, span.end) };
     const reason = pendingReason(entry);
     if (reason === null) continue;
@@ -358,10 +452,7 @@ export function convertPendingEntries(receiptText, facts) {
       ],
     );
   }
-  for (const span of findEntries(lines)) {
-    if (!converted.some((c) => c.heading === span.heading)) unchanged.push(span.heading);
-  }
-  return { text: lines.join('\n'), converted, unchanged };
+  return { text: lines.join('\n'), converted, outOfScope };
 }
 
 const REQUIRED_FACTS = [
