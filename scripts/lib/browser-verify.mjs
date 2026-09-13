@@ -1175,11 +1175,6 @@ export function createRecorder({
  */
 export async function shutdown({ browser, serverProc, graceMs = 0 } = {}) {
   try { if (browser) await browser.close(); } catch { /* already closed */ }
-  // Free the Vite cache slot this server held, so a second boot in the same
-  // gate reuses the warm directory instead of claiming a second one. Before
-  // the kill: releasing a slot whose server is still up is harmless (nothing
-  // else can be using it), losing the release to a throw is not.
-  try { serverProc?.releaseViteCacheSlot?.(); } catch { /* nothing to free */ }
   try {
     if (serverProc) {
       if (graceMs > 0) {
@@ -1191,4 +1186,16 @@ export async function shutdown({ browser, serverProc, graceMs = 0 } = {}) {
       }
     }
   } catch { /* already exited */ }
+  // Free the Vite cache slot this server held, so a second boot in the same
+  // gate reuses the warm directory instead of claiming a second one.
+  //
+  // AFTER the kill, not before, and not inside the try above. Releasing while
+  // the server is still up would let a second boot in the same process claim
+  // slot 0 and start an optimizer in a directory the dying server has not
+  // finished with — a smaller copy of the defect this whole change exists to
+  // close. Nothing is lost by waiting: `kill()` returns immediately, so the
+  // slot is still warm and still free for the next boot. Outside the try so a
+  // kill that throws (a process that already exited) cannot skip it; the exit
+  // hook in `bootKeylessServer` is the backstop if this is never reached.
+  try { serverProc?.releaseViteCacheSlot?.(); } catch { /* nothing to free */ }
 }
