@@ -4,13 +4,19 @@
   `/home/user/STORYMACHINE/node_modules`, which is the hazard this lane fixes
   and is left in place)
 - **Branch:** `lane/vite-cache-isolation`, from `main` at `f79b47ec`
-- **Tip:** `4b475582c97f3edc6e77095864535f44fa132406` — the tree every gate in §4
-  was confirmed against. Exactly one commit follows it on this branch and it
-  changes only these two lines and the log below, because a report cannot
-  contain the hash of the commit that contains the report.
+- **Tip:** `4beee016c2bfbf1c8f7ba936d3dd841da98bbf88` — the tree every gate in
+  §6 was confirmed against. Exactly one commit follows it on this branch and it
+  changes only these lines, because a report cannot contain the hash of the
+  commit that contains the report.
+- **Rounds:** round 1 reviewed at `b8adfcfc` (REVISE, `vitecache-review.md`
+  committed at `ecaf6d9b`); round 2 is §6.
 
 ```
 $ git log --oneline main..HEAD
+4beee016 docs(audit): round 2 of the vite-cache-isolation lane report
+836f4727 fix(vite): round 2 — unbreak the Docker builder stage, and make the lock's promises true
+ecaf6d9b docs(audit): vitecache-review round 1 (b8adfcfc) — REVISE
+b8adfcfc docs(audit): the lane report's own Tip line and log
 4b475582 docs(audit): the vite-cache-isolation lane report; release the cache slot after the kill
 bcd5de35 docs(brain): a Gate note for the Vite cache isolation harness
 d88cc1da fix(vite): one dependency-optimizer cache per worktree and per boot
@@ -731,4 +737,5 @@ rule for this round.
 
 ---
 
-Tip: `<TIP2>`
+Tip: `4beee016c2bfbf1c8f7ba936d3dd841da98bbf88` (the one commit after it is this
+line).
