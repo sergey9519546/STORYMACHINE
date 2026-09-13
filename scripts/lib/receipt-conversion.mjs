@@ -96,6 +96,81 @@ const CONVERTED_FIELDS = [
   { label: 'Runner attestation', insertIfMissing: true },
 ];
 
+/**
+ * The heading that bounds the entry as it was FILED.
+ *
+ * WHY THE ENTRY IS RESTRUCTURED AND NOT PATCHED IN PLACE (round-1 review, F4).
+ * Round 1 replaced each field where it stood and left the body around it. On
+ * the real `scoring/renderer-residuals` entry that produced a receipt whose
+ * heading says MEASURED and whose first paragraph says "its AUC-24 is not
+ * known … exits **1** on this entry, which is the intended state … No AUC-24
+ * number is stated, implied or projected anywhere on this branch". None of
+ * those sentences is in `PENDING_PHRASES`, so the scanner passed an entry that
+ * contradicted itself in the paragraph a reader reaches first.
+ *
+ * Per-sentence surgery on arbitrary prose is the wrong fix: those sentences
+ * were TRUE when they were written, and a mechanical rewrite of them would be
+ * this script inventing claims. So the entry is given one shape instead:
+ *
+ *   heading (MEASURED …)
+ *   the conversion banner
+ *   the five fields this run measured
+ *   - **Entry body as filed:**   <- bounds every field's value window
+ *   #### As filed, before this measurement …
+ *   the entry's original body, verbatim but for the re-tensed phrases
+ *
+ * Everything that describes the pending state is then below a heading that
+ * says so, and everything above it is the run's own record.
+ */
+export const AS_FILED_HEADING_PREFIX = '#### As filed, before this measurement';
+
+/**
+ * Sentences that assert no measurement exists. They are legitimate BELOW the
+ * as-filed boundary and a contradiction above it, so this is the guard that
+ * the restructure actually put them below it. Drawn from the three real
+ * pending entries (`AUC-24 is not known`, `no AUC-24 number is stated`,
+ * `exits **1** on this entry`, `claims none`, `not a receipt`).
+ */
+export const PENDING_ASSERTION_PATTERNS = Object.freeze([
+  /\bAUC-24\s+is\s+not\s+known\b/i,
+  /\bno\s+AUC-24\s+(?:number|value)\s+is\s+(?:stated|claimed)/i,
+  /\bhas\s+no\s+AUC-24\s+(?:number|value)\b/i,
+  /\bclaims\s+none\b/i,
+  /\bexits\s+\*\*1\*\*/i,
+  /\bis\s+an\s+honest\s+ledger\s+row,\s+not\s+a\s+receipt\b/i,
+  /\bno\s+real-corpus\s+(?:run|measurement)\s+(?:happened|was\s+run)\b/i,
+]);
+
+/**
+ * Refuse when a sentence asserting that no measurement exists survives ABOVE
+ * the as-filed boundary — where it would contradict the heading and the
+ * fields. Exported so the guard can be shown failing on its own input.
+ *
+ * @throws ConversionError naming every offending line.
+ */
+export function assertNoPendingAssertionsAbove(lines, boundaryIndex, heading = '(entry)') {
+  const offenders = [];
+  for (let i = 0; i < boundaryIndex && i < lines.length; i++) {
+    for (const re of PENDING_ASSERTION_PATTERNS) {
+      if (re.test(lines[i])) { offenders.push(`  line ${i + 1}: ${lines[i].trim()}`); break; }
+    }
+  }
+  if (offenders.length === 0) return;
+  throw new ConversionError(
+    `${offenders.length} sentence(s) asserting that no measurement exists survive ABOVE the `
+    + '"as filed" boundary of this entry.',
+    [
+      heading,
+      ...offenders,
+      '',
+      'Above that boundary the entry speaks for the run that just happened, so a sentence saying',
+      'the measurement does not exist is a contradiction a reader meets before the numbers. This',
+      'is the same refusal `convertHeading` applies to a heading, for the same reason. Move the',
+      'sentence below the boundary or rewrite it by hand; nothing was committed.',
+    ],
+  );
+}
+
 /** The bullet that BOUNDS every rewritten field's value window.
  *
  * THE PROBLEM IT SOLVES, which is the note's scan three in its hardest form: a
@@ -110,10 +185,28 @@ const CONVERTED_FIELDS = [
  */
 function terminatorLines(facts) {
   return [
-    `- **Entry body as filed:** everything below this line is this entry as it was`,
-    `  written before the measurement, with its pre-measurement tense corrected where`,
-    `  it described the absence of a run. Its original bytes are at`,
-    `  \`${facts.filedAtSha.slice(0, 8)}\`. The fields above are the run's own record.`,
+    '- **Entry body as filed:** the section below is this entry as it was filed,',
+    '  before any measurement existed — minus the fields above, which this run rewrote,',
+    '  and with the phrases that named the absence of a run put into the past tense.',
+    '  Sentences there describe the state AT FILING and several are no longer true; the',
+    `  fields above are the run's own record. Original bytes: \`${facts.filedAtSha.slice(0, 8)}\`.`,
+  ];
+}
+
+/**
+ * The probe lines of a Command field, one per side that was attempted, saying
+ * what actually happened. An empty `facts.probes` means the plan recorded no
+ * probe for this step, and the field says that instead of claiming a run.
+ */
+function probeCommandLines(facts) {
+  const probes = facts.probes ?? [];
+  if (probes.length === 0) {
+    return ['no corpus-shape probe (the measurement plan records none for this step);'];
+  }
+  const words = { ran: 'RAN', skipped: 'was SKIPPED', unavailable: 'was UNAVAILABLE' };
+  return [
+    '`npm run --silent probe-corpus-shape -- --csv`, which',
+    ...probes.map((p, i) => `  ${i === probes.length - 1 ? '' : ''}on the ${p.which} tree ${words[p.outcome] ?? p.outcome} (${p.detail.replace(/\s+/g, ' ').slice(0, 90)});`),
   ];
 }
 
@@ -221,9 +314,10 @@ function bannerLines(facts) {
   return [
     '',
     `**CONVERTED ${facts.date} BY \`npm run owner:measure\`.** This entry was filed as a ledger`,
-    'row before any real-corpus run existed. The fields below carry the numbers the run',
-    'printed; the prose under them is the entry AS FILED, with its pre-measurement tense',
-    `mechanically corrected. The original bytes are in git at \`${facts.filedAtSha.slice(0, 8)}\``,
+    'row before any real-corpus run existed. It now has two parts: the fields immediately',
+    `below, which are this run's record, and a \`${AS_FILED_HEADING_PREFIX}\``,
+    'section carrying the entry as it was filed. Read the fields for what was measured and',
+    `that section for what the branch is. Original bytes: \`${facts.filedAtSha.slice(0, 8)}\``,
     '(`git show <sha>:docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`).',
   ];
 }
@@ -233,15 +327,21 @@ function fieldBody(label, facts) {
   const bullet = (rest) => [`- **${label}:** ${rest[0]}`, ...rest.slice(1).map((l) => `  ${l}`)];
   switch (label) {
     case 'Command':
+      // WRITTEN FROM WHAT RAN, NOT FROM A TEMPLATE (round-1 review, F2). Round 1
+      // asserted `probe-corpus-shape` ran "on this tree and on the pre-branch
+      // base" in every receipt, under an attestation signing for the whole
+      // list — while three committed plan steps carry `probe: null` and a probe
+      // that exists can still come back skipped or unavailable. `facts.probes`
+      // is the run's own record of each side's outcome.
       return bullet([
         `\`REAL_SCRIPT_CORPUS_DIR=<corpus> npm run owner:measure\` on \`${facts.branch}\` @`,
         `\`${facts.filedAtSha.slice(0, 8)}\`, which ran, in this order and in the foreground:`,
-        '`node scripts/verify-corpus-layout.mjs --corpus-dir=<corpus>`,',
-        '`npm run --silent probe-corpus-shape -- --csv` (on this tree and on the pre-branch',
-        'base), and `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`. The full',
-        `command lines and their output are on the owner's machine in the run's local`,
-        'output directory, which is outside this repository and stays there. The command',
-        'list this entry carried as filed is in git at the SHA named above.',
+        '`node scripts/verify-corpus-layout.mjs --corpus-dir=<corpus>`;',
+        ...probeCommandLines(facts),
+        'and `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`. The full command',
+        `lines and their output are on the owner's machine in the run's local output`,
+        'directory, which is outside this repository and stays there. The command list',
+        'this entry carried as filed is in the section below and in git at the SHA above.',
       ]);
     case 'Measured AUC-24':
       if (facts.auc24 === null) {
@@ -250,15 +350,33 @@ function fieldBody(label, facts) {
           'entry, but this range moves no statistic AUC-24 reports. See the fingerprint above.',
         ]);
       }
+      // THE RECIPE ID IS THE ONE THAT PRODUCED THIS NUMBER (round-1 review, F1).
+      // Round 1 stamped `shuffle-drop/v2` on a number `measure-real` computed
+      // with its own pre-2026-09-12 scene split, in a permanent receipt, under
+      // an attestation — writing the id that exists to prevent exactly that
+      // comparison onto the number it was meant to protect against.
       return bullet([
         `**${facts.auc24.toFixed(4)}** — shuffle-drop over the first ${facts.subsetSize} manifest scripts,`,
-        `recipe \`${facts.degradationId}\` (the scene segmentation changed on 2026-09-12, so this`,
-        'number is NOT comparable to the 0.731 recorded on 2026-07-11, and not comparable to',
-        'the 761-script P1 baseline\'s 0.734 / 0.766 either — different corpus, different',
-        `degradation, different denominator). Floor \`AUC24_FLOOR\` ${facts.floor}.`,
+        `computed by \`npm run measure-real\` on recipe \`${facts.degradationId}\``,
+        `(${facts.degradationEvidence}).`,
+        ...(facts.recipeSame
+          ? [
+            `That is the same recipe \`lock-auc24\` writes (\`${facts.lockDegradationId}\`), so this`,
+            'number and the committed table are the same statistic.',
+          ]
+          : [
+            `**IT IS NOT THE RECIPE \`lock-auc24\` WRITES.** The committed table`,
+            `\`tests/fixtures/auc24-table.json\` is \`${facts.lockDegradationId}\` (scripts/lib/auc.ts);`,
+            'this number is on the segmentation that id was bumped away from, which is the same',
+            'segmentation the **0.731 of 2026-07-11** was measured on. So the two numbers this run',
+            'produces are NOT comparable to each other, and this one is NOT the one `AUC24_FLOOR`',
+            'was written for. Neither is comparable to the 761-script P1 baseline\'s 0.734 / 0.766',
+            '— different corpus, different degradation, different denominator.',
+          ]),
+        `Floor \`AUC24_FLOOR\` ${facts.floor}, for reference only where the recipes differ.`,
         ...(facts.baselineAuc24 === null || facts.baselineAuc24 === undefined
           ? []
-          : [`Same recipe, same corpus, ${facts.baselineRef} in the same run: **${facts.baselineAuc24.toFixed(4)}**.`]),
+          : [`Same recipe, same corpus, same run, ${facts.baselineRef}: **${facts.baselineAuc24.toFixed(4)}** — that comparison IS valid.`]),
         ...(facts.actSwapAuc === null || facts.actSwapAuc === undefined
           ? []
           : [`Act-swap, the second recipe \`npm run measure-real\` prints: ${facts.actSwapAuc.toFixed(3)}.`]),
@@ -312,90 +430,86 @@ function fieldBody(label, facts) {
  */
 function convertEntry(lines, span, facts) {
   const edits = [];
-  const out = lines.slice();
-  // The entry's end MOVES as the body grows. Every span below is recomputed
-  // against this, never against the caller's original `span.end` — the first
-  // version of this function used the stale bound and spliced an inserted
-  // field into the middle of another field's paragraph, which the
-  // "fields in document order" fixture in
-  // tests/scripts/receipt-conversion.test.ts now pins.
-  let end = span.end;
-  const grow = (delta) => { end += delta; };
-
+  const before = lines.slice(span.start, span.end);
   const newHeading = convertHeading(span.heading, facts);
   if (newHeading !== span.heading) {
     edits.push({ scan: 'one (heading)', before: span.heading, after: newHeading });
-    out[span.start] = newHeading;
   }
 
-  // Replace the fields the entry already carries, from the BOTTOM OF THE
-  // DOCUMENT upwards — by position, not by the order of CONVERTED_FIELDS. A
-  // real entry writes them in whatever order it likes (the renderer-residuals
-  // entry has Command, Git SHA, Measured AUC-24, … Corpus fingerprint, Runner
-  // attestation), so replacing them in list order invalidates every span below
-  // the one just edited.
+  // ── take the fields OUT of the body ──────────────────────────────────────
+  // Bottom-up by POSITION, not by the order of CONVERTED_FIELDS: a real entry
+  // writes them in whatever order it likes (the renderer-residuals ledger has
+  // Command, Git SHA, Measured AUC-24, … Corpus fingerprint, Runner
+  // attestation), and removing them in list order invalidates every span below
+  // the one just removed.
+  const body = before.slice(1);
   const located = CONVERTED_FIELDS
-    .map((field) => ({ field, para: fieldParagraph(out, span.start, end, field.label) }))
+    .map((field) => ({ field, para: fieldParagraph(body, 0, body.length, field.label) }))
     .filter((l) => l.para)
     .sort((a, b) => b.para.start - a.para.start);
   for (const { field, para } of located) {
-    const body = fieldBody(field.label, facts);
     edits.push({
-      scan: `field **${field.label}**`,
-      before: out.slice(para.start, para.end).join('\n'),
-      after: body.join('\n'),
+      scan: `field **${field.label}** (rewritten, and moved above the as-filed boundary)`,
+      before: body.slice(para.start, para.end).join('\n'),
+      after: fieldBody(field.label, facts).join('\n'),
     });
-    out.splice(para.start, para.end - para.start, ...body);
-    grow(body.length - (para.end - para.start));
+    body.splice(para.start, para.end - para.start);
   }
-
-  // A field the entry never carried is INSERTED after the last field it does
-  // carry. A missing required field is its own gate failure ("missing required
-  // field **X**"), so a converter that silently skipped one would hand the
-  // owner a commit that cannot pass.
   for (const field of CONVERTED_FIELDS) {
     if (!field.insertIfMissing) continue;
-    if (fieldParagraph(out, span.start, end, field.label)) continue;
-    const at = lastFieldEnd(out, span.start, end);
-    const body = fieldBody(field.label, facts);
-    edits.push({ scan: `field **${field.label}** (inserted — the entry had none)`, before: '', after: body.join('\n') });
-    out.splice(at, 0, ...body);
-    grow(body.length);
+    if (located.some((l) => l.field.label === field.label)) continue;
+    edits.push({
+      scan: `field **${field.label}** (added — the entry had none)`,
+      before: '',
+      after: fieldBody(field.label, facts).join('\n'),
+    });
   }
 
-  // Bound every rewritten field's value window (see terminatorLines).
-  const terminator = terminatorLines(facts);
-  edits.push({ scan: 'three (the field value window, bounded)', before: '', after: terminator.join('\n') });
-  out.splice(lastFieldEnd(out, span.start, end), 0, ...terminator);
-  grow(terminator.length);
-
-  // Scan two, over the whole entry body: re-tense, never delete.
-  const bodyText = out.slice(span.start + 1, end).join('\n');
-  const { text: retensed, hits } = retensePhrases(bodyText);
+  // ── scan two, over what is left of the body ──────────────────────────────
+  const { text: retensed, hits } = retensePhrases(body.join('\n'));
   if (hits.length > 0) {
     edits.push({
       scan: 'two (pending phrases, re-tensed)',
       before: hits.join(' · '),
       after: hits.map((h) => rewriteFor(h.toLowerCase()) ?? '(re-tensed)').join(' · '),
     });
-    const replacement = retensed.split('\n');
-    out.splice(span.start + 1, end - (span.start + 1), ...replacement);
-    grow(replacement.length - (end - (span.start + 1)));
   }
+  const asFiled = retensed.split('\n');
+  while (asFiled.length > 0 && asFiled[0].trim() === '') asFiled.shift();
+  while (asFiled.length > 0 && asFiled[asFiled.length - 1].trim() === '') asFiled.pop();
 
-  out.splice(span.start + 1, 0, ...bannerLines(facts));
-  return { lines: out, edits, newHeading };
-}
-
-/** One past the last line of the last CONVERTED_FIELDS paragraph in the entry,
- *  or the line after the heading when it carries none. */
-function lastFieldEnd(lines, start, end) {
-  let at = start + 1;
+  // ── one shape: heading, banner, fields, boundary, the entry as filed ─────
+  const fieldsBlock = [];
   for (const field of CONVERTED_FIELDS) {
-    const para = fieldParagraph(lines, start, end, field.label);
-    if (para && para.end > at) at = para.end;
+    if (!field.insertIfMissing && !located.some((l) => l.field.label === field.label)) continue;
+    fieldsBlock.push(...fieldBody(field.label, facts));
   }
-  return at;
+  const terminator = terminatorLines(facts);
+  edits.push({ scan: 'three (the field value window, bounded)', before: '', after: terminator.join('\n') });
+  const boundary = `${AS_FILED_HEADING_PREFIX} (${facts.date})`;
+  edits.push({ scan: 'the as-filed boundary', before: '', after: boundary });
+
+  const entry = [
+    newHeading,
+    ...bannerLines(facts),
+    '',
+    ...fieldsBlock,
+    ...terminator,
+    '',
+    boundary,
+    '',
+    ...asFiled,
+    '',
+  ];
+
+  // The guard that the restructure actually put the pending prose below the
+  // boundary. It can only fail if something above it acquired one of those
+  // sentences — which is what it is for.
+  assertNoPendingAssertionsAbove(entry, entry.indexOf(boundary), newHeading);
+
+  const out = lines.slice();
+  out.splice(span.start, span.end - span.start, ...entry);
+  return { lines: out, edits, newHeading };
 }
 
 /**
@@ -476,7 +590,12 @@ export function convertPendingEntries(receiptText, facts, { only = null } = {}) 
 
 const REQUIRED_FACTS = [
   'date', 'branch', 'filedAtSha', 'runner', 'corpusFingerprint', 'manifestHash',
-  'manifestScriptCount', 'corpusScriptCount', 'subsetSize', 'degradationId', 'floor',
+  'manifestScriptCount', 'corpusScriptCount', 'subsetSize', 'floor',
+  // The recipe that produced THIS number, the evidence for that claim, and the
+  // recipe the committed table uses. All three are required: an entry that
+  // names one without the other two is the round-1 receipt that stamped
+  // `shuffle-drop/v2` on a legacy-recipe number (review F1).
+  'degradationId', 'degradationEvidence', 'lockDegradationId',
 ];
 
 function requireFacts(facts) {
@@ -490,6 +609,12 @@ function requireFacts(facts) {
     }
   }
   if (!('auc24' in facts)) throw new ConversionError('refusing to write a receipt without `auc24` (pass null only when the range genuinely has none)');
+  if (typeof facts.recipeSame !== 'boolean') {
+    throw new ConversionError('refusing to write a receipt without `recipeSame` — whether the reported number and the locked table are the same statistic is not something to leave unsaid');
+  }
+  if (!Array.isArray(facts.probes)) {
+    throw new ConversionError('refusing to write a receipt without `probes` — the Command field is written FROM the run, and an absent list would make it a template again (review F2)');
+  }
   if (!/^[0-9a-f]{40}$/.test(facts.filedAtSha)) {
     throw new ConversionError(`\`filedAtSha\` must be a full 40-character SHA (got "${facts.filedAtSha}")`);
   }

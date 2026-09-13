@@ -291,7 +291,11 @@ the committed table last. Nothing that indexes the corpus enters the
 repository: tool output goes to a local directory outside it, and what travels
 into a receipt is numbers, hashes and a fingerprint.
 `tests/scripts/owner-measure-e2e.test.ts` runs the whole pipeline in CI against
-the 32 committed public screenplays.
+the 32 committed public screenplays. One run produces TWO AUC-24 numbers on two
+recipes — `measure-real` still carries its own pre-2026-09-12 scene split while
+`lock-auc24` uses `scripts/lib/auc.ts` — so each number is labelled with the
+recipe derived from the code that produced it, and the command says in words
+that the two are not comparable to each other.
 
 ### Cross-surface consistency (honesty-audit matrix, 2026-09-04)
 

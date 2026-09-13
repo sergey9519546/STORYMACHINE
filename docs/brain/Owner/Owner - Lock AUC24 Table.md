@@ -53,9 +53,15 @@ because the table has never existed — but the number this run produces is the
 first AUC-24 this segmentation has ever produced, and it is **not comparable to
 0.731**, nor to the 761-script P1 baseline's 0.734 / 0.766 (different corpus,
 different degradation, different denominator). `AUC24_FLOOR` stays at 0.622
-until a measurement moves it; `owner:measure` prints the measured number
-against the floor and against `main` measured in the SAME run, which is the
-only comparison a decision can be made on.
+until a measurement moves it; `owner:measure` prints the locked number against
+the floor and against `main` measured in the SAME run, which is the only
+comparison a decision can be made on.
+
+**And it is not the number `measure-real` reported earlier in the same run.**
+That script still carries its own pre-2026-09-12 scene split, so one run
+produces two AUC-24 figures on two recipes; the command labels each with the
+recipe that produced it and says plainly that they are not comparable to each
+other. See [[Owner - R5 Measurement and Merge]].
 
 A below-floor result is still written, with the real number, and
 `tests/core/auc24-table.test.ts` then fails the build on it. That is what the

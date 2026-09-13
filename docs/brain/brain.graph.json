@@ -1769,6 +1769,10 @@
       "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
     },
     {
+      "from": "docs/brain/Owner/Owner - Lock AUC24 Table.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
       "from": "docs/brain/Owner/Owner - P0 Fielding.md",
       "to": "docs/brain/Decisions/Decision 4 - Adopt the Power-Analysis Proposals.md"
     },

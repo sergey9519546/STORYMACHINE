@@ -93,6 +93,10 @@ const DEFAULT_REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
 const PLAN_PATH = 'docs/p1-benchmark/owner-measurement-plan.json';
 const MANIFEST_PATH = 'tests/fixtures/real-corpus-manifest.json';
 const RECEIPT_PATH = 'docs/p1-benchmark/MEASUREMENT_RECEIPTS.md';
+const MEASURE_REAL_REL = 'scripts/measure-real-script-discrimination.ts';
+/** The file an operator creates to say "this checkout is disposable". Fixture
+ *  mode refuses without it; see the refusal in `main()` (round-1 review, F5). */
+export const FIXTURE_MARKER = '.owner-measure-throwaway';
 
 /** Exit codes: 0 done, 1 a refusal or a failure, 2 a usage error. */
 const EXIT_OK = 0;
@@ -138,7 +142,7 @@ export function parseArgs(argv) {
   const args = {
     plan: false, dryRun: false, push: false, acceptAll: false, yes: false,
     stopAfter: null, only: null, corpusFixture: null, planFile: null,
-    repoRoot: null, outDir: null, remote: null, keepTrees: false,
+    repoRoot: null, outDir: null, remote: null, keepTrees: false, accept: [],
   };
   for (const a of argv) {
     if (a === '--plan') args.plan = true;
@@ -149,6 +153,7 @@ export function parseArgs(argv) {
     else if (a === '--keep-trees') args.keepTrees = true;
     else if (a.startsWith('--stop-after=')) args.stopAfter = a.slice('--stop-after='.length);
     else if (a.startsWith('--only=')) args.only = a.slice('--only='.length);
+    else if (a.startsWith('--accept=')) args.accept.push(a.slice('--accept='.length));
     else if (a.startsWith('--corpus-fixture=')) args.corpusFixture = a.slice('--corpus-fixture='.length);
     else if (a.startsWith('--plan-file=')) args.planFile = a.slice('--plan-file='.length);
     else if (a.startsWith('--repo-root=')) args.repoRoot = a.slice('--repo-root='.length);
@@ -168,7 +173,9 @@ const USAGE = `Usage: REAL_SCRIPT_CORPUS_DIR=<corpus> npm run owner:measure -- [
   --plan                   print the plan and the reason for every step, then exit
   --dry-run                run everything read-only; print every edit as a diff, write nothing
   --push                   push the conversion commit (default OFF — read the diff first)
-  --accept-all, --yes      do not prompt at an accept/reject gate
+  --accept-all, --yes      do not prompt at an accept/reject gate (a "report"
+                           step stays REPORTED — --accept-all is not --accept)
+  --accept=<step id>       accept this step by name, including a "report" one
   --stop-after=<step id>   stop after this step
   --only=<step id>         measure exactly this step (the way a "manual" step is reached)
   --corpus-fixture=public  self-test: run the whole pipeline on the 32 committed scripts
@@ -263,6 +270,90 @@ export function corpusFingerprint(manifestBytes) {
 }
 
 // ---------------------------------------------------------------------------
+// WHICH RECIPE PRODUCED WHICH NUMBER
+// ---------------------------------------------------------------------------
+
+/** What `measure-real`'s AUC-24 is called when that script still carries its
+ *  own pre-2026-09-12 scene split. Deliberately NOT a version of
+ *  `shuffle-drop/v2`: it is the segmentation `AUC24_DEGRADATION_ID` was bumped
+ *  away from, and it is the one the 0.731 of 2026-07-11 was measured on. */
+export const MEASURE_REAL_LEGACY_ID = 'shuffle-drop/legacy-int-ext-split';
+
+/**
+ * Read the recipe id of the number `measure-real` prints OFF THE CODE THAT
+ * PRINTS IT — never from a constant in this file.
+ *
+ * WHY THIS EXISTS (round-1 review, F1). `scripts/lock-auc24.mjs` and
+ * `tests/core/real-script-corpus.test.ts` import `shuffleDropDegrade` from
+ * `scripts/lib/auc.ts`, which is `shuffle-drop/v2`.
+ * `scripts/measure-real-script-discrimination.ts` does NOT: it still carries a
+ * private `splitScenes` that splits on `/^(?=INT\.|EXT\.)/mi` and a private
+ * `auc()`. So a single run of this command produces TWO AUC-24 numbers on TWO
+ * segmentations, and round 1 of this lane stamped both with
+ * `AUC24_DEGRADATION_ID`, in stdout AND in a permanent receipt — labelling an
+ * old-recipe number with the id that exists to stop exactly that comparison.
+ *
+ * Migrating `measure-real` moves a measured number and needs its own receipt
+ * and its own lane. Labelling it truthfully does not, so the id is DERIVED:
+ * this reads the script's source in the tree being measured, and the answer
+ * changes by itself on the day someone migrates it.
+ *
+ * @returns {{ id: string, migrated: boolean, evidence: string }}
+ */
+export function detectMeasureRealRecipe(tree) {
+  const file = path.join(tree, 'scripts/measure-real-script-discrimination.ts');
+  if (!existsSync(file)) {
+    return { id: 'shuffle-drop/unknown', migrated: false, evidence: `${MEASURE_REAL_REL} is not in this tree` };
+  }
+  const src = readFileSync(file, 'utf8');
+  const lines = src.split('\n');
+  const legacyAt = lines.findIndex((l) => /\.split\(\/\^\(\?=INT\\\.\|EXT\\\.\)\/mi\)/.test(l));
+  const importsShared = /import\s*\{[^}]*\bshuffleDropDegrade\b[^}]*\}\s*from\s*'\.\/lib\/auc\.ts'/s.test(src);
+  if (legacyAt !== -1) {
+    return {
+      id: MEASURE_REAL_LEGACY_ID,
+      migrated: false,
+      evidence: `${MEASURE_REAL_REL}:${legacyAt + 1} still splits scenes on /^(?=INT\\.|EXT\\.)/mi`,
+    };
+  }
+  if (importsShared) {
+    return {
+      id: AUC24_DEGRADATION_ID,
+      migrated: true,
+      evidence: `${MEASURE_REAL_REL} imports shuffleDropDegrade from scripts/lib/auc.ts`,
+    };
+  }
+  return {
+    id: 'shuffle-drop/unknown',
+    migrated: false,
+    evidence: `${MEASURE_REAL_REL} neither carries the legacy split nor imports scripts/lib/auc.ts — recipe unknown`,
+  };
+}
+
+/** The two recipe ids of one run, side by side, with the sentence a reader
+ *  needs between them. Pure, so the test can read it without a corpus. */
+export function recipeComparison(measureReal, lockRecipeId) {
+  const same = measureReal.id === lockRecipeId;
+  return {
+    same,
+    lines: same
+      ? [
+        `recipes         : measure-real and lock-auc24 both compute \`${lockRecipeId}\``,
+        `                  (${measureReal.evidence}). The two numbers below are the same statistic.`,
+      ]
+      : [
+        `recipes         : THESE TWO NUMBERS ARE ON DIFFERENT RECIPES AND ARE NOT COMPARABLE`,
+        `                  TO EACH OTHER. The AUC-24 this run REPORTS is \`${measureReal.id}\``,
+        `                  (${measureReal.evidence}); the table \`lock-auc24\` WRITES is`,
+        `                  \`${lockRecipeId}\` (scripts/lib/auc.ts). The reported number is on the`,
+        '                  same scene segmentation as the 0.731 of 2026-07-11; the locked table is',
+        '                  not. Migrating measure-real onto scripts/lib/auc.ts moves a measured',
+        '                  number and is its own change.',
+      ],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Parsing the tools' output
 // ---------------------------------------------------------------------------
 
@@ -347,11 +438,27 @@ export function parseLayoutChecks(stdout) {
  * manifest-resolution check below, which actually speaks about this corpus,
  * standing in its place. Any OTHER failing check stops the run.
  */
+export const FORGIVEN_LAYOUT_CHECKS = Object.freeze([
+  // verify-corpus-layout.mjs's check 2, about scripts/output/corpus-split.json:
+  // the committed split is the pre-migration 761-script P1 split, a DIFFERENT
+  // corpus from the 72-row AUC-24 one this run measures.
+  'split manifest is migrated schema (id + contentHash present)',
+  // Its optional manifest section's first check, about the corpus this run DOES
+  // measure: the committed rows carry name/file/contentHash and no `id`. It is
+  // forgiven only because the per-file checks under it are then not run at all
+  // (that script returns early), and because the pre-flight substitutes its own
+  // check that every manifest row resolves to a file in the corpus dir.
+  'real-corpus-manifest is migrated schema (id + contentHash present)',
+]);
+
 export function classifyLayout(status, checks) {
   const failing = checks.filter((c) => !c.ok);
   if (status === 0 && failing.length === 0) return { ok: true, preMigration: false, failing };
+  // NAMED, not pattern-matched (review F8). Round 1 forgave any failing check
+  // whose label matched /migrated schema/i, which is two checks today and
+  // whatever the next one is called tomorrow.
   const preMigrationOnly = failing.length > 0
-    && failing.every((c) => /migrated schema/i.test(c.label));
+    && failing.every((c) => FORGIVEN_LAYOUT_CHECKS.includes(c.label));
   if (preMigrationOnly) return { ok: true, preMigration: true, failing };
   return { ok: false, preMigration: false, failing };
 }
@@ -478,10 +585,21 @@ async function measureTree(ctx, { label, ref, tree, probe }) {
   say(`  tree            : ${label} @ ${git(ctx.repoRoot, ['rev-parse', '--short', ref])}`);
 
   // ── the probe, on this tree and on its pre-branch base ────────────────────
+  //
+  // EVERY OUTCOME IS RECORDED, because the receipt's Command field is written
+  // FROM THIS LIST. Round 1 wrote "npm run --silent probe-corpus-shape -- --csv
+  // (on this tree and on the pre-branch base)" into every converted receipt
+  // unconditionally — under an attestation signing for the whole list — while
+  // three of the six committed plan steps carry `probe: null` and a probe that
+  // exists can still come back `skipped` or `unavailable`. A fabricated command
+  // list in a measurement receipt is the class of thing this gate exists to
+  // make expensive (round-1 review, F2).
+  const probes = [];
   if (probe) {
     for (const [which, at] of [['branch', ref], ['base', probe.base]]) {
       const result = runProbe(ctx, { which, at, sourceRef: probe.sourceRef, label });
       say(`  probe (${which.padEnd(6)}) : ${result.summary}`);
+      probes.push({ which, at, outcome: result.outcome, detail: result.receiptDetail ?? result.outcome });
       log.push(...result.log);
     }
     say('  NOTE            : the probe CSVs index the corpus. They are in the output directory');
@@ -500,12 +618,16 @@ async function measureTree(ctx, { label, ref, tree, probe }) {
   const parsed = parseMeasureReal(res.stdout, res.status);
   say(`  measure-real    : ${parsed.scripts} scripts · shuffle-drop AUC-24 ${parsed.shuffleDropAuc.toFixed(4)} · act-swap ${parsed.actSwapAuc === null ? 'n/a' : parsed.actSwapAuc.toFixed(3)}`);
   say(`  manifest        : ${parsed.mismatches} mismatch(es) · ${parsed.belowFloor ?? '?'} below the produced floor`);
-  say(`  command         : REAL_SCRIPT_CORPUS_DIR=<corpus> ${cmd.slice(1).join(' ')}  (cwd ${redact(tree, ctx.corpusDir)})`);
+  // The FULL argv, node included: round 1 dropped `process.execPath`, so the
+  // line the receipt points at was not runnable (review F10).
+  const commandLine = `REAL_SCRIPT_CORPUS_DIR=<corpus> ${cmd.join(' ')}`;
+  say(`  command         : ${commandLine}  (cwd ${redact(tree, ctx.corpusDir)})`);
   say(`  log             : ${redact(logFile, ctx.corpusDir)}`);
 
   return {
     label, ref, tree, auc24: parsed.shuffleDropAuc, actSwap: parsed.actSwapAuc,
-    scripts: parsed.scripts, mismatches: parsed.mismatches, log, commandLine: cmd.join(' '),
+    scripts: parsed.scripts, mismatches: parsed.mismatches, log, commandLine, probes,
+    recipe: detectMeasureRealRecipe(tree),
   };
 }
 
@@ -535,27 +657,53 @@ function runProbe(ctx, { which, at, sourceRef, label }) {
     if (!existsSync(own) && sourceRef) {
       const show = run('git', ['-C', ctx.repoRoot, 'show', `${sourceRef}:scripts/probe-corpus-shape.ts`]);
       if (show.status !== 0) {
-        return { summary: `skipped — no probe on this tree and none at ${sourceRef.slice(0, 8)}`, log };
+        return {
+          outcome: 'skipped',
+          summary: `skipped — no probe on this tree and none at ${sourceRef.slice(0, 8)}`,
+          receiptDetail: `no probe on that tree and none at ${sourceRef.slice(0, 8)}`,
+          log,
+        };
       }
       writeFileSync(own, show.stdout, 'utf8');
       provenance = `copied from ${sourceRef.slice(0, 8)}`;
     }
     if (!existsSync(own)) {
-      return { summary: 'skipped — this tree has no scripts/probe-corpus-shape.ts and the plan names no source', log };
+      return {
+        outcome: 'skipped',
+        summary: 'skipped — this tree has no scripts/probe-corpus-shape.ts and the plan names no source',
+        receiptDetail: 'that tree has no scripts/probe-corpus-shape.ts and the plan names no source',
+        log,
+      };
     }
     const res = run(process.execPath, ['--experimental-strip-types', 'scripts/probe-corpus-shape.ts', '--csv'], {
       cwd: dir,
       env: { ...process.env, REAL_SCRIPT_CORPUS_DIR: ctx.corpusDir },
     });
     if (res.status !== 0) {
-      const why = redact(res.stderr.trim().split('\n').slice(-3).join(' | '), ctx.corpusDir);
-      writeArtifact(ctx.outDir, `${label}.probe-${which}.error.log`, `${res.stdout}\n${res.stderr}`);
-      return { summary: `unavailable (${provenance}) — ${why.slice(0, 160)}`, log };
+      // NOT ECHOED. This is a FOREIGN script's stderr; `redact()` masks the
+      // corpus directory but not a basename under it, and a probe that dies on
+      // one script names that script (review F11). The log is written and only
+      // its path is printed.
+      const errFile = writeArtifact(ctx.outDir, `${label}.probe-${which}.error.log`, `${res.stdout}\n${res.stderr}`);
+      return {
+        outcome: 'unavailable',
+        summary: `unavailable (${provenance}, exit ${res.status}) — its output is in ${redact(errFile, ctx.corpusDir)}, unread by this command`,
+        receiptDetail: `${provenance}, exit ${res.status}; its output stayed in the run's local output directory`,
+        log,
+      };
     }
     const file = writeArtifact(ctx.outDir, `${label}.probe-${which}.csv`, res.stdout);
     const rows = res.stdout.trim().split('\n').length - 1;
     log.push(`probe ${which} (${provenance}) -> ${file}`);
-    return { summary: `${rows} rows, ${provenance} -> ${redact(file, ctx.corpusDir)}`, log };
+    // `receiptDetail` carries NO PATH. `summary` names the CSV so the owner can
+    // find it; the receipt is committed, and a local output path has no more
+    // business in it than a screenplay title does.
+    return {
+      outcome: 'ran',
+      summary: `${rows} rows, ${provenance} -> ${redact(file, ctx.corpusDir)}`,
+      receiptDetail: `${rows} rows, ${provenance}`,
+      log,
+    };
   } finally {
     if (!ctx.keepTrees) removeWorktree(ctx.repoRoot, dir);
   }
@@ -578,7 +726,7 @@ function inspectRange(ctx, tree, base) {
   return JSON.parse(res.stdout.trim().split('\n').pop());
 }
 
-async function convertAndCommit(ctx, step, tree, measurement, baseline) {
+async function convertAndCommit(ctx, step, tree, measurement, baseline, recipes) {
   const receiptFile = path.join(tree, RECEIPT_PATH);
   const before = readFileSync(receiptFile, 'utf8');
   // The entries this RANGE adds — the only ones the conversion may touch. See
@@ -601,7 +749,14 @@ async function convertAndCommit(ctx, step, tree, measurement, baseline) {
     baselineRef: baseline ? baseline.label : null,
     corpusScriptCount: measurement.scripts,
     subsetSize: AUC24_SUBSET,
-    degradationId: AUC24_DEGRADATION_ID,
+    // The recipe that produced THIS number, read off the code that produced
+    // it — not the one `lock-auc24` uses (review F1).
+    degradationId: measurement.recipe.id,
+    degradationEvidence: measurement.recipe.evidence,
+    lockDegradationId: AUC24_DEGRADATION_ID,
+    recipeSame: recipes.same,
+    // What the probe actually did on each side (review F2).
+    probes: measurement.probes ?? [],
     floor: AUC24_FLOOR,
     ...fingerprint,
   };
@@ -828,7 +983,10 @@ async function main(argv) {
     runnerHost: os.hostname(),
   };
   ctx.treesDir = path.join(ctx.outDir, 'trees');
-  mkdirSync(ctx.outDir, { recursive: true });
+  // NOT created here. "Nothing was written" has to be TRUE on the pre-flight's
+  // refusals, and round 1 created this directory before the first check ran
+  // (review F7). `writeArtifact` and `addWorktree` create it when something is
+  // actually written, which is after the refusals.
 
   console.log(`output directory  : ${redact(ctx.outDir, null)}`);
   console.log('                    Everything this run writes outside the repository goes here. The');
@@ -838,6 +996,48 @@ async function main(argv) {
 
   // ── the public fixture: a throwaway corpus, manifest and plan ─────────────
   if (args.corpusFixture === 'public') {
+    // REFUSED IN THIS REPOSITORY (round-1 review, F5). Fixture mode overwrites
+    // `tests/fixtures/real-corpus-manifest.json` with a 32-row throwaway BEFORE
+    // the pre-flight, sets allowDirty, and would then commit that manifest onto
+    // a real `scoring/*` branch and move its ref. Round 1's only guard was a
+    // sentence in a file header saying it runs "in a clone".
+    if (!args.repoRoot) {
+      throw new Refusal(
+        '--corpus-fixture=public requires an explicit --repo-root, and it must not be this repository.',
+        [
+          'Fixture mode REPLACES tests/fixtures/real-corpus-manifest.json with a 32-row throwaway',
+          'and commits it onto the measured branch. Pointed at a real checkout it would overwrite',
+          "the committed 72-row manifest and move a scoring branch's ref.",
+          '',
+          '  git clone --shared <repo> /tmp/fixture && \\',
+          '    npm run owner:measure -- --corpus-fixture=public --repo-root=/tmp/fixture …',
+        ],
+      );
+    }
+    if (path.resolve(repoRoot) === path.resolve(DEFAULT_REPO_ROOT)) {
+      throw new Refusal(
+        `--corpus-fixture=public refuses to run against ${redact(DEFAULT_REPO_ROOT, null)} — the repository this script lives in.`,
+        [
+          'It is destructive by design (it replaces the committed corpus manifest with a 32-row',
+          'throwaway and commits it). Point --repo-root at a throwaway clone.',
+        ],
+      );
+    }
+    if (!existsSync(path.join(repoRoot, FIXTURE_MARKER))) {
+      throw new Refusal(
+        `${redact(repoRoot, null)} is not marked as a throwaway.`,
+        [
+          `Fixture mode writes and commits into the repository it is pointed at, so it wants the`,
+          'operator to have said out loud that this one is disposable. Create the marker in the',
+          'clone — never in a real checkout:',
+          '',
+          `  touch <clone>/${FIXTURE_MARKER}`,
+          '',
+          'A path check alone is not enough: a clone of this repository looks exactly like the',
+          'original, and the file header saying "it runs in a clone" was round 1\'s only guard.',
+        ],
+      );
+    }
     const fixture = await buildPublicFixtureCorpus(repoRoot, ctx.outDir);
     ctx.corpusDir = fixture.corpusDir;
     ctx.fixtureManifest = fixture.manifest;
@@ -863,6 +1063,11 @@ async function main(argv) {
   } finally {
     if (!ctx.keepTrees) removeWorktree(repoRoot, baselineTree);
   }
+  // Which recipe produced the number just printed, and whether it is the one
+  // `lock-auc24` will use. Derived from the source in the measured tree, so the
+  // answer changes by itself the day `measure-real` is migrated (review F1).
+  const recipes = recipeComparison(baseline.recipe, AUC24_DEGRADATION_ID);
+  for (const line of recipes.lines) console.log(`  ${line}`);
   console.log('');
 
   // ── the steps ────────────────────────────────────────────────────────────
@@ -888,27 +1093,44 @@ async function main(argv) {
       results.push({ step, measurement });
 
       console.log('');
-      console.log(`  AUC-24          : ${measurement.auc24.toFixed(4)}`);
+      console.log(`  AUC-24 reported : ${measurement.auc24.toFixed(4)}  (recipe \`${measurement.recipe.id}\`)`);
       console.log(`  vs AUC24_FLOOR  : ${AUC24_FLOOR} — ${measurement.auc24 >= AUC24_FLOOR ? 'clears' : 'BELOW THE FLOOR'}`);
-      console.log(`  vs ${baseline.label.padEnd(12)}: ${baseline.auc24.toFixed(4)} (${(measurement.auc24 - baseline.auc24 >= 0 ? '+' : '') + (measurement.auc24 - baseline.auc24).toFixed(4)})`);
-      console.log('  BOTH numbers are on recipe ' + AUC24_DEGRADATION_ID + ', measured in this run. The last');
-      console.log('  recorded AUC-24 (0.731, 2026-07-11) is on the PRE-2026-09-12 segmentation and is');
-      console.log('  not comparable to either of them.');
+      if (!recipes.same) {
+        console.log(`                    READ THAT COMPARISON WITH CARE: AUC24_FLOOR was written for`);
+        console.log(`                    \`${AUC24_DEGRADATION_ID}\`, and this number is not on it.`);
+      }
+      console.log(`  vs ${baseline.label.padEnd(12)}: ${baseline.auc24.toFixed(4)} (${(measurement.auc24 - baseline.auc24 >= 0 ? '+' : '') + (measurement.auc24 - baseline.auc24).toFixed(4)}) — same recipe, same run, so this one IS a comparison`);
+      for (const line of recipes.lines) console.log(`  ${line}`);
       console.log('');
 
-      const conversion = await convertAndCommit(ctx, step, tree, measurement, baseline);
+      const conversion = await convertAndCommit(ctx, step, tree, measurement, baseline, recipes);
 
       // ── the accept/reject gate ────────────────────────────────────────────
-      let decision = 'accepted';
-      if (step.gate === 'accept-reject') {
+      //
+      // A `report` STEP IS NOT ACCEPTED (round-1 review, F3). Round 1
+      // initialised `decision` to 'accepted' and only let `accept-reject`
+      // change it, so a report step printed "it takes no accept/reject
+      // decision" and was then treated as accepted: it re-locked the 72-row
+      // manifest, became the tip `lock-auc24` wrote against, and satisfied
+      // every downstream `if-accepted:`. The default path of the committed plan
+      // reached exactly that.
+      let decision;
+      if (args.accept.includes(step.id)) {
+        decision = 'accepted';
+        console.log(`  gate            : --accept=${step.id}, accepted by name`);
+      } else if (step.gate === 'accept-reject') {
         if (args.acceptAll) {
+          decision = 'accepted';
           console.log('  gate            : --accept-all, taken as accepted');
         } else {
           const answer = await ask(`  accept ${step.id} (AUC-24 ${measurement.auc24.toFixed(4)} vs baseline ${baseline.auc24.toFixed(4)})? [y/N] `);
           decision = answer === 'y' || answer === 'yes' ? 'accepted' : 'rejected';
         }
       } else {
-        console.log('  gate            : this step reports; it takes no accept/reject decision');
+        decision = 'reported';
+        console.log('  gate            : this step REPORTS. It is measured and written down, and it is');
+        console.log('                    NOT accepted: no manifest re-lock, not the lock tip, and it');
+        console.log(`                    satisfies no \`if-accepted:\`. Pass --accept=${step.id} to accept it.`);
       }
       decisions.set(step.id, decision);
       console.log(`  decision        : ${decision}`);
@@ -918,7 +1140,7 @@ async function main(argv) {
         accepted = { step, tree, measurement };
         relockStep(ctx, step, tree);
       } else {
-        console.log('  manifest        : not re-locked — the re-lock follows acceptance, never a measurement');
+        console.log(`  manifest        : not re-locked — the re-lock follows acceptance, and this step was ${decision}`);
       }
 
       if (conversion.committed) commitOnBranch(ctx, step, tree, measurement, decision);
@@ -1018,7 +1240,7 @@ function commitOnBranch(ctx, step, tree, measurement, decision) {
 
   // Only now is the branch ref moved, with its old value pinned so a branch
   // that moved under us fails instead of being overwritten.
-  git(ctx.repoRoot, ['update-ref', `refs/heads/${step.branch}`, newSha, step.tip], { allowFail: true });
+  moveBranchRef(ctx, step.branch, newSha, step.tip, tree);
   console.log(`  branch          : refs/heads/${step.branch} -> ${newSha.slice(0, 8)}`);
   if (ctx.push) {
     const res = run('git', ['-C', tree, 'push', ctx.remote, `${newSha}:refs/heads/${step.branch}`]);
@@ -1026,6 +1248,33 @@ function commitOnBranch(ctx, step, tree, measurement, decision) {
   } else {
     console.log('  push            : skipped (--push is off by default — read the diff first)');
   }
+}
+
+/**
+ * Move a branch ref by COMPARE-AND-SWAP, and fail out loud when the swap is
+ * rejected.
+ *
+ * Round 1 passed `allowFail: true` and then printed the move unconditionally
+ * (review F9): a branch that moved under the run was correctly not overwritten
+ * and incorrectly reported as moved. Exported so the refusal can be driven in
+ * a test against a throwaway repository.
+ *
+ * @throws Refusal when `oldSha` is no longer the branch's value.
+ */
+export function moveBranchRef(ctx, branch, newSha, oldSha, tree = '(the measured worktree)') {
+  const swap = run('git', ['-C', ctx.repoRoot, 'update-ref', `refs/heads/${branch}`, newSha, oldSha]);
+  if (swap.status !== 0) {
+    throw new Refusal(
+      `refs/heads/${branch} was NOT moved: its old value is no longer ${oldSha.slice(0, 8)}.`,
+      [
+        'The branch moved while this run was measuring. The conversion commit is safe at',
+        `${newSha.slice(0, 8)} in ${redact(tree, ctx.corpusDir)} — nothing was overwritten and nothing was lost.`,
+        'Re-read the branch, update the plan record and the owner note together, and run again.',
+        swap.stderr.trim(),
+      ],
+    );
+  }
+  return newSha;
 }
 
 /** The last step: the committed table the 2026-10-01 deadline is about. */

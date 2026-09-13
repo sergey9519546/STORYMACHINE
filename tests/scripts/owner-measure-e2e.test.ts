@@ -32,7 +32,11 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { parseMeasureReal, redact, resolveOutDir } from '../../scripts/owner-measure.mjs';
+import {
+  FIXTURE_MARKER, MEASURE_REAL_LEGACY_ID, classifyLayout, detectMeasureRealRecipe,
+  moveBranchRef, parseMeasureReal, recipeComparison, redact, resolveOutDir,
+} from '../../scripts/owner-measure.mjs';
+import { AUC24_DEGRADATION_ID } from '../../scripts/lib/auc.ts';
 
 const REPO = path.resolve(import.meta.dirname, '../..');
 const FIXTURE_BRANCH = 'scoring/fixture-e2e';
@@ -59,6 +63,26 @@ function git(repo: string, args: string[]) {
   assert.equal(res.status, 0, `git ${args.join(' ')} failed: ${res.stderr}`);
   return res.stdout.trim();
 }
+
+const REPORT_BRANCH = 'scoring/fixture-report';
+
+/** A corpus-shape probe the fixture branch carries and its BASE does not — the
+ *  shape of the real thing (`scripts/probe-corpus-shape.ts` exists on the three
+ *  adversarial-stack branches and on neither `main` nor
+ *  `scoring/feature-length-defects`). It prints a CSV of corpus filenames,
+ *  which is exactly why its output must reach the local run directory and
+ *  never stdout. */
+const FIXTURE_PROBE = `// fixture corpus-shape probe (tests/scripts/owner-measure-e2e.test.ts)
+import { readdirSync } from 'node:fs';
+const dir = process.env.REAL_SCRIPT_CORPUS_DIR ?? '';
+if (!dir) {
+  console.log('\\n[SKIP] REAL_SCRIPT_CORPUS_DIR not set');
+  process.exit(0);
+}
+console.log('file,words,@cue,>tr');
+for (const f of readdirSync(dir).sort()) console.log(\`\${f},0,0,0\`);
+process.exit(0);
+`;
 
 /** The PENDING ledger entry the fixture branch files — the input the three-scan
  *  conversion exists for, written to trip all three scans at once. */
@@ -90,6 +114,7 @@ let clone = '';
 let outDir = '';
 let baseSha = '';
 let fixtureTip = '';
+let reportTip = '';
 let run: { status: number | null; stdout: string; stderr: string } = { status: null, stdout: '', stderr: '' };
 let dryRun: { status: number | null; stdout: string; stderr: string } = { status: null, stdout: '', stderr: '' };
 let manifestBefore: Array<{ file: string }> = [];
@@ -110,6 +135,11 @@ describe('owner:measure end to end, on the committed public corpus', () => {
     sh('ln', ['-s', path.join(REPO, 'node_modules'), path.join(clone, 'node_modules')]);
     for (const rel of UNDER_TEST) copyFileSync(path.join(REPO, rel), path.join(clone, rel));
 
+    // The operator's explicit "this checkout is disposable" marker. Fixture
+    // mode refuses without it, and refuses to run against the repository the
+    // script itself lives in (round-1 review, F5).
+    writeFileSync(path.join(clone, '.owner-measure-throwaway'), 'owner-measure e2e fixture\n', 'utf8');
+
     baseSha = git(clone, ['rev-parse', 'HEAD']);
 
     // The fixture branch: one scoring-path change and one PENDING receipt
@@ -118,7 +148,15 @@ describe('owner:measure end to end, on the committed public corpus', () => {
     const build = path.join(tmp, 'build');
     git(clone, ['worktree', 'add', '--quiet', '-b', FIXTURE_BRANCH, build, baseSha]);
     const doctor = path.join(build, 'server/nvm/analyze/doctor.ts');
-    writeFileSync(doctor, `${readFileSync(doctor, 'utf8')}\n// owner-measure e2e fixture: a comment-only scoring-path touch.\n`, 'utf8');
+    // A REAL one-line scoring change, not a comment (round-1 review §4c): the
+    // scarcity scale moves every script's health, so the branch's AUC-24
+    // differs from the baseline's and the manifest re-lock actually moves
+    // fields. A comment-only touch made both numbers identical and printed
+    // "0 field(s) moved", which exercised neither path.
+    const doctorSrc = readFileSync(doctor, 'utf8');
+    assert.ok(doctorSrc.includes('const SCARCITY_SCALE = 140;'), 'the fixture needs this constant to still exist');
+    writeFileSync(doctor, doctorSrc.replace('const SCARCITY_SCALE = 140;', 'const SCARCITY_SCALE = 152;'), 'utf8');
+    writeFileSync(path.join(build, 'scripts/probe-corpus-shape.ts'), FIXTURE_PROBE, 'utf8');
     const receipt = path.join(build, 'docs/p1-benchmark/MEASUREMENT_RECEIPTS.md');
     writeFileSync(receipt, readFileSync(receipt, 'utf8') + pendingEntry(), 'utf8');
     git(clone, ['-C', build, 'add', '-A']);
@@ -127,6 +165,21 @@ describe('owner:measure end to end, on the committed public corpus', () => {
     git(clone, ['worktree', 'remove', '--force', build]);
     git(clone, ['push', '--quiet', 'origin', FIXTURE_BRANCH]);
 
+    // A SECOND branch, measured by a `report` step: measured and written down,
+    // never accepted (round-1 review, F3).
+    const build2 = path.join(tmp, 'build-report');
+    git(clone, ['worktree', 'add', '--quiet', '-b', REPORT_BRANCH, build2, baseSha]);
+    const doctor2 = path.join(build2, 'server/nvm/analyze/doctor.ts');
+    writeFileSync(doctor2, readFileSync(doctor2, 'utf8').replace('const SCARCITY_SCALE = 140;', 'const SCARCITY_SCALE = 133;'), 'utf8');
+    const receipt2 = path.join(build2, 'docs/p1-benchmark/MEASUREMENT_RECEIPTS.md');
+    writeFileSync(receipt2, readFileSync(receipt2, 'utf8')
+      + pendingEntry().replace(/FIXTURE E2E/g, 'FIXTURE REPORT').replace(/scoring\/fixture-e2e/g, REPORT_BRANCH), 'utf8');
+    git(clone, ['-C', build2, 'add', '-A']);
+    git(clone, ['-C', build2, 'commit', '--quiet', '-m', 'fixture: a second scoring-path change, for a report-gate step']);
+    reportTip = git(clone, ['rev-parse', REPORT_BRANCH]);
+    git(clone, ['worktree', 'remove', '--force', build2]);
+    git(clone, ['push', '--quiet', 'origin', REPORT_BRANCH]);
+
     // The plan and the note it must agree with, both throwaway.
     const notePath = 'docs/brain/Owner/Owner - Fixture E2E.md';
     writeFileSync(path.join(clone, notePath), [
@@ -134,6 +187,7 @@ describe('owner:measure end to end, on the committed public corpus', () => {
       '| branch | tip | what it is |',
       '| --- | --- | --- |',
       `| \`${FIXTURE_BRANCH}\` | \`${fixtureTip.slice(0, 8)}\` | the throwaway branch this test measures |`,
+      `| \`${REPORT_BRANCH}\` | \`${reportTip.slice(0, 8)}\` | the throwaway branch measured by a report step |`,
       '',
     ].join('\n'), 'utf8');
     writeFileSync(path.join(clone, 'fixture-plan.json'), `${JSON.stringify({
@@ -142,13 +196,24 @@ describe('owner:measure end to end, on the committed public corpus', () => {
       note: notePath,
       remote: 'origin',
       baseline: { ref: git(clone, ['rev-parse', '--abbrev-ref', 'HEAD']), reason: 'the fixture baseline, measured first' },
-      steps: [{
-        id: 'fixture', branch: FIXTURE_BRANCH, tip: fixtureTip, base: baseSha,
-        when: 'always', gate: 'accept-reject',
-        reason: 'the one throwaway step this fixture measures',
-        receiptRanges: [`${baseSha}..HEAD`],
-        probe: null,
-      }],
+      steps: [
+        {
+          id: 'fixture', branch: FIXTURE_BRANCH, tip: fixtureTip, base: baseSha,
+          when: 'always', gate: 'accept-reject',
+          reason: 'the one throwaway step this fixture accepts',
+          receiptRanges: [`${baseSha}..HEAD`],
+          // The branch carries a probe its base does not — one side RUNS and one
+          // side is SKIPPED, which is what the Command field has to say.
+          probe: { base: baseSha, sourceRef: null, reason: 'the fixture probe exists on the branch only' },
+        },
+        {
+          id: 'report-only', branch: REPORT_BRANCH, tip: reportTip, base: baseSha,
+          when: 'always', gate: 'report',
+          reason: 'measured and reported; never accepted, never re-locked, never the lock tip',
+          receiptRanges: [`${baseSha}..HEAD`],
+          probe: null,
+        },
+      ],
       lock: { command: 'npm run lock-auc24', artifact: 'tests/fixtures/auc24-table.json', reason: 'the deadline is the table' },
     }, null, 2)}\n`, 'utf8');
 
@@ -159,8 +224,11 @@ describe('owner:measure end to end, on the committed public corpus', () => {
     // --dry-run FIRST, on the untouched fixture branch: it must print every
     // edit and leave the branch, the manifest and the table exactly as they
     // were. Running it after the real pass would prove nothing.
+    // Run the WORKING TREE's script against the clone: the code under test is
+    // this checkout's, and `--repo-root` differs from the script's own
+    // repository, which is what fixture mode requires.
     dryRun = sh(process.execPath, [
-      '--experimental-strip-types', path.join(clone, 'scripts/owner-measure.mjs'),
+      '--experimental-strip-types', path.join(REPO, 'scripts/owner-measure.mjs'),
       '--corpus-fixture=public',
       `--plan-file=${path.join(clone, 'fixture-plan.json')}`,
       `--repo-root=${clone}`,
@@ -169,7 +237,7 @@ describe('owner:measure end to end, on the committed public corpus', () => {
     ], { cwd: clone, env });
 
     run = sh(process.execPath, [
-      '--experimental-strip-types', path.join(clone, 'scripts/owner-measure.mjs'),
+      '--experimental-strip-types', path.join(REPO, 'scripts/owner-measure.mjs'),
       '--corpus-fixture=public',
       `--plan-file=${path.join(clone, 'fixture-plan.json')}`,
       `--repo-root=${clone}`,
@@ -191,7 +259,7 @@ describe('owner:measure end to end, on the committed public corpus', () => {
 
   it('prints the plan, the step and the reason before doing anything', () => {
     assert.match(run.stdout, /OWNER MEASUREMENT PLAN/);
-    assert.match(run.stdout, /the one throwaway step this fixture measures/);
+    assert.match(run.stdout, /the one throwaway step this fixture accepts/);
     assert.ok(
       run.stdout.indexOf('OWNER MEASUREMENT PLAN') < run.stdout.indexOf('PRE-FLIGHT'),
       'the plan is printed before the pre-flight runs',
@@ -200,10 +268,27 @@ describe('owner:measure end to end, on the committed public corpus', () => {
 
   it('measures the BASELINE first, then the branch, and prints both against the floor', () => {
     assert.ok(run.stdout.indexOf('BASELINE') < run.stdout.indexOf('STEP fixture'), 'baseline first');
-    assert.match(run.stdout, /AUC-24\s+:\s+[0-9]\.\d{4}/);
+    assert.match(run.stdout, /AUC-24 reported :\s+[0-9]\.\d{4}\s+\(recipe `[^`]+`\)/);
     assert.match(run.stdout, /vs AUC24_FLOOR\s+:\s+0\.622/);
-    assert.match(run.stdout, /BOTH numbers are on recipe shuffle-drop\/v2/);
-    assert.match(run.stdout, /not comparable to either of them/);
+  });
+
+  it('labels each number with the recipe that produced it, and says they differ', () => {
+    // Round 1 printed "BOTH numbers are on recipe shuffle-drop/v2" while
+    // measure-real was computing its own legacy split (review F1).
+    assert.doesNotMatch(run.stdout, /BOTH numbers are on recipe/);
+    assert.match(run.stdout, /AUC-24 reported :\s+[0-9.]+\s+\(recipe `shuffle-drop\/legacy-int-ext-split`\)/);
+    assert.match(run.stdout, /THESE TWO NUMBERS ARE ON DIFFERENT RECIPES AND ARE NOT COMPARABLE/);
+    assert.match(run.stdout, /the table `lock-auc24` WRITES is/);
+    assert.match(run.stdout, /AUC24_FLOOR was written for/);
+    assert.match(run.stdout, /same recipe, same run, so this one IS a comparison/);
+  });
+
+  it('the branch and the baseline are DIFFERENT numbers — the comparison is not degenerate', () => {
+    const nums = [...run.stdout.matchAll(/AUC-24 reported :\s+([0-9.]+)/g)].map((m) => Number(m[1]));
+    const vsBaseline = /vs baseline\s+:\s+([0-9.]+) \(([+-][0-9.]+)\)/.exec(run.stdout);
+    assert.ok(nums.length >= 1);
+    assert.ok(vsBaseline, 'the run must print the branch against the baseline');
+    assert.notEqual(Number(vsBaseline![2]), 0, 'a comment-only fixture made this always 0.0000');
   });
 
   it('converts the PENDING entry and verifies 0 problems with the gate\'s own functions', () => {
@@ -253,8 +338,69 @@ describe('owner:measure end to end, on the committed public corpus', () => {
     assert.match(message, /No corpus path, title or filename is in this commit/);
   });
 
+  it('the report-gate step is measured and NOT accepted', () => {
+    // Round 1 initialised `decision` to 'accepted' and only let an
+    // accept-reject gate change it, so a report step re-locked the 72-row
+    // manifest, became the lock tip and satisfied every downstream
+    // `if-accepted:` — after printing that it took no decision (review F3).
+    assert.match(run.stdout, /STEP report-only — MEASURING/);
+    assert.match(run.stdout, /this step REPORTS/);
+    assert.match(run.stdout, /decision        : reported/);
+    assert.match(run.stdout, /not re-locked — the re-lock follows acceptance, and this step was reported/);
+    const relocks = [...run.stdout.matchAll(/manifest re-lock:/g)].length;
+    assert.equal(relocks, 1, 'exactly one step was accepted, so exactly one re-lock');
+  });
+
+  it('and its manifest is the throwaway one, un-re-locked, while the accepted branch\'s moved', () => {
+    const reportManifest = git(clone, ['show', `${git(clone, ['rev-parse', REPORT_BRANCH])}:tests/fixtures/real-corpus-manifest.json`]);
+    const acceptedManifest = git(clone, ['show', `${git(clone, ['rev-parse', FIXTURE_BRANCH])}:tests/fixtures/real-corpus-manifest.json`]);
+    assert.notEqual(reportManifest, acceptedManifest, 'the accepted branch was re-locked and the reported one was not');
+  });
+
+  it('the lock tip is the ACCEPTED step, never the reported one', () => {
+    assert.match(run.stdout, new RegExp(`LOCK — tests/fixtures/auc24-table\\.json on ${FIXTURE_BRANCH}`));
+    assert.doesNotMatch(run.stdout, new RegExp(`LOCK — .* on ${REPORT_BRANCH}`));
+  });
+
+  it('the Command field of the committed receipt says what the probe actually did', () => {
+    const tip = git(clone, ['rev-parse', FIXTURE_BRANCH]);
+    const receipt = git(clone, ['show', `${tip}:docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`]);
+    const entry = receipt.slice(receipt.indexOf('### 2026-09-13 — FIXTURE E2E'));
+    assert.match(entry, /on the branch tree RAN/);
+    assert.match(entry, /on the base tree was SKIPPED/);
+    // and the step with no probe says so rather than claiming one ran
+    const reportReceipt = git(clone, ['show', `${git(clone, ['rev-parse', REPORT_BRANCH])}:docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`]);
+    const reportEntry = reportReceipt.slice(reportReceipt.indexOf('### 2026-09-13 — FIXTURE REPORT'));
+    assert.match(reportEntry, /no corpus-shape probe \(the measurement plan records none for this step\)/);
+    assert.doesNotMatch(reportEntry, /probe-corpus-shape/);
+  });
+
+  it('the receipt names the recipe that produced its number, not the one lock-auc24 uses', () => {
+    const tip = git(clone, ['rev-parse', FIXTURE_BRANCH]);
+    const receipt = git(clone, ['show', `${tip}:docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`]);
+    const entry = receipt.slice(receipt.indexOf('### 2026-09-13 — FIXTURE E2E'));
+    assert.match(entry, /recipe `shuffle-drop\/legacy-int-ext-split`/);
+    assert.match(entry, /IT IS NOT THE RECIPE `lock-auc24` WRITES/);
+  });
+
+  it('the converted entry tells one story: fields above, as-filed prose below', () => {
+    const tip = git(clone, ['rev-parse', FIXTURE_BRANCH]);
+    const receipt = git(clone, ['show', `${tip}:docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`]);
+    const lines = receipt.slice(receipt.indexOf('### 2026-09-13 — FIXTURE E2E')).split('\n');
+    const boundary = lines.findIndex((l) => l.startsWith('#### As filed, before this measurement'));
+    assert.ok(boundary > 0);
+    const stale = lines.findIndex((l) => /and its AUC-24 is not known/.test(l));
+    if (stale !== -1) assert.ok(stale > boundary, 'a pending assertion survived above the boundary');
+    for (const label of ['Command', 'Measured AUC-24', 'Runner attestation']) {
+      assert.ok(lines.findIndex((l) => l.startsWith(`- **${label}:**`)) < boundary);
+    }
+  });
+
   it('re-locks the manifest IN PLACE, order preserved, only on acceptance', () => {
-    assert.match(run.stdout, /manifest re-lock: \d+ rows mapped IN PLACE, order preserved/);
+    const moved = /manifest re-lock: (\d+) rows mapped IN PLACE, order preserved — (\d+) field\(s\) moved/.exec(run.stdout);
+    assert.ok(moved, 'the accepted step must print its re-lock');
+    assert.equal(Number(moved![1]), 32);
+    assert.ok(Number(moved![2]) > 0, 'a comment-only fixture moved 0 fields and exercised nothing');
     const tip = git(clone, ['rev-parse', FIXTURE_BRANCH]);
     const after = JSON.parse(git(clone, ['show', `${tip}:tests/fixtures/real-corpus-manifest.json`]));
     assert.equal(after.length, 32, 'the throwaway manifest is the 32 committed scripts');
@@ -308,7 +454,7 @@ describe('owner:measure end to end, on the committed public corpus', () => {
   it('writes every local artifact OUTSIDE the repository, and says they index the corpus', () => {
     assert.match(run.stdout, /must not be pasted anywhere|never paste them anywhere/);
     const files = readdirSync(outDir);
-    for (const expected of ['baseline.measure-real.log', 'fixture.measure-real.log', 'lock-auc24.log', 'verify-corpus-layout.log']) {
+    for (const expected of ['baseline.measure-real.log', 'fixture.measure-real.log', 'lock-auc24.log', 'verify-corpus-layout.log', 'fixture.probe-branch.csv']) {
       assert.ok(files.includes(expected), `the run wrote no ${expected} (got ${files.join(', ')})`);
     }
     const tracked = sh('git', ['-C', clone, 'status', '--porcelain=v1', '--untracked-files=all']).stdout;
@@ -323,6 +469,87 @@ describe('owner:measure end to end, on the committed public corpus', () => {
   });
 });
 
+describe('a REJECTED step: nothing re-locked, the table locked on the baseline', () => {
+  // The other half of the gate, driven end to end by answering the prompt with
+  // "n" on stdin — no --accept-all, no flag that shortcuts the decision.
+  let dir = '';
+  let repo = '';
+  let res: { status: number | null; stdout: string; stderr: string } = { status: null, stdout: '', stderr: '' };
+
+  before(() => {
+    dir = mkdtempSync(path.join(tmpdir(), 'owner-measure-reject-'));
+    repo = path.join(dir, 'clone');
+    assert.equal(sh('git', ['clone', '--quiet', '--shared', REPO, repo]).status, 0);
+    git(repo, ['remote', 'set-url', 'origin', repo]);
+    git(repo, ['config', 'user.email', 'fixture@example.invalid']);
+    git(repo, ['config', 'user.name', 'owner-measure fixture']);
+    sh('ln', ['-s', path.join(REPO, 'node_modules'), path.join(repo, 'node_modules')]);
+    writeFileSync(path.join(repo, FIXTURE_MARKER), 'throwaway\n', 'utf8');
+    const base = git(repo, ['rev-parse', 'HEAD']);
+    const build = path.join(dir, 'build');
+    const branch = 'scoring/fixture-reject';
+    git(repo, ['worktree', 'add', '--quiet', '-b', branch, build, base]);
+    const doctor = path.join(build, 'server/nvm/analyze/doctor.ts');
+    writeFileSync(doctor, readFileSync(doctor, 'utf8').replace('const SCARCITY_SCALE = 140;', 'const SCARCITY_SCALE = 161;'), 'utf8');
+    const receipt = path.join(build, 'docs/p1-benchmark/MEASUREMENT_RECEIPTS.md');
+    writeFileSync(receipt, readFileSync(receipt, 'utf8') + pendingEntry().replace(/FIXTURE E2E/g, 'FIXTURE REJECT'), 'utf8');
+    git(repo, ['-C', build, 'add', '-A']);
+    git(repo, ['-C', build, 'commit', '--quiet', '-m', 'fixture: a scoring change the owner will reject']);
+    const tip = git(repo, ['rev-parse', branch]);
+    git(repo, ['worktree', 'remove', '--force', build]);
+    git(repo, ['push', '--quiet', 'origin', branch]);
+
+    const notePath = 'docs/brain/Owner/Owner - Fixture Reject.md';
+    writeFileSync(path.join(repo, notePath), [
+      '| branch | tip | what |', '| --- | --- | --- |',
+      `| \`${branch}\` | \`${tip.slice(0, 8)}\` | rejected in this fixture |`, '',
+    ].join('\n'), 'utf8');
+    writeFileSync(path.join(repo, 'reject-plan.json'), `${JSON.stringify({
+      schemaVersion: 1, updated: '2026-09-13', note: notePath, remote: 'origin',
+      baseline: { ref: git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']), reason: 'the baseline' },
+      steps: [{
+        id: 'reject-me', branch, tip, base, when: 'always', gate: 'accept-reject',
+        reason: 'the step this fixture rejects at the prompt',
+        receiptRanges: [`${base}..HEAD`], probe: null,
+      }],
+      lock: { command: 'npm run lock-auc24', artifact: 'tests/fixtures/auc24-table.json', reason: 'the table' },
+    }, null, 2)}\n`, 'utf8');
+
+    const env = { ...process.env };
+    delete env.REAL_SCRIPT_CORPUS_DIR;
+    res = sh(process.execPath, [
+      '--experimental-strip-types', path.join(REPO, 'scripts/owner-measure.mjs'),
+      '--corpus-fixture=public', `--plan-file=${path.join(repo, 'reject-plan.json')}`,
+      `--repo-root=${repo}`, `--out-dir=${path.join(dir, 'out')}`, '--keep-trees',
+    ], { cwd: repo, env, input: 'n\n' });
+  });
+
+  after(() => {
+    if (dir && existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('exits 0 and records the rejection', () => {
+    assert.equal(res.status, 0, `${res.stdout.slice(-3000)}\n${res.stderr.slice(-2000)}`);
+    assert.match(res.stdout, /accept reject-me \(AUC-24 [0-9.]+ vs baseline [0-9.]+\)\? \[y\/N\]/);
+    assert.match(res.stdout, /decision        : rejected/);
+  });
+
+  it('does not re-lock the manifest', () => {
+    assert.doesNotMatch(res.stdout, /manifest re-lock:/);
+    assert.match(res.stdout, /not re-locked — the re-lock follows acceptance, and this step was rejected/);
+  });
+
+  it('still writes the receipt, because the measurement happened', () => {
+    assert.match(res.stdout, /1 PENDING entry converted by the three-scan recipe/);
+    assert.match(res.stdout, /gate CLI        : check-scoring-receipt .*— exit 0/);
+  });
+
+  it('locks the table on the BASELINE, and says why', () => {
+    assert.match(res.stdout, /nothing was accepted, so this table is locked on the baseline/);
+    assert.match(res.stdout, /the TABLE, not the branches/);
+  });
+});
+
 describe('the refusals, each shown firing', () => {
   function runCli(args: string[], env: Record<string, string | undefined> = {}) {
     const merged = { ...process.env, ...env };
@@ -332,11 +559,49 @@ describe('the refusals, each shown firing', () => {
     });
   }
 
-  it('refuses with no REAL_SCRIPT_CORPUS_DIR — exit 1, nothing written', () => {
-    const res = runCli([`--out-dir=${path.join(tmpdir(), 'owner-measure-refusal')}`, '--accept-all']);
+  it('refuses with no REAL_SCRIPT_CORPUS_DIR — exit 1, and NOTHING is written', () => {
+    // Checked against the FILESYSTEM, not against the sentence. Round 1
+    // created the output directory before the first check ran, so the claim
+    // "Nothing was written" was false and this test — which only matched the
+    // string — could not fail (review F7).
+    const out = path.join(mkdtempSync(path.join(tmpdir(), 'owner-measure-refusal-')), 'out');
+    assert.ok(!existsSync(out));
+    const res = runCli([`--out-dir=${out}`, '--accept-all']);
     assert.equal(res.status, 1);
     assert.match(res.stderr, /REAL_SCRIPT_CORPUS_DIR is not set — refusing to run/);
     assert.match(res.stderr, /Nothing was written/);
+    assert.ok(!existsSync(out), `the refusal created ${out}`);
+    rmSync(path.dirname(out), { recursive: true, force: true });
+  });
+
+  it('--corpus-fixture=public refuses without an explicit --repo-root', () => {
+    const res = runCli(['--corpus-fixture=public', `--out-dir=${path.join(tmpdir(), 'owner-measure-fixture-refusal')}`]);
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /requires an explicit --repo-root/);
+  });
+
+  it('--corpus-fixture=public refuses to run against the repository it lives in', () => {
+    const res = runCli(['--corpus-fixture=public', `--repo-root=${REPO}`, `--out-dir=${path.join(tmpdir(), 'owner-measure-fixture-refusal')}`]);
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /the repository this script lives in/);
+  });
+
+  it('--corpus-fixture=public refuses a checkout that is not marked as a throwaway', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'owner-measure-unmarked-'));
+    try {
+      assert.equal(sh('git', ['clone', '--quiet', '--shared', REPO, path.join(dir, 'clone')]).status, 0);
+      assert.ok(!existsSync(path.join(dir, 'clone', FIXTURE_MARKER)));
+      const res = runCli(['--corpus-fixture=public', `--repo-root=${path.join(dir, 'clone')}`, `--out-dir=${path.join(dir, 'out')}`]);
+      assert.equal(res.status, 1);
+      assert.match(res.stderr, /is not marked as a throwaway/);
+      assert.match(res.stderr, new RegExp(FIXTURE_MARKER.replace('.', '\\.')));
+      // and it passes once the marker exists (the guard is a guard, not a wall)
+      writeFileSync(path.join(dir, 'clone', FIXTURE_MARKER), 'throwaway\n', 'utf8');
+      const res2 = runCli(['--corpus-fixture=public', `--repo-root=${path.join(dir, 'clone')}`, `--out-dir=${path.join(dir, 'out')}`, '--plan']);
+      assert.equal(res2.status, 0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('refuses a corpus path that is not a directory', () => {
@@ -498,6 +763,137 @@ describe('the output directory can never be inside the repository', () => {
     assert.equal(xdg, path.join('/var/state/storymachine/owner-measure/2026-09-13'));
     const home = resolveOutDir(REPO, { date: '2026-09-13', env: {}, home: '/home/o' });
     assert.equal(home, path.join('/home/o/.storymachine/owner-measure/2026-09-13'));
+  });
+});
+
+describe('which recipe produced which number', () => {
+  // Round 1 stamped `shuffle-drop/v2` — the id `lock-auc24` uses — onto the
+  // number `measure-real` computes with its own pre-2026-09-12 split, in
+  // stdout AND in a permanent receipt (review F1). The id is now DERIVED from
+  // the source of the script that prints the number, so the label cannot be
+  // wrong and cannot go stale.
+  function treeWith(source: string): string {
+    const dir = mkdtempSync(path.join(tmpdir(), 'owner-measure-recipe-'));
+    mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+    writeFileSync(path.join(dir, 'scripts/measure-real-script-discrimination.ts'), source, 'utf8');
+    return dir;
+  }
+
+  it('reads the LEGACY split off the source, and it is not the locked recipe', () => {
+    const dir = treeWith("function splitScenes(t) {\n  const parts = t.split(/^(?=INT\\.|EXT\\.)/mi);\n}\n");
+    try {
+      const r = detectMeasureRealRecipe(dir);
+      assert.equal(r.id, MEASURE_REAL_LEGACY_ID);
+      assert.equal(r.migrated, false);
+      assert.notEqual(r.id, AUC24_DEGRADATION_ID);
+      assert.match(r.evidence, /:2 still splits scenes/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('reads a MIGRATED script as the locked recipe, so the label fixes itself', () => {
+    const dir = treeWith("import { shuffleDropDegrade } from './lib/auc.ts';\n");
+    try {
+      const r = detectMeasureRealRecipe(dir);
+      assert.equal(r.id, AUC24_DEGRADATION_ID);
+      assert.equal(r.migrated, true);
+      assert.equal(recipeComparison(r, AUC24_DEGRADATION_ID).same, true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('says UNKNOWN rather than guessing when it recognises neither', () => {
+    const dir = treeWith('// a rewritten script that does neither\n');
+    try {
+      const r = detectMeasureRealRecipe(dir);
+      assert.equal(r.id, 'shuffle-drop/unknown');
+      assert.match(r.evidence, /recipe unknown/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('THE INVARIANT: the two labels are never equal while the two recipes differ', () => {
+    // Read against the REAL repository. While
+    // measure-real-script-discrimination.ts carries its own split, the label
+    // this command prints and writes MUST NOT be AUC24_DEGRADATION_ID. The day
+    // someone migrates that script, `migrated` flips and the two ids agree —
+    // and this assertion keeps holding, from the other side.
+    const real = detectMeasureRealRecipe(REPO);
+    const src = readFileSync(path.join(REPO, 'scripts/measure-real-script-discrimination.ts'), 'utf8');
+    const carriesLegacySplit = /\.split\(\/\^\(\?=INT\\\.\|EXT\\\.\)\/mi\)/.test(src);
+    if (carriesLegacySplit) {
+      assert.notEqual(real.id, AUC24_DEGRADATION_ID, 'a legacy-recipe number must never be labelled with the locked recipe id');
+      assert.equal(real.migrated, false);
+      assert.equal(recipeComparison(real, AUC24_DEGRADATION_ID).same, false);
+    } else {
+      assert.equal(real.id, AUC24_DEGRADATION_ID);
+      assert.equal(recipeComparison(real, AUC24_DEGRADATION_ID).same, true);
+    }
+  });
+
+  it('the printed comparison says, in words, that the two are not comparable', () => {
+    const different = recipeComparison({ id: MEASURE_REAL_LEGACY_ID, migrated: false, evidence: 'x' }, AUC24_DEGRADATION_ID);
+    assert.equal(different.same, false);
+    assert.ok(different.lines.some((l: string) => /NOT COMPARABLE/.test(l)));
+    assert.ok(different.lines.some((l: string) => /0\.731 of 2026-07-11/.test(l)));
+    const same = recipeComparison({ id: AUC24_DEGRADATION_ID, migrated: true, evidence: 'y' }, AUC24_DEGRADATION_ID);
+    assert.ok(same.lines.some((l: string) => /the same statistic/.test(l)));
+  });
+});
+
+describe('classifyLayout forgives two NAMED checks, not a phrase', () => {
+  const split = { ok: false, label: 'split manifest is migrated schema (id + contentHash present)' };
+  const manifest = { ok: false, label: 'real-corpus-manifest is migrated schema (id + contentHash present)' };
+  const other = { ok: false, label: 'content hash matches for every present file (60/72)' };
+
+  it('a clean run is ok and not pre-migration', () => {
+    const v = classifyLayout(0, [{ ok: true, label: 'corpus dir set and readable' }]);
+    assert.deepEqual([v.ok, v.preMigration], [true, false]);
+  });
+  it('the two known pre-migration failures are forgiven, and named', () => {
+    const v = classifyLayout(1, [{ ok: true, label: 'corpus dir set and readable' }, split, manifest]);
+    assert.deepEqual([v.ok, v.preMigration], [true, true]);
+  });
+  it('any OTHER failing check stops the run — including one about the corpus', () => {
+    // Round 1 matched /migrated schema/i, which forgives whatever the next
+    // check with that phrase is called (review F8).
+    const v = classifyLayout(1, [split, other]);
+    assert.equal(v.ok, false);
+    assert.ok(v.failing.some((c: { label: string }) => c.label === other.label));
+  });
+  it('a check whose label merely CONTAINS the phrase is not forgiven', () => {
+    const lookalike = { ok: false, label: 'partition counts are migrated schema counts' };
+    assert.equal(classifyLayout(1, [lookalike]).ok, false);
+  });
+});
+
+describe('the branch ref moves only by compare-and-swap', () => {
+  it('moves the ref when the old value is what the run measured, and REFUSES when it is not', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'owner-measure-swap-'));
+    try {
+      assert.equal(sh('git', ['init', '--quiet', dir]).status, 0);
+      git(dir, ['config', 'user.email', 'f@example.invalid']);
+      git(dir, ['config', 'user.name', 'fixture']);
+      writeFileSync(path.join(dir, 'a.txt'), 'one\n', 'utf8');
+      git(dir, ['add', '-A']);
+      git(dir, ['commit', '--quiet', '-m', 'one']);
+      const first = git(dir, ['rev-parse', 'HEAD']);
+      writeFileSync(path.join(dir, 'a.txt'), 'two\n', 'utf8');
+      git(dir, ['commit', '--quiet', '-am', 'two']);
+      const second = git(dir, ['rev-parse', 'HEAD']);
+      git(dir, ['branch', 'scoring/swap', first]);
+      const ctx = { repoRoot: dir, corpusDir: null };
+
+      // The old value is wrong: REFUSED, and the ref does not move.
+      assert.throws(() => moveBranchRef(ctx, 'scoring/swap', second, second), (err: unknown) => {
+        assert.match((err as Error).message, /was NOT moved: its old value is no longer/);
+        return true;
+      });
+      assert.equal(git(dir, ['rev-parse', 'scoring/swap']), first, 'the ref moved despite the refusal');
+
+      // The old value is right: it moves.
+      assert.equal(moveBranchRef(ctx, 'scoring/swap', second, first), second);
+      assert.equal(git(dir, ['rev-parse', 'scoring/swap']), second);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

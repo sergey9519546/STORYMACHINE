@@ -14,8 +14,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ConversionError, PENDING_PHRASE_REWRITES, convertHeading, convertPendingEntries,
-  fieldParagraph, findEntries, formatEdits, retensePhrases, rewriteFor,
+  AS_FILED_HEADING_PREFIX, ConversionError, PENDING_ASSERTION_PATTERNS,
+  PENDING_PHRASE_REWRITES, assertNoPendingAssertionsAbove, convertHeading,
+  convertPendingEntries, fieldParagraph, findEntries, formatEdits, retensePhrases, rewriteFor,
 } from '../../scripts/lib/receipt-conversion.mjs';
 import { PENDING_PHRASES, extractEntries, pendingReason, validateEntry } from '../../scripts/check-scoring-receipt.mjs';
 
@@ -35,7 +36,16 @@ const FACTS = {
   manifestHash: 'b'.repeat(64),
   corpusFingerprint: 'c'.repeat(64),
   subsetSize: 24,
-  degradationId: 'shuffle-drop/v2',
+  // The recipe that produced THIS number, and the DIFFERENT one the committed
+  // table uses — the pair round 1 collapsed into one id (review F1).
+  degradationId: 'shuffle-drop/legacy-int-ext-split',
+  degradationEvidence: 'scripts/measure-real-script-discrimination.ts:272 still splits scenes on the legacy pattern',
+  lockDegradationId: 'shuffle-drop/v2',
+  recipeSame: false,
+  probes: [
+    { which: 'branch', outcome: 'ran', detail: '72 rows, the tree\'s own copy' },
+    { which: 'base', outcome: 'skipped', detail: 'skipped — this tree has no probe and the plan names no source' },
+  ],
   floor: 0.622,
 };
 
@@ -145,8 +155,53 @@ describe('after the conversion, all three come back clean', () => {
 
   it('the baseline number is carried beside the branch number, on the same recipe', () => {
     const { text } = convert(SCAN_ONE);
-    assert.match(text, /Same recipe, same corpus, main in the same run: \*\*0\.6875\*\*/);
-    assert.match(text, /NOT comparable to the 0\.731/);
+    assert.match(text, /Same recipe, same corpus, same run, main: \*\*0\.6875\*\* — that comparison IS valid/);
+  });
+
+  it('names the recipe that produced THIS number, and says it is not the locked one', () => {
+    // Round 1 wrote `shuffle-drop/v2` — the id of the recipe `lock-auc24` uses —
+    // onto a number `measure-real` computed with its own legacy split, in a
+    // permanent receipt under an attestation (review F1).
+    const { text } = convert(SCAN_ONE);
+    assert.match(text, /recipe `shuffle-drop\/legacy-int-ext-split`/);
+    assert.match(text, /IT IS NOT THE RECIPE `lock-auc24` WRITES/);
+    assert.match(text, /segmentation the \*\*0\.731 of 2026-07-11\*\* was measured on/);
+    assert.doesNotMatch(text, /recipe `shuffle-drop\/v2` \(the scene segmentation changed/);
+  });
+
+  it('and says the opposite, plainly, once the two recipes ARE the same', () => {
+    const { text } = convert(SCAN_ONE, {
+      ...FACTS, degradationId: 'shuffle-drop/v2', recipeSame: true,
+      degradationEvidence: 'measure-real imports shuffleDropDegrade from scripts/lib/auc.ts',
+    });
+    assert.match(text, /the same recipe `lock-auc24` writes \(`shuffle-drop\/v2`\)/);
+    assert.doesNotMatch(text, /IT IS NOT THE RECIPE/);
+  });
+
+  it('the Command field describes the probes that actually ran', () => {
+    const { text } = convert(SCAN_ONE);
+    assert.match(text, /on the branch tree RAN/);
+    assert.match(text, /on the base tree was SKIPPED/);
+  });
+
+  it('and says so plainly when the plan records no probe for the step', () => {
+    const { text } = convert(SCAN_ONE, { ...FACTS, probes: [] });
+    assert.match(text, /no corpus-shape probe \(the measurement plan records none for this step\)/);
+    assert.doesNotMatch(text, /probe-corpus-shape/);
+  });
+
+  it('every measured field lands ABOVE the as-filed boundary, and every as-filed line below it', () => {
+    const { text } = convert(SHUFFLED_FIELDS);
+    const lines = text.split('\n');
+    const boundary = lines.findIndex((l) => l.startsWith(AS_FILED_HEADING_PREFIX));
+    assert.ok(boundary > 0, 'the converted entry must carry exactly one as-filed boundary');
+    assert.equal(lines.filter((l) => l.startsWith(AS_FILED_HEADING_PREFIX)).length, 1);
+    for (const label of ['Command', 'Measured AUC-24', 'Corpus fingerprint', 'Git SHA', 'Runner attestation']) {
+      const at = lines.findIndex((l) => l.startsWith(`- **${label}:**`));
+      assert.ok(at !== -1 && at < boundary, `**${label}** is not above the boundary`);
+    }
+    const closing = lines.findIndex((l) => l.includes('A closing paragraph that must survive'));
+    assert.ok(closing > boundary, 'as-filed prose must be below the boundary');
   });
 
   it('cites no git object it cannot resolve — the fingerprint is not a SHA', () => {
@@ -168,7 +223,7 @@ describe('after the conversion, all three come back clean', () => {
   it('the entry says, in its own text, that its body is the entry AS FILED', () => {
     const { text } = convert(SCAN_ONE);
     assert.match(text, /CONVERTED 2026-09-13 BY `npm run owner:measure`/);
-    assert.match(text, /the entry AS FILED/);
+    assert.match(text, new RegExp(AS_FILED_HEADING_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     assert.match(text, new RegExp(FACTS.filedAtSha.slice(0, 8)));
   });
 
@@ -284,6 +339,43 @@ describe('refusals', () => {
   it('refuses a short filedAtSha — a receipt names a commit a reviewer can check out', () => {
     assert.throws(() => convert(SCAN_ONE, { ...FACTS, filedAtSha: 'a4df0c49' }), /full 40-character SHA/);
   });
+  it('refuses when a sentence saying no measurement exists survives above the boundary', () => {
+    // The guard on the restructure itself (review F4). Driven directly, because
+    // the restructure is what keeps it from firing on a real entry.
+    const lines = [
+      '### 2026-09-07 — EXAMPLE (MEASURED 2026-09-13)',
+      '- **Measured AUC-24:** **0.7083**, and its AUC-24 is not known.',
+      '#### As filed, before this measurement (2026-09-13)',
+      'No AUC-24 number is stated on this branch.',
+    ];
+    assert.throws(() => assertNoPendingAssertionsAbove(lines, 2, lines[0]), (err: unknown) => {
+      assert.ok(err instanceof ConversionError);
+      assert.match((err as Error).message, /1 sentence\(s\) asserting that no measurement exists survive ABOVE/);
+      assert.ok((err as ConversionError).detail.some((l: string) => /AUC-24 is not known/.test(l)));
+      return true;
+    });
+    // The identical sentence BELOW the boundary is legitimate, and passes.
+    assert.doesNotThrow(() => assertNoPendingAssertionsAbove(lines.slice(2), 0, lines[0]));
+  });
+
+  it('every pattern in the guard fires on the sentence it names', () => {
+    const samples = [
+      'and its AUC-24 is not known.',
+      'No AUC-24 number is stated, implied or projected anywhere on this branch.',
+      'so this branch has no AUC-24 number and claims none.',
+      'the gate exits **1** on this entry.',
+      'the entry is an honest ledger row, not a receipt.',
+      'PENDING OWNER MEASUREMENT — no real-corpus run happened',
+    ];
+    for (const sample of samples) {
+      assert.ok(
+        PENDING_ASSERTION_PATTERNS.some((re) => re.test(sample)),
+        `no pattern catches: ${sample}`,
+      );
+    }
+    assert.ok(!PENDING_ASSERTION_PATTERNS.some((re) => re.test('the AUC-24 is 0.7083 and the table is locked')));
+  });
+
   it('a heading whose PENDING is not a parenthetical refuses through the whole conversion', () => {
     const stubborn = SCAN_ONE.replace(
       '### 2026-09-07 — EXAMPLE: a scoring change (PENDING OWNER MEASUREMENT — no real-corpus run happened)',
@@ -296,27 +388,25 @@ describe('refusals', () => {
     });
   });
 
-  it('an entry that cannot be closed names the entry AND the scan, and returns no text', () => {
-    // THE KNOWN LIMIT OF A MECHANICAL REWRITE, pinned rather than hidden. The
-    // gate finds a field label ANYWHERE on a line; this converter's own label
-    // pattern is anchored to the start of a line (optionally after a bullet
-    // marker), because a mid-sentence `**Command:**` is prose about a command,
-    // not a field, and replacing the rest of that paragraph would delete a
-    // sentence. So an entry that puts a required label mid-line AND a PENDING
-    // marker after it cannot be closed mechanically — and says so, naming the
-    // entry and the scan, rather than committing something that fails CI.
+  it('a mid-sentence field label below the boundary no longer blocks the conversion', () => {
+    // THE RESTRUCTURE FIXED THIS CASE, and the test records that rather than
+    // pretending it is still a limit. The gate resolves a field to the FIRST
+    // line matching its label, and after the restructure that line is always
+    // the run's own bullet at the top — so prose further down that happens to
+    // write `**Command:**` mid-sentence is no longer read as the field.
     const stubborn = SCAN_ONE
       .replace('- **Command:** `npm run benchmark:public`.\n', '')
       .replace(
         '**Branch:** `scoring/example`.',
         '**Branch:** `scoring/example`. Its **Command:** list is PENDING the owner run.',
       );
-    assert.throws(() => convert(stubborn), (err: unknown) => {
-      assert.ok(err instanceof ConversionError, String(err));
-      assert.match((err as Error).message, /still PENDING after conversion/);
-      assert.ok((err as ConversionError).detail.some((l: string) => /EXAMPLE: a scoring change/.test(l)), 'the refusal must name the entry');
-      return true;
-    });
+    const { text } = convert(stubborn);
+    assert.equal(pendingReason(entryOf(text)), null);
+    assert.deepEqual(validateEntry(entryOf(text), { objectExists: () => true }), []);
+    // and the prose is still there, below the boundary, unaltered
+    const lines = text.split('\n');
+    const boundary = lines.findIndex((l) => l.startsWith(AS_FILED_HEADING_PREFIX));
+    assert.ok(lines.findIndex((l) => l.includes('Its **Command:** list is')) > boundary);
   });
 });
 

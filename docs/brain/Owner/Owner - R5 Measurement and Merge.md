@@ -176,12 +176,28 @@ inside a receipt entry would hold that entry pending on its own, which is why
 the ledger deliberately does not spell them out and why the converter carries
 them as data.
 
+**And the converted entry is RESTRUCTURED, not patched.** Scan two only knows
+four phrases, so an entry can pass every scan while its first paragraph still
+says "its AUC-24 is not known … exits **1** on this entry, which is the
+intended state" under a heading that says MEASURED. Those sentences were true
+when they were written and mechanically rewriting arbitrary prose would be this
+script inventing claims, so the entry is given one shape instead: the heading,
+the conversion banner, the five measured fields, the
+`- **Entry body as filed:**` bullet that bounds every field's value window, and
+then a `#### As filed, before this measurement` section carrying the entry's
+original body. Everything describing the pending state is below a heading that
+says so; everything above it is the run's own record.
+`assertNoPendingAssertionsAbove` refuses if one of those sentences ever ends up
+above the boundary.
+
 After the rewrite, `owner:measure` verifies with the gate's own exported
 functions (`addedReceiptLines` against the working tree, then
 `extractEntries`/`validateEntry`) and requires **0 problems**; it then commits
 and runs the real CLI on every recorded range as the final check. On any
 surviving problem it prints the entry and the scan that failed and **commits
-nothing**.
+nothing**. The Command field it writes is built from what the run actually did:
+each probe side is recorded as RAN, SKIPPED or UNAVAILABLE, and a step whose
+plan entry records no probe says that rather than claiming one.
 
 ## The branches, and the order
 
@@ -198,6 +214,15 @@ nothing**.
 
 The three R5 rows are reached with `--only=<step id>`, not automatically: the
 decision tree gets there only after the first two steps have been read.
+
+**Every row's gate ASKS.** A step can also be declared `report` — measured and
+written down, never accepted: no manifest re-lock, not the tip `lock-auc24`
+writes against, and it satisfies no `if-accepted:`. `--accept=<step id>` accepts
+one by name. (Until 2026-09-13 a `report` step was silently treated as
+ACCEPTED, and the stack row was one, so the default path re-locked the 72-row
+manifest against a tree nobody had been asked about. The stack row is
+`accept-reject` now, and the semantics are driven end to end in
+`tests/scripts/owner-measure-e2e.test.ts`.)
 
 **THE ORDER CHANGED 2026-09-07 (corrected 2026-09-11), and the two heads are
 ALTERNATIVES, not a stack.** `scoring/feature-length-defects` attacks the same
@@ -263,11 +288,28 @@ corpus, so it is not evidence the score got better at judging craft. Treat any
 fall in AUC-24 as a real finding about these changes and do not answer it by
 moving the floor in `scripts/lib/auc.ts`; see [[Gate - AUC-24 Ratchet]].
 
-**And do not compare any of these numbers to 0.731.** That figure was measured
-on 2026-07-11 against the PRE-2026-09-12 scene segmentation;
-`AUC24_DEGRADATION_ID` is now `shuffle-drop/v2`. This is exactly why the run
-measures `main` first: the comparison a decision needs is branch-vs-main on the
-SAME recipe in the SAME session, and `owner:measure` prints it that way.
+**THE RUN PRODUCES TWO AUC-24 NUMBERS, ON TWO RECIPES, AND SAYS SO.**
+`scripts/measure-real-script-discrimination.ts` still carries its own
+`splitScenes` on `/^(?=INT\.|EXT\.)/mi` and its own `auc()`, while
+`lock-auc24` imports `shuffleDropDegrade` from `scripts/lib/auc.ts`
+(`shuffle-drop/v2`). So the AUC-24 the run REPORTS and the table it WRITES are
+not the same statistic. `owner:measure` derives each label from the code that
+produced the number — `detectMeasureRealRecipe` reads the script's source in
+the tree being measured, so the answer changes by itself the day that script is
+migrated — and prints them side by side with the sentence that matters:
+
+```
+recipes         : THESE TWO NUMBERS ARE ON DIFFERENT RECIPES AND ARE NOT COMPARABLE
+                  TO EACH OTHER.
+```
+
+The reported number IS on the same segmentation as the **0.731 of 2026-07-11**;
+the committed table is not, and `AUC24_FLOOR` was written for the table's
+recipe. The receipt carries the same statement. Migrating `measure-real` onto
+`scripts/lib/auc.ts` moves a measured number and is its own change with its own
+receipt — until then, the comparison a decision can lean on is
+**branch-vs-main, same recipe, same session**, which is why the run measures
+`main` first and prints that delta separately.
 
 ## Sources
 

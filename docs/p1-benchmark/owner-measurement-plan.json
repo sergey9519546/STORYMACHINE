@@ -50,7 +50,7 @@
       "tip": "a4df0c49f24e356e45677f0550972f6bf589917a",
       "base": "8aa1f69605134caae6749a6dc63ccb006c5c410c",
       "when": "if-accepted:feature-length-defects",
-      "gate": "report",
+      "gate": "accept-reject",
       "stack": [
         {
           "branch": "scoring/adversarial-2026-09-12",
@@ -65,7 +65,7 @@
           "tip": "a4df0c49f24e356e45677f0550972f6bf589917a"
         }
       ],
-      "reason": "One measurement, not three: scoring/forced-cue is stacked on scoring/adversarial-2026-09-12 and scoring/renderer-residuals on scoring/forced-cue, so checking out the last tip gets all three. Measured only if the first step is accepted. Read the probe's @cue and >tr columns before the AUC — both changes are invisible in this repository (0 of 32 committed scripts carry a line beginning @ or >) and the private corpus is the only place they show.",
+      "reason": "The owner decides on this one too, so its gate ASKS (until 2026-09-13 round 2 it was a `report` step, and a report step was silently treated as accepted — it re-locked the manifest and became the lock tip with no prompt). One measurement, not three: scoring/forced-cue is stacked on scoring/adversarial-2026-09-12 and scoring/renderer-residuals on scoring/forced-cue, so checking out the last tip gets all three. Measured only if the first step is accepted. Read the probe's @cue and >tr columns before the AUC — both changes are invisible in this repository (0 of 32 committed scripts carry a line beginning @ or >) and the private corpus is the only place they show.",
       "receiptRanges": [
         "089bec91d41adcf214dbc0388c5ef3edbc4769f9..HEAD",
         "8aa1f69605134caae6749a6dc63ccb006c5c410c..HEAD"
