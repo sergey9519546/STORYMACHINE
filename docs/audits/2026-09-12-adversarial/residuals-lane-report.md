@@ -349,7 +349,7 @@ they are not mistaken for tests that cannot fail.
 | benchmark | `npm run benchmark:public`, both trees | 0 |
 | probe | `npm run --silent probe-corpus-shape -- --public` | 0 |
 | receipt | `node scripts/check-scoring-receipt.mjs 089bec91..HEAD` — naming exactly ONE PENDING entry (intended) | 1 |
-| full suite | `npm test`, once, on the final tree | see §9 |
+| full suite | `npm test`, once, on the final tree — **13,338 pass, 0 fail, 91 skipped, 5 todo** (13,434 tests, 2,358 suites, 404 s) | 0 |
 
 ---
 
