@@ -150,8 +150,13 @@ async function main() {
   const sawUnanswered = await page.getByText(/1 unanswered/i).first()
     .waitFor({ timeout: timing.ms(6000) }).then(() => true).catch(() => false);
   record('A placeholder answer is reported as unanswered', sawUnanswered);
-  const sawReason = await page.getByText(/placeholder or filler text/i).first().isVisible().catch(() => false);
+  // The reason text says what the rule MEASURED. It must not say the answer
+  // is "made only of placeholder or filler text" — false in exactly the case
+  // the rule used to over-fire on (round-1 review, finding 1).
+  const sawReason = await page.getByText(/no words left/i).first().isVisible().catch(() => false);
   record('The writer is told WHY, per field, in words about the text', sawReason);
+  const overclaims = await page.getByText(/made only of placeholder/i).first().isVisible().catch(() => false);
+  record('The reason text does not assert the answer is nothing but filler', !overclaims);
   const describedBy = await fieldBox(page, 'forcingFunction').getAttribute('aria-describedby');
   record('The failing box points at its reason via aria-describedby', describedBy === 'beat-0-necessity-forcingFunction-reason', `got=${describedBy}`);
   await page.screenshot({ path: `${OUT_DIR}/necessity-check-failed.png`, fullPage: false });

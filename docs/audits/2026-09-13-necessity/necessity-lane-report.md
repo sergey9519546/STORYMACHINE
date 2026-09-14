@@ -114,8 +114,8 @@ not "unify" them.
 | `too_short` | 16 chars | no single English word reaches 16, so the rule cannot be satisfied by one word; every real minimal answer clears it ("The vault shuts at dawn" = 22). The archive's 10 passes "TBD later." exactly |
 | `too_long` | 500 chars | the cap `OutlineBeatSchema` already applies to goal/constraint/avoid. A second, different cap for strings taking the same road into a prompt would be a defect |
 | `too_few_distinct_words` | 4 distinct | a word count alone is beaten by "because because because because"; a character count alone by "aaaaaaaaaaaaaaaaaa". DISTINCT words closes both with one rule |
-| `non_answer` | placeholder-only | a fixed list of literal non-answers ("tbd", "because the plot needs it", "to move the story forward"), matched as whole token sequences. A field fails only when what SURVIVES removing them is under the distinct-word floor — so a real answer containing "later" or "test" passes |
-| `restates_context` | < 2 new non-stop words | "the vault at night" against `INT. VAULT - NIGHT` restates the question. Stop words are excluded from "new" or the rule is defeated by "the" and "at". Runs only when the caller supplies context — it never guesses at a heading |
+| `non_answer` | placeholder-only | a fixed list of literal non-answers, matched as whole token sequences. **Round 1's bound was wrong and is corrected in round 2 — see §7.** |
+| `restates_context` | < 2 new non-stop words | **REMOVED in round 2 — see §7.** |
 | `duplicate_answer` | exact, normalized | one sentence in two boxes means at least one question is unanswered. Normalization means case and punctuation do not hide a copy-paste |
 
 Every threshold is a floor on **effort**, not on quality, and a test asserts
@@ -358,6 +358,79 @@ is the single post-fix run the standard asks for.
 
 ---
 
-Tip: `8fb18977` — the tree every gate in §4/§5 was run against. This
-report's own final commit (the one adding this line) changes only this file
-and the commit list above it, and touches no code.
+---
+
+## 7. Round 2 (review `61ed735f`, VERDICT REVISE)
+
+The round-1 review's headline finding is correct and is the most useful thing
+anyone has said about this lane: the form check was bounded **by argument**
+and tested against fixtures its own author wrote, and it rejected **3 of 10
+realistic writer answers**. §9 of the review names the standing lesson —
+measure before threshold, synthetic coverage alone is not enough — and it
+applies to a form checker as hard as to a scoring rule, because here the
+failure mode is rejecting a real writer.
+
+### Per-item disposition
+
+| # | blocking item | disposition |
+|---|---|---|
+| 1 | fix `non_answer`'s bound to "no non-stop-word survives" | **DONE** — `server/lib/necessity-certificate.ts`. Shown red first: with round 1's bound the new fixture reports 12 rejections (3 answers × 4 fields), with the new bound 0, and all 10 intended targets are caught by both |
+| 2 | add the three false-failing answers as must-PASS fixtures | **DONE, widened** — two tables: `REAL_ANSWERS` (10 realistic answers, the reviewer's three first, each placed in all four fields = 40 placements) and `NON_ANSWERS` (10 placeholders that must still fail). Every round-1 must-FAIL fixture still fails |
+| 3 | correct `REASON_DETAIL.non_answer` | **DONE** — it now says what was measured ("…this answer has no words left"). A test forbids the old wording returning, and the browser suite reads the new sentence off the screen and asserts the old one is absent |
+| 4 | resolve `restates_context` | **DONE — removed**, the reviewer's stated preference. Two regression tests keep it gone, one of them the brief's own example ("It is the only room with the safe."). The option, the schema field, and the surface's context payload went with it |
+| 5 | one certificate, one verdict | **DONE** — `checkNecessity()` now has no option that can change a field's verdict (a test asserts that directly), and `tests/routes/outline-necessity.test.ts` runs the SURFACE over HTTP and the GENERATION path for nine certificates and asserts they agree on every one |
+
+| # | non-blocking | disposition |
+|---|---|---|
+| 3 | a test named "byte-identical" that asserted only marker-absence | **DONE** — it compares whole preamble strings now (no-certificate vs explicit-undefined vs form-failing) |
+| 4 | the surface never says no generator reads the answers yet | **DONE** — the sentence says it plainly, and claims row 118 was rewritten to match rather than leaving a true conditional no shipped client can satisfy |
+| 5 | the header disambiguates `necessityScore` but not `necessityProof` | **DONE** — a header section covers both, and names `proof/tier2/necessity.ts` as the place a reader following the archive lands first |
+| 6 | `NECESSITY_LABELS` defined in the component | **DONE** — moved to the module as `NECESSITY_UI_LABELS`; the component imports it |
+
+### The false-fail count after the fix
+
+Measured by `tests/core/necessity-certificate.test.ts`, which places each
+answer in each of the four fields:
+
+| bound | realistic answers rejected | intended targets missed |
+|---|---|---|
+| round 1 (`surviving.size < 4`) | **3 of 10** (12 of 40 placements) | 0 of 10 |
+| round 2 (no content word survives) | **0 of 10** (0 of 40 placements) | 0 of 10 |
+
+The three round-1 rejections reproduced exactly the reviewer's set:
+`"Nothing else has worked."`, `"She needs it later."`,
+`"He has nothing left."` The removed `restates_context` accounted for the
+reviewer's third with-context false-fail; both of its documented examples now
+pass and are pinned.
+
+### Round 2 gates
+
+| gate | exit |
+|---|---|
+| `tests/core/necessity-certificate.test.ts` | 0 (26/26) |
+| `tests/routes/outline-necessity.test.ts` | 0 (13/13) |
+| `tests/nvm/generate/necessity-injection.test.ts` | 0 (9/9) |
+| `tests/core/claims-row-citations.test.ts` · `honesty-audit-claims` | 0 (5/5, 15/15) |
+| `tests/core/brain-coverage.test.ts` | 0 (7/7) |
+| `npm run lint` · `check-docs` | 0 |
+| `npm run honesty-audit` | 0 — caught two of row 117's line anchors gone stale when the module's copy moved, fixed |
+| `npm run brain` · `check-brain` | 0 — 117 notes, 467 links, fresh |
+| `node scripts/check-scoring-receipt.mjs main..HEAD` | 0 — no scoring-path files changed |
+| `verify-necessity-surface.mjs` | 0 — **21/21** (one new assertion: the reason text does not assert the answer is nothing but filler) |
+
+No second full `npm test` — per the round-2 cost rule. The round-1 run
+(14,055 tests, 0 fail) stands for everything outside the six files this round
+touched.
+
+### What round 2 did NOT do
+
+The review's §9 suggests a **beat selector on the scene target** — let the
+writer pick which beat's certificate applies to the scene being generated,
+inventing no mapping and asking the author instead. That is the right next
+step and it is a feature, not a fix: it needs a producer UI on the converge
+surface, a schema for the target, and its own browser proof. It is not in the
+five blocking items and is not attempted here; it is the obvious next lane.
+
+---
+
+Tip: `<round 2 — filled in at the final commit>`
