@@ -990,6 +990,10 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-13 Necessity Certificate.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-13 Necessity Certificate.md",
       "to": "docs/brain/Decisions/Decision 8 - Necessity Certificate is Form-Checked Never Judged.md"
     },
     {

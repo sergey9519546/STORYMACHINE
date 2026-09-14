@@ -20,9 +20,8 @@ rather than judged.
 `server/lib/necessity-certificate.ts` holds the type and `checkNecessity()`
 — a pure, deterministic check of the TEXT of the four answers: present,
 non-empty, at least 16 characters, at least 4 DISTINCT words, not made only
-of placeholder phrases, not a restatement of the scene's own heading, not a
-copy of a sibling answer, not over the 500-character cap the beat's other
-text fields already carry. No model call, no corpus, no score. It answers
+of placeholder phrases, not a copy of a sibling answer, not over the
+500-character cap the beat's other text fields already carry. No model call, no corpus, no score. It answers
 "did you answer?" and never "is that a good reason?" — the rule
 [[Decision 8 - Necessity Certificate is Form-Checked Never Judged]] records
 as standing, and the direct application of NORTH_STAR §1's *no
@@ -102,6 +101,32 @@ require inventing a scene→beat mapping (`sceneIdx` is a scene counter, beats
 are turn ranges), so the lane stopped at the tested server seam and worded
 the writer-facing sentence to match — `docs/CLAIMS_REGISTER.md` row 118 is
 conditional on purpose, and row 117 registers the disclaimer.
+
+## Round 2 — what the review changed
+
+The round-1 review (`necessity-review.md`, VERDICT REVISE) measured the form
+check against writing rather than against the lane's own fixtures and found
+it rejecting **3 of 10 realistic writer answers** — "Nothing else has
+worked.", "She needs it later.", "He has nothing left." The `non_answer`
+bound required four SURVIVORS of placeholder removal, and the blocklist
+contains ordinary content words ("nothing", "later", "needed"), so a genuine
+short answer containing one fell under the floor. The bound is now "no
+CONTENT word survives", measured at 0 false-fails and 0 targets missed, with
+both tables kept as fixtures and the old bound shown red against them first.
+
+`restates_context` was REMOVED. A beat has no scene heading to restate, the
+only context available was a whole goal sentence, and a "why here" answer for
+a beat whose goal names the place must reuse the place's nouns. It was also
+the one rule the generation path never ran, so one certificate could get two
+verdicts — `checkNecessity()` now has no option that can change a field's
+verdict, and a test runs the surface (over HTTP) and the generation path for
+nine certificates and asserts they agree.
+
+The standing lesson is [[Patterns]]-shaped and belongs to the whole
+repository, not just this feature: a rule justified by reasoning and tested
+on its author's own examples is not yet evidence (CLAUDE.md's
+measure-before-threshold, applied to a form checker), and **a form check that
+rejects a real answer is worse than one that accepts a lazy one**.
 
 ## Surface and gates
 

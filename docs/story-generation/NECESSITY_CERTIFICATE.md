@@ -42,7 +42,7 @@ The value is the 90% case: the question that was skipped. A writer who
 answers thoughtfully but wrongly is not this feature's failure mode, and
 chasing that case is how the check turns into a judge.
 
-## The eight form rules
+## The seven form rules
 
 Each is a property of the TEXT. Each is tested in both directions, and each
 was shown failing first against a build with that one rule removed
@@ -55,13 +55,30 @@ was shown failing first against a build with that one rule removed
 | `too_short` | under **16** characters | no single English word reaches 16, and every real minimal answer clears it ("The vault shuts at dawn" is 22). The archive's 10-char floor passes "TBD later." exactly |
 | `too_long` | over **500** characters | the same cap the beat's own goal/constraint/avoid already carry; these strings travel the same road into a prompt |
 | `too_few_distinct_words` | fewer than **4** distinct words | a word floor alone is beaten by "because because because because"; a character floor alone by "aaaaaaaaaaaaaaaaaa". Counting DISTINCT words closes both with one rule |
-| `non_answer` | nothing survives removing placeholder phrases | "TBD", "because the plot needs it", "to move the story forward". Matched as whole token sequences, so "none" never fires inside "nonetheless", and a real answer that merely CONTAINS a filler word still passes |
-| `restates_context` | fewer than **2** non-stop words beyond the scene heading/goal | "the vault at night" against `INT. VAULT - NIGHT` restates the question instead of answering it. Only runs when the caller supplies context; it never guesses |
+| `non_answer` | no CONTENT word survives removing placeholder phrases | "TBD", "because the plot needs it", "to move the story forward". Matched as whole token sequences, so "none" never fires inside "nonetheless". The bound is "nothing but function words is left", not "fewer than four words are left" — round 1 used the latter and rejected 3 of 10 realistic writer answers, because the blocklist contains ordinary content words ("nothing", "later", "needed") |
 | `duplicate_answer` | the normalized text equals another field's | one sentence pasted into two boxes means at least one question is unanswered |
 
 Thresholds are a floor on **effort**, never on quality: a 16-character,
 four-word, shallow answer passes on purpose, and
 `tests/core/necessity-certificate.test.ts` pins exactly that.
+
+### The rule that was removed
+
+Round 1 also shipped `restates_context`: an answer adding fewer than two
+non-stop words beyond the beat's own text was reported as a restatement of
+the question. The round-1 review removed it, and the reason is worth keeping.
+A beat has **no scene heading** — `OutlineBeat` is phase, turn range, goal,
+constraint, avoid — so the only context the surface could send was a whole
+goal sentence, and a "why here" answer for a beat whose goal names the place
+must reuse the place's nouns. It rejected *"It is the only room with the
+safe."* for a beat about the safe room. It was also the one rule whose input
+the module could not validate, and the only one the generation path did not
+run, so one certificate could get two verdicts. Two regression tests keep it
+gone.
+
+**A form check that rejects a real answer is worse than one that accepts a
+lazy one.** The point is catching the SKIPPED question; a writer told that a
+real sentence is filler learns to distrust the whole check.
 
 ## Where it attaches
 

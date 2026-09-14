@@ -847,8 +847,7 @@ ANSWERED, or does it also assess whether an answer is a GOOD reason?
 
 1. **Form only.** Deterministic rules over the TEXT — present, non-empty,
    long enough, enough different words, not only placeholder tokens, not a
-   restatement of the scene heading, not a copy of a sibling answer — and no
-   opinion whatsoever about the content.
+   copy of a sibling answer — and no opinion whatsoever about the content.
 2. **Form plus an LLM quality pass.** Ask a model whether "because the
    protagonist needs a win" is a real reason, and surface that as a warning.
 3. **Form plus a deterministic "quality" heuristic.** No model, but rules
@@ -907,7 +906,13 @@ model check whether the reason is any good" has a decision to argue with.
 **Status**: Active
 
 **Revision History**: 2026-09-13 — created with the feature
-(`lane/necessity-certificate`); see
+(`lane/necessity-certificate`). Amended the same day at review round 2: the
+round-1 build carried an eighth rule (`restates_context`) that compared an
+answer against the beat's own text and rejected real answers, and the
+`non_answer` bound required four surviving words, which rejected 3 of 10
+realistic writer answers. Both are corrected — a form check that rejects a
+real answer is worse than one that accepts a lazy one, which is this
+decision's own logic applied to its own thresholds. See
 `docs/story-generation/NECESSITY_CERTIFICATE.md` and
 `docs/audits/2026-09-13-necessity/necessity-lane-report.md`.
 

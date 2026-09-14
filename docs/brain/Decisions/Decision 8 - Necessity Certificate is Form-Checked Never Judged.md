@@ -14,8 +14,7 @@ be asked: what does the engine do with the answers?
 
 **Decided:** check the FORM only. Deterministic rules over the TEXT —
 present, non-empty, at least 16 characters, at least four DISTINCT words,
-not only placeholder phrases, not a restatement of the scene's own heading,
-not a copy of a sibling answer — and no opinion whatsoever about the
+not only placeholder phrases, not a copy of a sibling answer — and no opinion whatsoever about the
 content.
 
 **Why not an LLM quality pass:** it is NORTH_STAR §1's *no LLM-as-judge*
@@ -49,6 +48,13 @@ failure mode is the SKIPPED question.
   fails a test that says why.
 - Raising a threshold is allowed. Adding a rule that reads for MEANING is
   this decision being revisited, not an implementation detail.
+
+**Amended at review round 2 (same day):** the thresholds are subject to the
+decision's own logic. Round 1's `non_answer` bound rejected 3 of 10 realistic
+writer answers and its eighth rule (`restates_context`) rejected an answer
+for reusing the nouns of the beat goal it was answering about. Both were
+corrected — a form check that rejects a real answer is worse than one that
+accepts a lazy one, because the target is the SKIPPED question.
 
 **Related:** [[Audit - 2026-09-13 Necessity Certificate]],
 [[Decision 3 - Demote Generative Surface to Labs]] (the generative half is
