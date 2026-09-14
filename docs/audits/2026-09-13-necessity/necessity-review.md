@@ -414,3 +414,86 @@ Blocking, in order:
 Non-blocking, address if cheap: findings 3, 4, 5, 6 in §8.
 
 Re-review will check these five against the new diff only.
+
+---
+
+# Round 2 (`811983ac`)
+
+**Reviewed object:** `811983ac` on `lane/necessity-certificate` (tip `64f50afc`
+adds only the report's `Tip:` line). **Round-2 diff:** `git diff 8fb18977..811983ac`.
+Warm re-check of my own five blocking and four non-blocking items only, per
+`docs/LANE_STANDARD.md` §6 — no battery re-run.
+
+## My 15-case set, re-run independently against the new bound
+
+The same answers from round 1, driven through the shipped `checkNecessity()`,
+each placed in **all four fields** (`<session scratch>/round2.ts`):
+
+```
+--- 10 REAL answers x 4 fields (must all PASS) ---
+PASS x4  "Nothing else has worked."            <- round-1 false-fail
+PASS x4  "She needs it later."                 <- round-1 false-fail
+PASS x4  "He has nothing left."                <- round-1 false-fail
+PASS x4  "It is the only room with the safe."  <- round-1 restates_context fail
+PASS x4  (six others)
+
+--- 10 INTENDED targets x 4 fields (must all FAIL) ---
+FAIL x4 (caught)  all ten, including "It is necessary and required."
+
+reviewer false-fails:    0/40 placements (10 answers)
+reviewer missed targets: 0/40 placements
+option-induced verdict drift over 20 answers x 3 option shapes: 0
+```
+
+**Reviewer false-fail count: 0** (round 1: 3 of 10 answers, 12 of 40
+placements). All three previously-failing answers pass in all four fields; the
+safe-room example passes even when round-1's exact `context` payload is handed
+in, because the option no longer exists. All ten placeholders still fail in all
+four fields — the fix bought nothing at the catching end.
+
+## Per-item verdicts
+
+| # | round-1 item | round-2 verdict |
+|---|---|---|
+| 1 | fix `non_answer`'s bound | **DONE** — fails only when no content word survives. Measured above: 0 false-fails, 0 missed targets |
+| 2 | add the false-failing answers as must-PASS fixtures | **DONE** — `REAL_ANSWERS` (10, my three first) × 4 fields and `NON_ANSWERS` (10) in `tests/core/necessity-certificate.test.ts`; every round-1 must-FAIL fixture still fails |
+| 3 | correct `REASON_DETAIL.non_answer` | **DONE** — now *"Setting aside placeholder phrases ("TBD", "because the plot needs it") and words like "it" and "is", this answer has no words left, so there is nothing here that answers the question."* It states what was measured and no longer asserts the text is "made only of placeholder or filler text" |
+| 4 | resolve `restates_context` | **DONE, by removal** — my preferred resolution. Gone from the module (only a removal note at `necessity-certificate.ts:391`), from `NecessityCheckOptions` (which now carries `beatId` alone), from `NecessityCheckBodySchema` (no `context` field), and from the surface (`DirectorPanel.tsx:587`, "Certificate only"). Documented in `NECESSITY_CERTIFICATE.md:67`. Kept gone by regression tests at `necessity-certificate.test.ts:283`, one of them my safe-room example. Every remaining repo hit for "restates" is unrelated pre-existing code |
+| 5 | surface and injection path must agree | **DONE, structurally** — `NecessityCheckOptions` no longer has any option that can change a field verdict, so the two paths cannot diverge by construction rather than by a test watching them. I verified it rather than taking the assertion: 20 answers × 3 option shapes (none / round-1's context / a mismatched `beatId`) produced **0** verdict drift. `tests/routes/outline-necessity.test.ts` additionally runs the live route against `buildSystemPreamble` for nine certificates asserting `generatorInjects === surfaceOk` |
+| NB3 | "byte-identical" test asserts less than its name | **DONE** — now compares whole strings three ways (baseline, explicit `undefined`, form-failing), so a stray separator fails it |
+| NB4 | surface never says no generator reads these | **DONE, and better than I asked** — the copy now reads *"Answers are saved with the beat. No scene generator in the app reads them yet — the engine states all four as constraints only for a scene generated from this beat, which nothing here does today."* Claims row 118 rewritten to the same sentence, so the register no longer carries a conditional whose antecedent nothing satisfies |
+| NB5 | `necessityProof` collision undisambiguated | **DONE** — `necessity-certificate.ts:56` names it and its kernel wiring |
+| NB6 | `NECESSITY_LABELS` stranded in the component | **DONE** — exported from the module as `NECESSITY_UI_LABELS` |
+
+## Reviewer-run gates
+
+| gate | result |
+|---|---|
+| my 15-case set, 80 placements | 0 false-fails, 0 missed targets |
+| option-drift probe, 20 answers × 3 option shapes | 0 drift |
+| `node --experimental-strip-types tests/routes/outline-necessity.test.ts` | 13/13 pass, 0 fail |
+| `PW_CHROMIUM_PATH=… node scripts/verify-necessity-surface.mjs` | **21/21 assertions passed** |
+
+I re-ran the browser suite because round 2 changed writer-visible copy, and
+copy is the one thing a unit test can agree with while the screen disagrees.
+
+## Assessment
+
+Every blocking item is resolved at the root rather than patched at the
+boundary. Item 4 was taken by deleting the rule and the option it rode on,
+which is what made item 5 disappear as a class of bug instead of becoming a
+test that watches for it — the stronger of the two resolutions I offered.
+Item 1's bound is the one I measured, and it holds on my set at four times the
+coverage I originally ran. The copy changes are honest in the direction that
+costs the feature something: the surface now tells a writer plainly that
+nothing reads the answers yet, which is the sentence a lane is least inclined
+to write about its own work.
+
+The round-1 non-blocking items were all taken as well, so nothing is carried
+forward.
+
+## VERDICT: MERGE
+
+No outstanding items. The unwired gap (round-1 §5) remains the honest stopping
+point it was, and is now stated on the surface, in claims row 118, in the
+feature doc and in the lane report — a writer can no longer misread it.
