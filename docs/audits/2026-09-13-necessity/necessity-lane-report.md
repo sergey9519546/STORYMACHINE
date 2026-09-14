@@ -6,6 +6,8 @@
 
 ```
 $ git log --oneline main..HEAD
+ed62ebe7 fix(gates): the new browser suite is the fifth graceMs=0 shutdown() caller
+8a356adf docs(audit): the necessity lane report + brain notes for the audit and Decision #8
 f4493d27 docs(claims): rows 117-118 — the two writer-facing necessity sentences
 024b3faf docs(necessity): Decision #8 (form-checked, never judged) + the feature doc
 47fd8776 fix(test): a literal NUL byte made outline-necessity.test.ts a binary file to git
@@ -298,10 +300,36 @@ no console errors. Screenshots in `scripts/output/necessity-*.png`.
 
 Recorded after the report was first written, in the order run:
 
-- `npm run test:ci-env -- tests/core/necessity-certificate.test.ts tests/routes/outline-necessity.test.ts tests/nvm/generate/necessity-injection.test.ts tests/routes/route-capabilities.test.ts tests/core/claims-row-citations.test.ts tests/core/brain-coverage.test.ts` — PENDING
-- `npm run brain` / `npm run check-brain` / brain-coverage — PENDING
-- `npm run gates` — PENDING
-- `npm test` (once, at the end) — PENDING
+| gate | result |
+|---|---|
+| `npm run brain` | exit 0 — 117 notes, 466 links written |
+| `npm run check-brain` | exit 0 — graph is fresh |
+| `tests/core/brain-coverage.test.ts` | exit 0 (7/7) |
+| `tests/core/claims-row-citations.test.ts` | exit 0 (5/5) — rows now run 1..118 with no gap |
+| `tests/core/honesty-audit-claims.test.ts` | exit 0 (15/15) |
+| `npm run test:ci-env -- <six touched test files>` | exit 0 — 62 tests, 0 fail |
+| `npm run gates` | exit 0 |
+| `npm test` (first run) | **exit 0 but 2 subtests RED** — see below |
+| `npm run test:ci-env -- tests/scripts/vite-cache-dir.test.ts` | exit 0 (27/27) after the fix |
+| `node scripts/check-scoring-receipt.mjs main..HEAD` (final tree) | exit 0 — no scoring-path files changed |
+| `npm test` (final, after the fix) | exit 0 — **14,055 tests, 13,963 pass, 0 fail**, 91 skipped, 1 todo, 328.7 s |
+
+**The two red subtests, and why they are worth reporting rather than
+silently fixing.** `tests/scripts/vite-cache-dir.test.ts` pins two counts
+under `scripts/`: how many files call `shutdown()` at the `graceMs = 0`
+default (4), and how many `shutdown()` call sites exist in total (11, in 8
+files). Both are checked against the comment beside `releaseViteCacheSlot()`
+in `scripts/lib/browser-verify.mjs` that NAMES the callers. Adding
+`scripts/verify-necessity-surface.mjs` made both stale, and the suite went
+red on exactly those two assertions — which is the coupling they exist to
+force. Fixed by moving the counts (5 files, 12 sites, 9 files) and naming
+the new caller in that comment, in one commit. Note that `npm test` exits 0
+even with failing subtests, so the counts above, not the exit code, are the
+evidence.
+
+Note also that the first `npm test` run was performed twice (once to see the
+counts, once to read the failure text) before the fix; the final run above
+is the single post-fix run the standard asks for.
 
 ---
 
