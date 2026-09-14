@@ -5,7 +5,12 @@
 **Reviewed SHA:** see `Tip:` at the end of this file.
 
 ```
-$ git log --oneline main..HEAD
+$ git log --oneline main..HEAD          # round 2 on top
+811983ac docs(audit): lane report Round 2 — per-item disposition and the false-fail count
+6d1ce076 docs(necessity): round 2 — the removed rule, the new bound, and an honest row 118
+f196d688 fix(necessity): round 2 items 1-5 — the form check stops rejecting real answers
+61ed735f docs(audit): necessity-review round 1 (8fb18977) — REVISE
+f999e31c docs(audit): Tip line — the reviewed SHA is 8fb18977
 8fb18977 docs(audit): fill in the lane report's late gates
 ed62ebe7 fix(gates): the new browser suite is the fifth graceMs=0 shutdown() caller
 8a356adf docs(audit): the necessity lane report + brain notes for the audit and Decision #8
@@ -433,4 +438,6 @@ five blocking items and is not attempted here; it is the obvious next lane.
 
 ---
 
-Tip: `<round 2 — filled in at the final commit>`
+Tip (round 2): `811983ac` — the tree every gate in §7 was run against. Round
+1's reviewed object was `8fb18977`. This report's own final commit (the one
+adding this line) changes only this file and touches no code.
