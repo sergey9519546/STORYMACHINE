@@ -6,6 +6,7 @@
 
 ```
 $ git log --oneline main..HEAD
+8fb18977 docs(audit): fill in the lane report's late gates
 ed62ebe7 fix(gates): the new browser suite is the fifth graceMs=0 shutdown() caller
 8a356adf docs(audit): the necessity lane report + brain notes for the audit and Decision #8
 f4493d27 docs(claims): rows 117-118 — the two writer-facing necessity sentences
@@ -357,4 +358,6 @@ is the single post-fix run the standard asks for.
 
 ---
 
-Tip: `<filled in at the final commit>`
+Tip: `8fb18977` — the tree every gate in §4/§5 was run against. This
+report's own final commit (the one adding this line) changes only this file
+and the commit list above it, and touches no code.
