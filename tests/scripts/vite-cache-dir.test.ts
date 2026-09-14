@@ -658,7 +658,7 @@ describe('shutdown()\'s graceMs=0 callers — the comment above releaseViteCache
    *  object literal — a FILE count, not a call-site count:
    *  `verify-production-build.mjs` has two `shutdown()` call sites (one for
    *  its dev instance, one for production) but only the dev one is
-   *  `graceMs=0`, and the file still counts once here, which is what "four
+   *  `graceMs=0`, and the file still counts once here, which is what "five
    *  callers" in the comment beside `releaseViteCacheSlot()` means. Assumes
    *  every call site is a single-line, unnested object literal — pinned as a
    *  COUNT below (review round 1, finding 3: "verified by hand" rotted into
@@ -677,14 +677,15 @@ describe('shutdown()\'s graceMs=0 callers — the comment above releaseViteCache
     return hits.sort();
   }
 
-  it('is exactly the four files the comment names — a count that can fail', () => {
+  it('is exactly the five files the comment names — a count that can fail', () => {
     const callers = zeroGraceShutdownCallers();
-    assert.equal(callers.length, 4, `expected 4 graceMs=0 shutdown() callers under scripts/, found ${callers.length}: ${JSON.stringify(callers)}`);
+    assert.equal(callers.length, 5, `expected 5 graceMs=0 shutdown() callers under scripts/, found ${callers.length}: ${JSON.stringify(callers)}`);
     assert.deepEqual(
       callers,
       [
         'scripts/verify-e4-local-safety-net.mjs',
         'scripts/verify-e5-command-palette.mjs',
+        'scripts/verify-necessity-surface.mjs',
         'scripts/verify-production-build.mjs',
         'scripts/verify-ui-polish-affordances.mjs',
       ],
@@ -700,10 +701,16 @@ describe('shutdown()\'s graceMs=0 callers — the comment above releaseViteCache
     // (every call site is a single-line, unnested object literal) held for
     // all eleven; only the hand count of call sites was wrong. Derived here
     // instead of typed into a comment, so it cannot rot the same way again.
+    // 2026-09-13: twelve sites in nine files, after
+    // scripts/verify-necessity-surface.mjs joined them
+    // (lane/necessity-certificate) — the counts below moved with it, and the
+    // comment beside releaseViteCacheSlot() moved from "four" to "five" in
+    // the same commit, which is the coupling these two assertions exist to
+    // force.
     const sites = allShutdownCallSites();
     const files = new Set(sites.map(s => s.file));
-    assert.equal(sites.length, 11, `expected 11 shutdown() call sites under scripts/ (excluding browser-verify.mjs), found ${sites.length}: ${JSON.stringify(sites.map(s => s.call))}`);
-    assert.equal(files.size, 8, `expected those call sites to live in 8 files, found ${files.size}: ${JSON.stringify([...files].sort())}`);
+    assert.equal(sites.length, 12, `expected 12 shutdown() call sites under scripts/ (excluding browser-verify.mjs), found ${sites.length}: ${JSON.stringify(sites.map(s => s.call))}`);
+    assert.equal(files.size, 9, `expected those call sites to live in 9 files, found ${files.size}: ${JSON.stringify([...files].sort())}`);
     for (const { file, call } of sites) {
       // The property the `[^}]*` scan actually depends on: no embedded
       // newline in the call (a single-line, unnested object literal).

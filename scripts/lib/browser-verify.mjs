@@ -1246,13 +1246,15 @@ export async function shutdown({ browser, serverProc, graceMs = 0 } = {}) {
   // would hand slot N to a second boot while the first server was still
   // running `vite.close()` — possibly mid-rename of `deps_temp_<hash>` onto
   // `deps/`. That is a smaller copy of the defect this whole change exists to
-  // close, and it is reachable at the `graceMs = 0` default that four callers
+  // close, and it is reachable at the `graceMs = 0` default that five callers
   // use: `verify:ui-polish`, `verify:local-safety-net`, `verify:command-palette`,
-  // and `verify:production`'s dev instance (verify-production-build.mjs's
-  // section 5 teardown). The `graceMs > 0` callers were incidentally covered
-  // by their own sleep; that was luck, not a mechanism.
+  // `verify:production`'s dev instance (verify-production-build.mjs's
+  // section 5 teardown), and verify-necessity-surface.mjs (added 2026-09-13,
+  // lane/necessity-certificate — the fifth entry). The `graceMs > 0` callers
+  // were incidentally covered by their own sleep; that was luck, not a
+  // mechanism.
   //
-  // The fourth entry is true only as of 2026-09-13: until then that dev
+  // The FOURTH entry is true only as of 2026-09-13: until then that dev
   // instance tore itself down inline (`kill('SIGTERM')` / sleep / `SIGKILL`)
   // and never called this function at all, so this comment's claim of "four"
   // was actually three — review round 2, observation (a)
@@ -1273,7 +1275,7 @@ export async function shutdown({ browser, serverProc, graceMs = 0 } = {}) {
   // worktree, or a second gate against this repo — which wants a pooled slot
   // during this suite's ~14 s section-6 Chromium journey and gets pushed to
   // slot N+1 instead of reusing this now-idle one. Routed through here
-  // instead, "four" is now literally true rather than a count that happened
+  // instead, that fourth entry is literally true rather than a count that happened
   // to read right, and the release happens at the end of section 5 — freeing
   // it for that concurrent gate — rather than at process exit.
   //
