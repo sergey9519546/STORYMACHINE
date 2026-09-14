@@ -607,13 +607,17 @@ named what is wrong with it.
 
 ## 6. Gates
 
-All run on the final rebased tree (`lane/story-bench` on `origin/main`
-`91c369c5`), in the foreground, exit codes as reported by the shell.
+*Round 2: re-run in full on the round-2 tree. The table below is the round-2
+result; the round-1 numbers it replaces differed only in the test counts.*
+
+All run on the final tree (`lane/story-bench` on `origin/main` `91c369c5`), in
+the foreground, exit codes as reported by the shell.
 
 | gate | command | exit |
 |---|---|---|
-| files touched — adapter guards | `node --experimental-strip-types tests/core/openai-compat-generation-guards.test.ts` | **0** (17 pass, 0 fail) |
-| files touched — bench helpers | `node --experimental-strip-types tests/scripts/story-bench.test.ts` | **0** (19 pass, 0 fail) |
+| files touched — adapter guards | `node --experimental-strip-types tests/core/openai-compat-generation-guards.test.ts` | **0** (**22** pass, 0 fail) |
+| files touched — schema contract | `node --experimental-strip-types tests/core/llm-generator-schema.test.ts` | **0** (**9** pass, 0 fail) — new in round 2 |
+| files touched — bench helpers | `node --experimental-strip-types tests/scripts/story-bench.test.ts` | **0** (**30** pass, 0 fail) |
 | files touched — core boundary | `node --experimental-strip-types tests/core/pure-core-boundary.test.ts` | **0** |
 | files touched — brain coverage | `node --experimental-strip-types tests/core/brain-coverage.test.ts` | **0** (7 pass) |
 | files touched — claims rows | `node --experimental-strip-types tests/core/claims-row-citations.test.ts` | **0** (5 pass) |
@@ -623,11 +627,11 @@ All run on the final rebased tree (`lane/story-bench` on `origin/main`
 | server reachability | `npm run check-server-reachability` | **0** |
 | build | `npm run build` | **0** |
 | docs quality | `npm run check-docs` | **0** |
-| honesty audit | `npm run honesty-audit` | **0** (465 files, 518 markdown, 118 claims rows) |
+| honesty audit | `npm run honesty-audit` | **0** (465 files, **519** markdown, 118 claims rows) — it caught three stale claims anchors the round-2 edits moved, and is clean after re-pointing them |
 | scoring receipt | `node scripts/check-scoring-receipt.mjs main..HEAD` | **0** — *"no scoring-path files changed"* |
 | unverified-gate report | `npm run gates` | **0** |
 | brain graph | `npm run brain` then `npm run check-brain` | **0** — 118 notes, 468 links, fresh |
-| full suite | `npm test` | **0** — 14,047 tests, **13,955 pass / 0 fail**, 91 skipped, 1 todo, ~341 s. Run on the rebased tree, and run AGAIN after the three docs-only commits that followed it: identical counts both times |
+| full suite | `npm test` | **0** — **14,072 tests, 13,980 pass / 0 fail**, 91 skipped, 1 todo, 324 s. ONCE, on the final round-2 tree. (Round 1's run was 14,047 / 13,955; the 25 new tests are round 2's schema contract, provider policy, classifier clauses and run-directory cases.) |
 
 **`check-scoring-receipt` agrees that generation is not the scoring path**, as
 the brief asked me to confirm: the range reports *no scoring-path files
@@ -741,20 +745,27 @@ the next round should add, and §7 records it as undone rather than done.
 
 ---
 
-`Tip:` `d5d58f56` is the commit that added this report; the branch tip is one
-commit later (`36e764bf`, which only writes this SHA in). Both are on
-`lane/story-bench`, pushed, rebased onto `origin/main`
-`91c369c5`. `npm test` 13,955 pass / 0 fail on that exact tree. The run's six
-scripts, six doctor readouts, six call logs, `packet.fountain` and `packet.pdf`
-are in `data/story-bench/2026-09-13/`, which is gitignored — they are on this
-machine only, and only numbers were copied into this report.
+`Tip:` `lane/story-bench`, pushed, on `origin/main` `91c369c5`. Round 1 ended at
+`9a7dc522`; the reviewer's record is `9af43fe2`; round 2 is everything after it.
+`npm test` 13,980 pass / 0 fail, once, on the final tree.
 
-**What the reviewer should attack first:** the `scenes` column. Every premise
-committed exactly one scene of the seven or eight it asked for, so every number
-to the right of it — words, health, verdict, the readings — describes a
-fragment, not a screenplay, and the honest question is whether an instrument
-that produces six one-scene fragments has measured generation at all or has
-only measured `ContinuityProof`. Second: `classifyRun` called all six runs
-`ok`, because its rule is "did any revision pass change the text" and 1–2 of 14
-did. A rule that lets a 1-of-8-scene run report `ok` is arguably too generous,
-and it is the honesty rule this lane registered as claim 117.
+The run artifacts are gitignored and on this machine only — **v1**
+`data/story-bench/2026-09-13/` (29 files; the stub-generator run) and **v2**
+`data/story-bench/2026-09-13-run2/` (the corrected-seam run, plus
+`packet.fountain` 15,702 chars and `packet.pdf` 32,871 bytes, which is the
+packet the owner should read). Only numbers were copied into this report; the
+provider key appears in no commit, no log line and no artifact.
+
+**What the reviewer should attack first, in round 2.** The `model scenes`
+column now reads 14 of 16, so the bench is finally measuring the model — which
+means the honest question moved. It is the **`scenes` column, still**: 16 of 45
+requested scenes committed, and **17 of the 29 that failed were blocked by
+IntentionalProof because the model invents characters instead of using the six
+it was handed.** Whether that is a prompt defect, a `buildSystemPreamble`
+ordering defect (the known-characters line is derived from committed state, and
+nothing is committed when the first beat runs), or the model, is unanswered —
+and answering it means changing a prompt, which this lane does not do. Second:
+`the-long-way-round` went BACKWARDS between the two runs on an unchanged
+pipeline (health 30 → 0, 3 scenes → 1), which is the cleanest evidence in the
+report that six premises at one run each cannot support any claim about
+direction, including the favourable ones in §4b's comparison table.
