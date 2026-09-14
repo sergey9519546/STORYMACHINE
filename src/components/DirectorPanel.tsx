@@ -7,6 +7,7 @@ import {
   NECESSITY_QUESTIONS,
   NECESSITY_CHECK_DISCLAIMER,
   NECESSITY_SAVED_WITH_BEAT_COPY,
+  NECESSITY_UI_LABELS,
   type NecessityCertificate,
   type NecessityField,
   type WithNecessity,
@@ -54,14 +55,6 @@ interface NecessityCheckResponse {
 
 const EMPTY_CERTIFICATE: NecessityCertificate = {
   beatId: "", whyNow: "", whyHere: "", whyThem: "", forcingFunction: "",
-};
-
-/** Writer-facing label for each field — short enough for a 375px column. */
-const NECESSITY_LABELS: Record<NecessityField, string> = {
-  whyNow: "Why now",
-  whyHere: "Why here",
-  whyThem: "Why them",
-  forcingFunction: "Forcing function",
 };
 
 // ─── Mini sparkline ───────────────────────────────────────────────────────────
@@ -591,11 +584,11 @@ export default function DirectorPanel({
       const res = await fetch("/api/outline/necessity-check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // Certificate only. The check takes no context, so this surface and
+        // the generation path reach the same verdict for the same answers
+        // (round-1 review, blocking item 5).
         body: JSON.stringify({
           certificate: { ...EMPTY_CERTIFICATE, ...(beat.necessity ?? {}) },
-          // The scene's own heading and goal: an answer that only repeats them
-          // has restated the question rather than answered it.
-          context: [beat.goal, beat.constraint].filter(Boolean),
         }),
       });
       if (!res.ok) { setNecessityChecks(prev => ({ ...prev, [idx]: null })); return; }
@@ -1549,11 +1542,11 @@ export default function DirectorPanel({
                                 htmlFor={`beat-${idx}-necessity-${field}`}
                                 className="text-[var(--sm-ink-faint)] text-[10px] uppercase font-bold tracking-widest"
                               >
-                                {NECESSITY_LABELS[field]}
+                                {NECESSITY_UI_LABELS[field]}
                               </label>
                               <textarea
                                 id={`beat-${idx}-necessity-${field}`}
-                                aria-label={`Beat ${idx + 1} ${NECESSITY_LABELS[field]} — ${NECESSITY_QUESTIONS[field]}`}
+                                aria-label={`Beat ${idx + 1} ${NECESSITY_UI_LABELS[field]} — ${NECESSITY_QUESTIONS[field]}`}
                                 aria-describedby={fieldResult && !fieldResult.ok ? `beat-${idx}-necessity-${field}-reason` : undefined}
                                 value={beat.necessity?.[field] ?? ""}
                                 onChange={(e) => updateNecessity(idx, field, e.target.value)}

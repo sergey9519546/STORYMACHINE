@@ -82,9 +82,24 @@ test('injection: the block never asks the model to judge the reasons', () => {
 
 // ── The negative direction ──────────────────────────────────────────────────
 
-test('injection: a target with no certificate leaves the preamble byte-identical to before', () => {
-  const before = buildSystemPreamble([], emptyState(), target());
-  assert.ok(!before.includes('SCENE NECESSITY'));
+test('injection: a target with no certificate produces a byte-identical preamble', () => {
+  // Round-1 review, finding 3: this test asserted only that the marker string
+  // was absent, which a stray blank line would have satisfied. It now
+  // compares the whole string, so any change to the assembled preamble for a
+  // caller that passes no certificate fails here.
+  const baseline = buildSystemPreamble([], emptyState(), target());
+  assert.ok(!baseline.includes('SCENE NECESSITY'));
+
+  // A target whose necessity field is explicitly undefined must produce the
+  // exact same bytes as one that never had the field.
+  const explicitUndefined = buildSystemPreamble([], emptyState(), target({ necessity: undefined }));
+  assert.equal(explicitUndefined, baseline);
+
+  // So must a certificate that FAILS the form check: no block, and no
+  // leftover separator where the block would have gone.
+  const formFailing = buildSystemPreamble([], emptyState(), target({ necessity: { ...CERT, whyThem: 'tbd' } }));
+  assert.equal(formFailing, baseline);
+
   // And the no-target path (existing callers) is untouched as well.
   assert.ok(!buildSystemPreamble([], emptyState()).includes('SCENE NECESSITY'));
 });

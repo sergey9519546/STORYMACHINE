@@ -18,6 +18,8 @@ import {
   NECESSITY_FIELDS,
   necessityBeatId,
 } from '../../server/lib/necessity-certificate.ts';
+import { buildSystemPreamble } from '../../server/nvm/generate/proof-spec.ts';
+import { emptyState } from '../../server/nvm/state/NarrativeState.ts';
 
 const WELL_FORMED = {
   beatId: 'whatever-the-client-said',
@@ -192,6 +194,58 @@ describe('outline necessity certificate — attachment and the keyless form chec
       assert.deepEqual(body.fields.whyNow.reasons, ['empty']);
     } finally {
       if (before !== undefined) process.env.GEMINI_API_KEY = before;
+    }
+  });
+
+  // ── One certificate, one verdict (round-1 review, blocking item 5) ───────
+  //
+  // Round 1 had the surface checking WITH context and the generation path
+  // checking without, so the writer could be told a field failed while the
+  // generator would happily inject that same certificate. The
+  // context-dependent rule is gone; this test is what keeps the two paths
+  // from diverging again, by running BOTH for the same certificates and
+  // asserting they agree on every one.
+  it('the writer surface and the generation path reach the same verdict for the same certificate', async () => {
+    const cases: Array<{ name: string; cert: Record<string, string> }> = [
+      { name: 'well-formed', cert: WELL_FORMED },
+      { name: 'one placeholder', cert: { ...WELL_FORMED, forcingFunction: 'because the plot needs it' } },
+      { name: 'one blank', cert: { ...WELL_FORMED, whyThem: '' } },
+      { name: 'copy-paste into two boxes', cert: { ...WELL_FORMED, whyHere: WELL_FORMED.whyNow } },
+      { name: 'too short', cert: { ...WELL_FORMED, whyNow: 'soon' } },
+      // The three answers round 1 rejected and round 2 must accept, through
+      // BOTH paths.
+      { name: 'real answer: nothing else has worked', cert: { ...WELL_FORMED, whyNow: 'Nothing else has worked.' } },
+      { name: 'real answer: she needs it later', cert: { ...WELL_FORMED, forcingFunction: 'She needs it later.' } },
+      { name: 'real answer: he has nothing left', cert: { ...WELL_FORMED, whyThem: 'He has nothing left.' } },
+      // The answer the removed context rule rejected, against a beat whose
+      // goal names that very room.
+      { name: 'real answer: the only room with the safe', cert: { ...WELL_FORMED, whyHere: 'It is the only room with the safe.' } },
+    ];
+
+    for (const { name, cert } of cases) {
+      const res = await fetch(`${server.baseUrl}/api/outline/necessity-check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ certificate: cert }),
+      });
+      assert.equal(res.status, 200, name);
+      const surfaceOk = (await res.json()).ok as boolean;
+
+      // The generation path: the block is injected if and only if the same
+      // certificate passes the same check.
+      const preamble = buildSystemPreamble([], emptyState(), {
+        sceneIdx: 1,
+        sceneFunction: 'advance_plot',
+        activeMechanisms: [],
+        tensionTarget: 50,
+        necessity: cert as never,
+      });
+      const generatorInjects = preamble.includes('SCENE NECESSITY');
+
+      assert.equal(
+        generatorInjects, surfaceOk,
+        `${name}: the surface says ok=${surfaceOk} but the generator ${generatorInjects ? 'injects' : 'does not inject'} — one certificate, two verdicts`,
+      );
     }
   });
 

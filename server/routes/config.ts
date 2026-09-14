@@ -561,12 +561,16 @@ router.post('/api/outline/necessity-check', gameLimiter, validate(NecessityCheck
   const body = req.body as {
     certificate: Record<string, unknown>;
     beatId?: string;
-    context?: string[];
   };
   const cert = coerceNecessityCertificate(body.certificate);
+  // No options beyond beatId, and that is the point: this route and the
+  // generation path (server/nvm/generate/proof-spec.ts) must reach the SAME
+  // verdict for the same certificate. Round 1 shipped a context-dependent
+  // rule that only the surface ran, so one certificate had two verdicts —
+  // round-1 review, finding 2/blocking item 5. The rule is gone and
+  // checkNecessity now has no option that can change a field's verdict.
   const result = checkNecessity(cert, {
     beatId: typeof body.beatId === 'string' ? body.beatId : undefined,
-    context: Array.isArray(body.context) ? body.context : undefined,
   });
   res.json({ ...result, questions: NECESSITY_QUESTIONS, disclaimer: NECESSITY_CHECK_DISCLAIMER });
 }));

@@ -203,32 +203,111 @@ test('rule non_answer: phrases match whole words only — "none" inside "nonethe
   assert.ok(!checkNecessity(cert).fields.whyHere.reasons.includes('non_answer'));
 });
 
-// ── Rule 7: restates_context ────────────────────────────────────────────────
+// ── non_answer, measured against writing rather than against fixtures ───────
+//
+// Round 1 bounded this rule by argument ("a real answer containing a filler
+// word still passes") and the argument was wrong by 3 in 10: the blocklist
+// contains ordinary English content words, and the old bound required four
+// SURVIVORS, so a genuine five-word answer containing one of them fell under
+// the floor. The round-1 review measured it; these two tables are that
+// measurement, kept as fixtures so the bound cannot re-tighten silently.
+//
+// The bound now is: a field fails only when NO content word survives removing
+// the placeholder phrases. A form check that rejects a real answer is worse
+// than one that accepts a lazy one — the point is catching the SKIPPED
+// question, not grading the answer.
 
-test('rule restates_context: repeating the scene heading fails; adding new words passes', () => {
-  const context = ['INT. VAULT - NIGHT', 'Mara opens the vault'];
+/** Answers a working screenwriter could type. Every one must PASS. The first
+ *  three are the exact answers the round-1 review found rejected. */
+const REAL_ANSWERS: readonly string[] = [
+  'Nothing else has worked.',
+  'She needs it later.',
+  'He has nothing left.',
+  'The hearing is tomorrow and the file has to be signed tonight.',
+  'It is the only room with the safe.',
+  'The lab test results are needed before the hearing.',
+  'Her mother is the only one who still has a key.',
+  'They have been circling this argument for a year.',
+  'The tide comes in at four and the causeway floods.',
+  'He is required to report to the station by six.',
+];
 
-  const restatement = checkNecessity(
-    validCert({ whyHere: 'Inside the vault at night.' }),
-    { context },
-  );
-  assert.ok(
-    restatement.fields.whyHere.reasons.includes('restates_context'),
-    `reasons: ${restatement.fields.whyHere.reasons.join(',')}`,
-  );
+/** Text a writer types INSTEAD of answering. Every one must FAIL. */
+const NON_ANSWERS: readonly string[] = [
+  'because the plot needs it',
+  'TBD — to be decided later',
+  'no reason, dramatic reasons',
+  'to move the story forward',
+  'same as above, ditto, etc',
+  'It is necessary and required.',
+  'the story needs it, obviously',
+  'placeholder placeholder placeholder placeholder',
+  'idk, whatever, for the plot',
+  'to be determined, see above',
+];
 
-  const real = checkNecessity(
-    validCert({ whyHere: 'The vault is the only room whose door cannot be opened from outside.' }),
-    { context },
-  );
-  assert.ok(!real.fields.whyHere.reasons.includes('restates_context'));
-  assert.equal(real.ok, true);
+test('non_answer: none of ten realistic writer answers is rejected (0 false-fails)', () => {
+  const falseFails: string[] = [];
+  for (const answer of REAL_ANSWERS) {
+    for (const field of NECESSITY_FIELDS) {
+      const result = checkNecessity(validCert({ [field]: answer }));
+      if (!result.fields[field].ok) {
+        falseFails.push(`[${field}] ${JSON.stringify(answer)} -> ${result.fields[field].reasons.join(',')}`);
+      }
+    }
+  }
+  assert.deepEqual(falseFails, [], `a real answer must never be rejected:\n  ${falseFails.join('\n  ')}`);
 });
 
-test('rule restates_context: with no context supplied the rule does not run (it never guesses)', () => {
-  const cert = validCert({ whyHere: 'Inside the vault at night.' });
-  assert.ok(!checkNecessity(cert).fields.whyHere.reasons.includes('restates_context'));
-  assert.ok(!checkNecessity(cert, { context: [] }).fields.whyHere.reasons.includes('restates_context'));
+test('non_answer: all ten intended targets are still caught (0 targets missed)', () => {
+  const missed: string[] = [];
+  for (const answer of NON_ANSWERS) {
+    const result = checkNecessity(validCert({ forcingFunction: answer }));
+    if (!result.fields.forcingFunction.reasons.includes('non_answer')) {
+      missed.push(`${JSON.stringify(answer)} -> ${result.fields.forcingFunction.reasons.join(',') || 'PASSED'}`);
+    }
+  }
+  assert.deepEqual(missed, [], `a placeholder must still be caught:\n  ${missed.join('\n  ')}`);
+});
+
+test('non_answer: the reason text says what was measured, not that the answer is filler', () => {
+  const result = checkNecessity(validCert({ forcingFunction: 'because the plot needs it' }));
+  const detail = result.fields.forcingFunction.detail.join(' ');
+  assert.match(detail, /no words left/);
+  // The round-1 wording asserted the answer was "made only of placeholder or
+  // filler text" — false in exactly the over-firing case, so it may not come
+  // back.
+  assert.ok(!/made only of placeholder/.test(detail), detail);
+});
+
+// ── The rule that was REMOVED: restates_context ─────────────────────────────
+//
+// Round 1 shipped a rule comparing an answer against the beat's own text. The
+// round-1 review removed it: a beat has no scene HEADING to restate, so the
+// only context available was a whole goal sentence, and a "why here" answer
+// for a beat whose goal names the place must reuse the place's nouns. These
+// two tests are the regression guard — the brief's own example, and the
+// reviewer's — so the rule cannot come back by accident.
+
+test('removed rule: an answer that reuses the beat goal\'s own nouns passes', () => {
+  // The brief's example, against a beat whose goal names that very room.
+  assert.equal(checkNecessity(validCert({ whyHere: 'It is the only room with the safe.' })).ok, true);
+  assert.equal(checkNecessity(validCert({ whyHere: 'The ledger is kept in the safe room.' })).ok, true);
+  // And the reviewer's: a slugline-shaped answer is not rejected either. It is
+  // a weak answer, and weak answers are not this check's business.
+  assert.equal(checkNecessity(validCert({ whyHere: 'Inside the vault at night.' })).ok, true);
+});
+
+test('removed rule: checkNecessity takes no option that can change a field verdict', () => {
+  // Blocking item 5: the surface and the generation path must agree. The only
+  // option left is beatId, which reports a wiring mismatch and never a form
+  // failure — so no caller can configure a different verdict.
+  const cert = validCert();
+  const bare = checkNecessity(cert);
+  const withBeat = checkNecessity(cert, { beatId: 'some-other-beat' });
+  assert.deepEqual(bare.fields, withBeat.fields);
+  assert.equal(bare.ok, withBeat.ok);
+  assert.equal(withBeat.beatIdMismatch, true);
 });
 
 // ── Rule 8: duplicate_answer ────────────────────────────────────────────────
@@ -334,11 +413,6 @@ test('buildNecessityPromptBlock: returns nothing for a missing or form-failing c
   // One unanswered question → no block at all, rather than three anchors that
   // read as the whole answer.
   assert.equal(buildNecessityPromptBlock(validCert({ whyThem: 'tbd' })), '');
-  // Context is honoured here too: a restatement suppresses the block.
-  assert.equal(
-    buildNecessityPromptBlock(validCert({ whyHere: 'Inside the vault at night.' }), { context: ['INT. VAULT - NIGHT'] }),
-    '',
-  );
 });
 
 // ── Surface copy ────────────────────────────────────────────────────────────

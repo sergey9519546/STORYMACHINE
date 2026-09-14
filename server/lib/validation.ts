@@ -2280,14 +2280,18 @@ export const OutlineBodySchema = z.object({
 });
 
 // POST /api/outline/necessity-check — the keyless form check the writer's
-// outline surface calls. Body is one certificate plus optional context (the
-// scene heading / beat goal the answers are about, which the restates_context
-// rule reads). No sessionId: the check is a pure function of its body and
+// outline surface calls. Body is one certificate, and optionally the beat it
+// is filed against. No sessionId: the check is a pure function of its body and
 // touches no session state.
+//
+// It carried a `context` array in round 1, for a rule that compared an answer
+// against the beat's own goal text. That rule was removed by the round-1
+// review (a beat has no scene heading to restate, and the rule rejected real
+// answers), and the field goes with it: the check must have no input the
+// generation path cannot also supply, or one certificate gets two verdicts.
 export const NecessityCheckBodySchema = z.object({
   certificate: NecessityCertificateSchema,
   beatId: noControlChars.max(128).optional(),
-  context: z.array(noControlChars.max(1000)).max(8).optional(),
 });
 
 // ── Collaboration rooms (share-link capability model) ───────────────────────

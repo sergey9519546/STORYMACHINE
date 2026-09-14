@@ -51,6 +51,15 @@
 //      SKIPPED question while still never judging the answer (see each rule's
 //      own note).
 //
+// ── TWO OTHER "NECESSITY" FUNCTIONS IN THIS REPOSITORY ─────────────────────
+//
+// `necessityProof` (server/nvm/proof/tier2/necessity.ts, wired into
+// proof/kernel.ts) is the name the archive's own sketch used, so a reader
+// following _CLEVER_MOVES §10 lands there first and may conclude this module
+// duplicates it. It does not: that proof calls `necessityScore` below on an
+// already-generated scene's ops and fails the candidate under 0.5. It never
+// sees a stated reason, and nothing here fails a candidate.
+//
 // ── RELATIONSHIP TO `necessityScore` (server/nvm/quality/index.ts:546) ──────
 // Different concept, deliberately not merged. That function scores the StoryOp
 // list of an already-generated scene — how many ops earn their place — and
@@ -78,6 +87,17 @@ export const NECESSITY_QUESTIONS: Record<NecessityField, string> = {
   whyHere: 'Why this place?',
   whyThem: 'Why these characters and no others?',
   forcingFunction: 'What makes this scene unavoidable — what pressure means it cannot be skipped?',
+};
+
+/** Short label for a narrow UI column — the writer surface's field labels.
+ *  Here rather than in the component, so the four questions have ONE home:
+ *  a fourth wording map living in DirectorPanel.tsx could drift from these
+ *  three (round-1 review, finding 6). */
+export const NECESSITY_UI_LABELS: Record<NecessityField, string> = {
+  whyNow: 'Why now',
+  whyHere: 'Why here',
+  whyThem: 'Why them',
+  forcingFunction: 'Forcing function',
 };
 
 /** Short prompt-side label for each field. */
@@ -187,20 +207,14 @@ export const NECESSITY_MIN_DISTINCT_WORDS = 4;
  *  second, different cap would be a defect. */
 export const NECESSITY_MAX_CHARS = 500;
 
-/** Minimum number of words an answer must add beyond the context it is
- *  answering about (scene heading, beat goal/title). Below this the answer is
- *  a restatement of the question's own subject, not an answer to it. Two is
- *  deliberately the weakest possible bar: an answer that shares every word
- *  with the slugline except one has not said anything the slugline did not. */
-export const NECESSITY_MIN_NEW_WORDS = 2;
-
-/** Function words that do not count as "new" when measuring what an answer
- *  adds to the scene's own heading. Without this list, "the vault at night"
- *  answers a heading of "INT. VAULT - NIGHT" with two new words ("the",
- *  "at") and passes — a pure restatement scoring as an answer. The list is
- *  used ONLY by the restates_context rule; the distinct-word floor still
- *  counts every word, because "the vault door is shut" is a real four-word
- *  answer and should not be punished for containing "the" and "is". */
+/** Function words. A word from this list is never, on its own, evidence that
+ *  a question was answered — "it is not" is three words and says nothing —
+ *  so the `non_answer` rule asks whether any word OUTSIDE this list survives
+ *  removing the placeholder phrases below.
+ *
+ *  It is used ONLY there. The distinct-word floor still counts every word,
+ *  because "the vault door is shut" is a real four-word answer and should not
+ *  be punished for containing "the" and "is". */
 export const NECESSITY_STOP_WORDS: ReadonlySet<string> = new Set([
   'a', 'an', 'the', 'and', 'or', 'but', 'of', 'to', 'in', 'on', 'at', 'for',
   'with', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'it', 'its',
@@ -250,7 +264,6 @@ export type NecessityReasonCode =
   | 'too_long'
   | 'too_few_distinct_words'
   | 'non_answer'
-  | 'restates_context'
   | 'duplicate_answer';
 
 export interface NecessityFieldResult {
@@ -287,11 +300,6 @@ export interface NecessityCheckOptions {
   /** The beat this certificate is supposed to belong to. When given and
    *  different from `cert.beatId`, the result reports `beatIdMismatch`. */
   beatId?: string;
-  /** Text the answers are answering ABOUT — the scene heading, the beat's
-   *  goal, its title. An answer that adds fewer than NECESSITY_MIN_NEW_WORDS
-   *  words to this text is a restatement of it (`restates_context`). Omit it
-   *  and that rule simply does not run; it never guesses at context. */
-  context?: readonly string[];
 }
 
 /** The sentence every surface must show next to a necessity verdict. It is a
@@ -309,7 +317,7 @@ export const NECESSITY_CHECK_DISCLAIMER =
  *  archetype rather than from this beat, is constrained by it — no client
  *  generates scenes from outline beats today. */
 export const NECESSITY_SAVED_WITH_BEAT_COPY =
-  'Answers are saved with the beat, and a scene generated from this beat states all four to the generator as constraints.';
+  'Answers are saved with the beat. No scene generator in the app reads them yet — the engine states all four as constraints only for a scene generated from this beat, which nothing here does today.';
 
 // ── Normalization ───────────────────────────────────────────────────────────
 
@@ -363,8 +371,11 @@ const REASON_DETAIL: Record<NecessityReasonCode, string> = {
   too_short: `This answer is shorter than ${NECESSITY_MIN_CHARS} characters — too short to be an answer rather than a placeholder.`,
   too_long: `This answer is longer than ${NECESSITY_MAX_CHARS} characters; shorten it (the beat's own goal/constraint fields carry the long form).`,
   too_few_distinct_words: `This answer uses fewer than ${NECESSITY_MIN_DISTINCT_WORDS} different words.`,
-  non_answer: 'This answer is made only of placeholder or filler text ("TBD", "because", "the plot needs it"), so no question was actually answered.',
-  restates_context: `This answer repeats the scene's own heading or goal and adds fewer than ${NECESSITY_MIN_NEW_WORDS} new words, so it restates the question instead of answering it.`,
+  // Says what the rule MEASURED, not what the writer meant. The earlier
+  // wording asserted the answer was "made only of placeholder or filler
+  // text", which is false in exactly the case the rule over-fires on
+  // ("Nothing else has worked." is not filler) — round-1 review, finding 1.
+  non_answer: 'Setting aside placeholder phrases ("TBD", "because the plot needs it") and words like "it" and "is", this answer has no words left, so there is nothing here that answers the question.',
   duplicate_answer: 'This answer is word-for-word identical to another of the four, so at least one of the four questions is unanswered.',
 };
 
@@ -373,9 +384,17 @@ const REASON_DETAIL: Record<NecessityReasonCode, string> = {
  * output, no model call, no scoring of whether a reason is *good*.
  *
  * Every rule is a property of the text — present, non-empty, long enough,
- * enough different words, not only placeholder tokens, not a restatement of
- * the scene's own heading, not a copy of a sibling answer. Nothing here reads
- * meaning.
+ * enough different words, not only placeholder tokens, not a copy of a
+ * sibling answer. Nothing here reads meaning.
+ *
+ * There is no rule here that compares an answer against the beat's own text.
+ * One existed in round 1 (`restates_context`) and was removed by the round-1
+ * review: a beat has no scene HEADING to restate — `OutlineBeat` is phase,
+ * turn range, goal, constraint, avoid — so the only context available was a
+ * whole goal sentence, and a "why here" answer for a beat whose goal names
+ * the place must reuse the place's nouns. It rejected "It is the only room
+ * with the safe." for a beat about the safe room. The other seven rules cover
+ * the skipped question without needing an input this module cannot validate.
  */
 export function checkNecessity(
   cert: NecessityCertificate | null | undefined,
@@ -393,13 +412,6 @@ export function checkNecessity(
     const value = raw[field];
     norm[field] = typeof value === 'string' ? normalized(value) : '';
   }
-
-  const contextTokens = new Set<string>();
-  for (const ctx of opts.context ?? []) {
-    if (typeof ctx !== 'string') continue;
-    for (const word of normalizeWords(ctx)) contextTokens.add(word);
-  }
-  const hasContext = contextTokens.size > 0;
 
   const fields = {} as Record<NecessityField, NecessityFieldResult>;
   const failed: NecessityField[] = [];
@@ -422,19 +434,31 @@ export function checkNecessity(
         const distinct = new Set(tokens);
         if (distinct.size < NECESSITY_MIN_DISTINCT_WORDS) reasons.push('too_few_distinct_words');
 
-        // Placeholder-only: what survives removing every non-answer phrase.
+        // Placeholder-only: does ANY content word survive removing the
+        // placeholder phrases?
+        //
+        // THE BOUND, AND WHY IT IS THIS ONE (round-1 review, finding 1).
+        // It used to be `surviving.size < NECESSITY_MIN_DISTINCT_WORDS` — at
+        // least four words had to survive — and that rejected real answers:
+        // the blocklist contains ordinary English content words ("nothing",
+        // "later", "needed", "necessary", "test"), so a genuine four-to-six
+        // word answer containing one of them dropped under the floor.
+        // Measured by the reviewer across fifteen cases: three of ten
+        // realistic writer answers were rejected ("Nothing else has worked.",
+        // "She needs it later.", "He has nothing left."), against zero
+        // intended targets missed either way. The bound below missed zero
+        // targets and rejected none of the real answers.
+        //
+        // A form check that rejects a real answer is worse than one that
+        // accepts a lazy one: the point is catching the SKIPPED question, and
+        // a writer who is told their real sentence is filler learns to
+        // distrust the whole check.
         const surviving = new Set(stripNonAnswerPhrases(tokens));
-        if (surviving.size < NECESSITY_MIN_DISTINCT_WORDS) reasons.push('non_answer');
-
-        // Restatement of the scene's own heading/goal.
-        if (hasContext) {
-          let newWords = 0;
-          for (const word of distinct) {
-            if (contextTokens.has(word) || NECESSITY_STOP_WORDS.has(word)) continue;
-            newWords += 1;
-          }
-          if (newWords < NECESSITY_MIN_NEW_WORDS) reasons.push('restates_context');
+        let survivingContentWords = 0;
+        for (const word of surviving) {
+          if (!NECESSITY_STOP_WORDS.has(word)) survivingContentWords += 1;
         }
+        if (survivingContentWords === 0) reasons.push('non_answer');
 
         // Copy of a sibling answer (exact, after normalization).
         const isDuplicate = NECESSITY_FIELDS.some(
