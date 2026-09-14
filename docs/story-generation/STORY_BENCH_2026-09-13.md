@@ -390,6 +390,223 @@ contains a single scene.
 
 ---
 
+## 4b. The re-run with the corrected seam (v2)
+
+The seam fix (`9d392911`) changed what the pipeline produces, so the run was
+repeated on the corrected seam. Both tables are kept, because the difference
+between them is the measurement.
+
+**v1 — what the bench measured before the fix** (`data/story-bench/2026-09-13/`):
+the STUB generator, colliding with itself. Re-labelled here by round 2's
+structural classifier, which is the label these runs should always have carried:
+
+| premise | shape | scenes | model scenes | words | health | verdict | llm calls | fallbacks | passes changed | wall s | tokens | v1 label | round-2 label |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| harbor-lights | ensemble / large cast | 1/8 | 0/1 | 142 | 0 | PASS | 16 | 15 | 2/14 | 1010.4 | 95444 | ok | **FAILED** |
+| counterweight | two-hander | 1/7 | 0/1 | 60 | 0 | PASS | 10 | 12 | 1/14 | 1170.3 | 52936 | ok | **FAILED** |
+| the-understudy-clause | comedy | 1/7 | 0/1 | 85 | 0 | PASS | 15 | 15 | 2/14 | 779.0 | 83118 | ok | **FAILED** |
+| nine-minutes-of-tape | non-linear | 1/7 | 0/1 | 117 | 0 | PASS | 14 | 14 | 1/14 | 1047.1 | 97541 | ok | **FAILED** |
+| the-long-way-round | animation / family | 1/8 | 0/1 | 100 | 30 | PASS | 13 | 15 | 1/14 | 1642.1 | 74804 | ok | **FAILED** |
+| cold-open | thriller | 1/8 | 0/1 | 83 | 0 | PASS | 15 | 15 | 2/14 | 1230.4 | 83230 | ok | **FAILED** |
+
+83 calls · 86 fallbacks (74 `llm_generator_partial_parse`) · 487,073 tokens ·
+114.7 min · **6 of 45 scenes committed, 0 of them model-authored** · 33
+ContinuityProof blocks, all of them stub-versus-stub. Every row re-labels from
+`ok` to `FAILED — no committed scene carried a model-authored op (every
+candidate stubbed)`, which is what actually happened.
+
+**v2 — the same six premises on the corrected seam**
+(`data/story-bench/2026-09-13-run2/`):
+
+| premise | shape | scenes | model scenes | words | health | verdict | llm calls | fallbacks | passes changed | wall s | tokens | status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| harbor-lights | ensemble / large cast | 3/8 | 2/3 | 290 | 53.3 | PASS | 21 | 1 | 4/14 | 1342.1 | 152592 | FRAGMENT |
+| counterweight | two-hander | 3/7 | 2/3 | 320 | 65 | CONSIDER | 20 | 3 | 6/14 | 1167.0 | 119007 | FRAGMENT |
+| the-understudy-clause | comedy | 3/7 | 3/3 | 437 | 71.9 | CONSIDER | 15 | 5 | 4/14 | 1481.9 | 110402 | FRAGMENT |
+| nine-minutes-of-tape | non-linear | 4/7 | 4/4 | 835 | 74.4 | CONSIDER | 23 | 1 | 8/14 | 1498.4 | 156757 | DEGRADED |
+| the-long-way-round | animation / family | 1/8 | 1/1 | 132 | 0 | PASS | 15 | 2 | 2/14 | 1197.2 | 83096 | FRAGMENT |
+| cold-open | thriller | 2/8 | 2/2 | 196 | 30 | PASS | 12 | 8 | 2/14 | 2065.1 | 76664 | FRAGMENT |
+
+106 calls · 20 fallbacks · 698,518 tokens · 145.9 min · **16 of 45 scenes
+committed, 14 of them model-authored, carrying 74 model-written ops** · 26 of
+84 revision passes changed text · 17 IntentionalProof blocks, 0 ContinuityProof
+blocks.
+
+**What moved, and what did not.**
+
+| | v1 | v2 |
+|---|---|---|
+| scenes committed | 6 / 45 | **16 / 45** |
+| committed scenes whose IR came from the model | **0 / 6** | **14 / 16** |
+| model-authored ops committed | **0** | **74** |
+| fallbacks per LLM call | 86 / 83 ≈ **1.04** | 20 / 106 ≈ **0.19** |
+| `llm_generator_partial_parse` | **74** | **4** |
+| revision passes that changed text | 9 / 84 | **26 / 84** |
+| words per script | 60–142 | **132–835** |
+| health | 0, 0, 0, 0, 30, 0 | 53.3, 65, 71.9, 74.4, 0, 30 |
+| verdicts | six PASS (rejection) | three PASS, **three CONSIDER** |
+| the blocking Tier 1 proof | ContinuityProof × 33 | **IntentionalProof × 17**, ContinuityProof × 0 |
+| every run's label | FAILED | 5 FRAGMENT, 1 DEGRADED |
+
+**Read `model scenes` first, as in v1.** It is 14 of 16 rather than 0 of 6: the
+model is now writing the story ops that reach a commit. `llm_generator_partial_parse`
+fell from 74 to **4**, which is the schema fix measured end to end.
+
+**The failure mode MOVED rather than disappearing.** ContinuityProof, which
+blocked 33 scenes in v1, blocked **none** in v2 — confirming that what it was
+refusing was the stub generator's own `scene.contains = event_N` facts.
+IntentionalProof now blocks 17, and the readings in §5b show why: the model
+invents characters (`PROTAGONIST`, `Alex`, `Antagonist`, `Rila`, `Char1`)
+instead of using the cast it is given, and an op referencing a character with no
+belief in state is a Tier 1 block. That is a real finding about the generation
+loop and the first one this bench has produced that is ABOUT the model.
+
+**Nothing here is a quality claim, and one row got worse.**
+`the-long-way-round` went from 1/8 to 1/8 and health 30 to health 0 — six
+premises, one run each, on a stochastic generator whose per-call latency varies
+5×. The table records a change in what the pipeline can assemble; it does not
+establish that any script is good, and §6 is still what the doctor cannot see.
+
+---
+
+## 4c. Two more instrument defects this run found
+
+Both were found by running the bench, which is what it is for, and both are
+disclosed rather than quietly fixed.
+
+**1. undici's 300 s `headersTimeout` was aborting the 14-pass revision, and it
+is not the `AbortSignal`.** `POST /api/nvm/revise` sends no headers until all
+fourteen sequential LLM passes have finished. undici's default
+`headersTimeout` fires independently of a request's `AbortSignal`, so a
+revision that legitimately ran past five minutes was killed client-side with a
+bare `fetch failed`. **Three of the six v2 rows lost their ENTIRE revision step
+to it at 301 s** — `counterweight`, `nine-minutes-of-tape` and
+`the-long-way-round` — and the bench recorded `revise failed — fetch failed`
+with no hint that the deadline was its own. Fixed in `ee115561` (the bench's
+own calls go through an `undici.Agent` with `headersTimeout` and `bodyTimeout`
+disabled, leaving the `AbortSignal` as the single real deadline), and **those
+three premises were re-run** on the fixed client into the same run directory;
+the v2 table above is the corrected one. The fix is visible in the numbers:
+`counterweight`'s revision now runs **405 s** and changes 6 of 14 passes, where
+before it was cut at 301 s having changed none.
+
+This is distinct from the `converge failed (300s)` lines in both runs, which
+are genuine: those carry `AI_BUDGET_DEADLINE_EXCEEDED` from the route's own
+budget, which this bench deliberately raised to 300 s for the server it boots.
+
+**2. Re-running one premise used to destroy the other five.** `table.md` and
+`summary.json` were written from whatever premises THIS invocation ran, so
+`--only <id>` after a six-premise run replaced a six-row table with a one-row
+one and turned `--packet` into a one-script packet. The reviewer hit it for
+real while reproducing a single row and restored 29 files by hand. Now each
+premise writes `<id>.row.json` and the table and summary are **derived** from
+every row file in the directory, in fixture order — so re-running the three
+rows defect 1 cost was additive, which is how the v2 table above came to exist
+without a second two-hour run. `--into <dir>` is the named way to write into an
+existing run; `--out` still refuses to reuse a directory that holds a
+`summary.json`.
+
+---
+
+## 5b. Two readings of the v2 output
+
+Read start to finish in `data/story-bench/2026-09-13-run2/` (gitignored; paths
+and line numbers are the evidence, no quoted text beyond a phrase). Both
+premises below completed their revision step, so their numbers are final and
+unaffected by the `headersTimeout` defect in §4c.
+
+### THE UNDERSTUDY CLAUSE (comedy, 3 of 7 scenes committed) — 101 lines
+
+`the-understudy-clause.final.fountain`. Health **71.9**, verdict **CONSIDER**,
+sceneCount 5, 3 pages, 437 words — the strongest row in the run, and the first
+script this bench has produced that a reader can get lost in for a page.
+
+**Something new happens here, and it is not what the pipeline was asked to
+do.** Lines 1–57 are the three committed scenes, still rendered through the
+template table. Lines 59–101 are two entirely new scenes the REVISION pipeline
+wrote from nothing — real sluglines (`INT. ARCHIVE ROOM - NIGHT`,
+`INT. THEATER LOBBY - NIGHT`), alternating cues, actions between lines. They
+have beats: ALEX wants the dossier, MR_DAWE will not hand it over, and the
+exchange escalates over four turns to `ALEX lunges.` (76). It is the only
+passage in either run with the shape of a scene.
+
+**And it is a different film.** The premise is a regional theatre faking a
+press night for an insurance payout. Lines 59–78 are an archive heist between
+two characters who are not in the cast, about a sealed dossier, with a red LED
+counting to 00:00. The revision pipeline invented a protagonist (`ALEX`), an
+antagonist role (`Antagonist`, 21 and 23) and a location, and wrote them
+competently into a story nobody asked for. The comedy — the clerk who cannot
+act, the critic, the assessor in seat F12 — never appears.
+
+**The dialogue tells you how it is being said.** Line 62 is `"I whisper, it's
+done."`; line 93 is `"I raise my voice: the insurance pays only if the show
+goes on."`; line 14 is `"I'm skeptical—something about the lead feels wrong"`.
+The performance direction has been folded into the words, which is what
+happens when a belief with a confidence value is asked to become a line: the
+attitude is data, so it gets typed.
+
+**The internal identifiers reached the page again, and this time one of them is
+a character in the story.** `"id 2"`, `"id 3"`, `"id 4"` are printed as clue
+text at lines 25, 36 and 55, and at lines 27, 38 and 53 the same string is the
+ticking clock: *"running out of time before the id 2 reaches its final hour"*.
+That sentence is a template constant with a model-supplied `clockId` slotted
+in, and the model supplied `id 2`. It appears three times in 57 lines.
+
+**The scene numbers admit what is missing.** The headings are SCENE 0, SCENE 3,
+SCENE 5 (1, 31, 44): the slug carries the requested beat index, so the four
+rejected beats leave visible gaps. A reader sees the holes without being told.
+
+**What the doctor said:** health 71.9, verdict **CONSIDER** — the middle tier,
+which is right for pages this thin — plus its own disclosure, which the bench
+now keeps: *"This reads like an excerpt (5 scenes analyzed)… read as feedback
+on the pages, not coverage of a feature."* Its top findings are `NO_REVERSALS`,
+three `BELIEF_ISOLATION`, `CLOCK_WITHOUT_CONFRONTATION` and
+`NO_RELATIONSHIP_MOVEMENT`. Every one of those is true of this script, and
+`CLOCK_WITHOUT_CONFRONTATION` is the clock called `id 2`.
+
+### HARBOR LIGHTS (ensemble, 3 of 8 scenes committed) — 64 lines
+
+`harbor-lights.final.fountain`. Health **53.3**, verdict **PASS**, sceneCount
+3, 2 pages, 290 words.
+
+**The queue from v1 is still a queue, and now it is a queue with a stranger in
+it.** Lines 4–28 are the six seeded characters saying their seeded belief in
+order, exactly as before — TOMAS (4), NELL (7), DRU (16), KAI (20), FATHER_ORR
+(24), MAYOR_LOCK (27) — and this time the revision pass appended a paraphrase
+of each belief as an action line beneath it (6, 14, 18, 22): *"He tucks the
+letter away, hoping to buy himself time."* Saying the subtext twice is worse
+than saying it once. Then at line 37 a character called `PROTAGONIST` speaks,
+and at 58 and 60 a character called `Alex` states his purpose and then his
+"actual purpose" — neither is in the premise, the cast, or the other twenty-six
+lines.
+
+**The only exchange in the script is nine words long.** At lines 7–10 NELL asks
+*"What if waiting makes it worse?"* and TOMAS answers *"All is well"*. That is
+the one moment in 64 lines where a character responds to another character. It
+is also the moment the script is closest to working, which is the useful thing
+to know.
+
+**Raw identifiers again:** `"c3"` (30), `"c4"` (32), `"c5"` (56) as clue text,
+and `tensionClock1` at line 64 inside the same deadline sentence. `event_1`
+survives at line 48 — that is the one committed scene whose IR is a stub
+(`committedNonStub` 2 of 3), so the template rendering of `stubIR`'s own
+`ADD_FACT` is still printed as prose.
+
+**Where the structure went:** 4 of the 8 beats were refused by
+**IntentionalProof** — an op referencing a character with no belief in state —
+which is the v2 failure mode and a direct consequence of the model inventing
+`PROTAGONIST` and `Alex` instead of using the six cast members it was given.
+One more beat lost its converge call to the route's 300 s budget.
+
+**What the doctor said:** health 53.3, verdict **PASS** — the rejection verdict,
+correctly — with `TOO_MANY_OPEN_CONFLICTS` first, then seven
+`INTENTION_INVISIBLE`, one per character, then `QUESTION_DODGE` and
+`CADENCE_MONOTONY`. `QUESTION_DODGE` is lines 8–10: NELL's question, TOMAS's
+non-answer. The deterministic engine found the one exchange in the script and
+named what is wrong with it.
+
+---
+
 ## 6. What the doctor cannot see
 
 The health, verdict and scene count in the table are real, deterministic
@@ -434,10 +651,15 @@ model and prompt, and feed no user-visible number. It does not carry one today.
 
 ## 6b. The reading packet
 
-`npm run story:bench -- --packet` assembled the six scripts from the run above
-into `data/story-bench/2026-09-13/packet.fountain` (6,152 chars) and
-`packet.pdf` (13,273 bytes), through `src/lib/pdf.ts`'s `fountainToPdf()` — the
-paginator the product ships, since there is no `POST /api/export/pdf`.
+`npm run story:bench -- --packet` assembles the six scripts of the newest run
+into one Fountain file and one PDF, through `src/lib/pdf.ts`'s
+`fountainToPdf()` — the paginator the product ships, since there is no
+`POST /api/export/pdf`. **The packet the owner should read is the v2 one**,
+`data/story-bench/2026-09-13-run2/packet.fountain` (15,702 chars) and
+`packet.pdf` (32,871 bytes). The v1 packet was 6,152 chars and 13,273 bytes,
+and v1 is the run in which no committed scene carried a model-authored op, so
+it is a packet of the stub generator's output and is not worth a reader's
+time.
 
 Its front matter carries the five questions the owner scores each script on,
 1–5, and a blank grid:
