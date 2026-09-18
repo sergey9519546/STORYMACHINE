@@ -795,3 +795,325 @@ only here, and will go with the next sandbox rebuild — so the recommendation
 stands and is the strongest single thing the next round could do: commit a
 bounded, redacted evidence file beside the numbers the bench publishes. It is
 still recorded as undone in §7 item 4 rather than claimed.
+
+---
+
+# ROUND 3 RE-CHECK — the reviewer's ruling
+
+**Tip line — reviewed object:** `lane/story-bench` @ **`19fd20d2`**
+("docs(audit): round-3 closure of the nine items, appended below the reviewer's
+text"), on `origin/main` `91c369c5`. Round 3 is `06dfad70..19fd20d2`, four
+commits (`95f03b3d`, `d3f4a113`, `72b0fc99`, `19fd20d2`).
+**Worktree:** a FRESH one, `<session scratch>/wt-sb-r3`, detached at `19fd20d2`
+— not the round-2 tree.
+**Reviewer:** the same one who returned REVISE at `2a0546ff` and wrote
+everything above the round-3 closure section.
+
+**My text above is unedited.** `git diff 06dfad70..19fd20d2 --
+docs/audits/2026-09-13-story/story-bench-review-round2.md` contains **zero `-`
+lines**: 318 insertions, 0 deletions, all below my last line.
+
+**Verdict: MERGE.** All nine items are closed, and I checked each one by
+running something rather than by reading the closure table. Two of them are
+closed better than I asked for. One thing I must correct first, because it is
+mine.
+
+---
+
+## 0. I was wrong about the artifacts, and the reason matters
+
+My round-2 note said `data/story-bench/` "does not exist on this machine", that
+both run directories "were lost with the sandbox", and that every line-level
+claim in §5b was "unverifiable by me and now cannot be" checked. **All three
+statements are false, and the record should carry the retraction louder than it
+carried the claim.**
+
+`/home/user/wt-story/data/story-bench/` holds `2026-09-13` (29 files) and
+`2026-09-13-run2` (35 files), complete. Nothing was lost.
+
+The lane's closure section is generous about it — "the reviewer's machine had
+lost them; this one had not" — and that explanation is also wrong, in a way
+worth fixing so the next lane does not inherit it. **It is the same machine.**
+`data/` is gitignored, so it is not shared between worktrees and does not travel
+with a branch; the bench writes to `<the worktree it ran from>/data`. The lane
+ran from `/home/user/wt-story`; I reviewed from a worktree of my own and looked
+in `/home/user/STORYMACHINE/data`, which never held them. That is a reviewer
+error — I checked one path and reported a sandbox rebuild — not a durability
+event. The §7 durability argument I drew from it is still right on its own
+merits, but it was not evidenced by this, and I should not have said it was.
+
+**I then re-verified, from the artifacts, every specific claim the coordinator
+named and several more.** All reproduce, exactly:
+
+| claim | file | result |
+|---|---|---|
+| v1 HARBOR LIGHTS: `event_0` at 25 and 29 | `2026-09-13/harbor-lights.final.fountain` | **both**, verbatim ("the scene holds event_0", "As event_0 lingers") |
+| v1 HARBOR LIGHTS: six cues at 4/8/11/14/17/20 | same | **TOMAS, NELL, DRU, KAI, FATHER_ORR, MAYOR_LOCK**, in that order |
+| v1 HARBOR LIGHTS: line 27 is not a sentence | same | `Silence thick here.` |
+| v1 COUNTERWEIGHT: 17 lines, ends on `event_0` | `2026-09-13/counterweight.final.fountain` | line 17 is the last line: `Scene contains event_0, plain and undeniable now.` |
+| `event_0` three across the run, two in HARBOR LIGHTS | all six v1 finals | harbor-lights **2**, counterweight **1**, other four **0** — the round-1 LOW 7 correction is right |
+| v2 UNDERSTUDY: 101 lines | `2026-09-13-run2/the-understudy-clause.final.fountain` | **101** |
+| v2 UNDERSTUDY: `id 2/3/4` as clue text at 25/36/55 | same | **all three**, same template sentence |
+| v2 UNDERSTUDY: the clock line at 27/38/53 | same | **all three**, each reading "before the id 2 reaches its final hour" |
+| v2 UNDERSTUDY: `ALEX lunges.` at 76 | same | exact |
+| v2 UNDERSTUDY: two invented scenes from 59 | same | `INT. ARCHIVE ROOM - NIGHT` (59), `INT. THEATER LOBBY - NIGHT` (80); committed three at 1/31/44 as SCENE 0/3/5 |
+| v2 HARBOR LIGHTS: 64 lines, cues at 4/7/16/20/24/27 | `2026-09-13-run2/harbor-lights.final.fountain` | **exact**, same six names |
+| v2 HARBOR LIGHTS: `PROTAGONIST` 37, `Alex` 58 and 60 | same | exact — "Alex states purpose…", "Alex actual purpose…" |
+| v2 HARBOR LIGHTS: `c3` 30, `c4` 32, `c5` 56, `event_1` 48, `tensionClock1` 64 | same | **all five** |
+| the readout writer kept 5 keys in v1 and 8 in v2 | both `counterweight.doctor.json` | v1 `{health, verdict, sceneCount, contentHash, topFindings}`; v2 adds `verdictMeaning`, `excerptNote`, `pageEstimate` |
+
+The one thing the lane reports as not reproducing — "three times in 57 lines" —
+I also checked. The three clock lines are 27, 38 and 53, all inside the
+committed portion the document itself calls "lines 1–57", so the old phrasing
+was defensible rather than a miscount; the new text ("lines 27, 38 and 53 of a
+101-line script") is strictly better because it is checkable, and the lane
+marked its own sentence harder than it needed to. No issue.
+
+**And the derivation, which round 2 could only defend with column arithmetic, I
+have now verified end to end.** `renderTable(rowsFromDir('2026-09-13-run2', <the
+six fixture ids>))` run against the real row files reproduces the committed v2
+table of `STORY_BENCH_2026-09-13.md:442-449` **cell for cell, all six rows and
+thirteen columns.** The committed table is the rendering of the row files.
+
+---
+
+## 1. The nine items
+
+| # | my round-2 item | **ruling** |
+|---|---|---|
+| 1 | delete the false "the doctor never mentions the thinness" sentence | **CLOSED.** A repo-wide grep finds the sentence only inside *(Corrected in round 3)* markers quoting its former text, and in the round-1 review file (history). `STORY_BENCH:398` / `lane-report:392` now name `excerptNote` (`doctor.ts:904`, wired `:2308`) and `pageEstimate` instead, and the two `.doctor.json` key sets back the claim. The closure table also re-labels its own round-2 row as **"OVERSTATED IN ROUND 2"** rather than quietly fixing it, which is the right way to answer a false-report finding. |
+| 2 | fix the surviving PASS sentence | **CLOSED.** `STORY_BENCH:350` / `lane-report:344` carry the correction with the same marker every other corrected paragraph has, and the replacement text is right: PASS is `health < 60`, the rejection verdict, and the number worth distrusting on that row is the five `INTENTION_INVISIBLE` findings, not the verdict. No longer contradicts §4. |
+| 3 | test `rowsFromDir`, shown RED first | **CLOSED, and wider than I asked.** Four assertions in a real tmpdir: fixture order against a deliberately non-alphabetical `ORDER` (so a `readdir` glob could not pass by accident), one re-written row replacing exactly one row, absent rows skipped with a stray `.final.fountain` ignored, and `renderTable(rowsFromDir(...)) === renderTable(rows)`. **I re-ran my own mutation on the round-3 tree: `rowsFromDir` → `return []` now gives 34 pass / 4 fail.** See §2 for the full audit. |
+| 4 | make the declared branches mirror `parseOp` | **CLOSED, and this is the best work in the round.** `minItems: 2, maxItems: 2` on `pair` (`llm-generator.ts:309`), `minItems`/`maxItems`/`minimum`/`maximum`/`minLength`/`maxLength`/`pattern` carried by the translator (`schema.ts:33`), and — the part that matters — `minimalInstance` (`llm-generator-schema.test.ts:57-88`), which synthesises each branch's own minimum from its `required` list, property types, enums and array bounds. I attacked it specifically; see §3. |
+| 5 | close the `EMOTION` branch and the NaN path | **CLOSED, pinned at both ends.** The branch requires all nine non-optional `EmotionState` fields (`anger_target_id` declared, not required), `dominant` and `BELIEF.source` are enums, and `parseOp:94-97` independently rejects a partial. See §4 for the independence proof and for the check that the debt assertion really reaches `quality/index.ts:495`. |
+| 6 | one number, one name, in the packet | **CLOSED, driven.** `scenesLabel` (`story-bench.mjs:945`) renders `"N of M scenes committed"` from the same fields `renderTable` uses; the packet header prints it **and** names the doctor's count separately; the front matter gains **TWO SCENE COUNTS, AND WHICH ONE IS AUTHORITATIVE**. I read the regenerated `packet.fountain` in the run directory: all six headers carry both numbers. |
+| 7 | the "counts one improvement five times" caveat | **CLOSED.** `STORY_BENCH:472` adds **"COUNT THE ROWS OF THIS TABLE AS ROUGHLY TWO MOVEMENTS, NOT NINE"**, with the AUC 0.938 / 0.076 reasoning, the grouping of the four schema-fix views into one, and the flat sentence *"Nothing in this table is evidence that any script got BETTER."* The understudy 71.9-on-sceneCount-5 connection I said was never made is now made, with the five slugline line numbers, which I verified in the artifact. One residual, non-blocking: see §6. |
+| 8 | bring the brain and Decision #8 to round 2 | **CLOSED, thoroughly.** Both brain notes and `DECISION_LOG.md:901` now say `getGenerativeProvider()` with the reason; "15 assertions" → "22 assertions as shipped"; a new **THE SCHEMA DEFECT** section in `Generation - Story Bench` carrying 74-of-74, the `anyOf` fix, round 3's two branch fixes and the v2 numbers; both `sources` lists extended with `llm-generator-schema.test.ts` and `schema.ts`; both `updated: 2026-09-18`. `check-brain` fresh at 118 notes / 468 links, `brain-coverage` 7/0. |
+| 9 | the three slips and the `--packet` gap | **CLOSED, 4 of 4.** `"two premises"` is gone from `story-bench.mjs` (both docs say three, which the artifacts support). `STORY_BENCH:676-688` re-words the `excerptNote` quote as a **v1** reading and says the number inside it is not a constant. `CLAIMS_REGISTER` rows 117/118 re-anchored to `:200` and `:494` — I opened both lines and they are the `it(...)` and the assertion. And `listRunDirs` takes a stamp: **driven, not asserted** — I created a `--out`-shaped `seam-fix` directory beside an older dated one and ran `node scripts/story-bench.mjs --packet`, which printed *"packet from seam-fix (the newest finished run of 2)"*. It also refuses a directory with no `summary.json`, so a crashed run can never be packeted. |
+
+---
+
+## 2. The mutation audit, re-run by me on the round-3 tree
+
+The lane reports auditing 12 exported helpers and finding a second vacuous one
+(`beatsToSceneTargets`). I did not take that on trust. I stubbed **every one of
+the 13 exported functions** in `scripts/story-bench.mjs` in turn — each with a
+degenerate return — and ran `tests/scripts/story-bench.test.ts` after each,
+restoring between:
+
+```
+runDirName           37/1     classifyRun          31/7     renderTable      36/2
+beatsToSceneTargets  37/1     scriptWordCount      37/1     scenesLabel      37/1
+castGroundingOps     37/1     rowsFromDir          34/4     packetFrontMatter 35/3
+parseLogLine         37/1     nextRunDir           35/3
+summariseCalls       37/1     listRunDirs          34/4
+```
+
+**All 13 go RED.** No exported helper is vacuous, including `scenesLabel`, which
+this round added. (The lane counted 12; there are 13 with `scenesLabel`.)
+
+**The vacuous-forEach sweep, extended past the helpers as asked.** Every
+loop-driven assertion in the three lane test files was checked for a
+zero-iteration hole:
+
+- `for (const kind of SCHEMA_OP_KINDS)` (two `it`s, accumulate-then-`deepEqual`)
+  — I stubbed `SCHEMA_OP_KINDS` to `[]`: **15 pass / 2 fail.** Not vacuous.
+- `for (const q of bench.RUBRIC)` — I stubbed `RUBRIC` to `[]`:
+  **37 pass / 1 fail.** Not vacuous.
+- `for (const p of FIXTURE.premises)` (four `it`s) — the count is pinned at
+  `tests/scripts/story-bench.test.ts:57`, `assert.equal(FIXTURE.premises.length, 6)`,
+  so an emptied fixture fails loudly there.
+- `for (const branch of opBranches())` — `opBranches()` asserts `Array.isArray`,
+  and the branch count is pinned to `SCHEMA_OP_KINDS.length` in the translator
+  test, which is itself pinned to the 14-key `STORY_OP_KINDS`.
+- The `[status, body, expect]` loop in the guards file and the `['ADD_FACT', …]`
+  loops iterate literal arrays.
+
+No vacuous assertion remains in the lane's tests.
+
+---
+
+## 3. The minimal-instance synthesiser, attacked
+
+This was the thing to be most suspicious of, because an exhaustive-looking
+generator that is not actually driven by the declaration is worse than the
+hand-written instances beside it. It holds.
+
+**It is genuinely declaration-driven.** I changed one branch's declaration —
+`RECORD_VISUAL_FACT`'s `fact` from `S` to `N`, i.e. the schema now promises a
+number where `parseOp` requires a string — and the test failed with the
+synthesised payload printed:
+
+```
+branches whose own minimum parseOp rejects:
+  RECORD_VISUAL_FACT {"op":"RECORD_VISUAL_FACT","sceneId":"x","fact":0}
+```
+
+The payload **changed with the declaration** (`fact: 0`, not `'x'`), and the
+hand-written `INSTANCES` test stayed green through it — which is precisely the
+gap the synthesiser exists to cover.
+
+**No branch can be silently skipped.** The loop runs over `SCHEMA_OP_KINDS`,
+`branchFor(kind)` asserts a branch exists for each, and a separate `it` pins
+`SCHEMA_OP_KINDS` set-equal to `STORY_OP_KINDS`'s fourteen. Emptying
+`SCHEMA_OP_KINDS` fails (above). So "all 14 exercised" is enforced, not assumed.
+
+**The synthesis rules are the right ones.** Enum → first value; `anyOf` → first
+branch; object → *only* the `required` keys, recursing (an optional property is
+by declaration omittable, so the minimum omits it); array → `minItems` copies,
+**defaulting to zero when unbounded** — which is exactly what produced the
+`pair: []` that caught `SHIFT_RELATIONSHIP`; number → 0; string → `'x'`.
+
+**RED, four ways, each un-fix applied alone and restored** (17/0 when fixed):
+
+| un-fix | result | lane's recorded number |
+|---|---|---|
+| `pair` bound removed | **14 / 3** | 14 / 3 ✔ |
+| `EMOTION` back to `required: ['dominant','intensity']` | **14 / 3** | 14 / 3 ✔ |
+| the whole `CONSTRAINTS` block removed from the translator | **15 / 2** | 15 / 2 ✔ |
+| `parseOp`'s emotion check removed, schema left strict | **16 / 1** | — (mine) |
+
+**The not-carried set is a deliberate, defensible line.** `format`, `default`
+and `propertyOrdering` are dropped, and that is pinned hard:
+`assert.deepEqual(dropped, { type: 'string' })` — a strict equality, so anything
+that starts leaking through fails. `propertyOrdering` is not a JSON Schema
+keyword at all; `default` is rejected by strict structured-output decoders; and
+I re-grepped every `responseSchema` in `server/` (`llm-generator.ts`,
+`nvm/live/intent-parser.ts`, `engine/Agent.ts`, `engine/agent/memory.ts`,
+`engine/agent/decision.ts`, `engine/DirectorNode.ts`, `routes/scriptide.ts`) —
+**no caller declares any of the three**, and the only caller of a newly-carried
+keyword is `IR_SCHEMA`'s `pair`. Nothing else is still being silently dropped.
+
+---
+
+## 4. The NaN invariant, pinned at both ends
+
+**The parser check is independent of the schema.** I removed only
+`parseOp`'s new check (`llm-generator.ts:94-97`) and left the branch's nine
+`required` fields in place: **16 pass / 1 fail**, the failure being *"parseOp
+rejects a partial EmotionState even when the schema is bypassed"*. So the
+invariant survives a caller that hand-rolls an op or a decoder that ignores
+`required` — which is the whole point of enforcing it twice.
+
+**The positive assertion really reaches `quality/index.ts:495`.** It is not a
+stub: the test parses a real appraisal (`distress: 70, fear: 60`), applies it
+through the **real** `applyStoryOp` (`server/nvm/ops/dispatcher.ts`) onto a real
+`emptyState()`, and calls the **real** `computeArcDebt`
+(`server/nvm/quality/index.ts:478`) — whose loop at `:494-495` is the
+`(emo.fear + emo.distress) > 100` comparison. 70 + 60 = 130 with no
+relationships, so the peak-distress debt fires and the assertion matches on its
+text. The line is genuinely exercised, in both directions.
+
+One consequence worth stating rather than hiding, and the lane does state it:
+`parseOp` is now stricter, so a model that returns an `APPRAISE_EMOTION` without
+`last_updated_at` loses that op entirely instead of committing a half-formed
+emotion. That is the correct direction — a dropped op is visible in
+`llm_generator_partial_parse`, a silently-failing debt check is not — and it is
+a deliberate yield-for-correctness trade, not an accident.
+
+---
+
+## 5. Gates — my numbers, on `19fd20d2`
+
+```
+npm run lint                                    exit 0, no output
+tests/core/llm-generator-schema.test.ts         17 pass / 0 fail   (was 9)
+tests/scripts/story-bench.test.ts               38 pass / 0 fail   (was 30)
+tests/core/openai-compat-generation-guards.ts   22 pass / 0 fail   (unchanged)
+npm run check-no-console                        OK, 307 files
+npm run honesty-audit                           clean (465 + 520 + 118 rows)
+npm run check-brain                             OK, 118 notes, 468 links, fresh
+tests/core/brain-coverage.test.ts               7 pass / 0 fail
+npm run check-docs                              clean
+check-scoring-receipt origin/main..HEAD         no scoring-path files changed
+npm test                                        exit 0 — 14,088 tests,
+                                                13,996 pass / 0 fail,
+                                                91 skipped, 1 todo,
+                                                2,452 suites, 356.5 s
+npm run test:ci-env -- <the three lane files>   77 pass / 0 fail
+```
+
+Against my round-2 baseline of 14,072 / 13,980 / 2,450 suites that is exactly
+**+16 tests, +16 passing, +2 suites**, with **skipped unchanged at 91 and todo
+unchanged at 1** — which reconciles to the 8 assertions and one `describe` added
+to each of the two files. The lane's own recorded figures match mine digit for
+digit.
+
+**The delta is additions only.** `git diff 06dfad70..19fd20d2 -- tests/` deletes
+**zero** `it(` lines and **zero** `assert.` lines. `it(` counts: schema 9 → 17,
+bench 30 → 38, guards 18 → 18. No `.skip`, `.only` or `.todo` anywhere in the
+three files. Skipped stays 91 and todo stays 1 against my round-2 baseline, so
+nothing was parked.
+
+**The bench was NOT re-run, and this is provable rather than asserted.** In
+`2026-09-13-run2/`, every generated artifact — all six `.final.fountain`,
+`.doctor.json`, `.calls.json`, `.row.json`, plus `summary.json`, `table.md` and
+`server.log` — still carries its **2026-09-14 00:50** mtime. Only
+`packet.fountain` and `packet.pdf` are newer (**2026-09-18 01:17**), which is
+`--packet` regenerating the reading packet from the existing run. `--packet`
+spends no generation and touches no provider.
+
+**Security and hygiene, re-checked on this tree.** No `console.` added under
+`server/**` in the round-3 diff and `check-no-console` passes; a repo-wide grep
+for key-shaped strings finds only the deliberately fake one in the pre-existing
+`tests/routes/safe-error.test.ts`; `git ls-files data/` returns only the CC0
+screenplay corpus, so nothing generated is committed and `.gitignore:41`'s bare
+`data/` still covers `<date>`, `-runN`, `--out` and `--into` alike; the keyless
+run still prints *"Nothing was measured. This is not a result."* and exits **2**;
+no route was added or changed, so no limiter or zod surface is touched; nothing
+in the bench lets a model score anything.
+
+---
+
+## 6. Two notes for the record, neither blocking
+
+1. **The bigger scene-count gap is in the packet but not in the method doc.**
+   `nine-minutes-of-tape` committed **4 of 7** and the doctor scored it on a
+   `sceneCount` of **9** — five headings a revision pass typed, which I
+   confirmed in the artifact (`INT. ARCHIVE ROOM - DAY` 1, `- NIGHT` 25,
+   `EXT. RAIN-SLICK ALLEY` 44, `INT. VAULT CORRIDOR` 65, `INT. SERVER ROOM`
+   78/92/107, `INT. ARCHIVE ROOM - DAWN` 145, `INT. VAULT` 182). Three of the
+   six v2 rows are inflated this way: 3→4, 3→5 and **4→9**. The regenerated
+   packet names all three, and §4b states the mechanism and illustrates it with
+   the 3→5 case; a reader of the method doc alone would think the understudy row
+   was the worst instance when it is the smaller one, on the row carrying the
+   run's second-highest health and its only DEGRADED label. One clause in the
+   §4b paragraph would fix it. I am not holding the merge for it — the artifact a
+   human actually scores from carries the number.
+2. **One gate figure in the closure section is mistyped.** It records
+   `npm run test:ci-env -- <the three files>` as **62 pass**; I ran the same
+   command and got **77 pass / 0 fail**, which is 17 + 38 + 22 and is the number
+   that reconciles. The true figure is higher and nothing failed, so this is a
+   transcription slip in a gate log, not a claim about behaviour — but in a lane
+   whose subject is accurate counting it should be corrected the next time that
+   file is touched.
+3. **My round-2 closing note stays in the record, wrong, with this retraction
+   under it.** That is the correct handling — a reviewer's text is not edited
+   after the fact — but anyone quoting "the artifacts are gone" from above
+   should read §0 first. The underlying recommendation (commit a bounded,
+   redacted evidence file beside the published numbers) still stands on its own
+   merits; it simply was not evidenced by what I claimed evidenced it.
+
+---
+
+## VERDICT: MERGE
+
+Nine of nine closed. Items 3, 4 and 5 are closed with mechanisms rather than
+edits — a mutation-audited helper set, a declaration-driven minimal-instance
+synthesiser that I proved changes with the declaration, and an invariant
+enforced independently at the schema and at the parser — which is the difference
+between fixing three findings and making that class of finding harder to create.
+Items 1, 2, 7, 8 and 9 are closed in the documents with correction markers, and
+the lane re-labelled one of its own round-2 rows as overstated rather than
+letting it stand, which is the behaviour that makes a closure table worth
+reading at all.
+
+The two things I got wrong in round 2 are corrected above: the artifacts exist,
+and every §5/§5b claim I called unverifiable reproduces against them. The
+committed v2 table is now verified as the literal rendering of the committed row
+files, cell for cell, which was the last thing round 2 could only defend by
+arithmetic.
+
+Nothing in this round is blocking. The next lane's questions are unchanged and
+are the lane's own: 16 of 45 scenes committed, 17 IntentionalProof blocks
+because the model invents its cast, and no raw completion kept.
