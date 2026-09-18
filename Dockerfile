@@ -1,5 +1,59 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
+
+# ── Native-addon build toolchain (deps stage ONLY) ───────────────────────────
+# Without this, `npm ci` below dies. That is not a hypothetical: GitHub
+# Actions was blocked at the account level until 2026-09-13, so edge.yml had
+# never executed; its FIRST real run, 34794216577 on main@be2341ac
+# (2026-09-14), failed here with
+#   npm error command sh -c node-gyp rebuild
+#   npm error gyp ERR! find Python Python is not set from command line or npm configuration
+#   npm error gyp ERR! stack Error: Could not find any Python installation to use
+#   npm error gyp ERR! cwd /app/node_modules/better-sqlite3
+# release.yml's `publish` job builds this same Dockerfile and failed
+# identically — the whole container delivery path was broken.
+#
+# WHY node-gyp RUNS AT ALL, and what it actually does here (measured
+# 2026-09-18, three layered container builds — see
+# docs/audits/2026-09-18-edge-image/README.md):
+# better-sqlite3 13.0.3 DOES ship a musl prebuild. It is bundled inside the
+# npm tarball (node_modules/better-sqlite3/prebuilds/linuxmusl-x64.node,
+# alongside linuxmusl-arm64 and the glibc/darwin/win32 variants) — it is not
+# downloaded, and there is no prebuild-install step to fail. The package has
+# no `install` script either; npm runs `node-gyp rebuild` implicitly because
+# binding.gyp is present. That binding.gyp is written to be a no-op in
+# exactly this case — its own comment reads "npm's implicit node-gyp rebuild
+# should do nothing when the package contains a prebuild for the host" — and
+# it detects the prebuild by shelling out to `node lib/binding.js`, making
+# both of its targets `'type': 'none'`.
+# So NO C++ is compiled for this platform. The failure is upstream of that:
+# node-gyp's own `configure` step runs gyp, which is a Python program, before
+# it can ever evaluate binding.gyp's conditions, and its `build` step then
+# invokes make on the (empty) generated makefiles. node:22-alpine ships
+# neither.
+# Measured, one package at a time, on this exact image:
+#   python3 alone       -> configure passes, then "gyp ERR! stack Error: not found: make"
+#   python3 + make      -> npm ci EXIT 0; build/Release/ holds no
+#                          better_sqlite3.node (the targets compiled nothing);
+#                          lib/binding.js getPrebuildPath() resolves to
+#                          .../prebuilds/linuxmusl-x64.node at runtime
+# python3 and make are therefore REQUIRED. g++ is deliberately included on
+# top: it is unused by better-sqlite3 13.0.3, and is here so that a native
+# dependency which does NOT ship a musl prebuild compiles from source instead
+# of failing with a cryptic missing-compiler error. Do not drop it to save a
+# layer — tests/core/dockerfile-toolchain.test.ts asserts all three.
+#
+# This stays in `deps` and is never added to `builder` or `runner`: builder
+# copies node_modules wholesale from here and runs no `npm ci` of its own, and
+# runner must stay slim. The toolchain does not reach the shipped image.
+#
+# musl/glibc consistency: all three stages are node:22-alpine, so the musl
+# prebuild that resolves here is the one the runner loads. Moving ANY stage to
+# a glibc base (node:22-slim/bookworm) without moving all of them would carry
+# a musl .node into a glibc runtime, or vice versa, and break at require()
+# time, not at build time.
+RUN apk add --no-cache python3 make g++
+
 COPY package*.json ./
 # NODE_ENV is unset in this stage, so `npm ci` installs devDependencies too
 # (npm only skips them when NODE_ENV=production at install time). That's
