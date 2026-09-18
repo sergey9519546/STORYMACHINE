@@ -188,6 +188,13 @@ cover `docs/**`:
 
 - `honesty-audit`'s stale-rule-count pass — four specific FIGURES across 522
   tracked markdown files, not language;
+- `honesty-audit`'s `SCAN_TRACKED_ARTIFACTS` (`honesty-audit.mjs:41-43`) —
+  **exactly one `docs/**` file**, `docs/user-validation/sample-coverage-report.html`,
+  goes through the FULL patterns set. Added in round 3 after the re-check
+  pointed out the omission; verified by appending an overclaim to that file,
+  which fails the audit with `[guarantees]`, `[industry-standard]` and
+  `[superlatives]`. It is one named artifact, not a directory scan, so the
+  headline below is unchanged;
 - `check-docs` — AI-writing patterns, and it is `continue-on-error: true`, so
   it cannot fail anything either way;
 - `check-brain` — graph freshness and wikilink resolution, not prose;
@@ -198,7 +205,8 @@ cover `docs/**`:
   that a citation lands on a row, not that the row is honest.
 
 An overclaim written into `docs/PATH_TO_EXCELLENCE.md` passes every one of
-them. **The fast path removes nothing here**: honesty-audit behaves
+them — as does one in any `docs/**` file other than the single named HTML
+artifact above. **The fast path removes nothing here**: honesty-audit behaves
 identically on both paths, and it runs unconditionally. But the argument for
 why the fast path is safe must not rest on a gate that does not exist. If
 `docs/**` overclaim scanning is wanted, it is a separate change to
@@ -265,11 +273,15 @@ sentence, not a path, so it resolves to nothing. That is why
 prose reasons — need no exclusion entry at all now: the derivation agrees
 they are not candidates, mechanically.
 
-**24 candidates. 17 run. 7 excluded, each with a reason that cites a file or
-a line**, in `EXCLUDED` in that test, where a stale entry (the file is gone,
-or the derivation no longer considers it a candidate) fails the suite.
+**25 candidates. 18 run. 8 excluded** — corrected in round 3; round 2's prose
+said 24/17/7 and was one low in both halves, while the shipped table has
+always had eight entries. (18, not 17, since round 3 added
+`tests/core/edge-docs-gate.test.ts`, which the guard flagged itself.) Every
+exclusion cites a file or a line, in `EXCLUDED` in that test, where a stale
+entry — the file is gone, or the derivation no longer considers it a
+candidate — fails the suite.
 
-### The 17
+### The 18
 
 | file | what it asserts on | s |
 |---|---|---|
@@ -278,6 +290,7 @@ or the derivation no longer considers it a candidate) fails the suite.
 | `tests/core/coverage-letter.test.ts` | `docs/brain/Surfaces/Surface - Coverage Letter.md` does not carry a retired phrase | 3.6 |
 | `tests/core/docs-gating-set.test.ts` | **this list** — see above. On the list because a docs-only DELETION changes what it derives | 13.7 |
 | `tests/core/documentation-truth.test.ts` | retired legacy-report claims stay retired, across root `*.md` | 0.2 |
+| `tests/core/edge-docs-gate.test.ts` | **added round 3** — `.dockerignore`'s two load-bearing facts, and `git ls-files 'server/**/*.md'` being non-empty, which a docs-only deletion could change | 0.6 |
 | `tests/core/finding-jump.test.ts` | the fixture panel renders the pair `docs/CLAIMS_REGISTER.md` row 80 quotes | 3.2 |
 | `tests/core/honesty-audit-claims.test.ts` | the real repository passes honesty-audit's claims-register lane | 5.3 |
 | `tests/core/p0-sample-drift.test.ts` | `docs/user-validation/sample-coverage-report.html` matches the generator | 1.6 |
@@ -291,13 +304,16 @@ or the derivation no longer considers it a candidate) fails the suite.
 | `tests/scripts/owner-measure-plan.test.ts` | the committed `docs/p1-benchmark/owner-measurement-plan.json` | 0.2 |
 | `tests/scripts/smoke-gate-serve-mode.test.ts` | `README.md`, `CONTRIBUTING.md`, `ci.yml` and a brain Gate note | 0.2 |
 
-**55 s total**, run individually on this sandbox (sum of the column above;
-the runner did the thirteen-file version in 24 s — run 35296219834, step 12).
-Against a ~7-minute `npm test` plus a ~5-minute browser job. The single
-biggest line is the guard itself at 13.7 s, which parses every test file; it
-is on the list because a docs-only DELETION changes what it derives.
+**~56 s total**, run individually on this sandbox (sum of the column above;
+the runner did the seventeen-file version in 44 s — run 35301550263, step
+12). Against a ~7-minute `npm test` plus a ~5-minute browser job. The single
+biggest line is the derivation guard itself at 13.7 s, which parses every
+test file; it is on the list because a docs-only DELETION changes what it
+derives, and `edge-docs-gate` joined for the same reason — it asserts
+`git ls-files 'server/**/*.md'` is non-empty, and those are files a
+documentation edit can remove.
 
-### The 7 excluded, and why
+### The 8 excluded, and why
 
 Each reason is checkable against the file, not a category label. The full
 text lives in `EXCLUDED` in `tests/core/docs-gating-set.test.ts`.
@@ -579,12 +595,24 @@ Cost: one authenticated GET per push. `ci.yml`'s `classify` job grants itself
 non-200, a malformed payload, no usable tip, no merge base — fails closed to
 a full run, with the reason printed in the step's own log.
 
-One incidental fix found while testing it: the script used to sit for
-**15,091 ms** after a successful API call, waiting on a keep-alive socket
-that would never be reused (measured against a loopback stub answering
-instantly; 51 ms on the path that makes no request). It now flushes its
-output and exits. A classify job whose whole justification is that it costs
-seconds cannot spend twenty-three of them on a dead socket.
+One shaping change made while testing it, **with the reason corrected in
+round 3**: the script flushes its output and exits explicitly rather than
+waiting for the event loop to drain. Round 2 justified that with a measured
+"15,091 ms on a dead keep-alive socket versus 51 ms". **That number was
+wrong** — it was an artifact of the harness that produced it, in which the
+loopback API stub ran in the same process as the `execFileSync` call and so
+could never answer the request; the child sat out its own 15-second fetch
+abort. Reproduced deliberately in round 3: **15,070 ms elapsed with the
+in-process stub reporting zero requests served.**
+
+Re-measured with the stub in its own process (Node v22.22.2, three runs
+each): **82-94 ms** with a successful API call, **36-39 ms** with none, and
+the pre-fix shape (`AbortSignal.timeout` and no explicit exit) **87-97 ms** —
+no measurable difference. The change stays on its own merits, not a rescued
+number: an explicit, flushed exit makes the step's wall time a property of
+the work it does rather than of what the global fetch dispatcher decides to
+do with an idle connection. The independent re-check flagged this, and it was
+right to.
 
 ### A property of the validated base, stated so nobody is surprised by it
 

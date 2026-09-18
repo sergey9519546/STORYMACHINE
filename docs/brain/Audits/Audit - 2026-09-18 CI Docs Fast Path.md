@@ -71,8 +71,8 @@ had no tests:
    `tests/core/telemetry-docs-truth.test.ts`, which reads the real
    `ROADMAP.md`. The list is now **derived** and pinned by
    [[Gate - Docs-Gating Set]] (`tests/core/docs-gating-set.test.ts`): 24
-   candidates, 17 run, 7 excluded with reasons that cite a file or a line and
-   that go stale loudly.
+   candidates (25 after round 3's correction), 18 run, 8 excluded with reasons
+   that cite a file or a line and that go stale loudly.
 3. **The impure half had zero tests**, which is why (1) survived review of the
    pure half's 21 green cases. `tests/scripts/classify-docs-only.test.ts` now
    drives the real script bytes against real git repositories and a loopback

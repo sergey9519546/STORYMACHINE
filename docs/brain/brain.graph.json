@@ -235,6 +235,12 @@
       "path": "docs/brain/Gates/Gate - Docs-Gating Set.md"
     },
     {
+      "id": "docs/brain/Gates/Gate - Edge Docs Build Gate.md",
+      "type": "gate",
+      "title": "Gate — Edge Docs Build Gate",
+      "path": "docs/brain/Gates/Gate - Edge Docs Build Gate.md"
+    },
+    {
       "id": "docs/brain/Gates/Gate - Fountain Shape Guard.md",
       "type": "gate",
       "title": "Gate — Fountain Shape Guard",
@@ -1444,6 +1450,10 @@
     },
     {
       "from": "docs/brain/Gates/Gate - Docs-Gating Set.md",
+      "to": "docs/brain/Gates/Gate - Edge Docs Build Gate.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Docs-Gating Set.md",
       "to": "docs/brain/Gates/Gate - Rulebook Freshness.md"
     },
     {
@@ -1461,6 +1471,26 @@
     {
       "from": "docs/brain/Gates/Gate - Docs-Gating Set.md",
       "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Edge Docs Build Gate.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Edge Docs Build Gate.md",
+      "to": "docs/brain/Gates/Gate - Docs-Gating Set.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Edge Docs Build Gate.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Edge Docs Build Gate.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 Edge Image.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Edge Docs Build Gate.md",
+      "to": "docs/brain/Gates/Gate - Docs-Gating Set.md"
     },
     {
       "from": "docs/brain/Gates/Gate - Fountain Shape Guard.md",

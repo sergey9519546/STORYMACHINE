@@ -1489,3 +1489,292 @@ fix chose the more invasive option because it closes a shape nobody asked
 about, then caught that shape in production four commits later. `ci-gates-intact`
 grew by 182 lines and lost none. Every mutation I invented was already covered
 or went RED. That is the standard working.
+
+---
+---
+
+# Round 3 — closure (lane, 2026-09-18)
+
+Everything above this line is unedited: the reviewer's round-1 text (lines
+1-457, 26,318 bytes), the lane's round-2 closure, and the reviewer's round-2
+re-check. Four items, one of which mattered.
+
+## 1. Defect B — applied, and the patch as specified was WRONG
+
+`lane/edge-image-real` merged first, so this lane is the one that "merges
+second". The gate is in `.github/workflows/edge.yml`: `fetch-depth: 2` on the
+existing `head_sha` checkout, one step diffing
+`git diff --name-only --no-renames "${HEAD_SHA}^" "${HEAD_SHA}"` through
+`scripts/lib/docs-only.mjs`, and `if: steps.docsonly.outputs.docs_only != 'true'`
+on login, buildx and build-push. The `Dockerfile`, the `branches: [main]`
+trigger filter and the job-level `if:` are untouched.
+
+### The defect in my own round-2 write-up
+
+The patch I specified gated on `classifyDocsOnly` — ci.yml's predicate. **It
+would have skipped a rebuild for a commit that genuinely changes the image.**
+
+`.dockerignore` denies `**` and then re-includes `!server/**`, `!src/**`,
+`!public/**`. Thirteen committed `*.md` files live under those trees. They
+enter the build context — not inferred, measured, by building a probe image
+with `COPY . .` and listing what arrived:
+
+```
+$ docker build -f probe.Dockerfile --no-cache .
+#8 === docs/ or *.md inside the build context? ===
+#8 ./server/planning/README.md
+#8 ./server/nvm/revision/WAVE_QUALITY_GUARANTEE.md
+#8 ./server/nvm/kernel/README.md
+…
+$ git ls-files 'server/**/*.md' 'src/**/*.md' 'public/**/*.md' | wc -l
+13
+```
+
+`Dockerfile:91` is `COPY --from=builder /app/server ./server`, so they are in
+the published image. And:
+
+```
+$ node -e 'import("./scripts/lib/docs-only.mjs").then(m =>
+    console.log(m.classifyDocsOnly(["server/nvm/kernel/README.md"])))'
+true
+```
+
+`classifyDocsOnly` is right for "which CI gates can this push affect" and
+wrong for "can this change the image". Two questions, one predicate — the same
+shape as blocker 1's rename hole, in a different place.
+
+So the gate uses a second, **strictly narrower** predicate,
+`canSkipImageBuild` (`scripts/lib/docs-only.mjs`): `docs/**` and **root-level**
+`*.md` only. A test asserts the narrowing is one-directional — everything
+skippable is also docs to CI, never the reverse — so the two can never drift
+into disagreeing in the unsafe direction.
+
+### The two `.dockerignore` facts, pinned rather than assumed
+
+`canSkipImageBuild` is only sound while (a) the blanket `**` deny is present
+and first, and (b) no negation re-includes `docs/**` or a root `*.md`.
+`tests/core/edge-docs-gate.test.ts` reads the real `.dockerignore` and fails on
+either. A future `!CHANGELOG.md` breaks a test instead of silently making the
+gate wrong.
+
+### Failure direction: deliberately inverted, and said so at the site
+
+ci.yml's classifier runs every gate on an input it cannot resolve, because
+guessing wrong there means a gate silently skipped. **edge.yml BUILDS on an
+input it cannot resolve**, because guessing wrong there means a missing or
+stale `:edge` — visible and recoverable — while over-building costs one runner
+slot. `edge.yml`'s comment on the step states this in those terms.
+
+`<head_sha>^` does not exist for a root commit or after a shallow fetch, and
+the classifier could fail for reasons nobody predicted. Every one of those
+paths writes `docs_only=false` **and exits 0**, so the step can never fail the
+job and block a publish. Both verified by running the extracted body:
+
+```
+--- ROOT COMMIT (no parent) ---
+cannot diff bb610beb^..bb610beb (root commit, shallow fetch, or an
+  unresolvable parent) — building
+OUT: docs_only=false          exit 0
+--- classifier removed ---
+exit=0  OUT: docs_only=false
+```
+
+### What skipping gives up, stated
+
+The image is a function of the context **and** the build-args, and `GIT_SHA`
+moves every commit. A skipped build leaves `:edge`'s `ENV GIT_SHA` and its
+`org.opencontainers.image.revision` label naming the last commit actually
+built, not `main`'s tip. If that label must track the tip,
+`docker buildx imagetools create` retags the existing manifest; rebuilding for
+it is not the answer. This is in `edge.yml`'s own comment, not only here.
+
+### The honest size of the win
+
+I could not complete a real image build in this sandbox — `apk add python3
+make g++` fails behind the proxy with "TLS: server certificate not trusted",
+so the `deps` stage never finishes and the four timed builds all returned
+`rc=1` in ~0.4 s. **That is a failed measurement and I am not reporting it as
+a result.** What I did measure:
+
+- the build context `docker build` transfers is **179.09 kB**, and it contains
+  no `docs/**` and no root `*.md` at all;
+- `ENV GIT_SHA` sits at `Dockerfile:84`, **before** the ten `COPY`/`RUN` layers
+  of the runner stage — so a new SHA invalidates from there down regardless of
+  the context being identical.
+
+Taken with the edge reviewer's own 19/19-cached-in-0.744 s figure, the honest
+statement is: **the gate does not save minutes of build time.** It saves a
+runner slot, a registry push, a workflow run and the log noise, on every
+docs-only push to `main`. That is a small win.
+
+**Is it worth its complexity? Yes, but not for the seconds.** Two reasons that
+survive the measurement:
+
+1. `:edge` is a published artifact. Republishing a byte-identical image under
+   a new digest on every prose edit makes the tag's history noise, and the
+   `revision` label stops meaning "the commit whose code this is".
+2. The gate is where the `server/**/*.md` finding lives. Without it nothing in
+   this repository states that `*.md` under an allowlisted tree is in the
+   image — and that fact now has a test, which is worth more than the runner
+   slot.
+
+If a future maintainer disagrees, the argument to beat is that one, not a
+timing claim.
+
+### RED-first, ten mutations
+
+| mutation | `ci-gates-intact` | `edge-docs-gate` |
+|---|---|---|
+| gate on `classifyDocsOnly` (**the patch as specified**) | 64/63/**1** | 28/26/**2** — including "a `*.md` change under server/ BUILDS" |
+| drop `--no-renames` | 64/63/**1** | 28/26/**2** — the rename case goes green-and-wrong |
+| `fetch-depth: 2` -> `1` | 64/63/**1** | — |
+| build-push `if:` `!= 'true'` -> `== 'false'` (never builds again) | 64/63/**1** | — |
+| delete the `if:` from the login step | 64/63/**1** | — |
+| `.dockerignore` re-includes `docs/**` | — | 28/27/**1** |
+| `.dockerignore` re-includes a root `*.md` | — | 28/27/**1** |
+| the blanket `**` deny removed | — | 28/27/**1** |
+| widen `canSkipImageBuild` to any `*.md` | — | 28/23/**5** |
+| an empty changed-file set becomes skippable | — | 28/27/**1** |
+| **shipped tree** | **64/64** | **28/28** |
+
+`tests/core/edge-docs-gate.test.ts` does not stop at reading YAML: it
+**extracts the step's `run:` body from `edge.yml` by its `id:` and executes it**
+against real git repositories, so a dropped flag, a wrong module path or an
+inverted failure direction fails here rather than on `main`.
+
+`git diff origin/main -- tests/core/ci-gates-intact.test.ts` is **+336 / −0**.
+No edge-lane assertion was touched; `yamlScalar`'s exact-path read of
+`jobs.publish-edge.if` and its every-key-unique rule are used as they are, and
+one of the new assertions checks that the docs gate was **not** folded into
+that job-level `if:`.
+
+The new suite is on the docs-only fast path (eighteen files now): the guard
+flagged it itself, correctly — it asserts `git ls-files 'server/**/*.md'` is
+non-empty, and those are files a documentation edit can delete.
+
+## 2. The 15,091 ms figure — withdrawn, and explained
+
+**The re-check is right and the number was wrong.** It was an artifact of the
+harness that produced it, not a property of the code.
+
+That harness ran the loopback API stub **in the same process** as the
+`execFileSync` call. `execFileSync` blocks the event loop for the child's whole
+lifetime, so the connection was never accepted, the request never arrived, and
+the child sat out its own 15-second fetch abort. Reproduced deliberately:
+
+```
+elapsed: 15070 ms
+requests the in-process stub actually served: 0
+docs-only classification: FULL (cannot establish a validated base:
+  runs API request failed: runs API timed out after 15s)
+```
+
+Zero requests served. Nothing to do with keep-alive. The irony is on the
+record: `tests/scripts/classify-docs-only.test.ts`'s own header documents this
+exact trap — it is why the suite's stub runs in its own process — and the
+number in the comment beside it was produced by the trap.
+
+**Re-measured properly** (stub in its own process, Node v22.22.2, three runs
+each, `GITHUB_OUTPUT` to `/dev/null`):
+
+| variant | runs |
+|---|---|
+| shipped, with a successful API call | 92 / 87 / 88 ms |
+| shipped, no API call | 37 / 37 / 40 ms |
+| pre-fix shape (`AbortSignal.timeout` **and** no explicit exit) | 97 / 92 / 91 ms |
+| pre-fix shape, stub `keepAliveTimeout=120000` | 87 / 92 / 97 ms |
+
+**No measurable difference.** Consistent with the re-check's 139–157 / 58–63 on
+its own machine.
+
+The code is unchanged — an explicit, flushed, deterministic exit is still the
+right shape — but its justification is rewritten at both sites
+(`scripts/classify-docs-only.mjs`, the `emitAndExit` docstring and the
+abort-controller comment) and in the audit README. It now says what it is:
+defensive shaping that costs nothing, which makes the step's wall time a
+property of the work it does rather than of what the global fetch dispatcher
+decides about an idle connection. No latency is quoted in support of it except
+the ones above.
+
+## 3. The two prose corrections
+
+- **25 candidates / 18 listed / 8 excluded.** Round 2's prose said 24/17/7 and
+  was one low in both halves while the shipped `EXCLUDED` table always had
+  eight entries. Corrected in the audit README (three places),
+  `docs/brain/Gates/Gate - Docs-Gating Set.md` and the audit brain note. 18
+  rather than 17 because round 3 adds `tests/core/edge-docs-gate.test.ts`.
+  The code was right throughout; only the prose was wrong.
+- **`SCAN_TRACKED_ARTIFACTS` added to item 7's enumeration.** Verified
+  independently rather than taken on trust: appending an overclaim to
+  `docs/user-validation/sample-coverage-report.html` fails `honesty-audit`
+  with `[guarantees]`, `[industry-standard]` and `[superlatives]`, exit 1.
+  It is one explicitly named artifact, not a directory scan, so the headline
+  finding is unchanged: **nothing scans `docs/**` prose for overclaim
+  language.** The enumeration now says so with the exception in it.
+
+## 4. The rebase
+
+Rebased onto `origin/main` `8b6a60c1`. The only conflicts were
+`docs/brain/GRAPH.md` and `docs/brain/brain.graph.json`, both resolved by
+running `npm run brain` and staging the regenerated output — **never a hand
+merge**, twice (the rebase stops at two of the fourteen commits).
+`docs/DECISION_LOG.md` and `tests/core/ci-gates-intact.test.ts` auto-merged.
+`npm run check-brain`: fresh, **125 notes / 510 links** (124/504 before this
+round's new gate note).
+
+The work was done on the branch, not in a detached worktree — the re-check's
+`owner-measure-e2e` red herring did not occur, and that suite is green in the
+full run below.
+
+## Gates
+
+| gate | result |
+|---|---|
+| `npm run lint` | **0**, exit 0 |
+| full `npm test` | **14,283 tests / 14,191 pass / 0 fail / 91 skipped / 1 todo**, exit 0, 355.1 s |
+| `npm run test:metamorphic` | **exit 0** — 6/7 raw, hard passes 6, `empty_verbosity` the one documented known-failing witness |
+| `tests/core/ci-gates-intact.test.ts` | 58 -> **64**, 64 pass, 0 fail |
+| `tests/core/edge-docs-gate.test.ts` | **28 pass**, 0 fail (new) |
+| `tests/core/docs-gating-set.test.ts` | **8 pass**, 0 fail |
+| `tests/scripts/classify-docs-only.test.ts` | **38 pass**, 0 fail |
+| `tests/core/docs-only-classify.test.ts` | **31 pass**, 0 fail |
+| `tests/core/docker-context.test.ts` | **7 pass**, 0 fail |
+| `tests/core/dockerfile-toolchain.test.ts` | **25 pass**, 0 fail |
+| `tests/core/brain-coverage.test.ts` | **7 pass**, 0 fail |
+| `check-no-console` / `check-server-reachability` / `check-docs` / `honesty-audit` / `check-brain` / `check-scoring-receipt` / `build` | all clean, exit 0 |
+
+`RUN_E2E` was not set, matching the re-check's rebased baseline of
+**14,249 / 14,157 / 0 / 91 / 1**. The **+34** is entirely new coverage and
+fully accounted for: `tests/core/edge-docs-gate.test.ts` **+28** and
+`tests/core/ci-gates-intact.test.ts` 58 -> **64** (+6). 28 + 6 = 34, and
+skipped/todo are unchanged at 91/1. `tests/scripts/owner-measure-e2e.test.ts`
+is **56/56** — the re-check's detached-worktree red herring did not occur,
+because this round rebased on the branch rather than at a commit on no ref.
+
+`npm run test:metamorphic` was run this round rather than reasoned past, as
+asked. The browser battery still has no surface to certify, re-confirmed
+**after** touching `edge.yml`:
+`git diff --name-only origin/main..HEAD -- src/ server/ public/` is empty.
+
+## What was NOT done, and why
+
+- **A real `docker build` timing.** The sandbox proxy blocks `apk` inside the
+  container, so the `deps` stage cannot complete here. Said plainly above
+  rather than reported as a number.
+- **Extracting `.dockerignore`'s full Moby evaluator into a shared module.**
+  `tests/core/docker-context.test.ts` carries one; reusing it would make
+  `edge-docs-gate` authoritative rather than assumption-pinning. It is the
+  stronger version and it is a refactor of a file this lane does not own, so
+  the two assumptions are pinned syntactically instead — narrow, exact, and
+  loud on any negation that mentions docs or markdown.
+- **Anything in `edge.yml` beyond the gate.** The `Dockerfile`, the
+  `branches: [main]` filter and the job-level `if:` are settled work from
+  another lane's three review rounds.
+- **One cosmetic line, deliberately not added after the full run.** The gate
+  captures `git diff ... 2>&1`, so a git *warning* on a successful diff would
+  join the file list and be classified as a non-docs path — pushing toward
+  BUILDING, which is this step's safe direction, so the behaviour is right.
+  Splitting stderr out would make the log tidier. The full suite ran on the
+  tree as it stands and `docs/LANE_STANDARD.md` §4 says that happens once on
+  the final tree, so the note is here rather than in a post-run edit; it is a
+  one-liner for whoever next opens that file.

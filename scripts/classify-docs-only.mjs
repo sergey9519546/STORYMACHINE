@@ -185,14 +185,18 @@ async function lastSuccessfulRunTip(head) {
   // is that it costs seconds. On timeout/abort the catch below returns null,
   // i.e. a full run.
   //
-  // Deliberately NOT `AbortSignal.timeout()`: that helper's internal timer is
-  // REF'D and is not cancelled when the fetch resolves, so the process stayed
-  // alive for the whole timeout after a perfectly successful request —
-  // measured at 15,072 ms per invocation against a loopback stub that
-  // answered instantly, versus 54 ms on the path that makes no request at
-  // all. An explicit controller with an unref'd timer, cleared in `finally`,
-  // gives the same abort semantics and lets the job exit as soon as it has
-  // its answer.
+  // An explicit controller with an UNREF'D timer cleared in `finally`, rather
+  // than `AbortSignal.timeout()`. Same abort semantics, and the timer cannot
+  // hold the event loop open after the fetch settles no matter how a future
+  // Node version chooses to ref that helper's internal timer.
+  //
+  // HONEST ABOUT THE SIZE OF THIS: round 2 of this lane justified the change
+  // with a measured 15,072 ms, and that number was WRONG — see the
+  // measurement note above `emitAndExit()`. Re-measured on Node v22.22.2
+  // against a stub in its own process, three runs each, the pre-fix shape
+  // (`AbortSignal.timeout` and no explicit exit) is **87-97 ms** and the
+  // shipped shape is **82-94 ms**: indistinguishable. This is defensive
+  // shaping that costs nothing, not a fix for an observed hang.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new Error('runs API timed out after 15s')), 15_000);
   timer.unref?.();
@@ -319,14 +323,31 @@ async function computeChangedFiles() {
 /**
  * Emits the classification and then ENDS THE PROCESS, deterministically.
  *
- * The exit is explicit rather than left to the event loop draining, because
- * after a successful `fetch` Node's global dispatcher holds the HTTP
- * connection open for keep-alive reuse that will never come, and the process
- * lingers. Measured against a loopback stub that answered instantly: 15,091 ms
- * per invocation waiting for that socket, versus 51 ms on the path that makes
- * no request at all. A classify job whose entire justification is that it
- * costs seconds cannot afford to sit on a dead socket — in CI it would have
- * turned a measured 8-second job into a ~23-second one, on every push.
+ * WHY, AND A CORRECTION TO THE REASON THIS FILE USED TO GIVE. Round 2 of this
+ * lane claimed the pre-fix code "sat 15,091 ms on a dead keep-alive socket,
+ * versus 51 ms". The independent re-check could not reproduce it, and it was
+ * right: **the number was an artifact of the harness that produced it, not a
+ * property of this script.** That harness ran the loopback API stub in the
+ * SAME process that called `execFileSync`, which blocks the event loop for
+ * the child's whole lifetime — so the connection was never accepted, the
+ * request never arrived, and the child sat out its own 15-second fetch abort.
+ * Reproduced deliberately: 15,070 ms elapsed with the in-process stub
+ * reporting **zero requests served** and the classifier printing "runs API
+ * request failed: runs API timed out after 15s". Nothing to do with
+ * keep-alive.
+ *
+ * Re-measured with the stub in its own process (Node v22.22.2, three runs
+ * each): **82-94 ms** with a successful API call, **36-39 ms** with no call,
+ * and the pre-fix shape **87-97 ms** — no measurable difference. The
+ * `tests/scripts/classify-docs-only.test.ts` header already records the same
+ * in-process-stub trap from the other side; this is where it produced a false
+ * number.
+ *
+ * The explicit exit STAYS, on its own merits rather than a rescued number: it
+ * makes this step's wall time a property of the work it does instead of
+ * whatever the global fetch dispatcher decides to do with an idle connection,
+ * which is the right shape for a job whose entire justification is that it
+ * costs seconds.
  *
  * `process.exit()` truncates pending async stdout writes, so the exit is
  * deferred into the write's own completion callback: everything this script

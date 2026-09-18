@@ -38,10 +38,15 @@ classifier would call docs. "Resolves to an existing path" is what keeps a
 The one-hop arm is what finds `tests/core/p0-sample-drift.test.ts`, which
 names no docs path at all.
 
-**Current state:** 24 candidates — **17 run on the fast path, 7 excluded**,
+**Current state:** 25 candidates — **18 run on the fast path, 8 excluded**,
 each exclusion carrying a reason that cites a file or a line. A stale
 exclusion (file gone, or no longer a candidate) fails the gate, so the table
-cannot rot into a permanent silencer.
+cannot rot into a permanent silencer. (Round 2's prose said 24/17/7 and was
+one low in both halves; the shipped table always had eight entries. Round 3
+corrected the count and added an eighteenth suite,
+[[Gate - Edge Docs Build Gate]]'s `tests/core/edge-docs-gate.test.ts`, which
+the guard flagged itself because a docs-only deletion of `server/**/*.md`
+changes what it asserts.)
 
 **What it does NOT claim:** completeness. A docs path assembled at runtime
 from non-literal parts, or reached more than one import hop away, is
