@@ -61,6 +61,35 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # Mirrors ci.yml's step name (tests/core/ci-gates-intact.test.ts requires
+  # every ci.yml step name to have a counterpart here, with an identical run
+  # body). UNLIKE ci.yml, its output is deliberately UNUSED below: neither
+  # `test` nor `browser` in this file gates on it, and both keep running
+  # unconditionally regardless of what this job reports. A release (a `v*`
+  # tag push or a manual workflow_dispatch) is a rare, deliberate, milestone
+  # event, not the frequent small-push case the docs-only fast path exists
+  # for (CLAUDE.md/LANE_STANDARD.md) — correctness matters more than the few
+  # seconds this would save here, so this workflow always runs every gate,
+  # exactly as it did before the fast path existed.
+  classify:
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Classify changed files (docs-only fast path)
+        id: classify
+        env:
+          DOCS_ONLY_BEFORE_SHA: ${{ github.event.before }}
+        run: node scripts/classify-docs-only.mjs
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -140,6 +169,37 @@ jobs:
         run: |
           set -o pipefail
           npm test 2>&1 | tee test-output.tap
+
+      # Mirrors ci.yml's step name and run body (tests/core/ci-gates-intact.
+      # test.ts requires both). UNCONDITIONAL here — no `if:` — because this
+      # workflow's `test` job always runs the full `npm test` above too, which
+      # already includes every one of these files; this step is a small,
+      # harmless re-run of a subset, not a fast path. It exists only so that a
+      # ci.yml step name introduced for the docs-only fast path (see that
+      # file's own comment on this step) has the required counterpart here,
+      # per this repository's mirror-step-for-step gate.
+      - name: Run docs-gating tests (docs-only fast path)
+        run: |
+          set -e
+          for f in \
+            tests/core/brain-coverage.test.ts \
+            tests/core/claims-row-citations.test.ts \
+            tests/core/documentation-truth.test.ts \
+            tests/core/rulebook-links.test.ts \
+            tests/core/rulebook.test.ts \
+            tests/core/rule-test-coverage.test.ts \
+            tests/core/p0-sample-drift.test.ts \
+            tests/core/honesty-audit-claims.test.ts \
+            tests/core/public-benchmark.test.ts \
+            tests/core/coverage-letter.test.ts \
+            tests/core/finding-jump.test.ts \
+            tests/scripts/smoke-gate-serve-mode.test.ts \
+            tests/scripts/owner-measure-plan.test.ts \
+          ; do
+            echo "::group::$f"
+            node --experimental-strip-types "$f"
+            echo "::endgroup::"
+          done
 
       # Mirrors ci.yml's failure-summary step — see that file's comment for
       # the incident (GitHub's ~100 KB job-log truncation hiding a red run's
