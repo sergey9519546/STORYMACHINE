@@ -1035,11 +1035,18 @@ closed. Note also that it is the interaction Decision #9 names: pushing at
 longer, so the window this fix closes gets wider, not narrower, under the new
 cadence.
 
-**And the fast path itself, on the new classifier:** the push carrying this
-addendum is docs-only and lands on top of `04a94f57`. If `04a94f57`'s run has
-completed green by then, the validated base IS `before`, the range does not
-widen, and the classification is the ordinary docs-only one — the fast path
-runs. If it has not, the base widens again and the run is FULL, which is the
-fix doing its job rather than a failure. The run id and which of the two
-happened is recorded by the lane in its report; the first fast-path run on the
-OLD classifier is 35296219834 (1 m 19 s), cited in full above.
+**And the fast path itself, on the new classifier.** Both pushes above widened
+and ran FULL, because each cancelled the previous run and left no green tip to
+chain from — the fix doing its job, not a failure. Run **35300910883**
+(`3de20d66`) then completed **success**, so the push carrying THIS paragraph
+lands on a completed-green predecessor: the validated base is `before`, the
+range does not widen, and the classification is the ordinary docs-only one.
+Its run id and timings are in the lane's round-2 report. The first fast-path
+run on the old classifier, cited in full above, is 35296219834 (1 m 19 s
+against a 9 m 03 s baseline).
+
+See "A property of the validated base" in this lane's README for the
+consequence stated generally: the saving lands on a docs-only push that sits
+on top of something CI has already proved — which is exactly the shape of a
+docs push to `main`, merged `--ff-only` one commit at a time into a per-SHA
+concurrency group that never cancels anything.

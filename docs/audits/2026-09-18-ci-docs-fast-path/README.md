@@ -586,6 +586,26 @@ instantly; 51 ms on the path that makes no request). It now flushes its
 output and exits. A classify job whose whole justification is that it costs
 seconds cannot spend twenty-three of them on a dead socket.
 
+### A property of the validated base, stated so nobody is surprised by it
+
+**The fast path fires only when the branch already has a completed, successful
+run to chain from.** That is the induction in `scripts/lib/validated-base.mjs`
+working as designed, and it has a visible consequence: a lane pushing several
+times in quick succession cancels its own runs, so there is no green tip, so
+the range widens and every push is FULL — until one run is allowed to finish.
+Observed twice in round 2 (runs 35300583675 and 35300910883, both widening to
+`e5049d6b..<head>` and both FULL).
+
+This is the correct trade and it is not a regression against round 1, because
+round 1's alternative in exactly that situation was a GREEN run over code
+nothing had tested. But it does mean the saving lands on the pushes that
+actually matter — a docs-only change on top of a branch (or `main`) that CI
+has already proved — and not on a burst. `main` is the common case for the
+saving: it is merged `--ff-only`, one commit at a time, with a per-SHA
+concurrency group that never cancels anything, so every docs-only push to
+`main` chains from a green predecessor.
+
+
 ## `docs/LANE_STANDARD.md` §7 — the durability-cadence change
 
 §7 item 1 said "runs `git push -u origin lane/<name>` after EVERY commit."
