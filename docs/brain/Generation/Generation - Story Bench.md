@@ -131,7 +131,7 @@ turn, or whether anyone would keep reading. The reading packet
   `tests/core/llm-generator-schema.test.ts` (the schema/`parseOp` contract)
 - `docs/story-generation/STORY_BENCH_2026-09-13.md` — method, BOTH run tables
   (v1 and the v2 re-run in §4b), and the readings in §5 and §5b
-- [[Decision 8 - Generation Quality Becomes a Measured Track]],
+- [[Decision 9 - Generation Quality Becomes a Measured Track]],
   [[Audit - 2026-09-13 Story Bench Lane]]
 
 ## What the doctor's own numbers say about reading this

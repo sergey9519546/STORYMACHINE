@@ -769,7 +769,7 @@ npm run check-docs                             clean
 npm run check-brain                            OK, 118 notes, 468 links, fresh
 node scripts/check-scoring-receipt.mjs origin/main..HEAD
                                                no scoring-path files changed
-npm run test:ci-env -- <the three files>       62 pass / 0 fail
+npm run test:ci-env -- <the three files>       77 pass / 0 fail   <- corrected: the closure section transcribed this as 62; the command gives 77 (17+38+22)
 npm run build                                  exit 0, built in 1.83 s
 npm test                                       exit 0 — 14,088 tests,
                                                13,996 pass / 0 fail,

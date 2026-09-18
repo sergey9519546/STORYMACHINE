@@ -111,7 +111,7 @@ response; one TCP hop is replaced.
 | 3 | Run it for real, 6 × 1 | see §4 and §5. |
 | 4 | Reading packet | **done.** `--packet` → `packet.fountain` + `packet.pdf` under the run directory, front matter with the five-question rubric, a blank grid, and the sentence that six scored scripts is the SEED of Decision #3's ~30-case set and satisfies none of its condition. **Deviation, stated:** through `src/lib/pdf.ts`'s `fountainToPdf()`, not `POST /api/export/pdf` — that route does not exist (§1e). |
 | 5 | Honesty boundaries | **done.** No LLM-reader column was added — the optional one is described and not built. No quality claim anywhere; §6 of the method doc states what the doctor cannot see. Nothing the bench produces reaches a user-visible surface. |
-| 6 | Docs, brain, ROADMAP, Decision, claims | **done.** `docs/story-generation/STORY_BENCH_2026-09-13.md`; brain notes `Generation - Story Bench`, `Decision 8 - …`, `Audit - 2026-09-13 Story Bench Lane`, linked from `00 Home`; ROADMAP P2 and P4 amendments that add the track WITHOUT touching the Labs gate or Decision #3's condition; `DECISION_LOG.md` Decision #8; claims rows 117–118. `npm run brain` + `check-brain` fresh; brain-coverage green. |
+| 6 | Docs, brain, ROADMAP, Decision, claims | **done.** `docs/story-generation/STORY_BENCH_2026-09-13.md`; brain notes `Generation - Story Bench`, `Decision 9 - …`, `Audit - 2026-09-13 Story Bench Lane`, linked from `00 Home`; ROADMAP P2 and P4 amendments that add the track WITHOUT touching the Labs gate or Decision #3's condition; `DECISION_LOG.md` Decision #9; claims rows 119–120. `npm run brain` + `check-brain` fresh; brain-coverage green. |
 
 ---
 

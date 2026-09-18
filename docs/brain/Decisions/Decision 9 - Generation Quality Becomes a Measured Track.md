@@ -5,7 +5,7 @@ sources: [docs/DECISION_LOG.md, ROADMAP.md, scripts/story-bench.mjs, tests/fixtu
 status: active
 ---
 
-# Decision #8 — Generation Quality Becomes a Measured Track (2026-09-13)
+# Decision #9 — Generation Quality Becomes a Measured Track (2026-09-13)
 
 The owner's direction that day, in their own words: work mainly on "the
 storymachine ability to actually generate good and quality stories that people
@@ -66,7 +66,7 @@ brief for the lane, and the repository's own docs, had wrong:
 
 ## Sources
 
-- `docs/DECISION_LOG.md` — "Decision #8"
+- `docs/DECISION_LOG.md` — "Decision #9"
 - `ROADMAP.md` — the P2 and P4 amendments of 2026-09-13
 - `scripts/story-bench.mjs`, `tests/fixtures/story-bench-premises.json`
 - `docs/story-generation/STORY_BENCH_2026-09-13.md` (method, table, readings)

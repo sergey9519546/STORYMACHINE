@@ -98,7 +98,7 @@ decision, repo visibility. Each has its own note under `Owner/`; start at
   screenplay is fixed-template output rather than generated prose, and that
   the 14-pass revision is the only step in the pipeline that writes. The
   ruling that the first lane MEASURES rather than tunes is
-  [[Decision 8 - Generation Quality Becomes a Measured Track]].
+  [[Decision 9 - Generation Quality Becomes a Measured Track]].
 - **"What can only the owner do, and why?"** → `Owner/` — start at
   [[Owner - Index]].
 - **"What is the R5 / advice-rule-fixes situation?"** → `Branches/` — start

@@ -6,7 +6,7 @@ direction to work on "the storymachine ability to actually generate good and
 quality stories that people will value and be entertained by."
 
 **What it is not.** It is not a quality claim, a gate, or a result anyone
-should tune against yet. It is a *before*. `docs/DECISION_LOG.md` Decision #8
+should tune against yet. It is a *before*. `docs/DECISION_LOG.md` Decision #9
 records why the first lane on that direction measures instead of tuning:
 Decision #3 gated the whole generative surface on the finding that every
 LLM-adjacent test in this repository is plumbing, and ten days later there was
@@ -481,6 +481,15 @@ ops`, `llm_generator_partial_parse` and `fallbacks per LLM call` are four views
 of that one thing, the schema fix — and (2) more scenes cleared Tier 1 and were
 committed, which drags health, verdict, words and the run label along behind it.
 Nothing in this table is evidence that any script got BETTER.
+
+Three of the six v2 rows are inflated this way — 3 scenes committed scored as
+5, 3 scored as 9, and 4 scored as 9 — so this is the run's normal case, not one
+outlier. The widest gap is `nine-minutes-of-tape`, scored on a `sceneCount` of
+**9** where **4** were committed; the illustration below uses the NARROWEST of
+the three because it also happens to be the run's highest health and its only
+DEGRADED label, which makes the point harder. *(The three-row count and the
+4-of-7 case were added in round 3 after the re-check observed that illustrating
+with the smallest gap understates how general the mechanism is.)*
 
 The clearest illustration is the run's highest health. `the-understudy-clause`
 scores **71.9**, and §5b calls it the strongest row — but that score is computed

@@ -45,4 +45,4 @@ Labs gate and satisfies no part of [[Decision 3 - Demote Generative Surface to L
 re-promotion condition; and it touched no scoring-path file
 (`check-scoring-receipt main..HEAD` reports none changed). See
 [[Generation - Story Bench]] for the instrument and
-[[Decision 8 - Generation Quality Becomes a Measured Track]] for the ruling.
+[[Decision 9 - Generation Quality Becomes a Measured Track]] for the ruling.
