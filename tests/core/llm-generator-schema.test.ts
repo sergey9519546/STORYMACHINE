@@ -19,6 +19,9 @@ import assert from 'node:assert/strict';
 import { IR_SCHEMA, SCHEMA_OP_KINDS, parseOp } from '../../server/nvm/generate/llm-generator.ts';
 import { STORY_OP_KINDS } from '../../server/nvm/ops/StoryOp.ts';
 import { geminiSchemaToJsonSchema } from '../../server/lib/ai-providers/schema.ts';
+import { applyStoryOp } from '../../server/nvm/ops/dispatcher.ts';
+import { emptyState } from '../../server/nvm/state/NarrativeState.ts';
+import { computeArcDebt } from '../../server/nvm/quality/index.ts';
 import type { Schema } from '@google/genai';
 
 /** The `anyOf` branch list the schema declares for one op. */
@@ -29,6 +32,59 @@ function opBranches(): Array<Record<string, unknown>> {
   const branches = (ops.items as Record<string, unknown>).anyOf;
   assert.ok(Array.isArray(branches), 'ops.items must be an anyOf union — a discriminated union cannot be declared any other way');
   return branches as Array<Record<string, unknown>>;
+}
+
+/** The declared branch for one op kind. */
+function branchFor(kind: string): Record<string, unknown> {
+  const found = opBranches().find((b) => (((b.properties as Record<string, Record<string, unknown>>)
+    .op.enum) as string[])?.[0] === kind);
+  assert.ok(found, `no declared branch for ${kind}`);
+  return found!;
+}
+
+/**
+ * The SMALLEST payload a schema node permits — every `required` property and
+ * nothing else, each property at the minimum its own declaration allows.
+ *
+ * This is the difference between "these fourteen payloads I wrote parse" and
+ * "everything this schema promises, parseOp accepts". A hand-written instance
+ * can only ever confirm the first, which is why SHIFT_RELATIONSHIP could
+ * declare `pair` as an unbounded array while parseOp required two elements and
+ * every test stayed green: nobody wrote the one-element payload the branch
+ * promised. Synthesised from the branch's own declaration, the minimum IS that
+ * payload, so the gap fails here instead of on the wire.
+ */
+function minimalInstance(node: Record<string, unknown>): unknown {
+  const enumVals = node.enum as unknown[] | undefined;
+  if (Array.isArray(enumVals) && enumVals.length > 0) return enumVals[0];
+
+  const anyOf = (node.anyOf ?? node.oneOf) as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(anyOf) && anyOf.length > 0) return minimalInstance(anyOf[0]);
+
+  const rawType = node.type;
+  const t = Array.isArray(rawType) ? String(rawType[0]) : String(rawType ?? 'string');
+
+  if (t === 'object') {
+    const props = (node.properties ?? {}) as Record<string, Record<string, unknown>>;
+    const required = (node.required ?? []) as string[];
+    const out: Record<string, unknown> = {};
+    // Only the required keys: an optional property is, by declaration, a
+    // property the decoder may omit, so the minimum omits it.
+    for (const key of required) {
+      assert.ok(props[key], `required property ${key} is not declared`);
+      out[key] = minimalInstance(props[key]);
+    }
+    return out;
+  }
+  if (t === 'array') {
+    const items = (node.items ?? { type: 'string' }) as Record<string, unknown>;
+    const min = typeof node.minItems === 'number' ? node.minItems : 0;
+    return Array.from({ length: min }, () => minimalInstance(items));
+  }
+  if (t === 'number' || t === 'integer') return 0;
+  if (t === 'boolean') return false;
+  if (t === 'null') return null;
+  return 'x';
 }
 
 /**
@@ -93,12 +149,113 @@ describe('IR_SCHEMA declares the whole StoryOp union', () => {
     assert.deepEqual(rejected, [], `declared branches parseOp rejects: ${rejected.join(', ')}`);
   });
 
+  it('accepts the SMALLEST payload every branch permits, not just a hand-written one', () => {
+    // The invariant this file's header claims, checked mechanically. Each
+    // instance is synthesised from the branch's own required list, property
+    // types, enums and array bounds — so a branch looser than parseOp ANYWHERE
+    // fails here. Before 2026-09-18 SHIFT_RELATIONSHIP failed it:
+    // `{op:'SHIFT_RELATIONSHIP', pair:[], delta:{...}}` satisfied the branch
+    // and parseOp returned null.
+    const rejected: string[] = [];
+    for (const kind of SCHEMA_OP_KINDS) {
+      const instance = minimalInstance(branchFor(kind)) as Record<string, unknown>;
+      const parsed = parseOp(instance);
+      if (parsed === null || parsed.op !== kind) rejected.push(`${kind} ${JSON.stringify(instance)}`);
+    }
+    assert.deepEqual(rejected, [], `branches whose own minimum parseOp rejects:\n  ${rejected.join('\n  ')}`);
+  });
+
+  it('bounds SHIFT_RELATIONSHIP.pair at two, the length parseOp requires', () => {
+    // The specific gap the synthesis above generalises. parseOp
+    // (llm-generator.ts:85-92) needs pair[0] and pair[1]; the union types it as
+    // a two-element tuple; the branch must say both.
+    const pair = ((branchFor('SHIFT_RELATIONSHIP').properties as Record<string, Record<string, unknown>>)
+      .pair) as Record<string, unknown>;
+    assert.equal(pair.minItems, 2, 'a one-element pair parses to null — the schema must not promise one');
+    assert.equal(pair.maxItems, 2, 'pair is a two-element tuple in StoryOp.ts');
+    const delta = { dimension: 'trust', amount: -0.3, reason: 'x' };
+    assert.equal(parseOp({ op: 'SHIFT_RELATIONSHIP', pair: ['ILKA'], delta }), null);
+    assert.equal(parseOp({ op: 'SHIFT_RELATIONSHIP', pair: [], delta }), null);
+    assert.ok(parseOp({ op: 'SHIFT_RELATIONSHIP', pair: ['ILKA', 'DESMOND'], delta }));
+  });
+
   it('still rejects a payload-less op — the shape the old schema produced', () => {
     // The other direction. parseOp must not be loosened to paper over a thin
     // schema: an op with no payload is not a valid op and never was.
     for (const kind of ['ADD_FACT', 'UPDATE_BELIEF', 'RAISE_CLOCK', 'SEED_CLUE']) {
       assert.equal(parseOp({ op: kind }), null, `${kind} with no payload must still parse to null`);
     }
+  });
+});
+
+describe('a conformant APPRAISE_EMOTION cannot NaN the quality engine', () => {
+  // WHY THIS IS HERE. The EMOTION branch used to require only `dominant` and
+  // `intensity`, while EmotionState (server/engine/types.ts:398-409) declares
+  // nine non-optional fields and parseOp cast the object through unchecked. The
+  // dispatcher stores it wholesale (server/nvm/ops/dispatcher.ts:45) and
+  // server/nvm/quality/index.ts:495 then evaluates `(emo.fear + emo.distress) >
+  // 100` — with the dimensions undefined that is `NaN > 100`, which is FALSE,
+  // so the peak-distress debt silently never fires rather than throwing. Before
+  // the round-2 schema fix the model could not emit an APPRAISE_EMOTION payload
+  // at all and the path was unreachable; it is reachable now.
+
+  it('the smallest conformant payload still carries six finite dimensions', () => {
+    const minimal = minimalInstance(branchFor('APPRAISE_EMOTION')) as Record<string, unknown>;
+    const op = parseOp(minimal);
+    assert.ok(op && op.op === 'APPRAISE_EMOTION', 'the branch minimum must parse');
+    const state = applyStoryOp(emptyState(), op!);
+    const emo = state.characterEmotions[(op as { charId: string }).charId];
+    assert.ok(emo, 'the dispatcher must have stored it');
+    for (const dim of ['joy', 'distress', 'anger', 'fear', 'pride', 'shame'] as const) {
+      assert.equal(typeof emo[dim], 'number');
+      assert.ok(Number.isFinite(emo[dim]), `${dim} reached committed state as ${String(emo[dim])}`);
+    }
+    assert.ok(Number.isFinite(emo.fear + emo.distress),
+      'quality/index.ts:495 compares (fear + distress) > 100; NaN there fails open, silently');
+  });
+
+  it('the debt at quality/index.ts:495 actually fires on a conformant payload', () => {
+    // The positive direction: a real appraisal must reach the comparison and
+    // trip it. If this ever goes quiet, the check has gone blind again.
+    const op = parseOp({
+      op: 'APPRAISE_EMOTION', charId: 'ILKA',
+      emotion: { joy: 0, distress: 70, anger: 0, fear: 60, pride: 0, shame: 0, dominant: 'distress', intensity: 70, last_updated_at: 0 },
+    });
+    assert.ok(op);
+    const debts = computeArcDebt(applyStoryOp(emptyState(), op!), 3);
+    assert.ok(debts.some((d) => d.includes('ILKA') && d.includes('peak distress')),
+      `peak-distress debt did not fire: ${JSON.stringify(debts)}`);
+  });
+
+  it('parseOp rejects a partial EmotionState even when the schema is bypassed', () => {
+    // The invariant must not depend on the declaration: a caller that hand-rolls
+    // an op, or a decoder that ignores `required`, must not get a partial into
+    // committed state either.
+    const partials: Array<Record<string, unknown>> = [
+      { op: 'APPRAISE_EMOTION', charId: 'ILKA', emotion: { dominant: 'fear', intensity: 70 } },
+      { op: 'APPRAISE_EMOTION', charId: 'ILKA', emotion: {} },
+      { op: 'APPRAISE_EMOTION', charId: 'ILKA', emotion: { joy: 0, distress: 0, anger: 0, fear: 0, pride: 0, shame: 0, dominant: 'neutral', intensity: 0 } },
+      { op: 'APPRAISE_EMOTION', charId: 'ILKA', emotion: { joy: 0, distress: 0, anger: 0, fear: 'a lot', pride: 0, shame: 0, dominant: 'fear', intensity: 0, last_updated_at: 0 } },
+    ];
+    for (const raw of partials) {
+      assert.equal(parseOp(raw), null, `a partial EmotionState must not parse: ${JSON.stringify(raw)}`);
+    }
+  });
+
+  it('declares dominant and BELIEF.source as enums, like the other three', () => {
+    const emotion = ((branchFor('APPRAISE_EMOTION').properties as Record<string, Record<string, unknown>>)
+      .emotion) as Record<string, unknown>;
+    const dominant = (emotion.properties as Record<string, Record<string, unknown>>).dominant;
+    assert.deepEqual(dominant.enum, ['neutral', 'joy', 'distress', 'anger', 'fear', 'pride', 'shame']);
+    assert.deepEqual(
+      ((emotion.required ?? []) as string[]).slice().sort(),
+      ['anger', 'distress', 'dominant', 'fear', 'intensity', 'joy', 'last_updated_at', 'pride', 'shame'],
+      'every non-optional EmotionState field must be required; anger_target_id is the only optional one',
+    );
+    const belief = ((branchFor('UPDATE_BELIEF').properties as Record<string, Record<string, unknown>>)
+      .belief) as Record<string, unknown>;
+    const source = (belief.properties as Record<string, Record<string, unknown>>).source;
+    assert.deepEqual(source.enum, ['witnessed', 'told', 'inferred']);
   });
 });
 
@@ -150,6 +307,48 @@ describe('the translator carries the union to the wire', () => {
     // AtomicFact.validTo is `number | null`.
     const nullable = geminiSchemaToJsonSchema({ type: ['NUMBER', 'NULL'] } as unknown as Schema);
     assert.deepEqual(nullable.type, ['number', 'null']);
+  });
+
+  it('carries minItems and maxItems, so a declared bound reaches the decoder', () => {
+    // The bound is useless if the translator eats it: the endpoint would still
+    // be told `pair` is an unbounded string array, and a one-element pair would
+    // still be spent and thrown away by parseOp.
+    const translated = geminiSchemaToJsonSchema(IR_SCHEMA as unknown as Schema);
+    const ops = ((((translated.properties as Record<string, Record<string, unknown>>)
+      .candidates.items as Record<string, Record<string, unknown>>)
+      .properties as Record<string, Record<string, unknown>>).ops) as Record<string, unknown>;
+    const branches = (ops.items as Record<string, unknown>).anyOf as Array<Record<string, Record<string, unknown>>>;
+    const shift = branches.find((b) => ((b.properties.op as Record<string, unknown>).enum as string[])?.[0] === 'SHIFT_RELATIONSHIP');
+    assert.ok(shift, 'the SHIFT_RELATIONSHIP branch must survive translation');
+    const pair = shift!.properties.pair as Record<string, unknown>;
+    assert.equal(pair.minItems, 2, 'minItems must reach the wire');
+    assert.equal(pair.maxItems, 2, 'maxItems must reach the wire');
+    assert.deepEqual(pair.items, { type: 'string' });
+  });
+
+  it('carries the other validation keywords, and deliberately not format/default', () => {
+    const bounded = geminiSchemaToJsonSchema({
+      type: 'OBJECT',
+      properties: {
+        n: { type: 'NUMBER', minimum: 1, maximum: 5 },
+        s: { type: 'STRING', minLength: 2, maxLength: 8, pattern: '^[A-Z]+$' },
+      },
+      required: ['n', 's'],
+    } as unknown as Schema);
+    const props = bounded.properties as Record<string, Record<string, unknown>>;
+    assert.equal(props.n.minimum, 1);
+    assert.equal(props.n.maximum, 5);
+    assert.equal(props.s.minLength, 2);
+    assert.equal(props.s.maxLength, 8);
+    assert.equal(props.s.pattern, '^[A-Z]+$');
+
+    // Not carried, on purpose — see the comment in schema.ts. `propertyOrdering`
+    // is not a JSON Schema keyword, and the other two change how a strict
+    // decoder treats an otherwise-valid payload.
+    const dropped = geminiSchemaToJsonSchema({
+      type: 'STRING', format: 'date-time', default: 'x', propertyOrdering: ['a'],
+    } as unknown as Schema);
+    assert.deepEqual(dropped, { type: 'string' });
   });
 
   it('leaves a schema with no union exactly as it was', () => {

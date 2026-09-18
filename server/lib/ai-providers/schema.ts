@@ -17,6 +17,25 @@ export function geminiSchemaToJsonSchema(gs: Schema): Record<string, unknown> {
   if (gs.description) out.description = gs.description;
   if ((gs as Schema & { enum?: unknown[] }).enum) out.enum = (gs as Schema & { enum?: unknown[] }).enum;
 
+  // VALIDATION KEYWORDS (story-bench lane round 3, 2026-09-18). These were
+  // dropped on the floor exactly as anyOf was, and the consequence is the same
+  // class of defect: a caller declares a bound, the decoder never hears it, and
+  // the payload it returns is rejected downstream by the parser the schema was
+  // supposed to mirror. IR_SCHEMA's SHIFT_RELATIONSHIP branch needs `minItems`
+  // (its `pair` is a two-element tuple and parseOp rejects a shorter one), so
+  // this is carried, not hypothetical. They are copied before the union
+  // early-return below and before the type switch because JSON Schema ignores a
+  // keyword that does not apply to the instance type, so one pass is correct
+  // for all of them. `format`, `default` and Gemini's own `propertyOrdering`
+  // are deliberately NOT carried: the first two change how a strict decoder
+  // treats an otherwise-valid payload and no caller in this repository declares
+  // them, and the third is not a JSON Schema keyword at all.
+  const CONSTRAINTS = ['minItems', 'maxItems', 'minimum', 'maximum', 'minLength', 'maxLength', 'pattern'] as const;
+  for (const key of CONSTRAINTS) {
+    const v = (gs as Schema & Record<string, unknown>)[key];
+    if (v !== undefined) out[key] = v;
+  }
+
   // UNION BRANCHES (story-bench lane round 2, 2026-09-13). A discriminated
   // union — the shape of every StoryOp — can only be declared to a structured
   // decoder as anyOf/oneOf, and this translator used to drop both on the floor,

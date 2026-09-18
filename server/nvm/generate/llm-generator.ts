@@ -80,6 +80,21 @@ export function parseOp(raw: Record<string, unknown>): StoryOp | null {
         const emotion = raw['emotion'];
         const charId  = raw['charId'];
         if (!isObj(emotion) || typeof charId !== 'string') return null;
+        // A PARTIAL EmotionState IS NOT AN EmotionState. `isObj` alone used to
+        // be the whole check, so `{dominant:'fear', intensity:70}` — which the
+        // schema branch also admitted — was cast through and stored wholesale
+        // by the dispatcher (server/nvm/ops/dispatcher.ts:45). The six
+        // dimensions then read `undefined`, and
+        // server/nvm/quality/index.ts:495 evaluates `(emo.fear + emo.distress)
+        // > 100` — `NaN > 100` is false, so the peak-distress debt SILENTLY
+        // never fires rather than throwing. Every non-optional field of
+        // EmotionState (server/engine/types.ts:398-409) is required here, and
+        // the schema branch below requires exactly the same set, so the
+        // invariant holds whether a payload arrives through the schema or not.
+        for (const dim of ['joy', 'distress', 'anger', 'fear', 'pride', 'shame', 'intensity', 'last_updated_at']) {
+          if (typeof emotion[dim] !== 'number' || !Number.isFinite(emotion[dim] as number)) return null;
+        }
+        if (typeof emotion['dominant'] !== 'string') return null;
         return { op: 'APPRAISE_EMOTION', charId, emotion: emotion as unknown as StoryOp & { op: 'APPRAISE_EMOTION' } extends { emotion: infer E } ? E : never };
       }
       case 'SHIFT_RELATIONSHIP': {
@@ -190,11 +205,24 @@ function parseIR(raw: unknown, spec: GenerationSpec, idx: number): NarrativeTran
 // rejects an op whose required fields are missing or mistyped, so a branch that
 // drifts from it produces valid JSON that still parses to null. All 14 kinds
 // are declared; tests/core/llm-generator-schema.test.ts asserts the set here
-// equals STORY_OP_KINDS and round-trips one instance of each through parseOp.
+// equals STORY_OP_KINDS.
+//
+// AND THAT CLAIM IS NOW CHECKED MECHANICALLY, NOT BY HAND-WRITTEN EXAMPLES.
+// Until 2026-09-18 the guard round-tripped fourteen payloads a human wrote,
+// which proves those fourteen parse and nothing about what the branches
+// PROMISE: SHIFT_RELATIONSHIP declared `pair` as an unbounded string array
+// while parseOp required two elements, so `pair:['ILKA']` satisfied the branch
+// and parsed to null, and no hand-written instance could have shown it. The
+// guard now synthesises the SMALLEST payload each branch permits, from that
+// branch's own `required` list, property types, enums and array bounds, and
+// requires parseOp to accept it — so a branch that is looser than the parser
+// anywhere fails in CI instead of over a bench run's worth of live calls.
 //
 // `server/lib/ai-providers/schema.ts` had to learn anyOf in the same change —
 // it was dropping the key, so a union declared here would have been deleted on
-// the way to the wire.
+// the way to the wire — and `minItems`/`maxItems` in the round after it, for
+// the same reason: a bound this file declares and the translator deletes is a
+// bound the decoder never hears.
 
 const S = { type: 'string' } as const;
 const N = { type: 'number' } as const;
@@ -213,18 +241,33 @@ const BELIEF = {
   type: 'object',
   properties: {
     id: S, proposition: S, confidence: N,
-    source: S, source_event_id: S, acquired_at: N,
+    // BeliefSource (server/engine/types.ts:132) has exactly three values, and
+    // an enum is the one place a decoder can be stopped from inventing a
+    // fourth — the same reasoning as RELATIONSHIP_DELTA.dimension below.
+    source: { type: 'string', enum: ['witnessed', 'told', 'inferred'] },
+    source_event_id: S, acquired_at: N,
   },
   required: ['id', 'proposition', 'confidence', 'source', 'source_event_id', 'acquired_at'],
 };
 
+// EVERY non-optional field of EmotionState is required. Requiring only
+// `dominant` and `intensity` (the shape until 2026-09-18) declared a payload
+// that parseOp accepted and the dispatcher stored, leaving the six dimensions
+// `undefined` and silencing the peak-distress debt in
+// server/nvm/quality/index.ts:495 through `NaN > 100 === false`. The only
+// optional member of the interface — `anger_target_id` — is declared but not
+// required, so the model can express it without being forced to invent one.
 const EMOTION = {
   type: 'object',
   properties: {
     joy: N, distress: N, anger: N, fear: N, pride: N, shame: N,
-    dominant: S, intensity: N, last_updated_at: N,
+    // EmotionType (server/engine/types.ts:396), enumerated for the same reason
+    // as BeliefSource above.
+    dominant: { type: 'string', enum: ['neutral', 'joy', 'distress', 'anger', 'fear', 'pride', 'shame'] },
+    intensity: N, last_updated_at: N,
+    anger_target_id: S,
   },
-  required: ['dominant', 'intensity'],
+  required: ['joy', 'distress', 'anger', 'fear', 'pride', 'shame', 'dominant', 'intensity', 'last_updated_at'],
 };
 
 // The 14 RelationshipDelta dimensions and 11 ThemeMove / 18 ClueCarrier values
@@ -257,7 +300,13 @@ const OP_BRANCHES = [
   { kind: 'APPRAISE_EMOTION', props: { charId: S, emotion: EMOTION }, required: ['charId', 'emotion'] },
   {
     kind: 'SHIFT_RELATIONSHIP',
-    props: { pair: { type: 'array', items: S }, delta: RELATIONSHIP_DELTA },
+    // `pair` is a TWO-element tuple in the union (StoryOp.ts) and parseOp
+    // rejects anything shorter, so the array is bounded at both ends. Declared
+    // without the bound, `pair: ['ILKA']` satisfied this branch and then parsed
+    // to null — the exact schema-vs-parser drift this block exists to prevent,
+    // one op later. `minItems`/`maxItems` reach the wire only because
+    // geminiSchemaToJsonSchema was taught to carry them in the same change.
+    props: { pair: { type: 'array', items: S, minItems: 2, maxItems: 2 }, delta: RELATIONSHIP_DELTA },
     required: ['pair', 'delta'],
   },
   { kind: 'ADVANCE_OBJECT_ARC', props: { objectId: S, toState: S }, required: ['objectId', 'toState'] },
