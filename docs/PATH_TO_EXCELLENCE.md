@@ -1656,20 +1656,22 @@ From the ops audit — the Docker vehicle is already well-built; finish it.
 the real environment; enable `BACKUP_INTERVAL_HOURS` (and retention) in
 production; push the `v1.0.0-rc.1` tag.
 
-**Owner-only, added 2026-09-03 — GitHub Actions is not running jobs.**
-Every `main` CI run since `db8b7a88` (2026-09-02 19:12 UTC, a docs-only
-commit) is red, and a manual re-run of `305bb4ab` (run 33696391120, attempt
-2) failed the same way: both jobs "complete" in 2–3 seconds with no runner
-assigned (`runner_id: 0`), no steps, and no downloadable log (HTTP 404).
-No workflow file changed between the last green run (`939f7829`,
-2026-08-24) and the first red one, and every gate in `ci.yml` passes
-locally on each merged commit (lint, full suite, no-console, reachability,
-receipt, docs, honesty, browser battery). This is the signature of an
-account-level Actions block — runner availability, a spending limit, or a
-failed payment on the account — not a code failure, and it cannot be
-diagnosed or fixed from a session (the API exposes no reason). Check
-Settings → Actions and Settings → Billing on the account, then re-run the
-latest `main` run; nothing needs to be pushed.
+**RESOLVED 2026-09-13 — GitHub Actions is running jobs again.** For eleven
+days it was not: every `main` CI run from `db8b7a88` (2026-09-02 19:12 UTC, a
+docs-only commit) onward was red, and a manual re-run of `305bb4ab` (run
+33696391120, attempt 2) failed the same way — both jobs "complete" in 2–3
+seconds with no runner assigned (`runner_id: 0`), no steps, and no
+downloadable log (HTTP 404). No workflow file changed between the last green
+run (`939f7829`, 2026-08-24) and the first red one, and every gate in
+`ci.yml` passed locally on each merged commit, which is what identified it as
+an account-level Actions block rather than a code failure. **The block lifted
+at 04:19 UTC on 2026-09-13** (session record above; `docs/audits/
+2026-09-13-ci-green/README.md`), and the first real run on `main` since
+2026-09-02 immediately found four defects only the runner could show. Nothing
+here is owner-only any more. Runs have been continuous since — including the
+`edge.yml` publish workflow, which fired for real as run 34794216577,
+triggered by CI run 34793742299 on `main@be2341ac`, and failed in the Docker
+build (a real, separate defect, being fixed on `lane/edge-image-real`).
 
 **Exit gate:** the stranger-week test — one pilot writer uses a hosted
 instance for a week and loses nothing. Human-only; not started.

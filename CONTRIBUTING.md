@@ -138,14 +138,26 @@ the private reporting channel and response SLA.
 - `.github/workflows/security.yml` — dependency review (PRs), `npm audit`
   (currently non-blocking), CodeQL scanning, weekly schedule.
 
-**If your PR's checks fail in ~2 seconds with no logs and no runner
-assigned, it is not your change.** That is the signature of a known
-account-level GitHub Actions block (a billing/spend limit or runner
-availability issue on the account, not a code failure) — every gate in
-`ci.yml` passes locally on the same commits when the failure looks like
-this. It cannot be diagnosed or fixed from a PR; see
-`docs/PATH_TO_EXCELLENCE.md`'s "GitHub Actions is not running jobs" entry
-for the full diagnosis and what the owner needs to check. Run the gates
-locally (`npm run lint && npm test && npm run build`, or `npm run
-validate`) and note that you did in the PR description if this is
-happening.
+**CI runs. It stopped for eleven days and it is back.** Between 2026-09-02
+and 2026-09-13 every run on this repository failed in 2-3 seconds with no
+runner assigned (`runner_id: 0`), no steps and no downloadable log — the
+signature of an account-level Actions block, not of anyone's change. That
+block lifted at **04:19 UTC on 2026-09-13** (`docs/PATH_TO_EXCELLENCE.md`,
+the 2026-09-13 session record; `docs/audits/2026-09-13-ci-green/README.md`),
+and runs have been real and continuous since. If you ever see that 2-second
+shape again, it is still not your change — but check the Actions tab before
+assuming it, because the ordinary case now is that CI ran and told you
+something true.
+
+Run the gates locally anyway before you push (`npm run lint && npm test &&
+npm run build`, or `npm run validate`): it is faster than a round trip, and
+two of the suites only ever went red on the runner.
+
+**A docs-only push takes a short path.** A push whose every changed file is
+under `docs/` or ends in `.md` skips the type check, the full `npm test`,
+the metamorphic gate, the build and the whole browser job, and runs the
+docs gates instead — honesty-audit, check-brain, check-docs, and the
+seventeen suites that assert on committed documentation. Measured: 1 m 19 s
+(run 35296219834) against 9 m 03 s before it (run 34793742299). Anything the
+classifier cannot positively prove is docs-only runs everything, exactly as
+before. See `docs/audits/2026-09-18-ci-docs-fast-path/README.md`.

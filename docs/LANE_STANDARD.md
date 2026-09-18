@@ -133,7 +133,9 @@ follow from that, each already cheap:
    between checkpoints, still has everything to lose to the same class of
    rebuild the old rule was written against. A checkpoint is therefore a
    judgment call a lane must actually make, not a cadence it can skip: when
-   in doubt, push. The orchestrator still merges only `--ff-only` and only
+   in doubt, push. The instruction that warranted changing a standing
+   standard is recorded as `docs/DECISION_LOG.md` **Decision #9**, not only
+   as a quotation here. The orchestrator still merges only `--ff-only` and only
    on MERGE; the branch is deleted from origin after the merge. Since
    2026-09-13 `.github/workflows/ci.yml` and `security.yml` carry a
    `concurrency` group keyed on the ref that cancels a branch's own

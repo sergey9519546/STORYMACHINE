@@ -95,12 +95,16 @@ before every push. CI runs lint + test + build on every branch, plus a
   issue volume.
 - The sandbox is rebuilt without warning (2026-09-07: every worktree, the
   scratch directory, local tags and an unpushed reviewed lane were erased).
-  Lanes push `lane/<name>` at meaningful checkpoints (a completed unit of
-  work, before a long-running operation, before handing off to a reviewer,
-  and always before the lane goes idle) — not after every commit, which the
-  owner flagged as real-time keystroke saving rather than milestone
-  synchronization; reviews are committed under `docs/audits/` before the
-  merge; see `docs/LANE_STANDARD.md` §7.
+  **A commit that exists only in a worktree is not work that exists.** Lanes
+  therefore push `lane/<name>` at meaningful checkpoints — a completed unit
+  of work, before a long-running operation, before handing off to a reviewer,
+  and always before the lane goes idle — and **when in doubt, push**. The
+  cadence is "checkpoints", not "every commit" (Decision #9, 2026-09-18:
+  "remote repositories are meant for milestone synchronization, not real-time
+  keystroke saving"), but the durability property is not relaxed by that, only
+  re-timed: between checkpoints a lane still has everything to lose to the
+  same class of rebuild. Reviews are committed under `docs/audits/` before the
+  merge; see `docs/LANE_STANDARD.md` §7 and `docs/DECISION_LOG.md` Decision #9.
 - Parallel sessions ship concurrently: pull the integration branch and check
   `git log` before starting any implementation work. Do not assume `main` or
   any other branch name; use the current session's designated branch.

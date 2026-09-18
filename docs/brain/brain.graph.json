@@ -199,6 +199,12 @@
       "path": "docs/brain/Decisions/Decision 9 - Generation Quality Becomes a Measured Track.md"
     },
     {
+      "id": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md",
+      "type": "decision",
+      "title": "Decision #9 — Lanes Push at Checkpoints, Not at Every Commit (2026-09-18)",
+      "path": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md"
+    },
+    {
       "id": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
       "type": "gate",
       "title": "Gate — AUC-24 Ratchet",
@@ -221,6 +227,12 @@
       "type": "gate",
       "title": "Gate — Corpus Layout Verification",
       "path": "docs/brain/Gates/Gate - Corpus Layout Verification.md"
+    },
+    {
+      "id": "docs/brain/Gates/Gate - Docs-Gating Set.md",
+      "type": "gate",
+      "title": "Gate — Docs-Gating Set",
+      "path": "docs/brain/Gates/Gate - Docs-Gating Set.md"
     },
     {
       "id": "docs/brain/Gates/Gate - Fountain Shape Guard.md",
@@ -513,7 +525,7 @@
     {
       "id": "docs/brain/Owner/Owner - Fix GitHub Actions.md",
       "type": "owner",
-      "title": "Owner Item — Fix GitHub Actions (Billing/Runner Block)",
+      "title": "Owner Item — Fix GitHub Actions (Billing/Runner Block) — RESOLVED 2026-09-13",
       "path": "docs/brain/Owner/Owner - Fix GitHub Actions.md"
     },
     {
@@ -1088,6 +1100,22 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
+      "to": "docs/brain/Gates/Gate - Docs-Gating Set.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
+      "to": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
+      "to": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
+      "to": "docs/brain/Owner/Owner - Fix GitHub Actions.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
       "to": "docs/brain/Patterns.md"
     },
     {
@@ -1097,6 +1125,14 @@
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
       "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
+      "to": "docs/brain/Gates/Gate - Docs-Gating Set.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
+      "to": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md"
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 Edge Image.md",
@@ -1343,6 +1379,18 @@
       "to": "docs/brain/Generation/Generation - Story Bench.md"
     },
     {
+      "from": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md",
+      "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
+    },
+    {
       "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
       "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
     },
@@ -1388,6 +1436,30 @@
     },
     {
       "from": "docs/brain/Gates/Gate - Corpus Layout Verification.md",
+      "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Docs-Gating Set.md",
+      "to": "docs/brain/Gates/Gate - Rulebook Freshness.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Docs-Gating Set.md",
+      "to": "docs/brain/Gates/Gate - Rulebook Freshness.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Docs-Gating Set.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Docs-Gating Set.md",
+      "to": "docs/brain/Gates/Gate - Rulebook Freshness.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Docs-Gating Set.md",
+      "to": "docs/brain/Gates/Gate - Honesty Audit.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - Docs-Gating Set.md",
       "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
     },
     {
@@ -1897,6 +1969,26 @@
     {
       "from": "docs/brain/Measurements Index.md",
       "to": "docs/brain/Measurements/Measurement - WHAT_THE_SCORE_DOES_2026-07-28.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Fix GitHub Actions.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Fix GitHub Actions.md",
+      "to": "docs/brain/Gates/Gate - Honesty Audit.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Fix GitHub Actions.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Fix GitHub Actions.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Fix GitHub Actions.md",
+      "to": "docs/brain/Gates/Gate - Honesty Audit.md"
     },
     {
       "from": "docs/brain/Owner/Owner - Fix Repo Description.md",
