@@ -14,7 +14,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -25,7 +26,9 @@ const bench = await import(pathToFileURL(path.join(ROOT, 'scripts', 'story-bench
   summariseCalls: (entries: Array<Record<string, unknown>>) => Record<string, unknown>;
   classifyRun: (a: { llmCalls: number; revisionPassesWithChanges: number; revisionPassCount: number; committedScenes?: number; requestedScenes?: number; committedNonStub?: number }) => { ok: boolean; status: string; label: string };
   nextRunDir: (root: string, date: string, exists: (f: string) => boolean, explicit?: string | null) => string;
-  listRunDirs: (names: string[]) => string[];
+  listRunDirs: (names: string[], stamp?: ((name: string) => number | null) | null) => string[];
+  rowsFromDir: (dir: string, orderedIds: string[]) => Array<Record<string, unknown>>;
+  scenesLabel: (row: Record<string, unknown>) => string;
   castGroundingOps: (p: unknown) => Array<Record<string, unknown>>;
   scriptWordCount: (f: string) => number;
   renderTable: (rows: Array<Record<string, unknown>>) => string;
@@ -106,6 +109,15 @@ describe('story-bench fixture', () => {
     ]);
     for (const p of FIXTURE.premises) {
       const targets = bench.beatsToSceneTargets(p);
+      // The forEach below is vacuous on an empty array: with
+      // beatsToSceneTargets stubbed to `return []` this whole file stayed
+      // 30 pass / 0 fail. One target per beat, and at least one, is the
+      // precondition that makes the rest of this assertion mean anything.
+      assert.equal(
+        targets.length, (p.beats as unknown[]).length,
+        `${p.id}: every beat must become a SceneTarget — a short list silently skips the checks below`,
+      );
+      assert.ok(targets.length > 0, `${p.id}: no scene targets at all`);
       targets.forEach((t, i) => {
         assert.equal(t.sceneIdx, i, `${p.id}: sceneIdx must be dense and zero-based`);
         assert.ok(FUNCTIONS.has(String(t.sceneFunction)), `${p.id}[${i}]: unknown sceneFunction ${t.sceneFunction}`);
@@ -279,6 +291,35 @@ describe('story-bench run directories are non-destructive', () => {
     assert.equal(bench.nextRunDir('/r', '2026-09-13', () => true, 'seam-fix'), path.join('/r', 'seam-fix'));
   });
 
+  it('finds the directories --out and --into write, which --packet could not see', () => {
+    // `listRunDirs` filtered on the dated pattern alone, so a run written to
+    // `--out seam-fix` was invisible to `--packet`, which then assembled a
+    // packet from an OLDER dated directory while printing "the newest run
+    // directory of N". With a stamp it sees every FINISHED run.
+    const stamps: Record<string, number> = {
+      '2026-09-12': 10, '2026-09-13': 20, 'seam-fix': 30, 'notes.txt': Number.NaN,
+    };
+    const stamp = (d: string) => (d in stamps && !Number.isNaN(stamps[d]) ? stamps[d] : null);
+    assert.deepEqual(
+      bench.listRunDirs(['seam-fix', '2026-09-13', '2026-09-12', 'notes.txt'], stamp),
+      ['2026-09-12', '2026-09-13', 'seam-fix'],
+      'a --out run is a run, and the newest one is the one --packet must read',
+    );
+  });
+
+  it('drops a directory with no summary.json, so --packet never picks a crashed run', () => {
+    const stamp = (d: string) => (d === '2026-09-12' ? 10 : null);
+    assert.deepEqual(bench.listRunDirs(['2026-09-12', '2026-09-13'], stamp), ['2026-09-12'],
+      'an unfinished run has no summary.json to read and must not be chosen as newest');
+  });
+
+  it('without a stamp keeps exactly the original name-only behaviour', () => {
+    assert.deepEqual(
+      bench.listRunDirs(['seam-fix', '2026-09-13', '2026-09-12', 'notes.txt']),
+      ['2026-09-12', '2026-09-13'],
+    );
+  });
+
   it('orders run directories so --packet reads the newest, not the lexically last', () => {
     // '2026-09-13-run10' sorts before '-run2' as a string; the packet must
     // still read run10.
@@ -286,6 +327,93 @@ describe('story-bench run directories are non-destructive', () => {
       bench.listRunDirs(['2026-09-13-run10', '2026-09-12', '2026-09-13', '2026-09-13-run2', 'notes.txt']),
       ['2026-09-12', '2026-09-13', '2026-09-13-run2', '2026-09-13-run10'],
     );
+  });
+});
+
+describe('story-bench table is DERIVED from the per-premise row files', () => {
+  // WHY THIS SUITE EXISTS. `rowsFromDir` is the whole of `ce2a75b6` — the
+  // commit that lets three premises be re-run into an existing run without
+  // inventing a table for the other three — and it shipped with NO assertion.
+  // The round-2 reviewer replaced its body with `return []` and this file
+  // reported 30 pass / 0 fail. Under docs/LANE_STANDARD.md §3 that is not a
+  // guard; it is an untested feature. These four assertions are the contract:
+  // fixture order, one row replaced, absent rows skipped, and a table that
+  // reproduces.
+  // Deliberately NOT alphabetical: a derivation that simply globbed the
+  // directory would come back in readdir order and pass an alphabetical
+  // fixture by accident. The table must follow the FIXTURE.
+  const ORDER = ['charlie', 'alpha', 'bravo'];
+  const rowFor = (id: string, over: Record<string, unknown> = {}) => ({
+    id, shape: 'thriller', scenes: 3, committedScenes: 3, committedNonStub: 2, requestedScenes: 8,
+    words: 100, health: 40, verdict: 'PASS', llmCalls: 5, fallbacks: 1,
+    revisionPassesWithChanges: 2, revisionPassCount: 14, wallMs: 1_000,
+    promptTokens: 10, completionTokens: 5, status: 'FRAGMENT', ...over,
+  });
+
+  function tmpRun(write: (dir: string) => void): string {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'story-bench-rows-'));
+    write(dir);
+    return dir;
+  }
+
+  it('returns rows in FIXTURE order, whatever order they were written in', () => {
+    const dir = tmpRun((d) => {
+      // Deliberately reverse: a re-run writes whichever premises it re-ran,
+      // whenever it finishes them, and the table must not reshuffle.
+      for (const id of ['alpha', 'bravo', 'charlie']) {
+        writeFileSync(path.join(d, `${id}.row.json`), JSON.stringify(rowFor(id)));
+      }
+    });
+    try {
+      assert.deepEqual(bench.rowsFromDir(dir, ORDER).map((r) => r.id), ORDER);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('a re-written row file replaces exactly one row and leaves the others standing', () => {
+    const dir = tmpRun((d) => {
+      for (const id of ORDER) writeFileSync(path.join(d, `${id}.row.json`), JSON.stringify(rowFor(id)));
+      // The re-run: one premise, new numbers, written over its own row file.
+      writeFileSync(path.join(d, 'bravo.row.json'), JSON.stringify(rowFor('bravo', { health: 71.9, committedScenes: 5, status: 'DEGRADED' })));
+    });
+    try {
+      const rows = bench.rowsFromDir(dir, ORDER);
+      assert.equal(rows.length, 3, 'the two premises that were not re-run must survive');
+      assert.deepEqual(rows.map((r) => r.id), ORDER);
+      assert.deepEqual(rows.map((r) => r.health), [40, 40, 71.9]);
+      assert.deepEqual(rows.map((r) => r.status), ['FRAGMENT', 'FRAGMENT', 'DEGRADED']);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('skips a premise with no row file rather than emitting a hole', () => {
+    const dir = tmpRun((d) => {
+      writeFileSync(path.join(d, 'alpha.row.json'), JSON.stringify(rowFor('alpha')));
+      writeFileSync(path.join(d, 'charlie.row.json'), JSON.stringify(rowFor('charlie')));
+      // A stray file that is not a row must not be picked up either.
+      writeFileSync(path.join(d, 'alpha.final.fountain'), 'INT. ROOM - DAY\n');
+    });
+    try {
+      const rows = bench.rowsFromDir(dir, ORDER);
+      assert.deepEqual(rows.map((r) => r.id), ['charlie', 'alpha']);
+      assert.ok(rows.every((r) => r && typeof r.id === 'string'), 'no undefined entries');
+      assert.deepEqual(bench.rowsFromDir(dir, []), [], 'no ids, no rows');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('renderTable(rowsFromDir(...)) reproduces the table the run would have printed', () => {
+    // The tie the committed documents rest on: the table is the rendering of
+    // the row files, not a thing typed beside them.
+    const rows = ORDER.map((id) => rowFor(id));
+    const dir = tmpRun((d) => {
+      for (const r of [rows[1], rows[2], rows[0]]) {
+        writeFileSync(path.join(d, `${r.id}.row.json`), JSON.stringify(r));
+      }
+    });
+    try {
+      assert.equal(bench.renderTable(bench.rowsFromDir(dir, ORDER)), bench.renderTable(rows));
+      const table = bench.renderTable(bench.rowsFromDir(dir, ORDER));
+      assert.equal(table.split('\n').length, 5, 'header, rule, three rows');
+      assert.ok(table.includes('alpha') && table.includes('bravo') && table.includes('charlie'));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
 
@@ -339,6 +467,21 @@ describe('story-bench reading packet front matter', () => {
     for (const q of bench.RUBRIC) assert.ok(fm.includes(q), `rubric question missing: ${q}`);
     assert.match(fm, /Q1 {2}Q2 {2}Q3 {2}Q4 {2}Q5/);
     assert.match(fm, /alpha\s+__ {2}__ {2}__ {2}__ {2}__/, 'the grid must be blank, not pre-filled');
+  });
+
+  it('heads each script with the COMMITTED scene count, not the doctor\'s', () => {
+    // The packet is the one artefact a human scores from, and it printed the
+    // doctor's sceneCount as "N scenes" under the same name the results table
+    // gives committed/requested. For the-understudy-clause that was 5 against 3
+    // committed, the extra two typed by a revision pass.
+    assert.equal(
+      bench.scenesLabel({ scenes: 5, committedScenes: 3, requestedScenes: 8 }),
+      '3 of 8 scenes committed',
+    );
+    // A row from before the columns existed still renders something true.
+    assert.equal(bench.scenesLabel({ scenes: 4 }), '4 of 4 scenes committed');
+    assert.match(fm, /TWO SCENE COUNTS, AND WHICH ONE IS AUTHORITATIVE/);
+    assert.match(fm, /the committed count is the truth about the run/);
   });
 
   it('says what the health number cannot see, and what this packet is the seed of', () => {

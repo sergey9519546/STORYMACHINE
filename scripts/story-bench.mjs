@@ -53,7 +53,7 @@
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import { fetch as undiciFetch, Agent } from 'undici';
-import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -283,18 +283,55 @@ function allocateRunDir(argv) {
   return nextRunDir(root, runDirName(), (f) => existsSync(f), explicit);
 }
 
-/** Every run directory under data/story-bench, oldest first. */
-export function listRunDirs(names) {
-  return names
-    .filter((d) => /^\d{4}-\d{2}-\d{2}(-run\d+)?$/.test(d))
-    .sort((a, b) => {
-      const key = (d) => {
-        const m = /^(\d{4}-\d{2}-\d{2})(?:-run(\d+))?$/.exec(d);
-        return [m[1], Number(m[2] ?? 1)];
-      };
-      const [da, na] = key(a); const [db, nb] = key(b);
-      return da === db ? na - nb : (da < db ? -1 : 1);
-    });
+const DATED_RUN = /^(\d{4}-\d{2}-\d{2})(?:-run(\d+))?$/;
+
+/** [date, runNumber] for a dated run directory, or null for any other name. */
+function datedKey(name) {
+  const m = DATED_RUN.exec(name);
+  return m ? [m[1], Number(m[2] ?? 1)] : null;
+}
+
+/**
+ * Every run directory under data/story-bench, oldest first.
+ *
+ * WITHOUT `stamp` this is the original name-only behaviour: dated directories
+ * (`<date>`, `<date>-runN`) ordered by date and run number, everything else
+ * ignored.
+ *
+ * WITH `stamp` — a function from directory name to the mtime of its
+ * summary.json, or null when it has none — it also sees the directories
+ * `--out <name>` and `--into <name>` write, which `--packet` could not find at
+ * all: it filtered on the dated pattern, so a run written to `--out seam-fix`
+ * was invisible and `--packet` silently assembled a packet from an OLDER dated
+ * directory while printing "the newest run directory of N". A directory with no
+ * summary.json is not a finished run and is dropped, which also stops `--packet`
+ * from picking a crashed run's directory and throwing on the missing file.
+ * Ordering is by that timestamp — the honest "newest" for a set that mixes
+ * dated and named directories — with the dated key as the tie-break.
+ */
+export function listRunDirs(names, stamp = null) {
+  if (!stamp) {
+    return names
+      .filter((d) => datedKey(d) !== null)
+      .sort((a, b) => {
+        const [da, na] = datedKey(a); const [db, nb] = datedKey(b);
+        return da === db ? na - nb : (da < db ? -1 : 1);
+      });
+  }
+  const runs = [];
+  for (const d of names) {
+    const t = stamp(d);
+    if (t === null || t === undefined) continue;
+    runs.push({ d, t, k: datedKey(d) });
+  }
+  runs.sort((a, b) => {
+    if (a.t !== b.t) return a.t - b.t;
+    if (a.k && b.k) return a.k[0] === b.k[0] ? a.k[1] - b.k[1] : (a.k[0] < b.k[0] ? -1 : 1);
+    if (a.k) return -1;
+    if (b.k) return 1;
+    return a.d < b.d ? -1 : (a.d > b.d ? 1 : 0);
+  });
+  return runs.map((r) => r.d);
 }
 
 /** Fixed-width table renderer — the one artefact the lane report quotes. */
@@ -412,8 +449,9 @@ async function bootServerWithKey({ port, logSink }) {
 // below — it fires independently and it fired here. POST /api/nvm/revise sends
 // no headers until all fourteen sequential LLM passes have finished, so a
 // revision that legitimately takes longer than five minutes was aborted
-// client-side with a bare `fetch failed`. Measured: two premises of the
-// 2026-09-13-run2 run lost their ENTIRE revision step to it at 301 s, and the
+// client-side with a bare `fetch failed`. Measured: THREE premises of the
+// 2026-09-13-run2 run — counterweight, nine-minutes-of-tape and
+// the-long-way-round — lost their ENTIRE revision step to it at 301 s, and the
 // bench recorded them as `revise failed — fetch failed` with no clue that the
 // deadline was its own. Both timeouts are disabled for the bench's own calls;
 // the AbortSignal remains the single real deadline, at a value the bench chose.
@@ -899,6 +937,18 @@ export const RUBRIC = [
 ];
 
 /**
+ * The scene count the packet and the table agree on: scenes the pipeline
+ * COMMITTED, over the scenes the premise asked for. It is the authoritative one
+ * because it is what the run produced; the doctor's `sceneCount` is a count of
+ * headings in the compiled document and can exceed it.
+ */
+export function scenesLabel(row) {
+  const committed = row.committedScenes ?? row.scenes;
+  const requested = row.requestedScenes ?? row.scenes;
+  return `${committed} of ${requested} scenes committed`;
+}
+
+/**
  * The packet's front matter, as Fountain. Deliberately says what this is FOR:
  * Decision #3 names a ~30-case human-scored golden set, with a rubric and >=2
  * scorers, as the condition for promoting generation out of Labs. Six scored
@@ -923,6 +973,16 @@ export function packetFrontMatter(rows, runDate) {
   ];
   RUBRIC.forEach((q, i) => lines.push(`  ${i + 1}. ${q}`));
   lines.push(
+    '',
+    'TWO SCENE COUNTS, AND WHICH ONE IS AUTHORITATIVE',
+    '',
+    'Each script is headed "N of M scenes committed". That is the run\'s own',
+    'number - scenes the pipeline committed, over the scenes the premise asked',
+    'for - and it is the number the results table uses. The doctor\'s sceneCount',
+    'is printed beside the health score because health is computed from it, and',
+    'it can be LARGER: it counts scene headings in the finished document,',
+    'including any a revision pass typed itself with no committed scene behind',
+    'it. Where the two disagree, the committed count is the truth about the run.',
     '',
     'WHY YOUR SCORES MATTER MORE THAN THE HEALTH NUMBERS',
     '',
@@ -952,16 +1012,40 @@ export function packetFrontMatter(rows, runDate) {
   return lines.join('\n');
 }
 
-async function runPacket() {
+/** The mtime of a directory's summary.json, or null when it has none. */
+function summaryStamp(root, name) {
+  try { return statSync(path.join(root, name, 'summary.json')).mtimeMs; } catch { return null; }
+}
+
+async function runPacket(argv) {
   const root = path.join(REPO, 'data', 'story-bench');
   if (!existsSync(root)) throw new Error('no data/story-bench — run `npm run story:bench` first');
-  const dirs = listRunDirs(readdirSync(root));
-  if (dirs.length === 0) throw new Error('no dated run directory under data/story-bench');
-  const runName = dirs[dirs.length - 1];
-  const runDate = runName.slice(0, 10);
+  // `--packet` takes the SAME directory arguments a run does, so a run written
+  // to `--out seam-fix` or `--into <dir>` can be read back. Without this the
+  // only way to reach one was to rename it to a dated name.
+  const named = ['--run', '--out', '--into']
+    .map((flag) => (argv.includes(flag) ? argv[argv.indexOf(flag) + 1] : null))
+    .find((v) => v) ?? null;
+  const dirs = listRunDirs(readdirSync(root), (d) => summaryStamp(root, d));
+  let runName;
+  if (named) {
+    if (summaryStamp(root, named) === null) {
+      throw new Error(`no summary.json under data/story-bench/${named} — that run did not finish`);
+    }
+    runName = named;
+    console.log(`[story-bench] packet from ${runName} (named explicitly)`);
+  } else {
+    if (dirs.length === 0) throw new Error('no finished run directory under data/story-bench');
+    runName = dirs[dirs.length - 1];
+    console.log(`[story-bench] packet from ${runName} (the newest finished run of ${dirs.length})`);
+  }
   const outDir = path.join(root, runName);
-  console.log(`[story-bench] packet from ${runName} (the newest run directory of ${dirs.length})`);
   const summary = JSON.parse(readFileSync(path.join(outDir, 'summary.json'), 'utf8'));
+  // A `--out`/`--into` directory carries no date in its name; the run's own
+  // `ranAt` does, and is the authority either way.
+  const runDate = DATED_RUN.test(runName)
+    ? runName.slice(0, 10)
+    : String(summary.ranAt ?? '').slice(0, 10) || runDirName();
 
   const parts = [packetFrontMatter(summary.rows, runDate)];
   for (const row of summary.rows) {
@@ -972,7 +1056,16 @@ async function runPacket() {
       [
         `.${row.title}`,
         '',
-        `[[ ${row.shape} · ${row.scenes} scenes · ${row.words} words · structural health ${row.health ?? '—'} (${row.verdict ?? 'no verdict'}) · run status ${row.status} ]]`,
+        // ONE NUMBER, ONE NAME. This line used to print the DOCTOR's
+        // sceneCount as "N scenes" while the table's `scenes` column printed
+        // committed/requested — two surfaces calling two different quantities by
+        // the same name, and the packet, the one artefact a human scores from,
+        // showed the larger one. The doctor counts headings in the compiled
+        // document, which includes any a revision pass typed itself: for
+        // the-understudy-clause that is 5 where 3 scenes were committed. The
+        // committed count is the authoritative one and says so; the doctor's is
+        // still shown, because health and verdict are computed from it.
+        `[[ ${row.shape} · ${scenesLabel(row)} · ${row.words} words · structural health ${row.health ?? '—'} (${row.verdict ?? 'no verdict'}), scored on the doctor's sceneCount ${row.scenes} · run status ${row.status} ]]`,
         '',
         body.trim(),
         '',
@@ -1007,7 +1100,7 @@ async function runPacket() {
 async function main() {
   const argv = process.argv.slice(2);
   if (argv.includes('--check')) { process.exit(await runCheck()); }
-  if (argv.includes('--packet')) { process.exit(await runPacket()); }
+  if (argv.includes('--packet')) { process.exit(await runPacket(argv)); }
   process.exit(await runBench(argv));
 }
 
