@@ -1382,3 +1382,402 @@ actually firing, and `release.yml`'s `publish` job are all untested. GHCR
 authentication is the one part already proved on the real runner (run
 34794216577, steps 1-5 concluded success). The first green push to `main`
 after the merge is the test.
+
+---
+
+# Round-3 re-check — independent reviewer, final
+
+**Tip reviewed: `61bfde81f87b80b2499217ebc64aed551fe763a7`**, rebased onto
+`origin/main` (`76ecacb3`, which is an ancestor). Fresh worktree
+`<session scratch>/wt-edge-r3`, `npm ci` from clean. Same reviewer as
+rounds 1 and 2.
+
+## Verdict: MERGE
+
+All five round-3 items are **CLOSED**. I re-ran the five myself and then spent
+the rest of the review trying to break the new code — **49 measured inputs
+across the round-3 parsers, and I could not find a single green-on-broken
+case.** The two directions the orchestrator was most worried about, the `#`
+fix being over-applied and the unique-key rule being over-applied, are both
+correct on every probe I could construct.
+
+Nothing from rounds 1 or 2 was re-opened, the rebase changed no lane code, and
+the full-suite delta accounts exactly with no residue.
+
+### Integrity of the earlier sections — verified against the pre-rebase objects
+
+The rebase rewrote every SHA, so I checked against the original blob rather
+than the rebased one. My round-2 re-check commit `731afe60` is still
+reachable locally:
+
+```
+head -1148 <731afe60 blob>   sha256 70b45a85fa1a85d63d6c73adbda0fb54d659c8a00dbcc1d71d603a9116ecb6cb
+head -1148 <61bfde81 file>   sha256 70b45a85fa1a85d63d6c73adbda0fb54d659c8a00dbcc1d71d603a9116ecb6cb
+diff <my entire 1148-line file> <first 1148 lines of the current file>  ->  identical
+git diff --numstat a3b6efd7..HEAD -- review.md  ->  236  0
+```
+
+**My round-1 review, the implementer's round-2 closure and my round-2 re-check
+are byte-identical and form an unedited prefix.** 236 added, 0 deleted.
+
+---
+
+## The five items
+
+| # | item | status | my result |
+|---|---|---|---|
+| R2-1 | `splitShellSteps` ignored an unquoted `#` | **CLOSED** | 24/25 RED |
+| R2-2 | no backslash-escape handling (two sites) | **CLOSED** | 24/25 RED |
+| R2-3a | second top-level `on:` with no `branches` | **CLOSED** | 51/52 RED |
+| R2-3b | second `if: always()` after the real one | **CLOSED** | 51/52 RED |
+| R2-3c | duplicate `publish-edge:` job key | **CLOSED** | 51/52 RED |
+| R2-4 | multi-document docstring claim | **CLOSED** | claim now split, and correct |
+| R2-5 | omitted gate rows + the `checkout --` incident | **CLOSED** | ruling below |
+
+Every number matches the lane's table exactly. Baseline on the clean tip:
+**dockerfile-toolchain 25/25, ci-gates-intact 52/52**, `npm run lint` exit 0.
+
+### Effective configuration of the three YAML defeats, re-read on the round-3 tree
+
+Each mutation applied alone to the real `edge.yml` and parsed with a real YAML
+implementation, so "the workflow cannot work" is measured on *this* tree:
+
+```
+R2-3a  effective on.workflow_run = {'workflows': ['CI'], 'types': ['completed']}
+       -> no branches filter: the 467-skipped-runs defect, restored
+R2-3b  effective jobs.publish-edge.if = 'always()'
+       -> publishes on EVERY workflow_run completion, holding `packages: write`
+R2-3c  effective jobs.publish-edge.if = <<ABSENT>>
+       -> same
+```
+
+All three are now RED. I also invented two duplicate shapes the lane did not
+pin, and both are caught:
+
+```
+duplicate top-level `jobs:`      -> effective jobs = ['other']  (publish-edge gone)   51/52 RED
+duplicate `branches:` in workflow_run -> effective branches = ['develop']             51/52 RED
+```
+
+---
+
+## Attacking the round-3 code
+
+### 1. The `#` fix — twelve probes, correct in both directions
+
+Shell semantics confirmed in the **shipped base image** first, not taken from
+the specification:
+
+```
+$ docker run --rm node:22-alpine sh -c 'echo one #&& echo two'   -> one
+$ docker run --rm node:22-alpine sh -c 'echo a#b'                -> a#b
+$ docker run --rm node:22-alpine sh -c 'echo "a # b"'            -> a # b
+$ docker run --rm node:22-alpine sh -c 'echo \#literal'          -> #literal
+```
+
+**Over-application — Dockerfiles that BUILD, all GREEN (25/25):**
+
+| probe | result |
+|---|---|
+| `&& echo "a # b"` (`#` inside double quotes) | GREEN ✓ |
+| `&& echo 'a # b'` (inside single quotes) | GREEN ✓ |
+| `RUN echo a#b && apk add …` (`#` mid-word) | GREEN ✓ |
+| `apk add --no-cache --virtual .build-deps#1 python3 make g++` | GREEN ✓ |
+| `&& wget -q https://x.example/a#frag` (URL fragment) | GREEN ✓ |
+| `&& echo \#literal` (backslash-escaped `#`) | GREEN ✓ |
+| heredoc whose body carries a `#` comment **line** | GREEN ✓ |
+| a second `RUN` ending in a trailing `# comment` | GREEN ✓ |
+| `apk add … #` (bare trailing `#`) | GREEN ✓ |
+| `apk add … && npm ci --dry-run # note` | GREEN ✓ |
+| `apk add … \|\| apk add …` | GREEN ✓ |
+| `printf "%s\n" "#" && apk add …` | GREEN ✓ |
+
+**Under-application — Dockerfiles that CANNOT build, all RED (24/25):**
+
+| probe | result |
+|---|---|
+| `apk add curl # && apk add …` (space after `#`) | RED ✓ |
+| `RUN #apk add …` (`#` at the very start) | RED ✓ |
+| `apk add curl;#apk add …` (after `;`) | RED ✓ |
+| `apk add curl && #apk add …` (right after `&&`) | RED ✓ |
+| heredoc **body line** `apk add curl #&& apk add …` | RED ✓ |
+| continuation, then `#&& apk add …` on the next line | RED ✓ |
+| `echo $(true && apk add …)` (command substitution) | RED ✓ |
+
+The heredoc pair is the one that vindicates the design choice: skipping to the
+next **newline** rather than the end of the body makes a `#` comment *line*
+inside a heredoc harmless (GREEN) while a `#`-hidden tail on a heredoc *line*
+is still caught (RED). Had it skipped the whole body, the first case would
+have false-positived.
+
+### 2. The backslash fix — the single-quote exception is real
+
+Verified in the base image rather than asserted, which is the half that
+matters because the exception is what makes the fix correct rather than merely
+stricter:
+
+```
+$ docker run --rm node:22-alpine sh -c "echo 'x \' && echo REACHED"
+x \
+REACHED                       <- backslash IS literal in single quotes; the && is a real operator
+
+$ docker run --rm node:22-alpine sh -c 'echo "x \" && echo NOT_REACHED"'
+x " && echo NOT_REACHED       <- one argument; NOT_REACHED never runs
+```
+
+| probe | result |
+|---|---|
+| `echo 'x \' && apk add …` — really installs | **GREEN** ✓ (the exception is honoured) |
+| `echo "a \" # apk add …"` — escaped quote, then `#` inside the still-open string | **RED** ✓ (the two fixes compose) |
+| continuation, then a comment line naming the packages | **RED** ✓ |
+| `apk add … && echo "ok \\"` (escaped backslash) | **GREEN** ✓ |
+
+The second row is the interaction case: an over-eager `#` rule would have to
+see inside the open double quote to fire, and it does not.
+
+### 3. The duplicate-key fix — held hardest, correct in both directions
+
+**Legitimate shapes, all GREEN (52/52):**
+
+| probe | result |
+|---|---|
+| a step-level `if:` added while the job `if:` stays (same key, different level) | GREEN ✓ |
+| `branches-ignore:` beside `branches:` (prefix-named sibling key) | GREEN ✓ |
+| `if: always()` twice inside a `run: \|` block scalar | GREEN ✓ |
+| `on:` twice in comment lines | GREEN ✓ |
+
+**Broken shapes, all RED (51/52):** the three fixtures plus my two extras
+above. I also confirmed the rule is applied at **both** sites — `yamlBlock`
+for every intermediate key (`:227`) and `yamlScalar` for the final key
+(`:274`) — which is what makes a duplicate *leaf* key like a second `if:` or a
+second `branches:` fail closed rather than resolving to the first.
+
+I could not construct a green-on-broken case anywhere in the round-3 parsers:
+**5 items + 12 `#` probes + 4 backslash probes + 6 unique-key probes + 8
+further shell probes + 14 kept-working cases = 49 measured inputs, 0 false
+greens, 0 false positives on anything that builds.** The only conservative
+REDs are the ones already recorded as known scope — a subshell
+`( apk add … )`, `sh -c "apk add …"`, `if …; then apk add …; fi` and
+`python3-dev` — all fail closed, all documented.
+
+### Kept-working set — fourteen cases on the round-3 code, no regression
+
+| case | round 3 | want |
+|---|---|---|
+| `Dockerfile:55` deleted | 24/25 RED | ✓ |
+| `Dockerfile:55` commented out | 24/25 RED | ✓ |
+| `apk add` in a different stage | 24/25 RED | ✓ |
+| `apk add` after `npm ci`, separate `RUN` | 24/25 RED | ✓ |
+| split across two `RUN apk add` lines | 25/25 GREEN | ✓ |
+| backslash-continued `apk add` | 25/25 GREEN | ✓ |
+| deleted + trailing `devtools` stage | 23/25 RED | ✓ |
+| comment inside a continuation | 24/25 RED | ✓ |
+| libc split (runner → `node:22-bookworm`) | 24/25 RED | ✓ |
+| live `branches: [main]` deleted | 51/52 RED | ✓ |
+| live `branches: [main]` commented out | 51/52 RED | ✓ |
+| `if:` deleted, conditions echoed in a scalar | 51/52 RED | ✓ |
+| `branches` deleted, echoed in a block scalar | 51/52 RED | ✓ |
+| one condition removed from the job `if:` | 51/52 RED | ✓ |
+
+---
+
+## Ruling on R2-5's placement (the §7 judgement call)
+
+**It satisfies §7, and the choice made was the better of the two available.**
+
+`docs/LANE_STANDARD.md` §7 is titled *"Nothing durable lives only in the
+sandbox"* and its requirement is that the record live **in the repository**,
+not in any particular section — §7.2 asks a reviewer to write its review "INTO
+the repository", §7.4 asks the orchestrator to draft in the repository rather
+than in scratch. Both facts I asked for — the full round-2 gate set and the
+`git checkout --` incident — are now committed, in the same file, under an
+explicit `R2-5` heading that names my item. That is the durability §7 exists
+for.
+
+The alternative would have required editing a section the orchestrator froze
+and that I had already reviewed and signed off, which would have left my
+round-2 re-check citing text that no longer existed. The implementer **flagged
+the deviation rather than making it silently**, which is exactly the standard
+§5 sets. One residual imperfection is unresolvable without breaking the other
+constraint: a reader who stops at the round-2 closure still sees its truncated
+gate table with no forward pointer. Not worth a round; note it if these
+sections are ever consolidated.
+
+I also read the incident account itself and find it candid and useful: it names
+the mechanism (`git checkout -- <file>` used as a mutation-revert, reaching an
+uncommitted edit the mutation never touched), how it was caught (grepping the
+committed file for the new headings before reporting), and the practice change
+(`cp` from an explicit backup). That is a better record than the two lines I
+asked for.
+
+---
+
+## The rebase changed no lane code
+
+Compared the lane's own patch across the rebase, excluding only the two
+regenerated brain-graph files:
+
+```
+git diff be2341ac..731afe60  -- . ':(exclude)docs/brain/GRAPH.md' ':(exclude)docs/brain/brain.graph.json'   3116 lines
+git diff 76ecacb3..a3b6efd7  -- . ':(exclude)docs/brain/GRAPH.md' ':(exclude)docs/brain/brain.graph.json'   3116 lines
+diff  ->  identical
+```
+
+**Byte-identical.** The rebase moved the base and nothing else.
+
+Brain resolution confirmed as described:
+
+- **zero conflict markers** anywhere in `docs/brain/`, `.github/`, `tests/`,
+  `Dockerfile` or the audit directory;
+- `npm run check-brain` → **`brain-graph --check: OK. 121 notes, 481 links,
+  graph is fresh.`** — which *is* the "was it regenerated rather than
+  hand-merged" test, since a hand-merged graph would not be fresh;
+- `tests/core/brain-coverage.test.ts` → **7 tests, 7 pass, 0 fail**;
+- `brain.graph.json` parses as JSON.
+
+Post-rebase, `git diff --stat origin/main..HEAD` is **nine files, all this
+lane's**, with 22 deletions: 13 comment lines in `edge.yml` (the obsolete
+"THIS CANNOT BE PROVEN BY A REAL RUN RIGHT NOW" block and a superseded
+three-line comment, both replaced in round 1) and 9 in the regenerated
+`GRAPH.md`. **Zero deletions in any test or source file.** The story-bench
+noise that made the pre-rebase diffstat look alarming is gone, as predicted.
+
+---
+
+## The full-suite delta, checked arithmetically
+
+| | tests | pass |
+|---|---|---|
+| my round-2 measurement (un-rebased `7ade7aca`) | 14,072 → **14,084** | 13,980 → **13,992** |
+| **my round-3 measurement (rebased `61bfde81`)** | **14,166** | **14,074** |
+
+**+82, fully accounted, no residue.** I counted the three story-bench files
+myself rather than accepting the itemisation:
+
+```
+tests/core/llm-generator-schema.test.ts               17 tests
+tests/core/openai-compat-generation-guards.test.ts    22 tests
+tests/scripts/story-bench.test.ts                     38 tests
+                                                      -- 
+                                                      77
+```
+
+All three are **ABSENT** at the pre-rebase lane tip (`git cat-file -e
+731afe60:<path>` fails for each), so they are main's, not the lane's. The only
+other addition anywhere under `tests/` between the two tips is
+`tests/fixtures/story-bench-premises.json`, a fixture that contributes zero
+tests, and **no test file was removed**. This lane's own contribution is
+21→25 and 51→52 = **+5**.
+
+**14,084 + 5 + 77 = 14,166.** Exact.
+
+---
+
+## Gates I ran on `61bfde81`
+
+| gate | result |
+|---|---|
+| `npm run lint` | exit 0 |
+| `npm run build` | exit 0 |
+| `tests/core/dockerfile-toolchain.test.ts` | **25 tests, 25 pass, 0 fail** |
+| `tests/core/ci-gates-intact.test.ts` | **52 tests, 52 pass, 0 fail** |
+| **`npm test` (once, rebased tree)** | **14,166 · 14,074 pass · 0 fail · 91 skipped · 1 todo · 359.0 s, exit 0** |
+| `tests/core/brain-coverage.test.ts` | **7 / 7** |
+| `npm run check-brain` | exit 0 — *OK. 121 notes, 481 links, graph is fresh* |
+| `check-docs` / `honesty-audit` / `check-no-console` / `check-server-reachability` | exit 0 each |
+| `node scripts/check-scoring-receipt.mjs origin/main..HEAD` | exit 0, "no scoring-path files changed" |
+| `git diff origin/main --numstat -- tests/core/ci-gates-intact.test.ts` | **419 added, 0 deleted** |
+| `git diff origin/main --numstat -- tests/core/dockerfile-toolchain.test.ts` | **973 added, 0 deleted** |
+| `console.*` added under `server/**` | none (no `server/**` change) |
+| key material in the diff | none |
+
+## Merge mechanics
+
+`origin/main` (`76ecacb3`) **is an ancestor of `61bfde81`**, so this lane is a
+clean `--ff-only` merge with **no conflict at all** — the brain-graph hazard I
+named in rounds 1 and 2 was consumed by the rebase.
+
+`lane/ci-docs-fast-path`, if merged after this, still conflicts on
+`docs/brain/GRAPH.md` and `brain.graph.json` and nothing else; resolve by
+regeneration, never by hand. That lane now also edits
+`tests/core/ci-gates-intact.test.ts`, and it **auto-merges cleanly** — I ran
+the git-merged combined file against the combined workflows: **58 tests, 58
+pass, 0 fail**. The two lanes are functionally compatible.
+
+---
+
+## For the merge record: what remains unproven until the first green push to main
+
+Carried forward verbatim, unchanged across three rounds because no round could
+change it. **`ghcr.io/<owner>/storymachine:edge` has never been published.**
+
+**Proved, and it transfers:**
+
+1. The defect and its fix. The unfixed `Dockerfile` reproduces run
+   34794216577's `gyp ERR! find Python … Could not find any Python installation
+   to use` byte-for-byte on a real `node:22-alpine` container; `python3` alone
+   then fails on `not found: make`; `python3 make` builds with exit 0, compiles
+   nothing, and resolves `prebuilds/linuxmusl-x64.node` at runtime. `g++` is
+   unused headroom, labelled as such at the site.
+2. The image builds and runs. Full multi-stage build exit 0, 1.5 GB; the
+   container serves `/health` 200, `/ready` 503→200, HEALTHCHECK `healthy`,
+   SPA `GET /` 200, and writes a real WAL-mode SQLite database as uid 1000.
+   The build toolchain does not ship. The runner stage I exercised is
+   sha256-identical to the shipped one.
+3. **GHCR authentication already works on the real runner** — in run
+   34794216577 the steps `Run actions/checkout@v4`, `Log in to GitHub
+   Container Registry`, `Set up Docker Buildx` and `Compute lowercase image
+   name` all concluded **success**; only step 6 `Build and push :edge` failed.
+
+**Not proved, and it does not transfer:**
+
+1. **The build on GitHub's network.** Every container build in this review
+   reached `dl-cdn.alpinelinux.org` and `registry.npmjs.org` through this
+   session's MITM proxy, using a CA-injecting overlay whose `runner` stage is
+   byte-identical to the shipped one. The CI path is strictly simpler, but
+   "apk resolves python3/make/g++ on a GitHub runner" is inferred, not
+   observed.
+2. **The push.** No `docker push` to `ghcr.io` has ever succeeded from this
+   repository. The `packages: write` grant, the lowercased image name, the
+   three OCI labels and the `:edge` tag itself are all unexercised. A
+   package-visibility or organisation-policy refusal would surface here and
+   nowhere earlier.
+3. **The new trigger filter firing.** `branches: [main]` has never executed.
+   Its semantics are confirmed by GitHub's documentation and by the
+   head_branch correlation (CI 34793742299 on `main` → edge 468 executed; CI
+   34794578018 on `lane/story-bench` → edge 471 skipped, both runs reporting
+   `main`), and the YAML nests it correctly, but the first real evidence is the
+   **absence** of skipped Edge runs after the next lane push and the presence
+   of **exactly one** Edge run after the next green push to main.
+4. **The end-to-end claim "a green push to main publishes `:edge`."** Untested
+   as a single path. The first green push to `main` after this merge is the
+   test; watch that one run rather than assuming it.
+5. **`release.yml`'s `publish` job.** It builds the same `Dockerfile` and was
+   broken for the same reason. This fix repairs it by construction, but no
+   tagged release has been cut to prove it.
+
+None of this is a reason to withhold the merge. It is the honest boundary of
+what three rounds and a sandbox can show, and the lane has said so itself at
+every round.
+
+## Follow-ups, recorded — none blocking
+
+- **Build cache on `edge.yml`** (`cache-from: type=gha` / `cache-to:
+  type=gha,mode=max`) plus moving `Dockerfile`'s runner-stage `ARG`/`ENV`
+  after the `chown`. Measured: `.dockerignore` keeps every markdown file out
+  of the build context, so a docs-only push rebuilds byte-identically —
+  19/19 layers cached, 0.744 s, identical RootFS layers. Pre-existing, owned
+  by neither lane, and the cost only materialises now that the image builds.
+- **Item 8**, the fourth inline comment-stripper: stays partially closed, to be
+  folded into whatever next edits `ci-gates-intact.test.ts` for its own
+  reasons.
+- **Known scope in these guards**, all recorded and all failing closed: `if:`
+  expressions read for presence rather than meaning; workflow-level
+  `permissions` hoisting unguarded; conservative RED on `python3-dev`,
+  `sh -c "apk add …"`, `if …; then apk add …; fi` and a subshell
+  `( apk add … )`; and `yamlBlock` reading only the first YAML document
+  (unreachable — Actions rejects multi-document workflow files).
+- **Image size**: 1.5 GB from shipping devDependencies so the runner can
+  `npx tsx server.ts`. An existing documented tradeoff, correctly left alone.
+
+**MERGE.**
