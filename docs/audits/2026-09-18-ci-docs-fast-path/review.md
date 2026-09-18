@@ -1039,11 +1039,36 @@ cadence.
 and ran FULL, because each cancelled the previous run and left no green tip to
 chain from — the fix doing its job, not a failure. Run **35300910883**
 (`3de20d66`) then completed **success**, so the push carrying THIS paragraph
-lands on a completed-green predecessor: the validated base is `before`, the
-range does not widen, and the classification is the ordinary docs-only one.
-Its run id and timings are in the lane's round-2 report. The first fast-path
-run on the old classifier, cited in full above, is 35296219834 (1 m 19 s
-against a 9 m 03 s baseline).
+lands on a completed-green predecessor. **Run 35301550263** (`799ae27e`),
+job 105465050999:
+
+```
+  DOCS_ONLY_BEFORE_SHA: 3de20d6603485fad93176d0c6c2d7a9c34817c42
+  DOCS_ONLY_FORCED: false
+docs-only classification: DOCS-ONLY (validated range
+  3de20d6603485fad93176d0c6c2d7a9c34817c42..799ae27e278f590a0d57257d66ea7d1c4af4a8ae)
+changed files (2):
+```
+
+No "widened" clause: the validated base IS `before`, so the range is exactly
+the push range and the fast path costs nothing in the common case, as the
+fixture asserts. The run:
+
+| | |
+|---|---|
+| run | 03:00:35 -> 03:02:45 = **2 m 10 s**, conclusion `success` |
+| `classify` | 03:00:37 -> 03:00:49 (12 s) — the API query included |
+| `test` | 03:01:27 -> 03:02:44 (1 m 17 s) |
+| `browser` | **skipped**, job level, 03:00:49 |
+| skipped steps | Type check, no-console, reachability, `npm test`, receipt guard, metamorphic, Build |
+| "Run docs-gating tests" | 03:01:48 -> 03:02:32 = **44 s** for all 17 files |
+
+Against the 9 m 03 s baseline (run 34793742299): **6 m 53 s saved**, with the
+validated base, `--no-renames`, the `actions: read` grant and all seventeen
+docs suites live. The earlier 1 m 19 s figure (run 35296219834) was the same
+path on the round-1 classifier and thirteen files; the extra ~50 s is four
+more suites plus the API query, and it is the honest price of the two
+blockers being closed.
 
 See "A property of the validated base" in this lane's README for the
 consequence stated generally: the saving lands on a docs-only push that sits

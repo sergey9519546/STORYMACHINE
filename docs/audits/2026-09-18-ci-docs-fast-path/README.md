@@ -646,6 +646,25 @@ docs-only push to `main`, 00:46:28 -> 00:55:31 = **9 m 03 s** — that is
 **7 m 44 s saved on one push**, at a cost of ~10 s and one runner slot on
 every full run.
 
+**And on the NEW classifier** (validated base, `actions: read`,
+`--no-renames`, seventeen docs suites): run **35301550263** (`799ae27e`),
+03:00:35 -> 03:02:45 = **2 m 10 s**, conclusion `success`. `classify` 12 s
+with the runs-API query included; `browser` skipped at job level; the same
+seven gate steps skipped; "Run docs-gating tests" 03:01:48 -> 03:02:32 =
+**44 s** for all seventeen files. Its classify log carries no "widened"
+clause —
+
+```
+docs-only classification: DOCS-ONLY (validated range
+  3de20d6603485fad93176d0c6c2d7a9c34817c42..799ae27e278f590a0d57257d66ea7d1c4af4a8ae)
+changed files (2):
+```
+
+— because the validated base WAS `before`, which is the common case the
+design promises costs nothing. The ~50 s against the round-1 figure is four
+more docs suites plus the API query: the price of blockers 1 and 2 being
+closed, and still **6 m 53 s** under the baseline.
+
 ## Cross-lane finding: `edge.yml` rebuilds a byte-identical image on every docs-only push to main
 
 **This is not hypothetical and it is not "once Actions is unblocked". It has
