@@ -28,6 +28,14 @@ npm run dev     # start dev server with hot reload
 Do not use `npm install` in CI-bound contexts — it can rewrite
 `package-lock.json`; `npm ci` is the reproducible install.
 
+**Windows without Visual Studio:** `npm ci` fails at `better-sqlite3`, whose
+`binding.gyp` makes npm run an implicit `node-gyp rebuild`; node-gyp looks for
+Visual Studio before it can see that the package bundles
+`prebuilds/win32-x64.node` and nothing needs compiling. Install with
+`npm ci --ignore-scripts`, then run `npm run setup-hooks` under Git Bash (e.g.
+`npm_config_script_shell="C:\Program Files\Git\bin\bash.exe"`), which is what
+the skipped `prepare` script does. The bundled binary loads at runtime.
+
 ## npm scripts (the ones that matter)
 
 | Script | What it does |
