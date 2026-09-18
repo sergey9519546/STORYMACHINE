@@ -64,11 +64,28 @@ jobs:
   # needs to skip at the JOB level (no checkout, no `npm ci`, no Chromium
   # download — the ~5-minute cost this exists to remove lives in that
   # provisioning, not only in the battery step), and a step cannot gate its
-  # own job's `if:`. `test` and `browser` both `needs: classify`, which adds
-  # a few seconds of serialization (a git diff over an already-fetched
-  # checkout, not a browser download) — not the minutes the `browser` job's
-  # own comment below explains it stays a separate job to avoid adding to
-  # `test`'s path.
+  # own job's `if:`. `test` and `browser` both `needs: classify`.
+  #
+  # WHAT THAT SERIALIZATION COSTS, measured rather than waved at (round-2
+  # review item 8, which found the original "a few seconds" unquantified).
+  # Run 35294788628 (a FULL run on this lane): the `classify` job occupied
+  # 01:18:33 -> 01:18:41, EIGHT seconds, and `test`/`browser` were not created
+  # until 01:18:43 — about 10 s of added wall time, plus one extra runner
+  # slot, on EVERY full run, which is the majority of runs. Against the
+  # docs-only saving it is still a large net win — run 35296219834, the first
+  # real fast-path run on this branch, took 01:39:37 -> 01:40:56, 1 m 19 s in
+  # total, against the 9 m 03 s a docs-only push cost before this lane
+  # (run 34793742299 on main) — but it is a real cost and it is stated here
+  # rather than discovered later.
+  #
+  # RANGE, and why it is not `github.event.before` (round-2 review item 5).
+  # `cancel-in-progress` above cancels a lane branch's in-flight run on the
+  # next push. A push carrying a `server/**` change whose run is cancelled by
+  # a following docs-only push would, chaining from `before`, leave the branch
+  # with one completed GREEN run over code nothing ever tested. The classifier
+  # therefore diffs from `merge-base(<tip of the last SUCCESSFUL run of this
+  # workflow on this ref>, before)` — see scripts/lib/validated-base.mjs. In
+  # the ordinary case that tip IS `before` and the range is unchanged.
   #
   # THIS JOB NEVER SKIPS ANYTHING ITSELF. It only ever adds information; every
   # check that gates a docs change today (honesty-audit, check-docs,
@@ -79,13 +96,28 @@ jobs:
   # whole browser battery) are skipped, and only when this job says so.
   classify:
     runs-on: ubuntu-latest
+    # Narrowest grant that lets the classifier ask which run of THIS workflow,
+    # on THIS ref, last COMPLETED SUCCESSFULLY — the only commit it is willing
+    # to treat as already validated (round-2 review item 5; the full argument
+    # is in scripts/lib/validated-base.mjs's header). `actions: read` is
+    # read-only over workflow-run metadata and is scoped to this job alone, so
+    # the `test` and `browser` jobs below keep the workflow-level
+    # `contents: read` and nothing else. Without this grant the runs API
+    # answers 403, the classifier cannot establish a validated base, and every
+    # push classifies FULL — the safe direction, and legible in the step's own
+    # log rather than silent.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       docs_only: ${{ steps.classify.outputs.docs_only }}
     steps:
       - uses: actions/checkout@v4
         with:
           # Same reason as the test job below: the classifier diffs against a
-          # `before` SHA that must actually resolve in this checkout.
+          # `before` SHA that must actually resolve in this checkout — and, as
+          # of round 2, also against the tip of the last successful run on
+          # this ref, which can be several pushes back.
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -96,6 +128,15 @@ jobs:
         id: classify
         env:
           DOCS_ONLY_BEFORE_SHA: ${{ github.event.before }}
+          # Round-2 review item 6: `before` had an explicit env wire and
+          # `forced` did not, so a force-push whose payload could not be read
+          # silently classified as an ordinary push. Both are wired now; the
+          # script ORs this with the payload, so neither one alone is
+          # load-bearing.
+          DOCS_ONLY_FORCED: ${{ github.event.forced }}
+          # Used only to authenticate the workflow-runs query above. Scoped by
+          # the job-level `permissions:` block to read-only Actions metadata.
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/classify-docs-only.mjs
 
   test:
@@ -259,18 +300,30 @@ jobs:
           npm test 2>&1 | tee test-output.tap
 
       # Runs ONLY on a docs-only push, in place of the full `npm test` above.
-      # This is the narrow set of test files that can actually FAIL on a
+      # This is the set of test files that can actually FAIL on a
       # docs/**-or-**/*.md-only change — each one reads committed documentation
       # (a brain note, a claims-register row, a generated rulebook page, the
-      # P0 sample report, a measurement receipt, README/CONTRIBUTING prose)
-      # and asserts it still matches what the live generator or a citing
-      # source claims. Selected by hand from `grep -rl` over tests/ for every
-      # suite that reads docs/ (see the audit README for the full list this
-      # was narrowed from and why each excluded one was excluded — most
-      # commonly: it only CITES a docs/ path in an error message rather than
-      # reading and asserting on real doc content, or it is a heavy
-      # integration test whose own docs/ read is incidental to a throwaway git
-      # fixture). All thirteen files together run in well under a minute.
+      # P0 sample report, a measurement receipt, the ROADMAP's P3 section,
+      # README/CONTRIBUTING prose) and asserts it still matches what the live
+      # generator or a citing source claims.
+      #
+      # THIS LIST IS NOT HAND-PICKED AND IS NOT ALLOWED TO BE. Round 1 selected
+      # it by judgment from a grep and missed two suites that gate docs
+      # (tests/routes/root-cause-parity.test.ts and
+      # tests/core/scoring-receipt-guard.test.ts); extending the same
+      # derivation found a third (tests/core/telemetry-docs-truth.test.ts,
+      # which reads the real ROADMAP.md). The set is now derived MECHANICALLY
+      # and pinned by tests/core/docs-gating-set.test.ts, which recomputes the
+      # candidates from tests/** and fails when a suite that reads committed
+      # documentation appears in neither this list nor that test's explicit,
+      # reasoned exclusion allowlist. Do not edit this list by hand without
+      # that test agreeing — and never edit it to make that test pass.
+      #
+      # Measured wall time for all sixteen, this sandbox, run individually:
+      # 41.3 s total (slowest: rule-test-coverage 8.6 s, public-benchmark
+      # 6.4 s, honesty-audit-claims 5.3 s, root-cause-parity 5.3 s). On the
+      # runner the thirteen-file version of this step took 24 s
+      # (run 35296219834, step 12).
       - name: Run docs-gating tests (docs-only fast path)
         if: needs.classify.outputs.docs_only == 'true'
         run: |
@@ -278,17 +331,21 @@ jobs:
           for f in \
             tests/core/brain-coverage.test.ts \
             tests/core/claims-row-citations.test.ts \
+            tests/core/coverage-letter.test.ts \
+            tests/core/docs-gating-set.test.ts \
             tests/core/documentation-truth.test.ts \
+            tests/core/finding-jump.test.ts \
+            tests/core/honesty-audit-claims.test.ts \
+            tests/core/p0-sample-drift.test.ts \
+            tests/core/public-benchmark.test.ts \
+            tests/core/rule-test-coverage.test.ts \
             tests/core/rulebook-links.test.ts \
             tests/core/rulebook.test.ts \
-            tests/core/rule-test-coverage.test.ts \
-            tests/core/p0-sample-drift.test.ts \
-            tests/core/honesty-audit-claims.test.ts \
-            tests/core/public-benchmark.test.ts \
-            tests/core/coverage-letter.test.ts \
-            tests/core/finding-jump.test.ts \
-            tests/scripts/smoke-gate-serve-mode.test.ts \
+            tests/core/scoring-receipt-guard.test.ts \
+            tests/core/telemetry-docs-truth.test.ts \
+            tests/routes/root-cause-parity.test.ts \
             tests/scripts/owner-measure-plan.test.ts \
+            tests/scripts/smoke-gate-serve-mode.test.ts \
           ; do
             echo "::group::$f"
             node --experimental-strip-types "$f"

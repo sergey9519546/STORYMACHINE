@@ -1306,3 +1306,185 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
     }
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// ADDED IN ROUND 2 of lane/ci-docs-fast-path (review item 10). Everything
+// above this line is byte-identical to `origin/main`; nothing above was
+// relaxed to make anything below pass.
+//
+// THE BLIND SPOT THIS CLOSES. Before the docs-only fast path, no ci.yml gate
+// step carried an `if:` at all. Seven of them now do. The assertions above
+// can see a gate that is `continue-on-error`, a gate whose `if:` contains a
+// literal `false`, and a gate that vanished from release.yml — but not a gate
+// whose `if:` is merely WRONG. Changing `ci.yml`'s
+//
+//     if: needs.classify.outputs.docs_only != 'true'
+//
+// to `== 'false'` skips the type check on EVERY run, because an unset or
+// absent output is the empty string and `'' == 'false'` is false in a GitHub
+// expression. Verified against this file before these tests existed: all 47
+// assertions stayed green under exactly that one-character-class mutation.
+//
+// So the polarity is pinned, and so is the exact SET of steps allowed to
+// carry a condition at all. A new `if:` on a gate that is supposed to run
+// unconditionally — honesty-audit, check-brain, the unverified-gates report —
+// fails here rather than quietly halving what CI proves.
+describe('CI gate integrity — the docs-only fast path may not mis-gate a step', () => {
+  const ci = fs.readFileSync(ciYml, 'utf8');
+  const release = fs.readFileSync(releaseYml, 'utf8');
+
+  /** The exact `if:` expression a step carries, or null when it carries none. */
+  function stepIf(source: string, stepName: string): string | null {
+    const block = stepBlock(source, stepName);
+    if (!block) return null;
+    const m = /^\s*if:\s*(.+?)\s*$/m.exec(block);
+    return m ? m[1] : null;
+  }
+
+  const SKIP_ON_DOCS_ONLY = "needs.classify.outputs.docs_only != 'true'";
+  const ONLY_ON_DOCS_ONLY = "needs.classify.outputs.docs_only == 'true'";
+
+  /**
+   * Every ci.yml step that is allowed to carry an `if:`, and the EXACT
+   * expression it must carry. A step absent from this map must carry no `if:`
+   * at all. Adding a row is the deliberate, reviewable act of putting one
+   * more check behind a condition.
+   */
+  const ALLOWED_CONDITIONS: Record<string, string> = {
+    // The seven hard gates the fast path skips, because a docs/**-or-**/*.md
+    // change provably cannot affect them. See ci.yml's per-step comments.
+    'Type check': SKIP_ON_DOCS_ONLY,
+    'Enforce no console.* under server/': SKIP_ON_DOCS_ONLY,
+    'Server dead-code tripwire (reachability from server.ts)': SKIP_ON_DOCS_ONLY,
+    'Run tests (keyless — analysis-only posture)': SKIP_ON_DOCS_ONLY,
+    'Scoring-path change requires a measurement receipt': SKIP_ON_DOCS_ONLY,
+    'Metamorphic scoring gate': SKIP_ON_DOCS_ONLY,
+    'Build': SKIP_ON_DOCS_ONLY,
+    // The one step that runs ONLY on the fast path — the opposite polarity,
+    // pinned just as hard. Flipping it to `!=` would run the narrow docs set
+    // on every full run and NOTHING on a docs-only push.
+    'Run docs-gating tests (docs-only fast path)': ONLY_ON_DOCS_ONLY,
+    // Pre-existing `always()` steps, unrelated to the fast path. They are
+    // listed so that this map is the complete account of conditions in the
+    // file rather than a partial one.
+    'Print test failure summary': 'always()',
+    'Upload full test output (TAP)': 'always()',
+    'Report unverified gates': 'always()',
+  };
+
+  it('every conditional ci.yml step carries EXACTLY its intended condition', () => {
+    const wrong: string[] = [];
+    for (const [name, expected] of Object.entries(ALLOWED_CONDITIONS)) {
+      const actual = stepIf(ci, name);
+      if (actual !== expected) wrong.push(`"${name}": expected \`${expected}\`, found \`${actual ?? '(no if:)'}\``);
+    }
+    assert.deepEqual(
+      wrong,
+      [],
+      'A gate\'s `if:` is part of the gate. `!= \'true\'` and `== \'false\'` look interchangeable and are not: '
+      + 'an unset output is the empty string, so `== \'false\'` is FALSE on every run and the step never runs. '
+      + 'If a condition genuinely needs to change, change this map in the same diff.',
+    );
+  });
+
+  it('no other ci.yml step has quietly become conditional', () => {
+    const unexpected = stepNames(ci)
+      .filter((name) => !(name in ALLOWED_CONDITIONS))
+      .filter((name) => stepIf(ci, name) !== null);
+    assert.deepEqual(
+      unexpected,
+      [],
+      'these ci.yml steps carry an `if:` without being in this test\'s ALLOWED_CONDITIONS map. The docs-only '
+      + 'fast path is the only reason any gate in this file is conditional; a new condition on honesty-audit, '
+      + 'check-brain, check-docs or anything else is a gate that stops running, and it must be a decision in a '
+      + 'diff rather than a line nobody reviewed.',
+    );
+  });
+
+  it("the whole `browser` job is gated on exactly the skip-on-docs-only expression", () => {
+    // A job-level `if:`, not a step-level one — stepBlock() cannot see it.
+    // The eight-suite battery is the single largest thing the fast path skips
+    // (~5 minutes including the Chromium download), so its polarity matters
+    // most: `== 'false'` here would skip the entire browser battery on every
+    // push, forever, with every other assertion in this file green.
+    const m = /^ {2}browser:\n(?: {4}.*\n|\n)*?/m.exec(ci);
+    assert.ok(m, 'ci.yml must keep a `browser:` job');
+    const jobBlock = ci.slice(ci.indexOf('\n  browser:\n'));
+    const header = jobBlock.slice(0, jobBlock.indexOf('\n    steps:'));
+    const ifLine = /^ {4}if:\s*(.+?)\s*$/m.exec(header);
+    assert.ok(ifLine, 'the browser job must keep its job-level `if:`');
+    assert.equal(
+      ifLine[1],
+      SKIP_ON_DOCS_ONLY,
+      'the browser job must skip on a docs-only push and run on every other push. Any other expression here '
+      + 'either runs the battery when it cannot matter or — far worse — skips it when it does.',
+    );
+  });
+
+  it('the classify job grants itself exactly `contents: read` + `actions: read`', () => {
+    // The job needs `actions: read` to ask which run of this workflow on this
+    // ref last completed successfully (scripts/lib/validated-base.mjs). That
+    // is the ONLY reason ci.yml departs from the workflow-level
+    // `contents: read`, and a widened grant here would hand a token with more
+    // rights to a job that runs `npm`-free but still runs code from the
+    // checkout.
+    const classify = ci.slice(ci.indexOf('\n  classify:\n'));
+    const header = classify.slice(0, classify.indexOf('\n    steps:'));
+    const permsIdx = header.indexOf('\n    permissions:');
+    assert.notEqual(permsIdx, -1, 'the classify job must declare its own `permissions:` block');
+    const perms: string[] = [];
+    for (const line of header.slice(permsIdx + 1).split('\n').slice(1)) {
+      if (line.trim() === '' || line.trim().startsWith('#')) continue;
+      // A sibling key at job level (`outputs:`, `steps:`, `runs-on:`) ends the
+      // block — without this the `outputs:` mapping below it reads as a grant.
+      if (line.search(/\S/) <= 4) break;
+      perms.push(line.trim());
+    }
+    assert.deepEqual(
+      perms,
+      ['contents: read', 'actions: read'],
+      'the classify job must grant read-only checkout access plus read-only Actions metadata, and nothing else',
+    );
+  });
+
+  it('release.yml never wires `classify` into anything (its copy stays inert)', () => {
+    // release.yml carries a mirrored `classify` job only because this file's
+    // step-for-step mirror rule requires every ci.yml step to have a
+    // counterpart. Its output is deliberately unused: `publish` needs
+    // `[test, browser]`, and a job skipped because a `needs` dependency FAILED
+    // leaves the run at `failure` — so wiring `needs: classify` into
+    // release.yml's `test` job would let a broken classifier turn a tag push
+    // into a release that never publishes. The review asked for this to be
+    // mechanical rather than a comment; here it is.
+    const live = release
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('#'))
+      .join('\n');
+    assert.doesNotMatch(
+      live,
+      /needs\.classify/,
+      'release.yml must not reference `needs.classify`. A release runs every gate unconditionally; putting '
+      + 'the classifier on that path trades a guaranteed release for ~30 seconds.',
+    );
+    assert.doesNotMatch(
+      live,
+      /^ {4}needs:\s*(\[[^\]]*\bclassify\b[^\]]*\]|classify\b)/m,
+      'no release.yml job may declare `needs: classify` — see above',
+    );
+  });
+
+  it('release.yml runs the docs-gating step unconditionally (no `if:` at all)', () => {
+    assert.equal(
+      stepIf(release, 'Run docs-gating tests (docs-only fast path)'),
+      null,
+      'release.yml\'s mirrored docs-gating step must stay unconditional. It re-runs files `npm test` already '
+      + 'ran, which costs 25-45 s on a milestone event and buys the guarantee that a release depends on no '
+      + 'classifier at all.',
+    );
+    assert.equal(
+      stepIf(release, 'Classify changed files (docs-only fast path)'),
+      null,
+      'release.yml\'s mirrored classify step must stay unconditional too — it is inert, not gated',
+    );
+  });
+});
