@@ -179,10 +179,10 @@ jobs:
       # test.ts requires both). UNCONDITIONAL here — no `if:` — and that is a
       # decision, re-taken in round 2 after the review measured the cost.
       #
-      # THE COST: this re-runs, on every release, sixteen files the full
-      # `npm test` above has already run. Measured 41.3 s on the lane's
-      # sandbox, 24 s on the runner for the thirteen-file version
-      # (run 35296219834, step 12). Call it 25-45 s per release.
+      # THE COST: this re-runs, on every release, seventeen files the full
+      # `npm test` above has already run. Measured 55 s on the lane's sandbox,
+      # 24 s on the runner for the thirteen-file version (run 35296219834,
+      # step 12). Call it 25-60 s per release.
       #
       # WHY IT IS STILL UNCONDITIONAL: the only way to skip it is
       # `if: needs.classify.outputs.docs_only == 'true'`, which requires
@@ -190,9 +190,9 @@ jobs:
       # on the release's critical path. `publish` needs `[test, browser]`; a
       # job skipped because a `needs` dependency FAILED leaves the run at
       # `failure`, so a broken classifier would turn a tag push into a release
-      # that does not publish, to save half a minute on a milestone event that
+      # that does not publish, to save under a minute on a milestone event that
       # happens a few times a year. Keeping `classify` inert here is worth far
-      # more than the 25-45 s. The inertness is not left to this comment:
+      # more than the 25-60 s. The inertness is not left to this comment:
       # tests/core/ci-gates-intact.test.ts asserts release.yml contains no
       # `needs.classify` reference at all, so wiring one in later fails the
       # build rather than quietly changing what a release depends on.

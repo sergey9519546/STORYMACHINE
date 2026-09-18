@@ -291,9 +291,11 @@ or the derivation no longer considers it a candidate) fails the suite.
 | `tests/scripts/owner-measure-plan.test.ts` | the committed `docs/p1-benchmark/owner-measurement-plan.json` | 0.2 |
 | `tests/scripts/smoke-gate-serve-mode.test.ts` | `README.md`, `CONTRIBUTING.md`, `ci.yml` and a brain Gate note | 0.2 |
 
-**41.3 s total**, run individually on this sandbox (sum of the column above;
+**55 s total**, run individually on this sandbox (sum of the column above;
 the runner did the thirteen-file version in 24 s — run 35296219834, step 12).
-Against a ~7-minute `npm test` plus a ~5-minute browser job.
+Against a ~7-minute `npm test` plus a ~5-minute browser job. The single
+biggest line is the guard itself at 13.7 s, which parses every test file; it
+is on the list because a docs-only DELETION changes what it derives.
 
 ### The 7 excluded, and why
 
@@ -403,7 +405,7 @@ touched, and the mirror rule was not weakened to accommodate anything.
 
 The review measured it: the mirrored `Run docs-gating tests` step re-runs, on
 every release, files the full `npm test` in the same job has already run —
-**41.3 s on this sandbox, 24 s on the runner** for the thirteen-file version.
+**55 s on this sandbox, 24 s on the runner** for the thirteen-file version.
 Real, and not free.
 
 It stays unconditional anyway. The only way to skip it is
@@ -412,7 +414,7 @@ It stays unconditional anyway. The only way to skip it is
 classifier on the release's critical path. `publish` needs `[test, browser]`;
 a job skipped because a `needs` dependency FAILED leaves the run at
 `failure`. A broken classifier would turn a tag push into a release that does
-not publish, to save half a minute on an event that happens a few times a
+not publish, to save under a minute on an event that happens a few times a
 year. The trade is obvious in that direction.
 
 What the review actually asked for was that the inertness be **mechanical

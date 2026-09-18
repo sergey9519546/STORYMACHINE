@@ -319,11 +319,13 @@ jobs:
       # reasoned exclusion allowlist. Do not edit this list by hand without
       # that test agreeing — and never edit it to make that test pass.
       #
-      # Measured wall time for all sixteen, this sandbox, run individually:
-      # 41.3 s total (slowest: rule-test-coverage 8.6 s, public-benchmark
-      # 6.4 s, honesty-audit-claims 5.3 s, root-cause-parity 5.3 s). On the
-      # runner the thirteen-file version of this step took 24 s
-      # (run 35296219834, step 12).
+      # Measured wall time for all SEVENTEEN, this sandbox, run individually:
+      # 55 s total (41.3 s for the sixteen others plus 13.7 s for
+      # docs-gating-set.test.ts, which parses every test file; slowest of the
+      # rest: rule-test-coverage 8.6 s, public-benchmark 6.4 s,
+      # honesty-audit-claims 5.3 s, root-cause-parity 5.3 s). On the runner the
+      # thirteen-file version of this step took 24 s (run 35296219834, step 12).
+      # Against a ~7-minute `npm test` plus a ~5-minute browser job.
       - name: Run docs-gating tests (docs-only fast path)
         if: needs.classify.outputs.docs_only == 'true'
         run: |
