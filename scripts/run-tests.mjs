@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import { testReporterFlags } from './lib/test-reporter.mjs';
 
 // Keep the suite boundary explicit: experimental engine/V5 test trees are not
 // part of the current P0 research gate. Passing literal glob strings to Node's
@@ -176,9 +177,12 @@ if (NOT_RUN.length > 0) {
   console.log(`Deliberately NOT run (${NOT_RUN.length}, see scripts/run-tests.mjs NOT_RUN for reasons):`);
   for (const e of NOT_RUN) console.log(`  - ${e.file}`);
 }
+// The reporter is named, not left to node:test's default: Node 23+ defaults to
+// `spec` even when piped, and CI's failure summary reads this output as TAP.
+// scripts/lib/test-reporter.mjs has the measurement.
 const result = spawnSync(
   process.execPath,
-  ['--experimental-strip-types', '--test', ...testFiles],
+  ['--experimental-strip-types', '--test', ...testReporterFlags(process.stdout.isTTY), ...testFiles],
   { stdio: 'inherit' },
 );
 
