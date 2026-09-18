@@ -194,12 +194,20 @@ export function jumpTargetForFinding(
     return { kind: "none", reason: NO_LOCATION_DOCUMENT_REASON };
   }
   if (finding.sceneIdxs.length > 0) {
+    // The button scrolls to startLine. Name the scene that CONTAINS that
+    // line when spans are known — sceneIdxs[0] is the cluster's first
+    // member scene (sorted), which is usually the same, but a location-parse
+    // member can put a different index first than the envelope start.
+    // Falling back to sceneIdxs[0] only when the line sits outside every
+    // span (or no spans were sent) keeps the old wording for older reports.
+    const sceneFromSpan = sceneNumberForLine(finding.startLine, spans);
+    const sceneNumber = sceneFromSpan ?? finding.sceneIdxs[0] + 1;
     return {
       kind: "jump",
       startLine: finding.startLine,
       endLine: finding.endLine,
-      label: `Jump to scene ${finding.sceneIdxs[0] + 1}`,
-      sceneNumber: finding.sceneIdxs[0] + 1,
+      label: `Jump to scene ${sceneNumber}`,
+      sceneNumber,
     };
   }
   return jumpTargetForSpan(finding, spans);
