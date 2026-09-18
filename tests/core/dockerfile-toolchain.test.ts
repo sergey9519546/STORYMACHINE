@@ -44,9 +44,34 @@
 //
 // This asserts the SHAPE of the Dockerfile, not its exact text: stage names,
 // ordering, extra packages, extra stages and rewritten comments are all fine.
-// It fails only when the stage that runs `npm ci` can no longer compile a
-// native addon, when the toolchain leaks into the shipped runner stage, or
-// when the stages stop agreeing about libc.
+//
+// WHAT THIS GUARD ACTUALLY CHECKS, precisely (round-2 review items 1-3 —
+// the round-1 version of this paragraph said "It fails only when…", which
+// overclaimed in BOTH directions and three measured mutations proved it):
+//
+//   1. Every stage that runs `npm ci` has python3, make and g++ INSTALLED AND
+//      STILL PRESENT at the moment `npm ci` runs. "Installed" means the
+//      package is an argument of an actual `apk add` COMMAND — evaluated per
+//      shell step, so a package name inside an `echo` string, a comment, or
+//      any other command's arguments does not count, and a later `apk del`
+//      takes it away again.
+//   2. Ordering is evaluated at the SHELL-STEP level, not just instruction to
+//      instruction, so `RUN npm ci && apk add …` reads as "too late" exactly
+//      as two separate `RUN`s would.
+//   3. The toolchain is NET-ABSENT at the end of the final (runner) stage.
+//   4. Every stage resolves to the same libc family, following
+//      `FROM <stage> AS <name>` aliases transitively to a real base image.
+//
+// WHERE IT FAILS CLOSED (a legitimate Dockerfile it cannot read reads as
+// broken, which is the right direction for a guard but is worth knowing
+// before someone rewrites this file and is surprised): a package list that
+// only exists at build time — `apk add $(cat pkgs.txt)`, a package set
+// assembled by a shell conditional, or an `ARG` with no default that is
+// supplied only via `--build-arg` — cannot be resolved from the file text and
+// reads as "not installed". Round-1 also failed closed on four shapes that
+// round 2 now handles for real: an `ARG`/`ENV`-parameterised package list, a
+// `RUN <<EOF` heredoc, `FROM <stage> AS <name>` stage inheritance, and
+// `FROM --platform=… <image>`. Each has a fixture at the bottom of this file.
 //
 // Comment lines are stripped before ANY of this is evaluated, and that is not
 // incidental. The live Dockerfile's explanatory comment block names all three
@@ -54,10 +79,7 @@
 // and make are therefore REQUIRED. g++ is deliberately included" — so a
 // checker that merely grepped the raw file for the package names would keep
 // reporting green after someone deleted the live RUN line and left the
-// explanation behind. (The comment does not currently contain the string
-// `apk add`, so the two-token check below would survive that particular
-// deletion; it would NOT survive someone commenting the RUN line out instead,
-// which is the cheaper and likelier edit.) This is the same shadowing failure
+// explanation behind. This is the same shadowing failure
 // tests/core/ci-gates-intact.test.ts was extended to catch — its "a
 // commented-out correct cancel-in-progress line cannot shadow a live incorrect
 // one" case. The negative fixtures at the bottom of this file pin both
@@ -76,69 +98,298 @@ const REQUIRED_TOOLCHAIN = ['python3', 'make', 'g++'] as const;
 interface Stage {
   /** Stage alias from `AS <name>`, or the 1-based index when unnamed. */
   name: string;
-  /** The image the stage is FROM, e.g. `node:22-alpine`. */
+  /** The FROM target verbatim — an image (`node:22-alpine`) OR a stage alias. */
   base: string;
-  /** Live (non-comment, continuation-joined) instruction lines, in order. */
+  /** Live (comment-stripped, continuation- and heredoc-joined) instructions. */
   instructions: string[];
+  /** `ARG NAME=value` instructions declared before the first FROM. */
+  globalArgs: string[];
 }
 
 /**
  * Split a Dockerfile into stages of LIVE instructions only.
  *
- * Two normalizations happen here and both are load-bearing:
+ * Three normalizations happen here and all are load-bearing:
  *  - comment-only lines are dropped (see the header — the real Dockerfile's
  *    prose quotes the very command this file checks for);
  *  - backslash line-continuations are joined into one logical instruction, so
- *    a toolchain split across several lines still reads as one `RUN`.
+ *    a toolchain split across several lines still reads as one `RUN`;
+ *  - a `RUN <<EOF` heredoc body is folded into its own RUN instruction
+ *    (round-2 review item 3) instead of being read as loose instructions that
+ *    belong to nothing.
  */
 function parseStages(source: string): Stage[] {
   const rawLines = source.split(/\r?\n/);
 
   // Drop comment-only lines first, then join continuations. Doing it in this
   // order means a comment sitting INSIDE a continued instruction (legal in a
-  // Dockerfile) cannot smuggle text into the joined logical line.
+  // Dockerfile) cannot smuggle text into the joined logical line. A `#` line
+  // inside a heredoc is a shell comment, so dropping it there is right too.
   const live = rawLines.filter((line) => !/^\s*#/.test(line));
 
   const logical: string[] = [];
   let buffer = '';
+  let heredocTerminator: string | null = null;
   for (const line of live) {
+    if (heredocTerminator !== null) {
+      if (line.trim() === heredocTerminator) {
+        logical.push(buffer.trim());
+        buffer = '';
+        heredocTerminator = null;
+        continue;
+      }
+      buffer += `\n${line}`;
+      continue;
+    }
     if (/\\\s*$/.test(line)) {
       buffer += `${line.replace(/\\\s*$/, '')} `;
       continue;
     }
-    logical.push(`${buffer}${line}`.trim());
+    const joined = `${buffer}${line}`.trim();
     buffer = '';
+    const heredoc = /<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?\s*$/.exec(joined);
+    if (heredoc !== null && /^RUN\b/i.test(joined)) {
+      heredocTerminator = heredoc[1];
+      buffer = joined;
+      continue;
+    }
+    logical.push(joined);
   }
   if (buffer.trim() !== '') logical.push(buffer.trim());
 
   const stages: Stage[] = [];
+  const globalArgs: string[] = [];
   for (const instruction of logical) {
     if (instruction === '') continue;
-    const from = /^FROM\s+(\S+)(?:\s+AS\s+(\S+))?\s*$/i.exec(instruction);
+    // `--platform=…` and any other FROM flag must not hide the stage
+    // (round-2 review item 3: the round-1 regex refused the whole line).
+    const from = /^FROM\s+((?:--\S+\s+)*)(\S+)(?:\s+AS\s+(\S+))?\s*$/i.exec(instruction);
     if (from) {
       stages.push({
-        name: from[2] ?? String(stages.length + 1),
-        base: from[1],
+        name: from[3] ?? String(stages.length + 1),
+        base: from[2],
         instructions: [],
+        globalArgs,
       });
       continue;
     }
-    if (stages.length > 0) stages[stages.length - 1].instructions.push(instruction);
+    if (stages.length === 0) {
+      if (/^ARG\b/i.test(instruction)) globalArgs.push(instruction);
+      continue;
+    }
+    stages[stages.length - 1].instructions.push(instruction);
   }
   return stages;
 }
 
-/** Does this logical instruction run `npm ci` (as opposed to merely naming it)? */
-function isNpmCiRun(instruction: string): boolean {
-  return /^RUN\b/i.test(instruction) && /\bnpm\s+ci\b/.test(instruction);
+function escapeForRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Does this logical instruction `apk add` the given package as its own token? */
-function apkAdds(instruction: string, pkg: string): boolean {
-  if (!/^RUN\b/i.test(instruction) || !/\bapk\s+add\b/.test(instruction)) return false;
-  // `g++` is regex-hostile, so match on whitespace-delimited tokens rather
-  // than building a pattern out of the package name.
-  return instruction.split(/\s+/).includes(pkg);
+/**
+ * Split a shell command line into the individual COMMANDS it runs, honouring
+ * quotes. `&&`, `||`, `;`, `|` and newlines all separate commands.
+ *
+ * This is the core of round-2 review items 1 and 2. Round 1 treated a whole
+ * `RUN` as one opaque string and asked only whether it contained `apk add`
+ * somewhere and the package name somewhere, which made
+ * `RUN apk add --no-cache curl && echo "dropped: python3 make g++"` and
+ * `RUN npm ci && apk add --no-cache python3 make g++` both read as correct.
+ */
+function splitShellSteps(body: string): string[] {
+  const out: string[] = [];
+  let current = '';
+  let quote: string | null = null;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (quote !== null) {
+      current += ch;
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      current += ch;
+      continue;
+    }
+    if (ch === '\n' || ch === ';') {
+      out.push(current);
+      current = '';
+      continue;
+    }
+    if ((ch === '&' && body[i + 1] === '&') || (ch === '|' && body[i + 1] === '|')) {
+      out.push(current);
+      current = '';
+      i++;
+      continue;
+    }
+    if (ch === '|' || ch === '&') {
+      out.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  out.push(current);
+  return out.map((step) => step.trim()).filter((step) => step !== '');
+}
+
+/** Whitespace-split a shell step into tokens, dropping quote characters. */
+function shellTokens(step: string): string[] {
+  const out: string[] = [];
+  let current = '';
+  let quote: string | null = null;
+  let quoted = false;
+  for (const ch of step) {
+    if (quote !== null) {
+      if (ch === quote) quote = null;
+      else current += ch;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      quoted = true;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      if (current !== '' || quoted) out.push(current);
+      current = '';
+      quoted = false;
+      continue;
+    }
+    current += ch;
+  }
+  if (current !== '' || quoted) out.push(current);
+  return out;
+}
+
+/** Skip `VAR=value` prefixes and an optional `sudo`, returning the command's index. */
+function commandStart(tokens: string[]): number {
+  let i = 0;
+  while (i < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[i])) i++;
+  if (tokens[i] === 'sudo' || tokens[i] === 'env') i++;
+  return i;
+}
+
+/**
+ * If this shell step IS an `apk add` / `apk del` command, its package
+ * arguments (version constraints stripped); otherwise null.
+ *
+ * Returning null for "this step is not that command" is the whole point: a
+ * package name that merely appears in some other command's arguments — an
+ * `echo`, a `label`, a `mv` — can never reach the installed set.
+ */
+function apkPackages(step: string, verb: 'add' | 'del'): string[] | null {
+  const tokens = shellTokens(step);
+  let i = commandStart(tokens);
+  if (tokens[i] !== 'apk') return null;
+  i++;
+  while (i < tokens.length && tokens[i].startsWith('-')) i++; // `apk --no-cache add`
+  if (tokens[i] !== verb) return null;
+  i++;
+  const packages: string[] = [];
+  for (; i < tokens.length; i++) {
+    if (tokens[i].startsWith('-')) continue;
+    const name = tokens[i].split(/[=<>~]/)[0];
+    if (name !== '') packages.push(name);
+  }
+  return packages;
+}
+
+/** Does this shell step RUN `npm ci` (as opposed to merely naming it)? */
+function isNpmCiStep(step: string): boolean {
+  const tokens = shellTokens(step);
+  const i = commandStart(tokens);
+  if (tokens[i] !== 'npm') return false;
+  for (let j = i + 1; j < tokens.length; j++) {
+    if (tokens[j].startsWith('-')) continue;
+    return tokens[j] === 'ci';
+  }
+  return false;
+}
+
+/** Does this logical instruction run `npm ci` in any of its shell steps? */
+function isNpmCiRun(instruction: string): boolean {
+  if (!/^RUN\b/i.test(instruction)) return false;
+  return splitShellSteps(runBody(instruction)).some(isNpmCiStep);
+}
+
+/** Strip `RUN`, its flags and any heredoc opener, leaving the shell body. */
+function runBody(instruction: string): string {
+  return instruction
+    .replace(/^RUN\s*/i, '')
+    .replace(/^(?:--\S+\s+)*/, '')
+    .replace(/^<<-?\s*['"]?[A-Za-z_][A-Za-z0-9_]*['"]?\s*/, '');
+}
+
+/** `NAME=value` pairs out of an `ARG`/`ENV` instruction's remainder. */
+function parseAssignments(rest: string): [string, string][] {
+  const out: [string, string][] = [];
+  const pattern = /([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"]*)"|'([^']*)'|(\S*))/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(rest)) !== null) {
+    out.push([match[1], match[2] ?? match[3] ?? match[4] ?? '']);
+  }
+  return out;
+}
+
+/** Substitute `$NAME` / `${NAME}` from the known build args. Unknown names stay literal. */
+function expandVars(text: string, vars: Map<string, string>): string {
+  return text.replace(
+    /\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g,
+    (whole, braced: string | undefined, bare: string | undefined) =>
+      vars.get(braced ?? bare ?? '') ?? whole,
+  );
+}
+
+/**
+ * A stage's shell steps in execution order, with `ARG`/`ENV` values expanded.
+ * Only `RUN` contributes steps — nothing else executes a command.
+ */
+function stageShellSteps(stage: Stage): string[] {
+  const vars = new Map<string, string>();
+  for (const declaration of stage.globalArgs) {
+    for (const [name, value] of parseAssignments(declaration.replace(/^ARG\s*/i, ''))) {
+      vars.set(name, value);
+    }
+  }
+  const steps: string[] = [];
+  for (const instruction of stage.instructions) {
+    const declaration = /^(?:ARG|ENV)\s+([\s\S]*)$/i.exec(instruction);
+    if (declaration) {
+      for (const [name, value] of parseAssignments(declaration[1])) vars.set(name, value);
+      continue;
+    }
+    if (!/^RUN\b/i.test(instruction)) continue;
+    steps.push(...splitShellSteps(expandVars(runBody(instruction), vars)));
+  }
+  return steps;
+}
+
+/**
+ * Follow `FROM <stage> AS <name>` aliases to the real base image.
+ *
+ * Round-2 review item 3: `libcFamily()` maps any base without `alpine` in it
+ * to glibc, so `FROM deps AS builder` — a stage inheriting from an alpine
+ * stage — was reported as a musl/glibc split that does not exist.
+ */
+function resolveBaseImage(stage: Stage, stages: readonly Stage[]): string {
+  const seen = new Set<string>();
+  let base = stage.base;
+  while (!seen.has(base.toLowerCase())) {
+    seen.add(base.toLowerCase());
+    const parent = stages.find((candidate) => candidate.name.toLowerCase() === base.toLowerCase());
+    if (!parent) return base;
+    base = parent.base;
+  }
+  return base;
+}
+
+/** The stage this one inherits its filesystem from, if it is a `FROM <stage>`. */
+function parentStage(stage: Stage, stages: readonly Stage[]): Stage | null {
+  return (
+    stages.find((candidate) => candidate.name.toLowerCase() === stage.base.toLowerCase()) ?? null
+  );
 }
 
 /**
@@ -146,10 +397,73 @@ function apkAdds(instruction: string, pkg: string): boolean {
  * variants (`node:22`, `-slim`, `-bookworm`) are glibc. A native `.node` built
  * for one cannot be loaded by the other, and the runner stage copies
  * node_modules wholesale out of `builder`, so a stage that disagrees with the
- * others breaks at require() time rather than at build time.
+ * others breaks at require() time rather than at build time. Callers must pass
+ * a RESOLVED base (see resolveBaseImage) — a stage alias is not an image.
  */
 function libcFamily(base: string): 'musl' | 'glibc' {
   return /alpine/i.test(base) ? 'musl' : 'glibc';
+}
+
+/** What a stage's shell steps do to the toolchain, in execution order. */
+interface StageToolchain {
+  /** Packages net-installed when the stage finishes (inherited ones included). */
+  installedAtEnd: Set<string>;
+  /** Packages present at the moment the stage's first `npm ci` runs. */
+  installedAtNpmCi: Set<string> | null;
+  /** Packages first `apk add`ed only AFTER `npm ci` had already run. */
+  addedAfterNpmCi: Set<string>;
+  /** Packages that were present at some point before `npm ci`, then removed. */
+  removedBeforeNpmCi: Set<string>;
+}
+
+/**
+ * Replay a stage's shell steps over an inherited package set.
+ *
+ * `inherited` is the parent stage's end state when this stage is a
+ * `FROM <stage>` — real Docker semantics, and the reason `FROM deps AS
+ * builder` running `npm ci` is legitimate: it already has deps' toolchain.
+ */
+function stageToolchain(stage: Stage, inherited: ReadonlySet<string>): StageToolchain {
+  const installed = new Set(inherited);
+  const everInstalledBeforeNpmCi = new Set(inherited);
+  const addedAfterNpmCi = new Set<string>();
+  const removedBeforeNpmCi = new Set<string>();
+  let installedAtNpmCi: Set<string> | null = null;
+
+  for (const step of stageShellSteps(stage)) {
+    if (installedAtNpmCi === null && isNpmCiStep(step)) {
+      installedAtNpmCi = new Set(installed);
+      continue;
+    }
+    const added = apkPackages(step, 'add');
+    if (added !== null) {
+      for (const pkg of added) {
+        installed.add(pkg);
+        if (installedAtNpmCi === null) everInstalledBeforeNpmCi.add(pkg);
+        else addedAfterNpmCi.add(pkg);
+      }
+      continue;
+    }
+    const deleted = apkPackages(step, 'del');
+    if (deleted !== null) {
+      for (const pkg of deleted) {
+        if (installed.delete(pkg) && installedAtNpmCi === null) removedBeforeNpmCi.add(pkg);
+      }
+    }
+  }
+
+  return { installedAtEnd: installed, installedAtNpmCi, addedAfterNpmCi, removedBeforeNpmCi };
+}
+
+/** Replay every stage in file order, threading `FROM <stage>` inheritance through. */
+function analyzeStages(stages: readonly Stage[]): Map<Stage, StageToolchain> {
+  const byStage = new Map<Stage, StageToolchain>();
+  for (const stage of stages) {
+    const parent = parentStage(stage, stages);
+    const inherited = parent ? (byStage.get(parent)?.installedAtEnd ?? new Set<string>()) : new Set<string>();
+    byStage.set(stage, stageToolchain(stage, inherited));
+  }
+  return byStage;
 }
 
 /**
@@ -166,24 +480,29 @@ function toolchainFindings(source: string): string[] {
     return findings;
   }
 
-  const compilingStages = stages.filter((stage) => stage.instructions.some(isNpmCiRun));
+  const analysis = analyzeStages(stages);
+  const compilingStages = stages.filter((stage) => analysis.get(stage)!.installedAtNpmCi !== null);
   if (compilingStages.length === 0) {
     findings.push('no stage runs `npm ci`; this guard no longer knows what it is guarding');
     return findings;
   }
 
   for (const stage of compilingStages) {
-    const npmCiAt = stage.instructions.findIndex(isNpmCiRun);
+    const state = analysis.get(stage)!;
     for (const pkg of REQUIRED_TOOLCHAIN) {
-      const addedAt = stage.instructions.findIndex((line) => apkAdds(line, pkg));
-      if (addedAt === -1) {
+      if (state.installedAtNpmCi!.has(pkg)) continue;
+      if (state.addedAfterNpmCi.has(pkg)) {
+        findings.push(
+          `stage "${stage.name}" installs ${pkg} AFTER \`npm ci\`, which is too late`,
+        );
+      } else if (state.removedBeforeNpmCi.has(pkg)) {
+        findings.push(
+          `stage "${stage.name}" installs ${pkg} and then removes it (\`apk del\`) before \`npm ci\` runs`,
+        );
+      } else {
         findings.push(
           `stage "${stage.name}" runs \`npm ci\` without installing ${pkg} ` +
             '(run 34794216577 failed exactly this way)',
-        );
-      } else if (addedAt > npmCiAt) {
-        findings.push(
-          `stage "${stage.name}" installs ${pkg} AFTER \`npm ci\`, which is too late`,
         );
       }
     }
@@ -214,27 +533,36 @@ describe('Dockerfile — the native-addon toolchain that makes `npm ci` possible
 
   it('keeps the toolchain OUT of the final (runner) stage, which must stay slim', () => {
     const stages = parseStages(dockerfile);
+    const analysis = analyzeStages(stages);
     const runner = stages[stages.length - 1];
     assert.ok(
       !runner.instructions.some(isNpmCiRun),
       `final stage "${runner.name}" runs \`npm ci\`; the runner is supposed to copy node_modules`,
     );
+    // Net-installed at the END of the stage: `apk add x && apk del x` genuinely
+    // does not ship x, and an inherited `FROM <toolchain stage>` genuinely does.
+    const shipped = analysis.get(runner)!.installedAtEnd;
     for (const pkg of REQUIRED_TOOLCHAIN) {
       assert.ok(
-        !runner.instructions.some((line) => apkAdds(line, pkg)),
-        `final stage "${runner.name}" installs ${pkg}; the build toolchain must not ship in the image`,
+        !shipped.has(pkg),
+        `final stage "${runner.name}" ships ${pkg}; the build toolchain must not ship in the image`,
       );
     }
   });
 
   it('keeps every stage on the same libc, so the native binary that is installed is the one that loads', () => {
     const stages = parseStages(dockerfile);
-    const families = new Set(stages.map((stage) => libcFamily(stage.base)));
+    const families = new Set(stages.map((stage) => libcFamily(resolveBaseImage(stage, stages))));
     assert.equal(
       families.size,
       1,
       'stages disagree about libc: ' +
-        stages.map((stage) => `${stage.name}=${stage.base} (${libcFamily(stage.base)})`).join(', ') +
+        stages
+          .map((stage) => {
+            const resolved = resolveBaseImage(stage, stages);
+            return `${stage.name}=${resolved} (${libcFamily(resolved)})`;
+          })
+          .join(', ') +
         ' — a musl .node copied into a glibc runtime (or the reverse) fails at require(), not at build',
     );
   });
@@ -295,6 +623,66 @@ describe('Dockerfile toolchain guard — it can actually fail', () => {
     );
   });
 
+  // ---------------------------------------------------------------------
+  // Round-2 review, items 1 and 2. Each of the next three inputs passed the
+  // round-1 guard 11/11 while producing an image that CANNOT build. They are
+  // pinned here so the defeat can never be re-introduced by a later rewrite
+  // of the parser.
+  // ---------------------------------------------------------------------
+
+  it('is not satisfied by a package name inside another command\'s arguments (review item 1)', () => {
+    // Measured on the real Dockerfile before the fix: 11 pass / 0 fail. This
+    // is what a leftover note looks like after exactly the "someone trimming
+    // an image-size layer" edit this file exists to stop — `apk add` is
+    // present, all three package names are present, and none of them is
+    // being installed.
+    const proseOnly = PRE_FIX_DEPS_STAGE.replace(
+      'COPY package*.json ./',
+      'RUN apk add --no-cache curl && echo "dropped: python3 make g++ (no longer needed)"\nCOPY package*.json ./',
+    );
+    const findings = toolchainFindings(proseOnly);
+    assert.equal(
+      findings.length,
+      REQUIRED_TOOLCHAIN.length,
+      `an echo string must not count as an install, got: ${JSON.stringify(findings)}`,
+    );
+    for (const pkg of REQUIRED_TOOLCHAIN) {
+      assert.ok(findings.some((finding) => finding.includes(`installing ${pkg}`)));
+    }
+  });
+
+  it('fires when the toolchain is `apk del`-ed again before `npm ci` (review item 1)', () => {
+    // The standard alpine slimming idiom written slightly wrong — the del
+    // belongs AFTER the build, not before it. Round-1 guard: 11 pass / 0 fail.
+    const addedThenRemoved = PRE_FIX_DEPS_STAGE.replace(
+      'COPY package*.json ./',
+      'RUN apk add --no-cache python3 make g++ && apk del python3 make g++\nCOPY package*.json ./',
+    );
+    const findings = toolchainFindings(addedThenRemoved);
+    assert.equal(findings.length, REQUIRED_TOOLCHAIN.length, JSON.stringify(findings));
+    assert.ok(
+      findings.every((finding) => finding.includes('removes it')),
+      `expected every finding to name the removal, got: ${JSON.stringify(findings)}`,
+    );
+  });
+
+  it('fires when `apk add` follows `npm ci` inside ONE `RUN` instruction (review item 2)', () => {
+    // Round-1 compared INDICES into stage.instructions, so two commands joined
+    // by `&&` inside one RUN compared equal and the "too late" branch could
+    // never fire. Round-1 guard on this input: 11 pass / 0 fail, while
+    // node-gyp runs before the toolchain it needs exists.
+    const sameInstruction = PRE_FIX_DEPS_STAGE.replace(
+      'RUN npm ci',
+      'RUN npm ci && apk add --no-cache python3 make g++',
+    );
+    const findings = toolchainFindings(sameInstruction);
+    assert.equal(findings.length, REQUIRED_TOOLCHAIN.length, JSON.stringify(findings));
+    assert.ok(
+      findings.every((finding) => finding.includes('too late')),
+      `expected every finding to say "too late", got: ${JSON.stringify(findings)}`,
+    );
+  });
+
   it('fires when the toolchain is installed too late to help `npm ci`', () => {
     const tooLate = PRE_FIX_DEPS_STAGE.replace(
       'RUN npm ci',
@@ -322,7 +710,8 @@ describe('Dockerfile toolchain guard — it can actually fail', () => {
 
   it('detects a libc split between the building stage and the runner', () => {
     const mixed = ['FROM node:22-bookworm AS deps', 'RUN npm ci', 'FROM node:22-alpine AS runner'].join('\n');
-    const families = new Set(parseStages(mixed).map((stage) => libcFamily(stage.base)));
+    const stages = parseStages(mixed);
+    const families = new Set(stages.map((stage) => libcFamily(resolveBaseImage(stage, stages))));
     assert.equal(families.size, 2, 'a glibc builder feeding a musl runner must read as a split');
   });
 
@@ -332,5 +721,108 @@ describe('Dockerfile toolchain guard — it can actually fail', () => {
       'RUN apk add --no-cache \\\n    python3 \\\n    make \\\n    g++\nCOPY package*.json ./',
     );
     assert.deepEqual(toolchainFindings(wrapped), []);
+  });
+
+  it('a trailing stage that re-installs the toolchain still fails the runner check', () => {
+    // Trailing-stage smuggling: append a stage after the runner and the
+    // toolchain ships after all. The runner check reads the LAST stage, so
+    // this must stay red.
+    const smuggled = [
+      'FROM node:22-alpine AS deps',
+      'RUN apk add --no-cache python3 make g++',
+      'RUN npm ci',
+      '',
+      'FROM node:22-alpine AS runner',
+      'CMD ["npx", "tsx", "server.ts"]',
+      '',
+      'FROM node:22-alpine AS extra',
+      'RUN apk add --no-cache python3 make g++',
+    ].join('\n');
+    const stages = parseStages(smuggled);
+    const analysis = analyzeStages(stages);
+    const last = stages[stages.length - 1];
+    assert.equal(last.name, 'extra');
+    for (const pkg of REQUIRED_TOOLCHAIN) {
+      assert.ok(
+        analysis.get(last)!.installedAtEnd.has(pkg),
+        `the runner check must see ${pkg} shipping in the trailing stage`,
+      );
+    }
+  });
+
+  // ---------------------------------------------------------------------
+  // Round-2 review, item 3. Four shapes that BUILD CORRECTLY and which the
+  // round-1 parser reported as broken. Failing closed is the right direction
+  // for a guard, but each of these is ordinary enough that a real edit would
+  // hit it, and a guard that cries wolf gets deleted.
+  // ---------------------------------------------------------------------
+
+  it('accepts an ARG-parameterised package list (review item 3)', () => {
+    const parameterised = PRE_FIX_DEPS_STAGE.replace(
+      'COPY package*.json ./',
+      'ARG TOOLCHAIN="python3 make g++"\nRUN apk add --no-cache $TOOLCHAIN\nCOPY package*.json ./',
+    );
+    assert.deepEqual(toolchainFindings(parameterised), []);
+  });
+
+  it('accepts a global ARG (declared before the first FROM) as the package list', () => {
+    const globalArg = `ARG TOOLCHAIN="python3 make g++"\n${PRE_FIX_DEPS_STAGE}`.replace(
+      'COPY package*.json ./',
+      'RUN apk add --no-cache ${TOOLCHAIN}\nCOPY package*.json ./',
+    );
+    assert.deepEqual(toolchainFindings(globalArg), []);
+  });
+
+  it('accepts a `RUN <<EOF` heredoc that installs the toolchain (review item 3)', () => {
+    const heredoc = PRE_FIX_DEPS_STAGE.replace(
+      'COPY package*.json ./',
+      'RUN <<EOF\napk add --no-cache python3 make g++\nEOF\nCOPY package*.json ./',
+    );
+    assert.deepEqual(toolchainFindings(heredoc), []);
+  });
+
+  it('resolves `FROM <stage> AS <name>` to the aliased stage, for libc AND for inherited packages (review item 3)', () => {
+    const inherited = [
+      'FROM node:22-alpine AS deps',
+      'RUN apk add --no-cache python3 make g++',
+      '',
+      'FROM deps AS builder',
+      'WORKDIR /app',
+      'RUN npm ci',
+      '',
+      'FROM node:22-alpine AS runner',
+      'CMD ["npx", "tsx", "server.ts"]',
+    ].join('\n');
+    // The toolchain is inherited from `deps`, so `npm ci` in `builder` is fine.
+    assert.deepEqual(toolchainFindings(inherited), []);
+    // And `builder` is musl, not the glibc a raw string match would infer.
+    const stages = parseStages(inherited);
+    assert.equal(resolveBaseImage(stages[1], stages), 'node:22-alpine');
+    assert.equal(new Set(stages.map((s) => libcFamily(resolveBaseImage(s, stages)))).size, 1);
+  });
+
+  it('accepts `FROM --platform=… <image> AS <name>` (review item 3)', () => {
+    const platformed = PRE_FIX_DEPS_STAGE.replace(
+      'FROM node:22-alpine AS deps',
+      'FROM --platform=$BUILDPLATFORM node:22-alpine AS deps',
+    ).replace('COPY package*.json ./', 'RUN apk add --no-cache python3 make g++\nCOPY package*.json ./');
+    const stages = parseStages(platformed);
+    assert.equal(stages.length, 2, 'a FROM carrying a flag must not drop the stage');
+    assert.equal(stages[0].name, 'deps');
+    assert.equal(stages[0].base, 'node:22-alpine');
+    assert.deepEqual(toolchainFindings(platformed), []);
+  });
+
+  it('still reads a stage alias that itself inherits, transitively', () => {
+    const chained = [
+      'FROM node:22-alpine AS base',
+      'RUN apk add --no-cache python3 make g++',
+      'FROM base AS deps',
+      'FROM deps AS builder',
+      'RUN npm ci',
+    ].join('\n');
+    const stages = parseStages(chained);
+    assert.equal(resolveBaseImage(stages[2], stages), 'node:22-alpine');
+    assert.deepEqual(toolchainFindings(chained), []);
   });
 });

@@ -127,6 +127,111 @@ function stepBlock(source: string, stepName: string): string | null {
   return out.join('\n');
 }
 
+/**
+ * A workflow source with comment-only lines removed.
+ *
+ * Round-2 review, minor item 3: the round-1 edge.yml assertions each carried
+ * their own inline `split/filter/join` copy of this. One helper. (The three
+ * PREDICATE uses above — topLevelConcurrencyBlock, topLevelConcurrencyKeyCount
+ * and stepBlock — are deliberately left as they are: they filter while walking
+ * indentation rather than producing a stripped source, and this lane is under
+ * a "no deletions from the pre-existing file" constraint. See the round-2
+ * closure section of docs/audits/2026-09-18-edge-image/review.md.)
+ *
+ * Stripping is load-bearing, not cosmetic: edge.yml's own explanatory prose
+ * quotes the very strings the assertions below look for, so a raw match on the
+ * file keeps reporting green after the LIVE line is deleted or commented out.
+ */
+function liveLines(source: string): string {
+  return source
+    .split('\n')
+    .filter((l) => !l.trim().startsWith('#'))
+    .join('\n');
+}
+
+function escapeForRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * The YAML block nested at an exact path of block-mapping keys — e.g.
+ * `yamlBlock(edgeSrc, ['on', 'workflow_run'])` returns ONLY the body of
+ * `on.workflow_run`, never a sibling trigger's body.
+ *
+ * WHY THIS EXISTS (round-2 review items 4 and 5). The round-1 assertions
+ * captured the whole `on:` block and substring-searched it, and searched the
+ * whole file for the job's `if:` conditions. Both were defeated by an ordinary
+ * edit that MOVES the text rather than deleting it:
+ *
+ *   - `branches: [main]` relocated from `on.workflow_run` to a sibling
+ *     `on.push` trigger — 49 pass / 0 fail, with the 467-skipped-runs defect
+ *     fully restored;
+ *   - the three `if:` conditions demoted from the `publish-edge` JOB to a
+ *     step-level `if:` — 49 pass / 0 fail, while every CI completion on main
+ *     again creates a real run that checks out the commit and holds
+ *     `packages: write`.
+ *
+ * A guard that is green on input that cannot work is not a guard
+ * (docs/LANE_STANDARD.md §3), so these read the structure instead of the text.
+ *
+ * This is an indentation-aware walk over YAML block mappings — the same walk
+ * `topLevelConcurrencyBlock` above already does, generalised to a path — NOT a
+ * full YAML implementation, and it is described that way deliberately: this
+ * repository vendors no YAML parser (`require.resolve('yaml')` and
+ * `require.resolve('js-yaml')` both fail), and adding a dependency to a test
+ * is a bigger change than the defect warrants. It handles what GitHub workflow
+ * files are: block mappings, comments, flow sequences and block scalars. It
+ * does NOT handle flow mappings (`on: {workflow_run: {...}}`), anchors or
+ * multi-document files — all of which would return null here and so fail the
+ * assertions CLOSED, which is the correct direction for a guard.
+ */
+function yamlBlock(source: string, keyPath: readonly string[]): string | null {
+  let lines = liveLines(source)
+    .split('\n')
+    .filter((l) => l.trim() !== '');
+  for (const key of keyPath) {
+    if (lines.length === 0) return null;
+    const levelIndent = lines[0].search(/\S/);
+    const keyLine = new RegExp(`^\\s*${escapeForRegExp(key)}\\s*:`);
+    const startIdx = lines.findIndex(
+      (l) => l.search(/\S/) === levelIndent && keyLine.test(l),
+    );
+    if (startIdx === -1) return null;
+    const body: string[] = [];
+    for (let i = startIdx + 1; i < lines.length; i++) {
+      if (lines[i].search(/\S/) <= levelIndent) break;
+      body.push(lines[i]);
+    }
+    lines = body;
+  }
+  return lines.join('\n');
+}
+
+/**
+ * The scalar value at an exact key path, block scalars (`>-`, `|`) folded into
+ * one line. Returns null when no key exists at that path — which is exactly
+ * what "the condition was moved somewhere else" looks like.
+ */
+function yamlScalar(source: string, keyPath: readonly string[]): string | null {
+  const key = keyPath[keyPath.length - 1];
+  const parentPath = keyPath.slice(0, -1);
+  const parent =
+    parentPath.length === 0 ? liveLines(source) : yamlBlock(source, parentPath);
+  if (parent === null) return null;
+  const lines = parent.split('\n').filter((l) => l.trim() !== '');
+  if (lines.length === 0) return null;
+  const levelIndent = lines[0].search(/\S/);
+  const keyLine = new RegExp(`^\\s*${escapeForRegExp(key)}\\s*:`);
+  const startIdx = lines.findIndex((l) => l.search(/\S/) === levelIndent && keyLine.test(l));
+  if (startIdx === -1) return null;
+  const parts = [lines[startIdx].replace(keyLine, '').trim()];
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    if (lines[i].search(/\S/) <= levelIndent) break;
+    parts.push(lines[i].trim());
+  }
+  return parts.join(' ').trim();
+}
+
 describe('CI gate integrity — blocking gates must stay blocking', () => {
   const security = fs.readFileSync(securityYml, 'utf8');
   const ci = fs.readFileSync(ciYml, 'utf8');
@@ -530,50 +635,164 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
     // line was deleted — the same shadowing failure this file's
     // cancel-in-progress case exists to catch.
     const edgeSrc = fs.readFileSync(path.join(root, '.github/workflows/edge.yml'), 'utf8');
-    const live = edgeSrc
-      .split('\n')
-      .filter((l) => !l.trim().startsWith('#'))
-      .join('\n');
 
-    const onBlock = /^on:\n((?:[ \t]+.*\n?)+)/m.exec(live);
-    assert.ok(onBlock, 'edge.yml has no top-level `on:` block outside of comments');
-    assert.match(
-      onBlock[1],
-      /workflow_run:/,
+    assert.ok(
+      yamlBlock(edgeSrc, ['on', 'workflow_run']) !== null,
       'edge.yml must still trigger on workflow_run (see its own "WHY workflow_run" comment)',
     );
-    assert.match(
-      onBlock[1],
-      /^\s+branches:\s*\[\s*main\s*\]\s*$/m,
-      'edge.yml\'s workflow_run trigger must keep `branches: [main]`. Without it, every lane branch\'s '
-      + 'CI completion creates an Edge Image run that immediately skips — 467 of the first 471 runs. '
+    // ROUND-2 REVIEW ITEM 4: this is asserted at the EXACT path
+    // `on.workflow_run.branches`, not anywhere inside `on:`. The round-1
+    // version captured the whole `on:` block and matched the string in it, so
+    // moving the filter to a sibling `on.push` trigger — an ordinary edit,
+    // and one that restores the defect completely, since a `workflow_run`
+    // trigger with no `branches:` fires for every branch again — left the
+    // guard at 49 pass / 0 fail. Measured before the fix; see the round-2
+    // closure section of docs/audits/2026-09-18-edge-image/review.md.
+    const workflowRunBranches = yamlScalar(edgeSrc, ['on', 'workflow_run', 'branches']);
+    assert.equal(
+      workflowRunBranches,
+      '[main]',
+      'edge.yml\'s workflow_run trigger must keep `branches: [main]` AT `on.workflow_run.branches`. '
+      + 'Without it, every lane branch\'s CI completion creates an Edge Image run that immediately '
+      + 'skips — 467 of the first 471 runs. A `branches:` on any OTHER trigger does not count. '
       + 'Note this filter matches the UPSTREAM run\'s branch, not this workflow file\'s ref.',
+    );
+  });
+
+  it('edge.yml\'s `branches: [main]` cannot be satisfied by a sibling trigger (round-2 review item 4)', () => {
+    // The defeating mutation, pinned as a fixture so it can never come back.
+    const defeated = [
+      'on:',
+      '  workflow_run:',
+      '    workflows: ["CI"]',
+      '    types: [completed]',
+      '  push:',
+      '    branches: [main]',
+      'jobs: {}',
+    ].join('\n');
+    assert.equal(
+      yamlScalar(defeated, ['on', 'workflow_run', 'branches']),
+      null,
+      'a `branches:` under a sibling `push:` trigger must NOT read as the workflow_run filter',
+    );
+    // ...and the real shape still does.
+    const correct = [
+      'on:',
+      '  workflow_run:',
+      '    workflows: ["CI"]',
+      '    types: [completed]',
+      '    branches: [main]',
+      'jobs: {}',
+    ].join('\n');
+    assert.equal(yamlScalar(correct, ['on', 'workflow_run', 'branches']), '[main]');
+    // A commented-out filter must not satisfy it either.
+    assert.equal(
+      yamlScalar(correct.replace('    branches: [main]', '    # branches: [main]'), [
+        'on',
+        'workflow_run',
+        'branches',
+      ]),
+      null,
+      'a commented-out `branches: [main]` must not read as live',
     );
   });
 
   it("edge.yml keeps all three job-level `if:` conditions as belt and braces (the trigger filter does not cover two of them)", () => {
     // The `branches: [main]` filter above covers the BRANCH only. workflow_run
-    // still fires for a FAILED CI run on main, and for a CI run whose own
-    // event was `pull_request` against main — neither may publish :edge. So
-    // `conclusion == 'success'` and `event == 'push'` are load-bearing, not
-    // redundant, and must not be deleted as "handled by the trigger now".
-    // head_branch is deliberately redundant and is kept as the third brace.
+    // still fires for a FAILED CI run on main, and for a pull_request-event CI
+    // run whose own HEAD branch is named `main` (the ordinary shape of a fork
+    // contribution) — neither may publish :edge. So `conclusion == 'success'`
+    // and `event == 'push'` are load-bearing, not redundant, and must not be
+    // deleted as "handled by the trigger now". head_branch is deliberately
+    // redundant and is kept as the third brace.
+    //
+    // ROUND-2 REVIEW ITEM 5: the conditions are read from the JOB's own `if:`
+    // at `jobs.publish-edge.if`, not substring-searched over the file, which
+    // is what this test's own name has always claimed. The round-1 version
+    // searched the whole comment-stripped source, so deleting the job-level
+    // `if:` and demoting the identical three conditions to a step-level `if:`
+    // on "Build and push :edge" left the guard at 49 pass / 0 fail. That is
+    // not cosmetic and it is the security-relevant one of the two: with no
+    // job-level `if:`, every completed CI run on main — including a RED one —
+    // creates a real Edge run that checks out the commit, logs in to GHCR and
+    // sets up Buildx while holding `packages: write`, and only the last step
+    // declines. The job-level guard is what stops a registry-write token ever
+    // being handed to a run that should never have started.
     const edgeSrc = fs.readFileSync(path.join(root, '.github/workflows/edge.yml'), 'utf8');
-    const live = edgeSrc
-      .split('\n')
-      .filter((l) => !l.trim().startsWith('#'))
-      .join('\n');
+    const jobIf = yamlScalar(edgeSrc, ['jobs', 'publish-edge', 'if']);
+    assert.ok(
+      jobIf !== null,
+      'edge.yml\'s `publish-edge` job must keep a JOB-LEVEL `if:`. A step-level `if:` does not count: '
+      + 'the run is still created and still holds `packages: write` before the step is reached.',
+    );
 
     for (const [condition, why] of [
       ["github.event.workflow_run.conclusion == 'success'", 'a RED CI run on main must not publish an image'],
       ["github.event.workflow_run.head_branch == 'main'", 'the redundant brace under the trigger filter'],
-      ["github.event.workflow_run.event == 'push'", 'a pull_request-event CI run targeting main must not publish'],
+      ["github.event.workflow_run.event == 'push'", 'a pull_request-event run whose HEAD branch is named `main` (a fork) must not reach a `packages: write` job'],
     ] as const) {
       assert.ok(
-        live.includes(condition),
-        `edge.yml must keep \`${condition}\` in its publish-edge \`if:\` — ${why}`,
+        jobIf!.includes(condition),
+        `edge.yml must keep \`${condition}\` in its publish-edge JOB-LEVEL \`if:\` — ${why}`,
       );
     }
+  });
+
+  it('edge.yml\'s three conditions cannot be satisfied from a step-level `if:` (round-2 review item 5)', () => {
+    // The defeating mutation, pinned as a fixture.
+    const conditions = [
+      "      github.event.workflow_run.conclusion == 'success' &&",
+      "      github.event.workflow_run.head_branch == 'main' &&",
+      "      github.event.workflow_run.event == 'push'",
+    ];
+    const demoted = [
+      'jobs:',
+      '  publish-edge:',
+      '    runs-on: ubuntu-latest',
+      '    permissions:',
+      '      contents: read',
+      '      packages: write',
+      '    steps:',
+      '      - name: Build and push :edge',
+      '        if: >-',
+      ...conditions.map((l) => `    ${l}`),
+      '        uses: docker/build-push-action@v5',
+    ].join('\n');
+    assert.equal(
+      yamlScalar(demoted, ['jobs', 'publish-edge', 'if']),
+      null,
+      'a step-level `if:` must NOT read as the job-level one — the run is created either way',
+    );
+
+    const correct = [
+      'jobs:',
+      '  publish-edge:',
+      '    if: >-',
+      ...conditions,
+      '    runs-on: ubuntu-latest',
+      '    steps:',
+      '      - name: Build and push :edge',
+      '        uses: docker/build-push-action@v5',
+    ].join('\n');
+    const jobIf = yamlScalar(correct, ['jobs', 'publish-edge', 'if']);
+    assert.ok(jobIf !== null);
+    for (const condition of [
+      "github.event.workflow_run.conclusion == 'success'",
+      "github.event.workflow_run.head_branch == 'main'",
+      "github.event.workflow_run.event == 'push'",
+    ]) {
+      assert.ok(jobIf!.includes(condition), `folded block scalar must yield ${condition}`);
+    }
+
+    // A commented-out job-level `if:` must not read as live either.
+    assert.equal(
+      yamlScalar(
+        correct.replace('    if: >-', '    # if: >-'),
+        ['jobs', 'publish-edge', 'if'],
+      ),
+      null,
+      'a commented-out job-level `if:` must not read as live',
+    );
   });
 
   it('release.yml documents, in-file, why it has no concurrency group', () => {
