@@ -1075,3 +1075,417 @@ consequence stated generally: the saving lands on a docs-only push that sits
 on top of something CI has already proved — which is exactly the shape of a
 docs push to `main`, merged `--ff-only` one commit at a time into a per-SHA
 concurrency group that never cancels anything.
+
+---
+---
+
+# Round 2 — re-check (same reviewer, 2026-09-18)
+
+**Tip reviewed: `f3f619791d5a833704b6db3217f641090f0e99f3`** — ten commits on top
+of round 1's review commit `f4c6ee4e`. Fresh worktrees at that tip
+(`<session scratch>/wt-cidocs-r2` read/run, `<session scratch>/wt-cidocs-r2exp`
+adversarial, `<session scratch>/wt-cidocs-rebase` rebased-onto-main). Everything
+above this line is unedited: the round-1 text is byte-identical to `f4c6ee4e`
+(first **457 lines / 26,318 bytes**, `cmp` clean), and the lane's closure below
+it is untouched. The file is 1,077 lines.
+
+## Verdict: **MERGE**
+
+All three blockers are closed and I reproduced every closure on my own harness,
+not the lane's. Two follow-ups below are real but neither blocks: one is a
+number I could not reproduce, one is a cross-lane gating change that **became
+this lane's to make while round 2 was running** — `lane/edge-image-real` has
+already merged (`origin/main` is now `8b6a60c1`, and `origin/lane/edge-image-real`
+points at the same commit).
+
+## The twelve items
+
+| # | item | disposition | my evidence |
+|---|---|---|---|
+| B1 | rename out of `server/` classified docs-only | **CLOSED** | `gitDiffNames()` (`scripts/classify-docs-only.mjs:110-116`) pins `--no-renames` + `core.quotePath=true` on both arms; 38-case fixture suite drives the real bytes |
+| B2a | `root-cause-parity` missing from the list | **CLOSED** | my witness now RED on my own replay; isolated run 18/17/**1 fail** |
+| B2b | `scoring-receipt-guard` excluded on a false reason | **CLOSED** | my witness now RED; 26/25/**1 fail** |
+| B2c | *(new, lane-found)* `telemetry-docs-truth` reads `ROADMAP.md` | **CLOSED** | my witness RED; the derivation sees `'../../ROADMAP.md'`, my round-1 grep could not |
+| 4 | nothing guarded the list | **CLOSED** | `tests/core/docs-gating-set.test.ts`, 8/8; 7 of my 8 mutations RED |
+| 5 | `before..head` + `cancel-in-progress` | **CLOSED** | `scripts/lib/validated-base.mjs`; 12 hostile cases, all fail closed; **fired in production** |
+| 6 | impure half untested | **CLOSED** | `tests/scripts/classify-docs-only.test.ts`, 38/38, first case asserts byte-identical copies |
+| 7 | `honesty-audit` overclaim | **CLOSED** (negative finding, honestly filed) | enumeration verified; one small omission noted below |
+| 8 | fast path had never executed | **CLOSED** | two real runs, both verified against the Actions API |
+| 9 | `release.yml` mirror step | **CLOSED** | trade accepted; inertness is now a gate (2 mutations RED) |
+| 10 | `ci-gates-intact` could not see a wrong `if:` | **CLOSED**, and my round-1 witness was wrong — the lane's correction is right | 11 mutations run against both suites |
+| 11 | §7 / `CLAUDE.md` | **CLOSED** | "when in doubt, push" restored at `CLAUDE.md:98-106`; Decision #9 at `docs/DECISION_LOG.md:921` |
+| 12 | branch protection | **CLOSED** (no action) | `main` still `"protected": false`, all 38 branches |
+| A | stale account-block claim | **CLOSED**, swept | 4 sites corrected; only `edge.yml:33` remains, correctly left to the other lane |
+| B | edge cost regression | **WRITTEN UP, NOT APPLIED** — and it is now live in `main` | see follow-up 2 |
+
+## B2 — my own replay, not the lane's
+
+I rebuilt the replay harness from `ci.yml`'s shipped 17-file list plus the two
+unconditional gates, ran it in a worktree of my own, and restored the tree
+between every perturbation. Baseline **GREEN, 54.6 s** (round 1: 28.5 s; the
+four added suites are the difference).
+
+| witness (each a change the classifier calls `docs_only=true`) | fast path | full path |
+|---|---|---|
+| `Surface - Root Cause Pipeline.md`: `\| root causes \| 70 \| 69 \|` -> `\| 71 \| 68 \|` | **RED** | 18 tests / 17 pass / 1 fail |
+| `MEASUREMENT_RECEIPTS.md`: `### 2026-08-08 Receipt:` -> `… Receipt (SUPERSEDED):` | **RED** | 26 / 25 / 1 fail |
+| `ROADMAP.md` P3: `not durable` -> `kept safely` | **RED** | 1 / 0 / 1 fail |
+| broken `[[wikilink]]` in `docs/brain/00 Home.md` | **RED** | — |
+| hand-edited `docs/brain/GRAPH.md` (stale export) | **RED** | — |
+| overclaim appended to `README.md` | **RED** | — |
+| last row deleted from `docs/CLAIMS_REGISTER.md` | **RED** | — |
+| *(control)* overclaim appended to `docs/PATH_TO_EXCELLENCE.md` | GREEN | GREEN — nothing catches it either way (item 7) |
+
+### Item 2 of the re-check brief — the correction the lane owed me
+
+**The lane's retraction is right and my witness stands.** Run in isolation on a
+clean tree, `node --experimental-strip-types tests/routes/root-cause-parity.test.ts`
+with only the `70 | 69` -> `71 | 68` edit applied gives **18 tests, 17 pass,
+1 fail** (`not ok 7 - the scene-span drift measurement is re-measured, not
+re-typed`). The intermediate claim that it does not fail was wrong; the
+published closure says so in its own text. The record now says it plainly from
+both sides.
+
+### The candidate set — re-derived by me, and the one-hop arm
+
+I wrote my own derivation (same two rules, my own code, no import of the lane's
+test) and ran it over `tests/**`. It finds **25 candidates**, which is exactly
+the lane's 17 listed + 8 excluded, with **zero uncovered**. Six are reachable
+only through the one-hop arm:
+
+```
+p0-sample-drift · public-benchmark-limits · sample-coverage-facts
+scene-segments · discharge-obligations · receipt-conversion
+```
+
+**The one-hop arm is right, and it earns its keep.** `p0-sample-drift.test.ts`
+names no docs path at all and is a candidate only because
+`scripts/generate-p0-sample-report.ts` builds `docs/user-validation/…`; I
+confirmed it is a genuine docs gate by appending a comment to that committed
+artifact — `p0-sample-drift` **FAILS**, `sample-coverage-facts` passes, exactly
+as the exclusion table predicts. **Two hops is correctly rejected**: I checked
+the stated reason and it holds — `server/lib/rulebook-count.ts` reads
+`docs/rulebook/coverage.json` at module load and is reachable from `doctor.ts`,
+so two hops would sweep most of the suite in for no new coverage.
+
+**All eight exclusions are sound** — I tested them rather than reading them.
+Perturbing the real file each one names and running the excluded suite:
+
+| exclusion | perturbation I applied | result |
+|---|---|---|
+| `check-scoring-receipt.test.ts` | ledger heading reworded | PASS (holds) |
+| `discharge-obligations.test.ts` | ledger heading reworded | PASS |
+| `receipt-conversion.test.ts` | ledger heading reworded | PASS |
+| `public-benchmark-limits.test.ts` | `data/screenplays/LICENSE-live-action.md` corrupted | PASS |
+| `scene-segments.test.ts` | same | PASS |
+| `sample-coverage-facts.test.ts` | committed P0 sample report edited | PASS |
+| `owner-measure-e2e.test.ts` | (heavy git fixtures; reason cites lines, verified by reading) | — |
+| `classify-docs-only.test.ts` | (writes its own fixtures under `os.tmpdir()`) | — |
+
+None is a false reason of the kind I caught in round 1. The lane's own count of
+"24 candidates, 7 excluded" is **one low in both halves** — the shipped table
+has **8** entries and the derivation finds **25**. Cosmetic, and the code is the
+authority, but the prose should say 25/17/8.
+
+### The guard itself goes RED
+
+| mutation | result |
+|---|---|
+| drop `root-cause-parity` from both lists | **RED** (2 fail) |
+| drop `docs-gating-set.test.ts` itself | **RED** (1 fail) — the self-flagging claim is real |
+| drop `telemetry-docs-truth` from both lists | **RED** (2 fail) |
+| lists diverge (remove one file from `ci.yml` only) | **RED** (2 fail) |
+| `EXCLUDED` names a file that does not exist | **RED** |
+| `EXCLUDED` names a non-candidate (stale silencer) | **RED** |
+| exclusion reason replaced by a bare category label | **RED** |
+| baseline | 8/8 green |
+
+**The self-flag is not circular.** Removing `docs-gating-set.test.ts` from the
+list makes the suite name itself as uncovered, because it is a derived
+candidate (it contains the literal `'docs'`, which resolves to a real
+directory). Its own assertions are about the workflow lists and the derivation
+— inputs a documentation edit cannot change — so being on the fast path costs
+13.7 s and proves nothing extra; it is simply the rule applied to itself
+without an exception, which is the right call.
+
+## Item 3 — attacking the validated base
+
+I built a fixture repo and a loopback runs-API stub of my own and drove the
+shipped `scripts/classify-docs-only.mjs`:
+
+| case | result |
+|---|---|
+| ordinary: last-success tip **is** `before` | `docs_only=true`, range **not** widened — the design's "costs nothing" promise, verified |
+| cancellation: last-success tip older than `before` | `docs_only=false`, log names the widening and both SHAs |
+| runs API returns **403** (rate limit / missing grant) | `docs_only=false`, "runs API returned HTTP 403" |
+| **no successful run ever** on the ref (empty list) | `docs_only=false`, "0 candidate run(s) considered" |
+| 20 successes returned, **none usable** (pagination truncation) | `docs_only=false`, "20 candidate run(s) considered" |
+| last-success tip **force-pushed away** (object absent) | `docs_only=false` |
+| last-success tip on a **diverged branch** (rebase / re-point, non-ancestor) | skipped as non-ancestor, walks to the next older run, widens, `docs_only=false` |
+| the **currently-executing run** nominating its own tip | excluded, `docs_only=false` |
+| API unreachable | `docs_only=false` |
+| unwritable `$GITHUB_OUTPUT` | warning printed, assignment echoed to stdout, **exit 0**, no unhandled rejection |
+
+Every unresolvable case fails closed, and every exit code was 0 — which matters,
+because a non-zero `classify` fails the job, and `test`/`browser` both `needs:`
+it, so a red classifier reddens the run rather than degrading to a full pass.
+
+**`merge-base` over "just use the tip" is the right choice**, and the diverged-branch
+case is why: a non-ancestor tip is not evidence about this commit's history, and
+`merge-base` is an ancestor of both, so the range can only ever widen. Widening
+can turn `true` into `false` and never the reverse.
+
+**`actions: read` cannot see runs it should not.** It is scoped to this job
+(`ci.yml:81-91`), read-only over workflow-run metadata of this repository, and
+the query is further narrowed to one workflow file, one ref and successes only.
+`workflowFileFromRef` (`validated-base.mjs:131-139`) refuses anything that is
+not a plain `*.yml`/`*.yaml` basename before it reaches a URL path, so
+"a different workflow with the same basename" is not reachable within a
+repository (file names are unique) and cannot be reached across repositories at
+all. `release.yml`'s copy carries the same grant and its output stays unused.
+
+**On the choice of fix:** the lane took the validated base over "disable the
+fast path when superseding a cancelled run", on the grounds that it also closes
+the FAILED-run shape I never named. **That reasoning is correct and I endorse
+it.** A docs-only push landing on top of a *red* commit is the same induction
+break — the tip has not been proved by any completed run — and the cheaper fix
+would have left it open. The cost is real and the lane states it: on a branch
+pushing faster than CI completes, every push is FULL until one run finishes.
+That is the correct trade; the saving is meant to land on `main`, which is
+merged `--ff-only` into a per-SHA group that cancels nothing.
+
+## Item 4 — the in-the-wild firing, verified against the Actions API
+
+Every number checks out:
+
+- Last **successful** run on the ref before the event: **35298622753**, head
+  `e5049d6b`, `2026-09-18T02:15:24Z`, conclusion `success`.
+- Four runs `cancelled` in between: **35299806186** (`031617eb`),
+  **35299903993** (`d16bae81`), **35300227954** (`a0a881ec`),
+  **35300544242** (`184c0c67`) — five pushes between 02:33:25 and 02:45:10.
+- `git diff --name-only 184c0c67..04a94f57` = **1 file**
+  (`docs/audits/…/review.md`), and `classifyDocsOnly` on it returns **true** —
+  the round-1 classifier would have skipped the type check, `npm test`,
+  metamorphic, build and the whole browser job.
+- `git merge-base e5049d6b 184c0c67` = `e5049d6b`;
+  `git diff --name-only --no-renames e5049d6b..04a94f57` = **18 files**,
+  including `.github/workflows/ci.yml`, `scripts/classify-docs-only.mjs`,
+  `tests/core/docs-only-classify.test.ts` and
+  `tests/scripts/classify-docs-only.test.ts` — the classifier's own source
+  among them. `classifyDocsOnly` returns **false**.
+
+The fix caught the exact shape it was written for, on real infrastructure, four
+commits after it was written. This is the strongest evidence in the report and
+it is all independently checkable.
+
+## Item 5 — item 10's two halves, both ruled on
+
+I ran eleven mutations against **both** suites: round 1's `ci-gates-intact.test.ts`
+(restored from `f4c6ee4e`, byte-identical to main's) and round 2's.
+
+| mutation on `ci.yml` | round 1 | round 2 |
+|---|---|---|
+| Type check `!= 'true'` -> `== 'true'` | 0 fail | **1 fail** |
+| Type check `!= 'true'` -> `== 'false'` (**my round-1 witness**) | **1 fail** | 2 fail |
+| no-console -> `== 'true'` | 0 | **1** |
+| reachability -> `== 'true'` | 0 | **1** |
+| `npm test` -> `== 'true'` | 0 | **1** |
+| receipt guard -> `== 'true'` | 0 | **1** |
+| metamorphic -> `== 'true'` | 0 | **1** |
+| Build -> `== 'true'` | 0 | **1** |
+| `browser` job `if:` -> `== 'true'` | 0 | **1** |
+| fast-path step `== 'true'` -> `!= 'true'` | 0 | **1** |
+| `browser` job `if:` deleted outright | 0 | **1** |
+| new `if:` on "Honesty string audit" | 0 | **1** |
+| new `if:` on "Check project brain" | 0 | **1** |
+| classify grant widened to `contents: write` | 0 | **1** |
+| `actions: read` deleted from classify | 0 | **1** |
+| `release.yml` `test` job gains `needs: classify` | 0 | **1** |
+| `release.yml` docs-gating step gains an `if:` | 0 | **2** |
+
+**My round-1 witness was wrong and the lane is right to say so.** `== 'false'`
+trips the pre-existing `if:`-contains-a-literal-`false` scan
+(`ci-gates-intact.test.ts:262-274`) — round 1 fails **1**, not 0, under exactly
+that mutation. **The hole was real all the same**, and the lane's replacement
+witness proves it: copy-pasting the fast-path step's `== 'true'` onto "Type
+check" leaves round 1 at 47/47 green while skipping `tsc` on every full run.
+Sixteen mutations now go RED where round 1 saw nothing.
+
+`git diff f4c6ee4e..HEAD -- tests/core/ci-gates-intact.test.ts` is
+**+182 / -0** with **zero deleted lines** — additive only, no pre-existing
+assertion touched. 47 -> **53**, and 53/53 green.
+
+## Item 6 — item 7's enumeration, checked for honesty
+
+The headline is **correct and correctly filed as not-done**: nothing scans
+`docs/**` prose for overclaim language, and I re-confirmed it — the sentence
+*"STORYMACHINE is the industry-standard, world-class, revolutionary tool and we
+guarantee Hollywood-standard results"* appended to `docs/PATH_TO_EXCELLENCE.md`
+leaves `honesty-audit` **clean at exit 0**; in `README.md` it exits 1 with five
+pattern hits. The "four FIGURES" claim is exact (`honesty-audit.mjs:204-…`
+carries 8917 / 10523 / 5701 / 12700; 3216 is deliberately excluded and the file
+says why).
+
+**One omission, and it makes the statement slightly too pessimistic, not too
+generous.** `SCAN_TRACKED_ARTIFACTS` (`honesty-audit.mjs:41-43`) puts exactly
+one `docs/**` file — `docs/user-validation/sample-coverage-report.html` —
+through the **full** PATTERNS set. Verified: an overclaim appended to it fails
+`honesty-audit` with `[guarantees]`, `[industry-standard]`, `[superlatives]`.
+The enumeration also omits four suites that gate `docs/**` *content* without
+being language scans (`coverage-letter`, `root-cause-parity`, the two
+`rulebook` suites, `brain-coverage`, `p0-sample-drift`). Neither changes the
+conclusion — the safety argument still may not rest on a gate that does not
+exist — so this is a one-line correction, not a reopened item.
+
+## Item 7 — the `release.yml` trade
+
+**The trade is right.** Gating the mirrored step needs `needs: classify` on
+`release.yml`'s `test` job; `publish` needs `[test, browser]`; and a job skipped
+because a `needs` dependency **failed** leaves the run at `failure` — so a
+classifier bug would convert a `v*` tag push into a release that silently never
+publishes, to save 25–60 s on an event that happens a few times a year. Trading
+release reliability for seconds on the rarest event in the repository would be
+the wrong direction.
+
+**And the test pins what matters.** `release.yml` gaining `needs: classify` on
+its `test` job is **RED (1 fail)**; the docs-gating step gaining any `if:` is
+**RED (2 fail)**; both were green on round 1. That is exactly the mechanical
+inertness I asked for, and it is stronger than the comment it replaces.
+
+## Everything else the re-check asked for
+
+- **Full `npm test`, my own run, round-2 tip:** **14,142 tests / 14,050 pass /
+  0 fail / 91 skipped / 1 todo**, exit 0, 467.8 s, `RUN_E2E` unset — matching
+  the lane exactly. The **+62** against my round-1 baseline of 14,080 / 13,988
+  is fully accounted for, and I counted each file myself:
+  `classify-docs-only.test.ts` **38**, `docs-gating-set.test.ts` **8**,
+  `docs-only-classify.test.ts` 21 -> **31** (+10), `ci-gates-intact.test.ts`
+  47 -> **53** (+6). 38 + 8 + 10 + 6 = 62.
+- **`npm run lint`: 0**, exit 0. `honesty-audit` clean, `check-docs` clean,
+  `check-brain` fresh, `check-scoring-receipt` "no scoring-path files changed".
+- **B3's 38 cases really drive the script bytes.** Its first case reads both
+  the fixture copy and the committed file and `deepEqual`s the **Buffers**
+  (`classify-docs-only.test.ts:260-270`); `makeRepo()` `copyFileSync`s the
+  three real scripts in and excludes them from git so they can never enter a
+  classified changed-file set. 38/38, no skips.
+- **The two fast-path runs, both verified against the API.** Run
+  **35296219834** (`f4c6ee4e`): 01:39:37 -> 01:40:57, **1 m 20 s**, `success`.
+  Run **35301550263** (`799ae27e`): 03:00:35 -> 03:02:45, **2 m 10 s**,
+  `success`; `classify` job 13 s; `browser` job **`"conclusion":"skipped"`**
+  with no runner assigned; seven gate steps `skipped`; "Run docs-gating tests"
+  03:01:48 -> 03:02:32 = **44 s**. Against the 9 m 03 s baseline
+  (34793742299, verified again) that is **6 m 53 s** of wall clock.
+  Incidentally this run is also the first *empirical* proof of my round-1
+  claim in defect B: a run whose `browser` job is skipped still concludes
+  `success`, so `edge.yml` will fire on it.
+- **Cost figures corrected and correct.** On the full run 35294788628 the
+  `classify` job was 8 s of work in a 10 s wall-clock gap before `test` and
+  `browser` were created, plus one runner slot. That is what `ci.yml` and the
+  README now say.
+- **Defect A swept.** Corrected at `docs/PATH_TO_EXCELLENCE.md` ("RESOLVED
+  2026-09-13 — GitHub Actions is running jobs again", with the eleven-day gap
+  kept as history), `CONTRIBUTING.md` ("CI runs. It stopped for eleven days and
+  it is back."), the audit README, and
+  `docs/brain/Owner/Owner - Fix GitHub Actions.md` (`status: resolved`). A
+  repo-wide grep for the block language leaves exactly one live hit,
+  `.github/workflows/edge.yml:33` — correctly **not** this lane's to edit.
+- **`edge.yml` and `Dockerfile` untouched**: `git diff origin/main..HEAD --
+  .github/workflows/edge.yml Dockerfile` is empty on the rebased tree.
+- **Item 11/12:** `CLAUDE.md:96-106` now leads with "**A commit that exists
+  only in a worktree is not work that exists**", restores "**when in doubt,
+  push**", and cites Decision #9. `docs/DECISION_LOG.md:921` records Decision
+  #9 with the maintainer's own words, and it has a brain note. Branch
+  protection re-queried: `main` `"protected": false`, and all 38 branches.
+
+## The rebase, and the state of `main`
+
+`main` has moved **twice more** than the brief says: it is now **`8b6a60c1`**,
+and `origin/lane/edge-image-real` points at that same commit — **the edge lane
+has already merged.** I rebased this lane onto it in a scratch worktree:
+
+- The only conflicts are `docs/brain/GRAPH.md` and
+  `docs/brain/brain.graph.json`, resolved by `npm run brain` (never by hand).
+  `docs/DECISION_LOG.md` and **`tests/core/ci-gates-intact.test.ts` auto-merge
+  cleanly**.
+- On the rebased combined tree: **`ci-gates-intact` 58 tests / 58 pass** —
+  the figure the edge reviewer reported, reproduced. Also
+  `docs-gating-set` 8/8, `classify-docs-only` 38/38, `brain-coverage` 7/7,
+  `check-brain` fresh (124 notes / 504 links), `lint` 0, `honesty-audit` clean,
+  `check-docs` clean, `check-scoring-receipt` clean.
+- **Full `npm test` on the rebased tree: 14,249 tests / 14,157 pass / 0 fail /
+  91 skipped / 1 todo, exit 0**, 367.3 s. This lane, rebased onto a `main` that
+  already carries the edge lane, is green end to end.
+- The edge lane's work survives the rebase intact (`Dockerfile`'s
+  `python3 make g++`, `edge.yml`'s `branches: [main]`).
+
+**One scare, run down to the end, and it is mine, not the lane's.** The first
+full `npm test` I ran on the rebased tree came back **25 failures**, all of them
+inside `tests/scripts/owner-measure-e2e.test.ts`. They are an artifact of my own
+dry-run, not a lane or combination defect, and the proof is three runs:
+
+| tree | `owner-measure-e2e` |
+|---|---|
+| pristine `origin/main` `8b6a60c1` | 56 / 56 pass |
+| the lane tip `f3f61979` | 56 / 56 pass |
+| my rebased worktree, **detached** at a commit on no ref | 31 pass / **25 fail** |
+| the same rebased tree, after `git checkout -B tmp/rebase-check` | **56 / 56 pass** |
+
+The failure is `[REFUSED] git worktree add --detach … origin/HEAD failed (exit
+128) / fatal: invalid reference: origin/HEAD`: the suite clones the repository
+with `git clone --shared`, and my rebased commits existed on no branch, so the
+clone had no ref containing them and `origin/HEAD` did not resolve. Putting the
+tip on a branch fixes it completely. Worth recording for the next person who
+rebases into a detached worktree and runs the full suite: **give the rebase a
+branch name first**, or this one suite will hand you twenty-five red herrings.
+
+**On the skipped browser battery and metamorphic:** acceptable, and I closed the
+gap rather than merely ruling on it. `git diff --name-only origin/main..HEAD --
+src/ server/ public/` is **empty** — the lane touches no rendered surface at all
+— and `check-scoring-receipt origin/main..HEAD` reports no scoring-path files.
+I ran `npm run test:metamorphic` myself on the rebased tree: **exit 0**, hard
+invariants hold, `empty_verbosity` still the one documented known-failing
+witness. The browser battery is the orchestrator's to run on the rebased branch
+per §4, and it has no surface here to certify.
+
+## Follow-ups — neither blocks the merge
+
+1. **The 15,091 ms figure does not reproduce for me.** `classify-docs-only.mjs:320-331`
+   claims the pre-fix code sat 15,091 ms on a dead keep-alive socket versus
+   51 ms. On this sandbox (Node v22.22.2, a loopback stub, `GITHUB_OUTPUT`
+   to `/dev/null`, three runs each) I measured the shipped script at
+   **139–157 ms** with a successful API call and **58–63 ms** with no call;
+   reverting the explicit exit gave **149 ms**, and restoring the full pre-fix
+   shape (`AbortSignal.timeout(15_000)` *and* no explicit exit), including
+   against a stub with `keepAliveTimeout=120000`, gave **147–158 ms**. The fix
+   itself is correct and harmless — an explicit, flushed, deterministic exit is
+   the right shape for a job whose justification is that it costs seconds — but
+   the quoted number should either name the environment that produced it or be
+   re-measured. A number a reviewer cannot reproduce is the one kind of claim
+   this standard exists to catch (§3).
+2. **Defect B is now live in `main`, and it is now this lane's to close.** The
+   edge lane merged first, so this lane is the one that "merges second" in my
+   round-1 framing. On `origin/main` today the `Dockerfile` builds, `edge.yml`
+   is filtered to `branches: [main]`, and it carries **no docs-only gate** — I
+   grepped the merged file. Every green docs-only push to `main` will now buy a
+   full `docker build --push` of a byte-identical image, on exactly the pushes
+   this lane just made cheap. The patch is already written out in full in the
+   closure's defect-B section; applying it is a short round 3 or an immediate
+   follow-up lane, and the guard should be a `ci-gates-intact` assertion that
+   `edge.yml` gates its build steps on a docs-only classification.
+3. **Cosmetic:** the closure and the audit README say "24 candidates, 7
+   excluded"; the shipped table has **8** exclusions and the derivation finds
+   **25**. The code is right; the prose is one low in both halves.
+4. **Cosmetic:** item 7's enumeration omits `SCAN_TRACKED_ARTIFACTS`, the one
+   `docs/**` file (`docs/user-validation/sample-coverage-report.html`) that
+   *is* scanned with the full PATTERNS set — verified, it fails
+   `honesty-audit` on an inserted overclaim. The conclusion is unchanged.
+
+## What this round did well
+
+The lane did not defend round 1's positions; it re-measured them, published a
+retraction of its own intermediate claim about my witness, and found a third
+missed suite that my derivation structurally could not see. The validated-base
+fix chose the more invasive option because it closes a shape nobody asked
+about, then caught that shape in production four commits later. `ci-gates-intact`
+grew by 182 lines and lost none. Every mutation I invented was already covered
+or went RED. That is the standard working.
