@@ -181,9 +181,48 @@ function escapeForRegExp(text: string): string {
  * `require.resolve('js-yaml')` both fail), and adding a dependency to a test
  * is a bigger change than the defect warrants. It handles what GitHub workflow
  * files are: block mappings, comments, flow sequences and block scalars. It
- * does NOT handle flow mappings (`on: {workflow_run: {...}}`), anchors or
- * multi-document files — all of which would return null here and so fail the
- * assertions CLOSED, which is the correct direction for a guard.
+ * does NOT handle flow mappings (`on: {workflow_run: {...}}`) or anchors,
+ * both of which return null here and so fail the assertions CLOSED, which is
+ * the correct direction for a guard. A quoted key (`"on":`) and tab
+ * indentation fail closed the same way.
+ *
+ * MULTI-DOCUMENT files are the one exception, and round-3 review corrected
+ * this sentence: `yamlBlock` reads the FIRST document and ignores a `---`
+ * separated second one, so a second document with an unfiltered trigger comes
+ * back GREEN rather than null. That is unreachable in practice — GitHub
+ * Actions does not accept a multi-document workflow file — but the docstring
+ * previously claimed it failed closed, and it does not.
+ *
+ * DUPLICATE KEYS FAIL CLOSED, and that is round-3 review item R2-3, the one
+ * hole in this helper that was reachable. YAML resolves a repeated mapping key
+ * to the LAST occurrence; this walk took the FIRST. Three edits that add a
+ * key rather than moving one were each 51/51 GREEN on a workflow whose
+ * EFFECTIVE configuration is broken (confirmed against a real YAML
+ * implementation, not asserted):
+ *
+ *   - a second top-level `on:` whose `workflow_run` has no `branches:` —
+ *     effective trigger `{'workflows': ['CI'], 'types': ['completed']}`, i.e.
+ *     the 467-skipped-runs defect fully restored;
+ *   - a second `if: always()` after the job's real `if:` — effective `if:` is
+ *     `always()`, so EVERY workflow_run completion publishes while holding
+ *     `packages: write`;
+ *   - a second `publish-edge:` job key with no `if:` at all — same.
+ *
+ * The second and third are round-1 item 5 restored through a different edit.
+ * THIS FILE ALREADY KNEW about the hazard: `topLevelConcurrencyKeyCount` at
+ * :79-85 exists for exactly it, and its docstring says "later keys shadow
+ * earlier ones… would read as correct here while the broken one actually
+ * governs". This helper, 100 lines below, had reintroduced it. The fix below
+ * makes that lesson general instead of `concurrency`-specific: every key on
+ * the path must occur EXACTLY ONCE at its level, and a repeat returns null.
+ *
+ * Honest caveat, recorded rather than leaned on: GitHub's workflow parser
+ * very likely rejects a duplicate mapping key outright, making the real-world
+ * consequence a loud `startup_failure` rather than a silently-wrong trigger.
+ * Neither GitHub's workflow-syntax reference nor its Actions documentation
+ * says anything about duplicate keys, and no test workflow was pushed to find
+ * out. Either way the guard was green on a workflow that cannot work, which
+ * is the standard this lane set for itself.
  */
 function yamlBlock(source: string, keyPath: readonly string[]): string | null {
   let lines = liveLines(source)
@@ -193,9 +232,12 @@ function yamlBlock(source: string, keyPath: readonly string[]): string | null {
     if (lines.length === 0) return null;
     const levelIndent = lines[0].search(/\S/);
     const keyLine = new RegExp(`^\\s*${escapeForRegExp(key)}\\s*:`);
-    const startIdx = lines.findIndex(
-      (l) => l.search(/\S/) === levelIndent && keyLine.test(l),
-    );
+    const matches = lines.filter((l) => l.search(/\S/) === levelIndent && keyLine.test(l));
+    // Exactly once, or fail closed. A repeated key resolves to the LAST
+    // occurrence for a real YAML loader while this walk reads the first, so
+    // "present twice" cannot be allowed to read as "present". (R2-3)
+    if (matches.length !== 1) return null;
+    const startIdx = lines.indexOf(matches[0]);
     if (startIdx === -1) return null;
     const body: string[] = [];
     for (let i = startIdx + 1; i < lines.length; i++) {
@@ -210,7 +252,9 @@ function yamlBlock(source: string, keyPath: readonly string[]): string | null {
 /**
  * The scalar value at an exact key path, block scalars (`>-`, `|`) folded into
  * one line. Returns null when no key exists at that path — which is exactly
- * what "the condition was moved somewhere else" looks like.
+ * what "the condition was moved somewhere else" looks like — and also when a
+ * key on the path occurs more than once at its level, which is what "a second
+ * key was added after the real one" looks like (see yamlBlock, R2-3).
  */
 function yamlScalar(source: string, keyPath: readonly string[]): string | null {
   const key = keyPath[keyPath.length - 1];
@@ -222,7 +266,12 @@ function yamlScalar(source: string, keyPath: readonly string[]): string | null {
   if (lines.length === 0) return null;
   const levelIndent = lines[0].search(/\S/);
   const keyLine = new RegExp(`^\\s*${escapeForRegExp(key)}\\s*:`);
-  const startIdx = lines.findIndex((l) => l.search(/\S/) === levelIndent && keyLine.test(l));
+  const matches = lines.filter((l) => l.search(/\S/) === levelIndent && keyLine.test(l));
+  // Same unique-key rule as yamlBlock — see its docstring (R2-3). A second
+  // `if:` on the job is what makes this load-bearing: YAML resolves it to the
+  // LAST one, so a trailing `if: always()` governs.
+  if (matches.length !== 1) return null;
+  const startIdx = lines.indexOf(matches[0]);
   if (startIdx === -1) return null;
   const parts = [lines[startIdx].replace(keyLine, '').trim()];
   for (let i = startIdx + 1; i < lines.length; i++) {
@@ -793,6 +842,95 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
       null,
       'a commented-out job-level `if:` must not read as live',
     );
+  });
+
+  it('a duplicate key on the path cannot shadow the real one (round-3 review item R2-3)', () => {
+    // YAML resolves a repeated mapping key to the LAST occurrence. An
+    // indentation walk that takes the FIRST therefore reads a workflow that
+    // does not exist. Each of these three was 51/51 GREEN in round 2, and each
+    // effective config below was confirmed with a real YAML implementation.
+    // This is the hazard `topLevelConcurrencyKeyCount` at :79-85 already
+    // guards for `concurrency:`, generalised to every key on a path.
+
+    // (a) A second top-level `on:` with no `branches:` — the effective
+    //     workflow_run trigger becomes {workflows, types}, restoring the
+    //     467-skipped-runs defect.
+    const duplicateOn = [
+      'on:',
+      '  workflow_run:',
+      '    workflows: ["CI"]',
+      '    types: [completed]',
+      '    branches: [main]',
+      'on:',
+      '  workflow_run:',
+      '    workflows: ["CI"]',
+      '    types: [completed]',
+      'jobs: {}',
+    ].join('\n');
+    assert.equal(
+      yamlScalar(duplicateOn, ['on', 'workflow_run', 'branches']),
+      null,
+      'a second `on:` key must not let the FIRST one satisfy the branches filter',
+    );
+
+    // (b) A second job-level `if: always()` — the effective `if:` is
+    //     `always()`, so every workflow_run completion publishes while
+    //     holding `packages: write`. Round-1 item 5, restored by adding a key
+    //     instead of moving one.
+    const duplicateIf = [
+      'jobs:',
+      '  publish-edge:',
+      '    if: >-',
+      "      github.event.workflow_run.conclusion == 'success' &&",
+      "      github.event.workflow_run.head_branch == 'main' &&",
+      "      github.event.workflow_run.event == 'push'",
+      '    if: always()',
+      '    runs-on: ubuntu-latest',
+    ].join('\n');
+    assert.equal(
+      yamlScalar(duplicateIf, ['jobs', 'publish-edge', 'if']),
+      null,
+      'a second job-level `if:` must not let the FIRST one satisfy the conditions',
+    );
+
+    // (c) A second `publish-edge:` job key with no `if:` at all.
+    const duplicateJob = [
+      'jobs:',
+      '  publish-edge:',
+      '    if: >-',
+      "      github.event.workflow_run.conclusion == 'success'",
+      '    runs-on: ubuntu-latest',
+      '  publish-edge:',
+      '    runs-on: ubuntu-latest',
+      '    permissions:',
+      '      packages: write',
+    ].join('\n');
+    assert.equal(
+      yamlScalar(duplicateJob, ['jobs', 'publish-edge', 'if']),
+      null,
+      'a second `publish-edge:` job key must not let the FIRST one satisfy the conditions',
+    );
+    assert.equal(
+      yamlBlock(duplicateJob, ['jobs', 'publish-edge']),
+      null,
+      'yamlBlock must fail closed on the duplicate job key too, not only yamlScalar',
+    );
+
+    // The negative direction: the unique, correct shapes still resolve, so
+    // the unique-key rule cannot be over-applied into a guard that never
+    // reads anything. A key repeated at a DIFFERENT level is not a duplicate.
+    const nested = [
+      'on:',
+      '  workflow_run:',
+      '    branches: [main]',
+      'jobs:',
+      '  publish-edge:',
+      '    steps:',
+      '      - uses: actions/checkout@v4',
+      '        with:',
+      '          branches: [something-else]',
+    ].join('\n');
+    assert.equal(yamlScalar(nested, ['on', 'workflow_run', 'branches']), '[main]');
   });
 
   it('release.yml documents, in-file, why it has no concurrency group', () => {

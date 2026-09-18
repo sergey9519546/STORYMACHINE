@@ -195,6 +195,32 @@ function escapeForRegExp(text: string): string {
  * somewhere and the package name somewhere, which made
  * `RUN apk add --no-cache curl && echo "dropped: python3 make g++"` and
  * `RUN npm ci && apk add --no-cache python3 make g++` both read as correct.
+ *
+ * ROUND-3 REVIEW ITEMS R2-1 and R2-2. The round-2 splitter honoured quotes but
+ * not the two other things that decide where a shell command ends, and each
+ * omission was a GREEN guard on an image that cannot build:
+ *
+ *   R2-1  `RUN apk add --no-cache curl #&& apk add --no-cache python3 make g++`
+ *         An unquoted `#` at a WORD BOUNDARY starts a shell comment, so the
+ *         `&&` and everything after it is dead text. Round-2 guard: 21/21
+ *         GREEN. Measured in the shipped base image, not argued:
+ *           docker run --rm node:22-alpine sh -c 'echo one #&& echo two'  -> `one`
+ *           docker run --rm node:22-alpine sh -c 'echo a#b'               -> `a#b`
+ *         The second is why the boundary test matters: a `#` mid-word is an
+ *         ordinary character. This hole contradicted this file's OWN header at
+ *         :52-64, which argues the guard must survive "someone commenting the
+ *         RUN line out… the cheaper and likelier edit" — commenting out the
+ *         TAIL is that same edit, one character shorter.
+ *
+ *   R2-2  `RUN apk add --no-cache curl && echo "x \" && apk add … python3 make g++"`
+ *         A backslash escapes the next character, so `\"` does NOT close the
+ *         quote and the whole thing is one `echo` argument. Round-2 read the
+ *         `\"` as a closing quote and invented a phantom `apk add` step —
+ *         21/21 GREEN. Measured:
+ *           docker run --rm node:22-alpine sh -c 'echo "x \" && echo SMUGGLED"'
+ *             -> `x " && echo SMUGGLED`   (SMUGGLED never runs)
+ *
+ * Both are pinned as fixtures at the bottom of this file.
  */
 function splitShellSteps(body: string): string[] {
   const out: string[] = [];
@@ -202,6 +228,18 @@ function splitShellSteps(body: string): string[] {
   let quote: string | null = null;
   for (let i = 0; i < body.length; i++) {
     const ch = body[i];
+    // A backslash escapes the next character everywhere except inside single
+    // quotes, where it is literal. An escaped character can never open or
+    // close a quote, separate a command, or start a comment — so consume the
+    // pair together, before any of those tests run. (R2-2)
+    if (ch === '\\' && quote !== "'") {
+      current += ch;
+      if (i + 1 < body.length) {
+        current += body[i + 1];
+        i++;
+      }
+      continue;
+    }
     if (quote !== null) {
       current += ch;
       if (ch === quote) quote = null;
@@ -210,6 +248,18 @@ function splitShellSteps(body: string): string[] {
     if (ch === '"' || ch === "'") {
       quote = ch;
       current += ch;
+      continue;
+    }
+    // An unquoted `#` at a word boundary comments out the rest of the LINE
+    // (not the rest of the body — a heredoc or a newline-joined RUN has more
+    // lines after it). The boundary test is what keeps `a#b` a literal word
+    // and `--virtual .build-deps#1` an argument. (R2-1)
+    if (ch === '#' && (i === 0 || /[\s;&|(]/.test(body[i - 1]))) {
+      const newline = body.indexOf('\n', i);
+      out.push(current);
+      current = '';
+      if (newline === -1) break;
+      i = newline;
       continue;
     }
     if (ch === '\n' || ch === ';') {
@@ -234,13 +284,29 @@ function splitShellSteps(body: string): string[] {
   return out.map((step) => step.trim()).filter((step) => step !== '');
 }
 
-/** Whitespace-split a shell step into tokens, dropping quote characters. */
+/**
+ * Whitespace-split a shell step into tokens, dropping quote characters.
+ *
+ * Backslash escapes the next character (round-3 review item R2-2, same fix
+ * site as the splitter): the escaped character joins the current token
+ * literally and can never close a quote or end a word. Inside single quotes a
+ * backslash is itself literal, as the shell has it.
+ */
 function shellTokens(step: string): string[] {
   const out: string[] = [];
   let current = '';
   let quote: string | null = null;
   let quoted = false;
-  for (const ch of step) {
+  for (let i = 0; i < step.length; i++) {
+    const ch = step[i];
+    if (ch === '\\' && quote !== "'") {
+      if (i + 1 < step.length) {
+        current += step[i + 1];
+        i++;
+      }
+      quoted = true;
+      continue;
+    }
     if (quote !== null) {
       if (ch === quote) quote = null;
       else current += ch;
@@ -681,6 +747,85 @@ describe('Dockerfile toolchain guard — it can actually fail', () => {
       findings.every((finding) => finding.includes('too late')),
       `expected every finding to say "too late", got: ${JSON.stringify(findings)}`,
     );
+  });
+
+  // ---------------------------------------------------------------------
+  // Round-3 review, items R2-1 and R2-2. Both passed the round-2 guard 21/21
+  // while producing an image that CANNOT build, and both are the same parser
+  // bug class as items 1 and 2: the splitter did not know where a shell
+  // command actually ends. Shell behaviour verified in the shipped base image
+  // (`docker run --rm node:22-alpine sh -c …`), not argued from the spec.
+  // ---------------------------------------------------------------------
+
+  it('is not satisfied by an `apk add` hidden behind a shell `#` comment (review item R2-1)', () => {
+    // `#` at a word boundary comments out the rest of the line, so the `&&`
+    // and the whole second command are dead text. Commenting out the TAIL of
+    // the RUN line is the same edit this file's header calls "the cheaper and
+    // likelier edit", one character shorter — and round 2 did not survive it.
+    const commentedTail = PRE_FIX_DEPS_STAGE.replace(
+      'COPY package*.json ./',
+      'RUN apk add --no-cache curl #&& apk add --no-cache python3 make g++\nCOPY package*.json ./',
+    );
+    const findings = toolchainFindings(commentedTail);
+    assert.equal(
+      findings.length,
+      REQUIRED_TOOLCHAIN.length,
+      `a shell-commented tail must not count as an install, got: ${JSON.stringify(findings)}`,
+    );
+    for (const pkg of REQUIRED_TOOLCHAIN) {
+      assert.ok(findings.some((finding) => finding.includes(`installing ${pkg}`)));
+    }
+  });
+
+  it('still treats a `#` that is NOT at a word boundary as an ordinary character', () => {
+    // The negative direction of R2-1, so the fix cannot be over-applied:
+    // `docker run --rm node:22-alpine sh -c 'echo a#b'` prints `a#b`.
+    // An `apk add` whose arguments contain a `#` mid-word must still install.
+    assert.deepEqual(splitShellSteps('echo a#b && apk add --no-cache python3'), [
+      'echo a#b',
+      'apk add --no-cache python3',
+    ]);
+    const midWord = PRE_FIX_DEPS_STAGE.replace(
+      'COPY package*.json ./',
+      'RUN apk add --no-cache --virtual .build-deps#1 python3 make g++\nCOPY package*.json ./',
+    );
+    assert.deepEqual(toolchainFindings(midWord), []);
+  });
+
+  it('is not satisfied by an `apk add` smuggled past a backslash-escaped quote (review item R2-2)', () => {
+    // The shell sees ONE echo argument: `x " && apk add --no-cache python3
+    // make g++`. Round 2 read the `\"` as a closing quote and invented a
+    // phantom `apk add` step.
+    const escapedQuote = PRE_FIX_DEPS_STAGE.replace(
+      'COPY package*.json ./',
+      'RUN apk add --no-cache curl && echo "x \\" && apk add --no-cache python3 make g++"\nCOPY package*.json ./',
+    );
+    const findings = toolchainFindings(escapedQuote);
+    assert.equal(
+      findings.length,
+      REQUIRED_TOOLCHAIN.length,
+      `an escaped quote must not end the string, got: ${JSON.stringify(findings)}`,
+    );
+    for (const pkg of REQUIRED_TOOLCHAIN) {
+      assert.ok(findings.some((finding) => finding.includes(`installing ${pkg}`)));
+    }
+  });
+
+  it('keeps a backslash-escaped character inside the token it belongs to', () => {
+    // The negative direction of R2-2. `\ ` is an escaped space, so this is one
+    // argument, not two — and an escaped `&` is not a command separator.
+    assert.deepEqual(splitShellSteps('echo a\\&\\&b && apk add --no-cache make'), [
+      'echo a\\&\\&b',
+      'apk add --no-cache make',
+    ]);
+    assert.deepEqual(shellTokens('apk add --no-cache my\\ pkg'), [
+      'apk',
+      'add',
+      '--no-cache',
+      'my pkg',
+    ]);
+    // A backslash inside SINGLE quotes is literal, as the shell has it.
+    assert.deepEqual(shellTokens("echo 'a\\b'"), ['echo', 'a\\b']);
   });
 
   it('fires when the toolchain is installed too late to help `npm ci`', () => {
