@@ -29,20 +29,64 @@ name: Edge Image
 # already-computed verdict of BOTH ci.yml jobs (test and browser) for that
 # exact SHA — no separate polling or job-status lookup needed.
 #
-# THIS CANNOT BE PROVEN BY A REAL RUN RIGHT NOW: GitHub Actions is currently
-# blocked at the account level for this repository (see
-# docs/PATH_TO_EXCELLENCE.md) — ci.yml's own runs are failing with no runner
-# assigned and no downloadable log, the account-level-block signature, not a
-# code failure. That means this workflow cannot fire even in principle until
-# an owner clears the block, and nothing here has executed end-to-end. What
-# IS verified: `docker compose config`-equivalent YAML validity (this file
-# parses as valid GitHub Actions workflow YAML) and
-# tests/core/ci-gates-intact.test.ts staying green with this file present
-# (it does not read edge.yml at all, by design — see above).
+# WHAT REAL RUNS HAVE NOW PROVEN (this block replaced an earlier one, written
+# while GitHub Actions was blocked at the account level, which said "THIS
+# CANNOT BE PROVEN BY A REAL RUN RIGHT NOW" — that statement is obsolete):
+#
+# The block lifted on 2026-09-13 and this workflow finally executed. Of its
+# first 471 runs, 467 concluded `skipped`, 1 was a `startup_failure`, 3 were
+# real build attempts, and ZERO succeeded — no :edge image has ever been
+# published. All three real attempts (34752889476 and 34753539471 on
+# 2026-09-13, then 34794216577 on main@be2341ac on 2026-09-14) failed at the
+# same step, "Build and push :edge", with the same cause:
+#
+#     > [deps 4/4] RUN npm ci:
+#     npm error command sh -c node-gyp rebuild
+#     npm error gyp ERR! find Python Python is not set from command line or npm configuration
+#     npm error gyp ERR! stack Error: Could not find any Python installation to use
+#     npm error gyp ERR! cwd /app/node_modules/better-sqlite3
+#
+# `FROM node:22-alpine` carries no python3/make/g++, which node-gyp needs to
+# run at all. release.yml's `publish` job builds the same Dockerfile and would
+# have failed identically, so the whole container delivery path was broken and
+# nothing noticed. Fixed 2026-09-18 by adding `apk add --no-cache python3 make
+# g++` to the Dockerfile's `deps` stage — see that file's comment for why
+# node-gyp runs even though better-sqlite3 ships a bundled musl prebuild, and
+# tests/core/dockerfile-toolchain.test.ts for the guard that keeps it there.
+# The fixed image was built and booted end to end (/health 200, /ready 200,
+# container HEALTHCHECK healthy, better-sqlite3 exercised at runtime);
+# evidence in docs/audits/2026-09-18-edge-image/README.md.
+#
+# WHY THE TRIGGER FILTERS ON `branches: [main]`:
+# `workflow_run` fires on EVERY completion of CI, on EVERY branch. Without the
+# filter, each lane-branch push manufactured a whole Edge Image run that
+# existed only to evaluate the job-level `if:` below to false and skip — which
+# is where 467 of those 471 runs came from, several per minute during parallel
+# lane work. The job-level `concurrency` group cannot help: a skipped run never
+# contends for it, because it skips before it starts. Filtering at the trigger
+# means a CI completion on a lane branch creates no Edge run at all.
+#
+# `branches` here matches the branch of the TRIGGERING (upstream) run, not this
+# workflow file's own ref — that distinction is the whole point, and it is easy
+# to get backwards: a `workflow_run`-triggered run reports the head_sha and
+# head_branch of the WORKFLOW FILE's ref (main), never the upstream run's. So
+# the run list showing "main" for all 471 does NOT mean main triggered them.
+# Correlating each skipped run against the CI run that preceded it shows the
+# real upstream branches — lane/necessity-certificate, lane/story-bench,
+# lane/edge-image-real — while the single run that actually executed
+# (34794216577) is the one whose upstream CI really was on main.
+#
+# The job-level `if:` below is KEPT as belt and braces, not made redundant:
+# the trigger filter covers the branch only, while the `if:` also requires
+# `conclusion == 'success'` and `event == 'push'` — a failed CI run on main, or
+# a pull_request-event CI run targeting main, still reaches this workflow and
+# must still be refused. tests/core/ci-gates-intact.test.ts asserts both
+# halves stay present so neither can be deleted as "already covered".
 on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
@@ -55,9 +99,14 @@ jobs:
   publish-edge:
     # Only a completed, GREEN run of CI for a push to `main` itself (not a PR
     # build, not any other branch, and not a failed/cancelled run) publishes.
-    # workflow_run always fires regardless of the upstream run's outcome or
-    # branch, so both conditions are asserted here rather than left to the
-    # trigger.
+    # The `on:` block's `branches: [main]` filter already stops a lane branch's
+    # CI completion from creating a run at all; these three conditions are the
+    # belt-and-braces check on top of it. The head_branch line is deliberately
+    # redundant with that filter; the conclusion and event lines are NOT
+    # covered by it at all — workflow_run still fires for a FAILED CI run on
+    # main, and for a CI run whose own event was `pull_request` against main.
+    # Do not delete any of the three as "handled by the trigger now"
+    # (tests/core/ci-gates-intact.test.ts asserts all three, and the filter).
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main' &&

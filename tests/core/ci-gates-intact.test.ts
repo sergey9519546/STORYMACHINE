@@ -514,6 +514,68 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
     );
   });
 
+  it("edge.yml filters its workflow_run trigger to `branches: [main]` (the 467-skipped-runs defect)", () => {
+    // WHY: `workflow_run` fires on EVERY completion of CI on EVERY branch, so
+    // before this filter existed every lane-branch push manufactured a whole
+    // Edge Image run that existed only to evaluate the job-level `if:` to
+    // false and skip. Of edge.yml's first 471 runs, 467 concluded `skipped`
+    // for exactly that reason (1 startup_failure, 3 real attempts, 0
+    // successes). The job-level concurrency group cannot help — a skipped run
+    // never contends for it, because it skips before it starts.
+    //
+    // Comment lines are stripped first. edge.yml's own explanation contains
+    // the string `branches: [main]` twice in prose ("WHY THE TRIGGER FILTERS
+    // ON `branches: [main]`" and "The `on:` block's `branches: [main]`
+    // filter"), so a raw match on the file would keep passing after the live
+    // line was deleted — the same shadowing failure this file's
+    // cancel-in-progress case exists to catch.
+    const edgeSrc = fs.readFileSync(path.join(root, '.github/workflows/edge.yml'), 'utf8');
+    const live = edgeSrc
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('#'))
+      .join('\n');
+
+    const onBlock = /^on:\n((?:[ \t]+.*\n?)+)/m.exec(live);
+    assert.ok(onBlock, 'edge.yml has no top-level `on:` block outside of comments');
+    assert.match(
+      onBlock[1],
+      /workflow_run:/,
+      'edge.yml must still trigger on workflow_run (see its own "WHY workflow_run" comment)',
+    );
+    assert.match(
+      onBlock[1],
+      /^\s+branches:\s*\[\s*main\s*\]\s*$/m,
+      'edge.yml\'s workflow_run trigger must keep `branches: [main]`. Without it, every lane branch\'s '
+      + 'CI completion creates an Edge Image run that immediately skips — 467 of the first 471 runs. '
+      + 'Note this filter matches the UPSTREAM run\'s branch, not this workflow file\'s ref.',
+    );
+  });
+
+  it("edge.yml keeps all three job-level `if:` conditions as belt and braces (the trigger filter does not cover two of them)", () => {
+    // The `branches: [main]` filter above covers the BRANCH only. workflow_run
+    // still fires for a FAILED CI run on main, and for a CI run whose own
+    // event was `pull_request` against main — neither may publish :edge. So
+    // `conclusion == 'success'` and `event == 'push'` are load-bearing, not
+    // redundant, and must not be deleted as "handled by the trigger now".
+    // head_branch is deliberately redundant and is kept as the third brace.
+    const edgeSrc = fs.readFileSync(path.join(root, '.github/workflows/edge.yml'), 'utf8');
+    const live = edgeSrc
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('#'))
+      .join('\n');
+
+    for (const [condition, why] of [
+      ["github.event.workflow_run.conclusion == 'success'", 'a RED CI run on main must not publish an image'],
+      ["github.event.workflow_run.head_branch == 'main'", 'the redundant brace under the trigger filter'],
+      ["github.event.workflow_run.event == 'push'", 'a pull_request-event CI run targeting main must not publish'],
+    ] as const) {
+      assert.ok(
+        live.includes(condition),
+        `edge.yml must keep \`${condition}\` in its publish-edge \`if:\` — ${why}`,
+      );
+    }
+  });
+
   it('release.yml documents, in-file, why it has no concurrency group', () => {
     assert.match(
       release,
