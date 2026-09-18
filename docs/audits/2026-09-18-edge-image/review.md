@@ -1146,3 +1146,239 @@ the merge is the test.
 Items 1-3 are the ones that matter, and item 3 most of all. **Do not re-open
 anything from rounds 1 or 2** — all six items are closed and all nine mutations
 verified by me at `7ade7aca`.
+
+---
+
+# Round-3 closure — the lane's response
+
+**Round-3 tip: see `lane/edge-image-real`, rebased onto `origin/main`
+(`76ecacb3`).** Written by the lane agent. **Both earlier sections are
+unedited** — the round-1 review, the round-2 closure and the round-2 re-check
+are exactly as they were; `git diff 731afe60..HEAD -- <this file>` adds only
+what follows.
+
+**Verdict accepted in full.** All three holes were real, all three were in
+code written in round 2, and all three were found by the method this lane
+endorsed: an input on which the guard is GREEN and the image or workflow
+cannot work. Nothing from rounds 1 or 2 was re-opened.
+
+The reviewer's sharpest observation is the one worth repeating: **R2-1 and
+R2-3 each contradicted a claim one of the lane's own files already makes.**
+R2-1 broke the header at `dockerfile-toolchain.test.ts:52-64`, which argues
+the guard must survive "commenting the RUN line out… the cheaper and likelier
+edit" — commenting out the *tail* is that same edit, one character shorter.
+R2-3 reintroduced, 100 lines below it, exactly the hazard
+`topLevelConcurrencyKeyCount` at `:79-85` was written to guard. Round 2 wrote
+new parsers without re-reading what the file it was editing already knew.
+
+Counts: `dockerfile-toolchain.test.ts` **21 → 25**, `ci-gates-intact.test.ts`
+**51 → 52**. `git diff origin/main --numstat` → **973 / 0** and **419 / 0**;
+still **0 deletions**.
+
+## Evidence — five mutations, each applied alone and reverted
+
+| # | mutation | round 2 | round 3 |
+|---|---|---|---|
+| R2-1 | `RUN apk add --no-cache curl #&& apk add --no-cache python3 make g++` | **21/21 GREEN** | **24/25 RED** |
+| R2-2 | `RUN apk add … curl && echo "x \" && apk add … python3 make g++"` | **21/21 GREEN** | **24/25 RED** |
+| R2-3a | a second top-level `on:` whose `workflow_run` has no `branches` | **51/51 GREEN** | **51/52 RED** |
+| R2-3b | a second `if: always()` after the job's real `if:` | **51/51 GREEN** | **51/52 RED** |
+| R2-3c | a duplicate `publish-edge:` job key with no `if:` | **51/51 GREEN** | **51/52 RED** |
+
+Each R2-3 mutation's **effective** configuration was read back with a real
+YAML implementation before the fix, so the "cannot work" half is measured, not
+asserted:
+
+```
+R2-3a  effective workflow_run: {'workflows': ['CI'], 'types': ['completed']}
+       branches present? False            <- the 467-skipped-runs defect, restored
+R2-3b  effective if: 'always()'           <- publishes on EVERY completion,
+                                             holding `packages: write`
+R2-3c  effective publish-edge has if? False | steps: [{'run': 'echo unguarded'}]
+```
+
+The shell semantics behind R2-1 and R2-2 were confirmed in the **shipped base
+image**, not from the specification:
+
+```
+$ docker run --rm node:22-alpine sh -c 'echo one #&& echo two'     -> one
+$ docker run --rm node:22-alpine sh -c 'echo a#b'                  -> a#b
+$ docker run --rm node:22-alpine sh -c 'echo "x \" && echo SMUGGLED"'
+                                                  -> x " && echo SMUGGLED
+```
+
+The middle line is why the R2-1 fix tests for a **word boundary** rather than
+for `#`: a `#` mid-word is an ordinary character, and an over-applied fix
+would break `apk add --virtual .build-deps#1 python3 …`. Both directions are
+pinned as fixtures.
+
+## Item by item
+
+### R2-1. `splitShellSteps` did not stop at an unquoted `#` — `tests/core/dockerfile-toolchain.test.ts:225`
+
+**Done.** When not inside a quote, a `#` at a word boundary (start of body, or
+preceded by whitespace or an operator) ends the current command and skips to
+the next newline — the rest of the **line**, not the rest of the body, because
+a heredoc or newline-joined `RUN` has more lines after it. Fixtures:
+*"is not satisfied by an `apk add` hidden behind a shell `#` comment"* and its
+negative twin *"still treats a `#` that is NOT at a word boundary as an
+ordinary character"*.
+
+### R2-2. No backslash-escape handling — `:225` and `:295`
+
+**Done**, at both sites the reviewer named. A backslash now consumes the next
+character everywhere except inside single quotes, where it is literal, as the
+shell has it — so an escaped quote cannot close a string and an escaped `&`
+cannot separate a command. Fixtures cover the smuggling shape and the negative
+direction (escaped space stays one token, escaped `&&` is not a separator,
+backslash inside single quotes stays literal).
+
+### R2-3. `yamlBlock`/`yamlScalar` took the FIRST key; YAML takes the LAST — `tests/core/ci-gates-intact.test.ts:227`, `:259`
+
+**Done, and this was the important one.** Every key on a path must now occur
+**exactly once** at its level; a repeat returns null and fails the assertion
+closed. Six lines, in the loop that already did the `findIndex`, exactly as
+the review proposed — which makes `topLevelConcurrencyKeyCount`'s lesson
+general instead of `concurrency:`-specific.
+
+The reviewer's severity caveat is **recorded at the site** (`:207-213`) rather
+than leaned on: GitHub very likely rejects a duplicate mapping key outright,
+making the real-world consequence a loud `startup_failure` rather than a
+silently-wrong trigger. Neither GitHub's workflow-syntax reference nor its
+Actions documentation says anything about duplicate keys, and no test workflow
+was pushed to find out. The fix does not depend on the answer: the guard was
+green on a workflow that cannot work, which is the standard this lane set for
+itself.
+
+Fixtures pin all three shapes, plus the negative direction — a key repeated at
+a **different** level is not a duplicate, so `on.workflow_run.branches` still
+resolves when a step's `with:` block also has a `branches:`.
+
+### R2-4. The docstring's multi-document claim — `:189`
+
+**Done, and the claim is now split rather than softened.** Quoted keys, flow
+mappings, tab indentation, anchors and (now) duplicate keys **do** fail
+closed, as claimed. Multi-document files **do not**: `yamlBlock` reads the
+first document and ignores a `---` separated second one, so a second document
+with an unfiltered trigger comes back GREEN rather than null. Unreachable in
+practice — Actions does not accept a multi-document workflow file — but the
+docstring said it returned null and it did not.
+
+### R2-5. The omitted gate rows and the `git checkout --` incident
+
+**Done, here rather than in the round-2 closure.** The reviewer asked for two
+lines *in the closure*; the orchestrator asked that both earlier sections stay
+unedited. Recording them in this section satisfies
+`docs/LANE_STANDARD.md` §7 — they are in the repository record, not only in a
+hand-back — without rewriting text a reviewer has already signed off. Flagging
+the choice rather than making it silently.
+
+**(a) The full round-2 gate set**, which reached the orchestrator but not the
+repository:
+
+| gate | result at the round-2 tip `7ade7aca` |
+|---|---|
+| `npm run lint` | exit 0 |
+| `npm run build` | exit 0 |
+| `npm run check-brain` | exit 0 |
+| `npm run check-docs` | exit 0 (1 non-blocking hit, the quoted line the review ruled should stay) |
+| `npm run check-no-console` | exit 0 |
+| `npm run check-server-reachability` | exit 0 |
+| `npm run honesty-audit` | exit 0 |
+| `node scripts/check-scoring-receipt.mjs origin/main..HEAD` | exit 0, "no scoring-path files changed" |
+| `npm run test:ci-env` (both files) | 72 / 72 pass / 0 fail |
+| **`npm test`** | **14,084 · 13,992 pass · 0 fail · 91 skipped · 1 todo · 573.1 s** |
+
+**(b) The `git checkout --` incident.** During round 2 a mutation-revert block
+ended with `git checkout -- .github/workflows/edge.yml` while that file
+carried **uncommitted** item-6 and item-7 edits. The revert discarded them
+silently — no error, no prompt — and the next commit contained only the two
+test files. It was caught by grepping the committed file for the new comment
+headings before reporting, re-applied, and re-verified (M4 and M5 RED against
+the final tip; the reviewer independently confirmed both edits are present at
+`7ade7aca` and that nothing was lost). The practice that caused it was using
+`git checkout --` as a mutation-revert; every mutation in round 3 used a
+`cp` from an explicit backup instead, which cannot reach anything the mutation
+did not touch.
+
+## Kept-working set — re-verified on the round-3 code, no regression
+
+| case | round 3 | want |
+|---|---|---|
+| `Dockerfile:55` deleted | 24/25 RED | RED ✓ |
+| `Dockerfile:55` commented out | 24/25 RED | RED ✓ |
+| `apk add` after `npm ci`, separate `RUN` | 24/25 RED | RED ✓ |
+| trailing-stage smuggling | 24/25 RED | RED ✓ |
+| libc split (runner → `node:22-bookworm`) | 24/25 RED | RED ✓ |
+| backslash-continued `apk add` | 25/25 GREEN | GREEN ✓ |
+| live `branches: [main]` deleted | 51/52 RED | RED ✓ |
+| live `branches: [main]` commented out | 51/52 RED | RED ✓ |
+| one condition removed from the job `if:` | 51/52 RED | RED ✓ |
+| `branches: [main]` moved to a sibling trigger (M4) | 51/52 RED | RED ✓ |
+| job `if:` demoted to step level (M5) | 51/52 RED | RED ✓ |
+
+## Rebase onto the moved main
+
+`origin/main` had moved to `76ecacb3` (`lane/story-bench` merged). Rebased.
+
+- **Conflict set: exactly `docs/brain/GRAPH.md` and
+  `docs/brain/brain.graph.json`**, as the reviewer predicted, and nothing
+  else.
+- **Resolved by regeneration, never by hand**: `npm run brain` on the
+  conflicted tree, then `npm run check-brain` → *"OK. 121 notes, 481 links,
+  graph is fresh."* Zero conflict markers remained in either file.
+- The large `server/**` and `scripts/story-bench.mjs` deletions that
+  `git diff --stat origin/main..HEAD` showed **before** the rebase were main's
+  story-bench work this branch did not yet have. After the rebase the diff
+  against main is this lane's nine files and nothing else.
+
+### The full-suite delta, accounted for
+
+| | tests | pass |
+|---|---|---|
+| round-2 tip (un-rebased) | 14,084 | 13,992 |
+| **round-3 tip (rebased)** | **14,166** | **14,074** |
+| delta | **+82** | **+82** |
+
+Accounted for exactly, with no residue:
+
+- **+5 this lane**: `dockerfile-toolchain.test.ts` 21 → 25, `ci-gates-intact.test.ts` 51 → 52.
+- **+77 from main's story-bench merge**, measured file by file rather than
+  inferred: `tests/core/llm-generator-schema.test.ts` **17**,
+  `tests/core/openai-compat-generation-guards.test.ts` **22**,
+  `tests/scripts/story-bench.test.ts` **38**.
+
+14,084 + 5 + 77 = **14,166**. Nothing else moved.
+
+## Gates on the rebased tree
+
+| gate | result |
+|---|---|
+| `npm run lint` | exit 0 |
+| `npm run build` | exit 0 |
+| `node --experimental-strip-types tests/core/dockerfile-toolchain.test.ts` | **25 tests, 25 pass, 0 fail** |
+| `node --experimental-strip-types tests/core/ci-gates-intact.test.ts` | **52 tests, 52 pass, 0 fail** |
+| `npm run test:ci-env` (both files) | **77 / 77 pass / 0 fail** |
+| **`npm test` (once, rebased tree)** | **14,166 · 14,074 pass · 0 fail · 91 skipped · 1 todo · 379.0 s** |
+| `npm run check-brain` | exit 0 — 121 notes, 481 links, fresh |
+| `check-docs` / `check-no-console` / `check-server-reachability` / `honesty-audit` | exit 0 each |
+| `node scripts/check-scoring-receipt.mjs origin/main..HEAD` | exit 0, "no scoring-path files changed" |
+| `git diff origin/main --numstat -- tests/core/ci-gates-intact.test.ts` | **419 added, 0 deleted** |
+| `git diff origin/main --numstat -- tests/core/dockerfile-toolchain.test.ts` | **973 added, 0 deleted** |
+
+## Not acted on, per the orchestrator's rulings
+
+Item 8 (the fourth inline stripper) stays **partially closed** — to be folded
+into whatever next edits that file for its own reasons, not a lane of its own.
+The reviewer's three "notes, not REVISE items" — `if:` logic being read for
+presence rather than meaning, workflow-level `permissions` hoisting being
+unguarded, and the conservative RED on `python3-dev`, `sh -c "…"` and
+`if …; then apk add …; fi` — are recorded as known scope for a future change
+to these files, not closed here.
+
+**Still unproven, unchanged:** `:edge` has never been published. The build on
+GitHub's network, the `docker push` to ghcr.io, the `branches: [main]` filter
+actually firing, and `release.yml`'s `publish` job are all untested. GHCR
+authentication is the one part already proved on the real runner (run
+34794216577, steps 1-5 concluded success). The first green push to `main`
+after the merge is the test.
