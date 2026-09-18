@@ -234,6 +234,28 @@ test('(e) brain.graph.json and GRAPH.md are fresh (regeneration produces no diff
   assert.equal(actualMd, expectedMd, 'docs/brain/GRAPH.md is stale — run `npm run brain` and commit the result');
 });
 
+test('(e2) the committed graph uses repo paths with forward slashes, whichever OS wrote it', () => {
+  // (e) regenerates on the machine running the test, so it can only catch a
+  // Windows-written graph ON Windows — and it did: before brain-graph.mjs
+  // normalized its paths, a Windows run wrote every id as `docs\brain\...`,
+  // (e) then called main's own Linux-written graph stale, and the "fix" that
+  // got committed (fd5b0e1f) rewrote all 1,606 lines. This reads the committed
+  // file, so CI on Linux rejects such a commit too.
+  const graph = JSON.parse(read('docs/brain/brain.graph.json')) as {
+    nodes: { id: string; path: string }[];
+    edges: { from: string; to: string }[];
+  };
+  const bad = [
+    ...graph.nodes.flatMap((n) => [n.id, n.path]),
+    ...graph.edges.flatMap((e) => [e.from, e.to]),
+  ].filter((p) => p.includes('\\') || !p.startsWith('docs/brain/'));
+  assert.deepEqual(
+    [...new Set(bad)].slice(0, 5),
+    [],
+    `${new Set(bad).size} graph path(s) are not forward-slash repo paths under docs/brain/ — regenerate with \`npm run brain\``,
+  );
+});
+
 test('(f) no unresolved wikilinks and every note has YAML frontmatter', async () => {
   const graphModule = await import(
     pathToFileURL(path.join(ROOT, 'scripts', 'brain-graph.mjs')).href
