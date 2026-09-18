@@ -340,14 +340,24 @@ async function computeChangedFiles() {
 function emitAndExit(log, name, value) {
   const outPath = process.env.GITHUB_OUTPUT;
   const line = `${name}=${value}\n`;
+  let wrote = false;
   if (outPath) {
-    appendFileSync(outPath, line);
-    process.stdout.write(log, () => process.exit(0));
-    return;
+    // An unwritable $GITHUB_OUTPUT must not throw out of here. This function
+    // is called from `main()` AND from `main().catch()`, so a throw would
+    // reject main's promise, re-enter that catch, throw again, and become an
+    // unhandled rejection — a red `classify` job, and therefore a red run,
+    // instead of the conservative answer. Fall back to stdout and say so.
+    try {
+      appendFileSync(outPath, line);
+      wrote = true;
+    } catch (err) {
+      log += `WARNING: could not write $GITHUB_OUTPUT (${err && err.message ? err.message : String(err)});`
+        + ' the step output stays unset, which every gate below reads as NOT docs-only\n';
+    }
   }
   // Not running under GitHub Actions (e.g. a local invocation to sanity-check
-  // the script) — print the assignment instead of failing.
-  process.stdout.write(log + line, () => process.exit(0));
+  // the script), or the write above failed — print the assignment instead.
+  process.stdout.write(wrote ? log : log + line, () => process.exit(0));
 }
 
 async function main() {

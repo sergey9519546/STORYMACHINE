@@ -123,9 +123,9 @@ Round 1 backed it with dry runs that left no artifact, and the independent
 review re-ran every row hostilely and found them all true — but the two
 defects it DID find were both in this file, which had no test at all.
 `tests/scripts/classify-docs-only.test.ts` now drives the real script bytes
-(copied verbatim into throwaway git repositories, with `copiesAreVerbatim`
-asserting the copies are byte-identical) against real histories and a
-loopback stand-in for the Actions runs API: **38 cases**, including every row
+(copied verbatim into throwaway git repositories, where the suite's first
+case asserts those copies are byte-identical to the committed files) against
+real histories and a loopback stand-in for the Actions runs API: **38 cases**, including every row
 above, renames in both directions, a copy that is genuinely docs-only, a
 repo-level `diff.renames=copies` config, a shallow clone, unrelated
 histories, a cancelled-run branch, and the positive path so the suite can

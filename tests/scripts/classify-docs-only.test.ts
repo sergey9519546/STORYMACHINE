@@ -25,9 +25,9 @@
 // HOW IT DRIVES THE REAL SCRIPT. classify-docs-only.mjs resolves its
 // repository root from its own `__dirname`, so the fixtures COPY the real
 // script bytes (and both libs it imports) into `<fixture>/scripts/` and run
-// them there. `copiesAreVerbatim` asserts the copies are byte-identical to
-// the committed files, so this suite can never drift into testing a
-// paraphrase of the thing it is meant to guard.
+// them there. The first case in this file asserts those copies are
+// byte-identical to the committed files, so the suite can never drift into
+// testing a paraphrase of the thing it is meant to guard.
 //
 // ENVIRONMENT HYGIENE (LANE_STANDARD §4, the 2026-09-13 ci-env findings).
 // Every child process below gets an env built FROM SCRATCH — never
