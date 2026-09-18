@@ -477,3 +477,321 @@ artifacts by anyone but their author, and now cannot be. That is
 `docs/LANE_STANDARD.md` §7 operating exactly as described, and it is an
 argument — for the next lane, not this one — that the bench should commit a
 redacted, bounded evidence file alongside the numbers it publishes.
+
+---
+
+# ROUND 3 — the lane's closure of the nine items
+
+*(Appended by the lane, 2026-09-18. The reviewer's text above is unchanged.)*
+
+Reviewed object was `lane/story-bench` @ `2a0546ff`; the review itself is
+committed at `06dfad70`, which is where round 3 starts. Round 3 is
+`06dfad70..72b0fc99`, three commits:
+
+```
+95f03b3d fix(schema): the declared op branches mirror parseOp, and a partial
+         EmotionState cannot reach state
+d3f4a113 test(bench): the derivation the table rests on is guarded, and two
+         siblings with it
+72b0fc99 docs: the false sentence, the surviving PASS reading, the five-times
+         table, and the brain
+```
+
+No bench re-run. No assertion weakened, no feature, doc section or guard
+removed. The provider key was never printed, echoed, logged or written to any
+artifact — the only bench command run was `--packet`, which reads a finished run
+and touches no provider.
+
+## 1 — the false sentence, and the closure table that reported it deleted
+
+**Deleted, in both documents.** `docs/story-generation/STORY_BENCH_2026-09-13.md`
+§5 and `docs/audits/2026-09-13-story/story-bench-lane-report.md` §5 no longer
+contain "Nothing in the report mentions that the screenplay is seventeen lines
+long, ends on `event_0`, or contains a single scene." The paragraph now ends at
+`STORY_BENCH_2026-09-13.md:397` / `story-bench-lane-report.md:391` with a
+*(Corrected in round 3)* marker that states what the doctor's report DOES carry
+for a one-scene script: `excerptNote` (`server/nvm/analyze/doctor.ts:904`, wired
+at `:2308`), quoted in full, plus `pageEstimate` — 2 pages on this script.
+
+**Verified against the artifacts, which DO still exist in this sandbox** (see
+the closing note below): `data/story-bench/2026-09-13/counterweight.doctor.json`
+has exactly five keys — `health`, `verdict`, `sceneCount`, `contentHash`,
+`topFindings` — and `data/story-bench/2026-09-13-run2/counterweight.doctor.json`
+has eight, adding `verdictMeaning`, `excerptNote` and `pageEstimate`. So what
+dropped the doctor's disclosure was this bench's FIRST readout writer, not the
+doctor, and the corrected sentence says that rather than blaming the engine.
+`excerptNoteFor(1)` was run directly and returns the exact string quoted.
+
+**The closure table is corrected at `story-bench-lane-report.md:689-694`, and
+the other rows were audited.**
+
+| row | round 2 said | now |
+|---|---|---|
+| 2 | "All three sentences corrected in both docs" | **OVERSTATED IN ROUND 2; CLOSED IN ROUND 3.** Two were. The row now says which one was not and that it is fixed. |
+| 3 | "the claim that the doctor never mentions the thinness is deleted" | **FALSELY REPORTED IN ROUND 2; CLOSED IN ROUND 3.** It was not deleted. The row now says so in those words, with the artifact evidence. |
+| 7 | "done, twice" | **BUILT IN ROUND 2, GUARDED IN ROUND 3.** The feature was real; the derivation had no assertion. The row now says both. |
+| 1, 4, 5, 6, 8, 9, 10 | `done` | **Stand as written.** Re-checked against the source and, where the artifacts allow it, against the run: §5b's line-level readings reproduce exactly (below). |
+
+Spot-check of the rows the reviewer could not reach, run against the artifacts
+in this worktree: `event_0` at `harbor-lights.final.fountain` lines 25 and 29,
+and a third occurrence in `counterweight.final.fountain` — "twice here, three
+across the run" is exact. `"id 2"`, `"id 3"`, `"id 4"` as clue text at lines 25,
+36 and 55 of `the-understudy-clause.final.fountain`, with the clock sentence at
+27, 38 and 53. `ALEX lunges.` at line 76. HARBOR LIGHTS v2's six character cues
+at 4, 7, 16, 20, 24, 27 with the revision pass's paraphrases at 6, 14, 18, 22,
+and `"c3"` at 30. Every one reproduces. One number did NOT: "It appears three
+times in 57 lines" — the script is 101 lines and the three occurrences are at
+27, 38 and 53. Corrected at `STORY_BENCH_2026-09-13.md:601` /
+`story-bench-lane-report.md:595`.
+
+## 2 — the surviving PASS sentence
+
+**Fixed at `STORY_BENCH_2026-09-13.md:349` and
+`story-bench-lane-report.md:343`.** "A verdict of PASS on a 142-word fragment is
+the number this lane most wants a reader to distrust" is now "…is the doctor
+REJECTING the fragment, which is the right answer", carrying the same
+*(Corrected…)* marker the neighbouring paragraphs carry and naming what on that
+row IS worth distrusting — the five `INTENTION_INVISIBLE` findings about the six
+characters whose only content is a tracked belief. The surviving version is the
+one §4 (`:272`) and §6 already state and that `verdictFor` (`doctor.ts:860`)
+backs: `health < 60` returns PASS, the rejection verdict.
+
+## 3 — the derivation is guarded, and a second untested helper came with it
+
+**RED FIRST, reproducing the reviewer's own mutation before writing anything.**
+With `rowsFromDir`'s body replaced by `return []` on the unmodified round-2 tree:
+
+```
+node --experimental-strip-types tests/scripts/story-bench.test.ts
+# tests 30
+# pass 30
+# fail 0          <-- the reviewer's finding, reproduced
+```
+
+Four assertions were then written —
+`tests/scripts/story-bench.test.ts:333-411`, "story-bench table is DERIVED from
+the per-premise row files": rows in FIXTURE order whatever order they were
+written in, a re-written `<id>.row.json` replacing exactly one row with the
+other two standing, an absent row file skipped with no hole and no stray file
+picked up, and `renderTable(rowsFromDir(...))` equal to
+`renderTable(rows)` string for string. The fixture ids are deliberately
+**not alphabetical** (`charlie, alpha, bravo`) so that a derivation which simply
+globbed the directory fails too.
+
+RED again, each un-fix applied alone (38 pass / 0 fail when fixed):
+
+| un-fix | file | result |
+|---|---|---|
+| `rowsFromDir` body → `return []` | `scripts/story-bench.mjs:248` | **34 pass / 4 fail** — all four new assertions |
+| `rowsFromDir` globs `readdirSync` instead of following `orderedIds` | same | **34 pass / 4 fail** |
+
+**THE SIBLING AUDIT — and it found a second one.** Every exported helper of
+`scripts/story-bench.mjs` was stubbed in turn and the suite re-run
+(12 helpers). On the round-2 tree, TWO were unguarded, not one:
+
+```
+beatsToSceneTargets   pass 30 / fail 0   <-- UNGUARDED
+rowsFromDir           pass 30 / fail 0   <-- UNGUARDED
+castGroundingOps      29/1   parseLogLine 29/1   summariseCalls 29/1
+classifyRun           23/7   scriptWordCount 29/1  nextRunDir 27/3
+listRunDirs           29/1   renderTable 29/1    packetFrontMatter 28/2
+```
+
+`beatsToSceneTargets` was pinned only by a test that iterated its result with
+`forEach`, which is vacuous on an empty array — a test that could not have
+caught the bug, exactly the §3 failure in a different shape. It now asserts one
+target per beat, and at least one, BEFORE it iterates
+(`tests/scripts/story-bench.test.ts:113-121`); stubbed, the file is 37/1.
+After round 3 all twelve helpers plus the new `scenesLabel` go RED when stubbed.
+
+## 4 — `SHIFT_RELATIONSHIP` mirrors `parseOp`, and so does every other branch
+
+**Made true, not struck.** `server/nvm/generate/llm-generator.ts:309` declares
+`pair: { type: 'array', items: S, minItems: 2, maxItems: 2 }` — `minItems`
+because `parseOp:85-92` requires two elements, `maxItems` because `StoryOp.ts`
+types it as a two-element tuple. `server/lib/ai-providers/schema.ts:33` now
+carries `minItems`, `maxItems`, `minimum`, `maximum`, `minLength`, `maxLength`
+and `pattern`, which it was dropping exactly as it had been dropping `anyOf`; a
+bound the translator eats is a bound the decoder never hears. `format`, `default`
+and Gemini's `propertyOrdering` are deliberately NOT carried, with the reason at
+the site, and that decision is itself pinned by an assertion so it cannot drift
+into an accident.
+
+**The other thirteen branches were checked mechanically, not by hand.** The
+reviewer's diagnosis of why the guard missed this was right: `INSTANCES` are
+hand-written full payloads, so a branch could require the wrong fields entirely
+and the round-trip test would still pass. `tests/core/llm-generator-schema.test.ts:152`
+now synthesises the SMALLEST payload each branch permits — from that branch's
+own `required` list, property types, enums and array bounds — and requires
+`parseOp` to accept it. That is the invariant the file's header claims, and it
+is the assertion that fails the moment any branch is looser than the parser
+anywhere. The hand-written instances are kept beside it; they test a different
+thing (that a realistic payload parses) and nothing was removed.
+
+RED first, each un-fix alone (17 pass / 0 fail when fixed):
+
+| un-fix | result |
+|---|---|
+| `pair` bound removed (the exact round-2 shape) | **14 pass / 3 fail** — the synthesis test names `SHIFT_RELATIONSHIP {"op":"SHIFT_RELATIONSHIP","pair":[],...}`, plus the bound assertion and the translator assertion |
+| the translator drops `minItems`/`maxItems` again | **15 pass / 2 fail** |
+
+## 5 — the `EMOTION` branch cannot put a partial `EmotionState` into state
+
+**Closed at the schema AND at the parser.** `llm-generator.ts:270` requires all
+nine non-optional `EmotionState` fields (`anger_target_id`, the interface's only
+optional member, is declared but not required, so the model can express it
+without being forced to invent one). `dominant` is now the `EmotionType` enum
+(`:266`) and `BELIEF.source` the `BeliefSource` enum (`:247`), for the reason the
+file already gave for the other three. And `parseOp:94-98` rejects a partial
+whether or not the schema was honoured, so the invariant does not depend on the
+declaration — a future caller that hand-rolls an op cannot get one in either.
+
+**The NaN is pinned in both directions**
+(`tests/core/llm-generator-schema.test.ts:191-258`, "a conformant
+APPRAISE_EMOTION cannot NaN the quality engine"): the branch's own minimum
+payload is parsed, dispatched through `applyStoryOp` and read back out of
+`characterEmotions`, with every one of the six dimensions asserted finite and
+`(fear + distress)` asserted finite — the exact expression at
+`server/nvm/quality/index.ts:495`; a real appraisal (fear 60, distress 70) is
+asserted to REACH that comparison and trip the peak-distress debt, so if the
+check ever goes blind again it fails here; and four partial payloads, including
+the `{dominant, intensity}` shape the old branch admitted, are asserted to parse
+to `null`.
+
+RED: with the branch back to `required: ['dominant','intensity']` and the
+parser's check removed — **14 pass / 3 fail**, the first failure reporting a
+dimension that "reached committed state as undefined".
+
+## 6 — one number, one name, in the packet
+
+`scripts/story-bench.mjs:945` adds `scenesLabel(row)`, which renders
+`"N of M scenes committed"` from `committedScenes`/`requestedScenes` — the same
+quantities `renderTable` uses. The packet header (`:1068`) prints that, and
+prints the doctor's count separately and by name: *"structural health 71.9
+(CONSIDER), scored on the doctor's sceneCount 5"*. The front matter gains a
+section, **TWO SCENE COUNTS, AND WHICH ONE IS AUTHORITATIVE**, which says the
+committed count is the truth about the run and that the doctor's can be larger
+because it counts headings a revision pass typed.
+
+Driven, not asserted: `node scripts/story-bench.mjs --packet` regenerated the
+packet from the real `2026-09-13-run2` artifacts. The six headers now read
+
+```
+[[ comedy · 3 of 7 scenes committed · 437 words · structural health 71.9
+   (CONSIDER), scored on the doctor's sceneCount 5 · run status FRAGMENT ]]
+[[ non-linear · 4 of 7 scenes committed · 835 words · structural health 74.4
+   (CONSIDER), scored on the doctor's sceneCount 9 · run status DEGRADED ]]
+```
+
+— the second gap is wider than the one the reviewer found, and was invisible
+before this change. RED: with `scenesLabel` returning `` `${row.scenes} scenes` ``,
+37 pass / 1 fail.
+
+## 7 — §4b's comparison reads as two movements, not nine
+
+`STORY_BENCH_2026-09-13.md:472` and `story-bench-lane-report.md:466` add a
+paragraph under the table: `health`, `verdicts` and `words per script` largely
+restate `scenes committed` at the doctor's own AUC ~0.938 against ~0.076 for the
+whole weighted-rule channel, and `model scenes` / `model-authored ops` /
+`llm_generator_partial_parse` / `fallbacks per LLM call` are four views of the
+schema fix. It states plainly that nothing in the table is evidence any script
+got better.
+
+It also makes the connection the reviewer said was never made, with the line
+numbers checked in the artifact: `the-understudy-clause`'s 71.9 is the run's
+highest health and is scored on a `sceneCount` of 5 where 3 committed —
+`INT. SCENE 0 - DAY` (1), `INT. SCENE 3 - LATER` (31) and `INT. SCENE 5 - NIGHT`
+(44) are the committed three; `INT. ARCHIVE ROOM - NIGHT` (59) and
+`INT. THEATER LOBBY - NIGHT` (80) are not. The same mechanism §4 uses to explain
+v1's lone health-30 row, operating on v2's best number.
+
+## 8 — the brain, Decision #8 and the method doc are at round 3
+
+- `docs/brain/Generation/Generation - Story Bench.md`: `getGenerativeProvider()`
+  with the reason it is not `getLLMProvider()`; "22 assertions", not 15; a new
+  **THE SCHEMA DEFECT** section carrying the 74-of-74 finding, the `anyOf` fix,
+  round 3's two branch fixes and the v2 numbers; a new section on what the
+  doctor's AUC figures mean for reading any of it; `sources` extended with
+  `tests/core/llm-generator-schema.test.ts` and
+  `server/lib/ai-providers/schema.ts`; `updated: 2026-09-18`.
+- `docs/brain/Decisions/Decision 8 - ….md:53`: same rename, plus the schema
+  defect as a second bullet in the same voice as the first.
+- `docs/DECISION_LOG.md:901`: `getGenerativeProvider()` with the distinction
+  spelled out, and two new bullets — the `IR_SCHEMA` fix with the 74-of-74
+  measurement and round 3's two branch defects, and the v2 re-run's numbers with
+  an explicit note that they are a measurement becoming real, not a quality
+  claim.
+- `docs/story-generation/STORY_BENCH_2026-09-13.md:57`: corrected in place with
+  a marker.
+
+`npm run brain` regenerated (118 notes, 468 links); `npm run check-brain` fresh;
+`tests/core/brain-coverage.test.ts` 7 pass / 0 fail.
+
+## 9 — the three slips and the `--packet` gap
+
+- `scripts/story-bench.mjs:415`: "two premises" → **three**, and it now names
+  them (`counterweight`, `nine-minutes-of-tape`, `the-long-way-round`), matching
+  §4c.
+- `STORY_BENCH_2026-09-13.md:682`: the "(1 scene analyzed) … on every script in
+  this run" quote is marked as the **v1** reading it is, with the note that the
+  v2 scripts have 1 to 5 scenes and `excerptNote` interpolates the count —
+  §5b quotes the 5-scene variant and `2026-09-13-run2/counterweight.doctor.json`
+  holds the 4-scene one.
+- `docs/CLAIMS_REGISTER.md`: row 117's anchor `:186` → **`:200`**, and row 118's
+  two anchors re-pointed to `:494` and `scripts/story-bench.mjs:998`, where this
+  round moved them. `honesty-audit` clean.
+- **Fixed, not documented.** `listRunDirs` (`scripts/story-bench.mjs:312`) takes
+  an optional `stamp` — the mtime of a directory's `summary.json` — and with it
+  sees every FINISHED run, including the ones `--out <name>` and `--into <name>`
+  write. A directory with no `summary.json` is dropped, so `--packet` can no
+  longer pick a crashed run and throw on the missing file. With no `stamp` the
+  original name-only behaviour is byte-identical, and that is asserted.
+  `--packet` also now accepts `--run`/`--out`/`--into` to name a directory
+  outright, and derives the draft date from the run's own `ranAt` when the name
+  carries none. RED: with the dated-only filter restored, 36 pass / 2 fail.
+
+## Gates
+
+```
+npm run lint                                   exit 0, no output
+node --experimental-strip-types tests/core/llm-generator-schema.test.ts
+                                               17 pass / 0 fail  (was 9)
+node --experimental-strip-types tests/scripts/story-bench.test.ts
+                                               38 pass / 0 fail  (was 30)
+node --experimental-strip-types tests/core/openai-compat-generation-guards.test.ts
+                                               22 pass / 0 fail
+node --experimental-strip-types tests/core/brain-coverage.test.ts
+                                               7 pass / 0 fail
+npm run check-no-console                       OK, 307 files
+npm run check-server-reachability              OK
+npm run honesty-audit                          clean (465 + 520 + 118 rows)
+npm run check-docs                             clean
+npm run check-brain                            OK, 118 notes, 468 links, fresh
+node scripts/check-scoring-receipt.mjs origin/main..HEAD
+                                               no scoring-path files changed
+npm run test:ci-env -- <the three files>       62 pass / 0 fail
+npm run build                                  exit 0, built in 1.83 s
+npm test                                       exit 0 — 14,088 tests,
+                                               13,996 pass / 0 fail,
+                                               91 skipped, 1 todo,
+                                               2,452 suites, 628.5 s
+```
+
+The full suite reconciles exactly against the reviewer's baseline of
+14,072 / 13,980 / 0 / 91: **+16 tests, +16 passing, +2 suites**, which is the
+8 assertions added to each of the two test files and one new `describe` block in
+each. No test was removed, skipped or loosened.
+
+## One correction to the reviewer's closing note
+
+**`data/story-bench/` DOES exist in this lane's worktree**, and both run
+directories are intact — `2026-09-13` and `2026-09-13-run2`, with every
+`.final.fountain`, `.doctor.json`, `.calls.json`, `.row.json`, `summary.json`
+and `server.log`. The reviewer's machine had lost them; this one had not. Every
+§5 and §5b line-and-file claim listed as unverifiable above was therefore
+checked, and all of them reproduce except the "57 lines" miscount, now fixed.
+That does not weaken the reviewer's point — the artifacts are gitignored, live
+only here, and will go with the next sandbox rebuild — so the recommendation
+stands and is the strongest single thing the next round could do: commit a
+bounded, redacted evidence file beside the numbers the bench publishes. It is
+still recorded as undone in §7 item 4 rather than claimed.
