@@ -339,8 +339,14 @@ those two, and neither of the twelve that followed noticed.
 `INTENTION_INVISIBLE` findings, one per character, saying each "appears in the
 screenplay but has no tracked beliefs or goals" — about the six characters
 whose ONLY content is a tracked belief, which the revision pass had just
-rewritten into dialogue. A verdict of PASS on a 142-word fragment is the number
-this lane most wants a reader to distrust.
+rewritten into dialogue. A verdict of PASS on a 142-word fragment is the doctor
+REJECTING the fragment, which is the right answer. *(Corrected in round 3: this
+sentence used to read "the number this lane most wants a reader to distrust",
+which contradicts §4 above — `verdictFor` (`doctor.ts:860`) returns PASS for
+`health < 60`, and in coverage vocabulary PASS is a reader passing ON the
+script. The number worth distrusting on this row is not the verdict; it is the
+five `INTENTION_INVISIBLE` findings underneath it, which name the six characters
+whose only content IS a tracked belief.)*
 
 ### COUNTERWEIGHT (two-hander, 7 beats requested, 1 committed) — 17 lines
 
@@ -382,9 +388,20 @@ reveals he has already read it — does not exist in any file.
 **What the doctor said about it:** health **0**, verdict **PASS**, sceneCount
 1, and exactly two findings, both `INTENTION_INVISIBLE`, one per character.
 The one thing the doctor flagged is the one thing the script arguably does have
-— each character states a want in their only line. Nothing in the report
-mentions that the screenplay is seventeen lines long, ends on `event_0`, or
-contains a single scene.
+— each character states a want in their only line. *(Corrected in round 3: this
+paragraph used to end "Nothing in the report mentions that the screenplay is
+seventeen lines long, ends on `event_0`, or contains a single scene." That was
+false about the doctor, and this document says so twice elsewhere — §4 above and
+§6 below. What the doctor's report carries for a one-scene script is
+`excerptNote` (`server/nvm/analyze/doctor.ts:904`, wired at `:2308`): "This
+reads like an excerpt (1 scene analyzed): scores and verdicts are computed the
+same way as for a full script, but with this little material they should be read
+as feedback on the pages, not coverage of a feature", plus `pageEstimate` — 2
+pages here. What dropped them was the FIRST version of THIS BENCH's readout
+writer, which kept only health, verdict, sceneCount, contentHash and ten
+findings; `data/story-bench/2026-09-13/counterweight.doctor.json` has exactly
+those five keys and the v2 file beside it has eight. The doctor does not mention
+`event_0` or the line count, and nothing claims it should.)*
 
 ---
 
@@ -445,6 +462,32 @@ blocks.
 | verdicts | six PASS (rejection) | three PASS, **three CONSIDER** |
 | the blocking Tier 1 proof | ContinuityProof × 33 | **IntentionalProof × 17**, ContinuityProof × 0 |
 | every run's label | FAILED | 5 FRAGMENT, 1 DEGRADED |
+
+**COUNT THE ROWS OF THIS TABLE AS ROUGHLY TWO MOVEMENTS, NOT NINE.** *(Added in
+round 3.)* Several of them are one measurement seen several times. By this
+document's own §6, the doctor's scene-count scarcity term carries AUC ~0.938 of
+its discrimination against ~0.076 for the entire weighted-rule channel
+(`server/nvm/analyze/doctor.ts:2092-2093`) — so `health` and `verdicts` very
+largely RESTATE `scenes committed`, and `words per script` moves with it too:
+more committed scenes is more text. The independent movements are (1) the
+generator started producing parseable ops — `model scenes`, `model-authored
+ops`, `llm_generator_partial_parse` and `fallbacks per LLM call` are four views
+of that one thing, the schema fix — and (2) more scenes cleared Tier 1 and were
+committed, which drags health, verdict, words and the run label along behind it.
+Nothing in this table is evidence that any script got BETTER.
+
+The clearest illustration is the run's highest health. `the-understudy-clause`
+scores **71.9**, and §5b calls it the strongest row — but that score is computed
+on a `sceneCount` of **5** where **3** scenes were committed. The other two are
+headings a revision pass typed with no committed scene behind them: in
+`the-understudy-clause.final.fountain`, `INT. SCENE 0 - DAY` (1),
+`INT. SCENE 3 - LATER` (31) and `INT. SCENE 5 - NIGHT` (44) are the committed
+three, while `INT. ARCHIVE ROOM - NIGHT` (59) and `INT. THEATER LOBBY - NIGHT`
+(80) are not. That is the same mechanism §4 uses to explain v1's lone health-30
+row, operating here on the highest number in the run — the instrument moved, not
+the story. It is also why the reading packet now heads each script with the
+COMMITTED count and names the doctor's separately (`scenesLabel`,
+`scripts/story-bench.mjs`).
 
 **Read `model scenes` first, as in v1.** It is 14 of 16 rather than 0 of 6: the
 model is now writing the story ops that reach a commit. `llm_generator_partial_parse`
@@ -548,7 +591,9 @@ a character in the story.** `"id 2"`, `"id 3"`, `"id 4"` are printed as clue
 text at lines 25, 36 and 55, and at lines 27, 38 and 53 the same string is the
 ticking clock: *"running out of time before the id 2 reaches its final hour"*.
 That sentence is a template constant with a model-supplied `clockId` slotted
-in, and the model supplied `id 2`. It appears three times in 57 lines.
+in, and the model supplied `id 2`. It appears three times — lines 27, 38 and 53
+of a 101-line script. *(Corrected in round 3, verified against the artifact:
+"three times in 57 lines" was a miscount.)*
 
 **The scene numbers admit what is missing.** The headings are SCENE 0, SCENE 3,
 SCENE 5 (1, 31, 44): the slug carries the requested beat index, so the four
@@ -669,12 +714,12 @@ reader would have quoted pointed the next lane at the wrong component.
 | # | review item | disposition |
 |---|---|---|
 | 1 | correct the ContinuityProof attribution | **done.** §4 of this report and of the method doc now state that 74/74 returned candidates were stubbed, that no model-authored op reached any committed scene, and that the colliding `(scene, contains, event_N)` facts are `stubIR`'s. Both carry the two-schema measurement and point at `IR_SCHEMA` / `geminiSchemaToJsonSchema`. §7.4's "most useful next thing to look at" is replaced by what was found and fixed. |
-| 2 | fix the PASS reading | **done.** `verdictFor` (`doctor.ts:860`) returns PASS for `health < 60` — the rejection verdict. All three sentences corrected in both docs; the `.doctor.json` writer now records `verdictMeaning` beside the verdict so the file cannot be misread either. |
-| 3 | keep `excerptNote` and `pageEstimate` | **done.** Both are in the readout writer (`story-bench.mjs`), the claim that the doctor never mentions the thinness is deleted, and §6 of the method doc now quotes `excerptNote` as the thing the doctor DOES say. Visible in the v2 readings. |
+| 2 | fix the PASS reading | **OVERSTATED IN ROUND 2; CLOSED IN ROUND 3.** Round 2 wrote "All three sentences corrected in both docs". Two were. The third — "the number this lane most wants a reader to distrust" — survived verbatim at §5b, contradicting §4 of the same file, and the round-2 reviewer found it. It is corrected now, in both docs, with the *(Corrected…)* marker the other paragraphs carry. What round 2 did do: `verdictFor` (`doctor.ts:860`) returns PASS for `health < 60` — the rejection verdict — and the `.doctor.json` writer records `verdictMeaning` beside the verdict so the file cannot be misread either. |
+| 3 | keep `excerptNote` and `pageEstimate` | **FALSELY REPORTED IN ROUND 2; CLOSED IN ROUND 3.** This row said "the claim that the doctor never mentions the thinness is deleted". It was not deleted. The sentence was still at `STORY_BENCH_2026-09-13.md:388` and at `:386` of this file when the round-2 reviewer read it, and a closure table reporting a deletion that did not happen is worse than the sentence. It is deleted now, replaced by what the doctor's report actually carries for a one-scene script, in both docs. What round 2 did do, correctly: `excerptNote` and `pageEstimate` are in the readout writer, and §6 of the method doc quotes `excerptNote` as the thing the doctor DOES say. Verified against the artifacts: `data/story-bench/2026-09-13/counterweight.doctor.json` has five keys, `2026-09-13-run2/counterweight.doctor.json` has eight. |
 | 4 | add the column that decides what the run measured | **done.** `model scenes` — committed scenes whose IR is not a stub — is in `renderTable` and in both tables. v1 reads **0/1 in all six rows**; v2 reads 14/16 overall. "The generative half is alive" is narrowed to the revision step. |
 | 5 | widen `classifyRun` structurally | **done.** FAILED / FRAGMENT / DEGRADED / ok, with the two original clauses FIRST so claims row 117 stays literally true, pinned both ways (10 new assertions, including one that a perfect scene record cannot talk the original clause out of firing). Re-run over the v1 artifacts, **all six rows move from `ok` to `FAILED`**. |
 | 6 | resolve the FreeRide priority | **done.** `getGenerativeProvider()` honours an explicit configuration always and refuses an AUTO-SELECTED FreeRide, which is what `ai-config.ts`'s `llmReady()` policy requires for these surfaces. Three tests: Gemini-keyed unchanged, openai-compat used when configured, FreeRide never called. The docstring is corrected — the seam was never "Gemini otherwise". |
-| 7 | make the run directory non-destructive | **done, twice.** Per-run directories (`<date>`, `<date>-runN`, `--out`), and then the half the reviewer actually asked for: each premise writes `<id>.row.json` and the table is **derived** from every row file present. Re-running three premises into an existing run is additive — which is how the corrected v2 table exists without a second two-hour run. |
+| 7 | make the run directory non-destructive | **BUILT IN ROUND 2, GUARDED IN ROUND 3.** Per-run directories (`<date>`, `<date>-runN`, `--out`), and then the half the reviewer actually asked for: each premise writes `<id>.row.json` and the table is **derived** from every row file present. Re-running three premises into an existing run is additive — which is how the corrected v2 table exists without a second two-hour run. What round 2 did NOT do was test the derivation: the reviewer replaced `rowsFromDir`'s body with `return []` and the suite stayed 30 pass / 0 fail, so under `docs/LANE_STANDARD.md` §3 there was no guard. Four assertions now pin it, and the sibling audit behind them found a second untested helper. |
 | 8 | the four LOW items | **done.** `event_0`: twice in HARBOR LIGHTS, three across the run. §3's un-fix table re-recorded against the file as shipped (22 cases, not 15), with the `length → MAX_TOKENS` row and the two schema un-fixes. HTTP 400 is named as a rejected REQUEST rather than an unavailable model, and 400 and 403 are now tested. The `intention` and `rhythm` passes are named where the report said "some pass". |
 | 9 | fix the schema seam, shown failing first | **done.** All 14 StoryOp kinds declared as an `anyOf` mirroring `parseOp`; `geminiSchemaToJsonSchema` taught `anyOf`/`oneOf`, `additionalProperties` and explicit type arrays, all three of which it was dropping. Shown failing first two ways (§3), plus one live call through the real adapter with the real schema: **5 ops returned, 5 accepted by `parseOp`, 8.6 s.** No prompt, craft directive, pass order or budget touched. |
 | 10 | re-run the six premises, second table beside the first | **done.** §4b. `llm_generator_partial_parse` 74 → 4; committed scenes 6/45 → 16/45; model-authored ops committed 0 → 74. Two fresh readings in §5b, warranted because the output changed shape: the revision pipeline now writes whole scenes with real exchanges, and it writes them about a story nobody asked for. |

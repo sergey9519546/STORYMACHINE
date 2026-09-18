@@ -54,7 +54,11 @@ deployment: `server/nvm/revision/rewrite-llm.ts` and
 provider not available* and took its documented fallback. The result looked
 like fourteen clean passes over a compiled script with a health score beside
 it, and not one word of it had been written by a model. Both call sites now use
-`getLLMProvider()`.
+`getGenerativeProvider()` (`server/engine/ai.ts:308`) — *(corrected in round 3;
+this said `getLLMProvider()`, which is a different function. The distinction was
+review round 1's item 6: `getGenerativeProvider()` honours an explicitly
+configured provider always and refuses an AUTO-SELECTED FreeRide for these two
+surfaces, falling back to `geminiProvider`.)*
 
 Two further behaviours a reader should not assume:
 
@@ -341,8 +345,14 @@ those two, and neither of the twelve that followed noticed.
 `INTENTION_INVISIBLE` findings, one per character, saying each "appears in the
 screenplay but has no tracked beliefs or goals" — about the six characters
 whose ONLY content is a tracked belief, which the revision pass had just
-rewritten into dialogue. A verdict of PASS on a 142-word fragment is the number
-this lane most wants a reader to distrust.
+rewritten into dialogue. A verdict of PASS on a 142-word fragment is the doctor
+REJECTING the fragment, which is the right answer. *(Corrected in round 3: this
+sentence used to read "the number this lane most wants a reader to distrust",
+which contradicts §4 above — `verdictFor` (`doctor.ts:860`) returns PASS for
+`health < 60`, and in coverage vocabulary PASS is a reader passing ON the
+script. The number worth distrusting on this row is not the verdict; it is the
+five `INTENTION_INVISIBLE` findings underneath it, which name the six characters
+whose only content IS a tracked belief.)*
 
 ### COUNTERWEIGHT (two-hander, 7 beats requested, 1 committed) — 17 lines
 
@@ -384,9 +394,20 @@ reveals he has already read it — does not exist in any file.
 **What the doctor said about it:** health **0**, verdict **PASS**, sceneCount
 1, and exactly two findings, both `INTENTION_INVISIBLE`, one per character.
 The one thing the doctor flagged is the one thing the script arguably does have
-— each character states a want in their only line. Nothing in the report
-mentions that the screenplay is seventeen lines long, ends on `event_0`, or
-contains a single scene.
+— each character states a want in their only line. *(Corrected in round 3: this
+paragraph used to end "Nothing in the report mentions that the screenplay is
+seventeen lines long, ends on `event_0`, or contains a single scene." That was
+false about the doctor, and this document says so twice elsewhere — §4 above and
+§6 below. What the doctor's report carries for a one-scene script is
+`excerptNote` (`server/nvm/analyze/doctor.ts:904`, wired at `:2308`): "This
+reads like an excerpt (1 scene analyzed): scores and verdicts are computed the
+same way as for a full script, but with this little material they should be read
+as feedback on the pages, not coverage of a feature", plus `pageEstimate` — 2
+pages here. What dropped them was the FIRST version of THIS BENCH's readout
+writer, which kept only health, verdict, sceneCount, contentHash and ten
+findings; `data/story-bench/2026-09-13/counterweight.doctor.json` has exactly
+those five keys and the v2 file beside it has eight. The doctor does not mention
+`event_0` or the line count, and nothing claims it should.)*
 
 ---
 
@@ -447,6 +468,32 @@ blocks.
 | verdicts | six PASS (rejection) | three PASS, **three CONSIDER** |
 | the blocking Tier 1 proof | ContinuityProof × 33 | **IntentionalProof × 17**, ContinuityProof × 0 |
 | every run's label | FAILED | 5 FRAGMENT, 1 DEGRADED |
+
+**COUNT THE ROWS OF THIS TABLE AS ROUGHLY TWO MOVEMENTS, NOT NINE.** *(Added in
+round 3.)* Several of them are one measurement seen several times. By this
+document's own §6, the doctor's scene-count scarcity term carries AUC ~0.938 of
+its discrimination against ~0.076 for the entire weighted-rule channel
+(`server/nvm/analyze/doctor.ts:2092-2093`) — so `health` and `verdicts` very
+largely RESTATE `scenes committed`, and `words per script` moves with it too:
+more committed scenes is more text. The independent movements are (1) the
+generator started producing parseable ops — `model scenes`, `model-authored
+ops`, `llm_generator_partial_parse` and `fallbacks per LLM call` are four views
+of that one thing, the schema fix — and (2) more scenes cleared Tier 1 and were
+committed, which drags health, verdict, words and the run label along behind it.
+Nothing in this table is evidence that any script got BETTER.
+
+The clearest illustration is the run's highest health. `the-understudy-clause`
+scores **71.9**, and §5b calls it the strongest row — but that score is computed
+on a `sceneCount` of **5** where **3** scenes were committed. The other two are
+headings a revision pass typed with no committed scene behind them: in
+`the-understudy-clause.final.fountain`, `INT. SCENE 0 - DAY` (1),
+`INT. SCENE 3 - LATER` (31) and `INT. SCENE 5 - NIGHT` (44) are the committed
+three, while `INT. ARCHIVE ROOM - NIGHT` (59) and `INT. THEATER LOBBY - NIGHT`
+(80) are not. That is the same mechanism §4 uses to explain v1's lone health-30
+row, operating here on the highest number in the run — the instrument moved, not
+the story. It is also why the reading packet now heads each script with the
+COMMITTED count and names the doctor's separately (`scenesLabel`,
+`scripts/story-bench.mjs`).
 
 **Read `model scenes` first, as in v1.** It is 14 of 16 rather than 0 of 6: the
 model is now writing the story ops that reach a commit. `llm_generator_partial_parse`
@@ -550,7 +597,9 @@ a character in the story.** `"id 2"`, `"id 3"`, `"id 4"` are printed as clue
 text at lines 25, 36 and 55, and at lines 27, 38 and 53 the same string is the
 ticking clock: *"running out of time before the id 2 reaches its final hour"*.
 That sentence is a template constant with a model-supplied `clockId` slotted
-in, and the model supplied `id 2`. It appears three times in 57 lines.
+in, and the model supplied `id 2`. It appears three times — lines 27, 38 and 53
+of a 101-line script. *(Corrected in round 3, verified against the artifact:
+"three times in 57 lines" was a miscount.)*
 
 **The scene numbers admit what is missing.** The headings are SCENE 0, SCENE 3,
 SCENE 5 (1, 31, 44): the slug carries the requested beat index, so the four
@@ -624,13 +673,21 @@ They do not measure, and nothing in this repository measures:
 
 **What it DOES say about a fragment, and the bench used to throw away.**
 `excerptNote` (`server/nvm/analyze/doctor.ts:900-910`, wired at
-`doctor.ts:2308`) fires below the RECOMMEND floor of 8 scenes and reads, on
-every script in this run: *"This reads like an excerpt (1 scene analyzed):
-scores and verdicts are computed the same way as for a full script, but with
-this little material they should be read as feedback on the pages, not coverage
-of a feature."* The doctor is not silent about thinness; the first version of
-this bench's readout writer dropped the field, and then the readings reported
-its absence as a finding. It is kept now, with `pageEstimate`. And `verdictFor`
+`doctor.ts:2308`) fires below the RECOMMEND floor of 8 scenes and interpolates
+the count it saw. On every script of the **v1** run — which is where this
+reading was taken, and where every script had exactly one scene — it read:
+*"This reads like an excerpt (1 scene analyzed): scores and verdicts are
+computed the same way as for a full script, but with this little material they
+should be read as feedback on the pages, not coverage of a feature."*
+*(Corrected in round 3: this used to say "on every script in this run", which is
+a v1 reading printed as if it were general. The v2 scripts have 1 to 5 scenes
+and the note counts them — §5b quotes the 5-scene variant at the-understudy-
+clause, and the 4-scene variant is in
+`data/story-bench/2026-09-13-run2/counterweight.doctor.json`. The sentence is
+the same; the number inside it is not a constant.)* The doctor is not silent
+about thinness; the first version of this bench's readout writer dropped the
+field, and then the readings reported its absence as a finding. It is kept now,
+with `pageEstimate`. And `verdictFor`
 (`doctor.ts:860`) returns **PASS for `health < 60`** — the rejection verdict, a
 reader passing ON the script — so on these fragments the doctor's verdict is
 correct, not credulous.

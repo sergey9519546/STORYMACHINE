@@ -984,11 +984,38 @@ research instrument that makes no quality claim.
   log line, a named non-retryable error for an unavailable model,
   `maxOutputTokens` forwarded as `max_tokens`, and the `@google/genai`
   response shape emitted alongside `.text`.
-- `server/engine/ai.ts`: `getLLMProvider()`, and `withRetry` honours a
-  `nonRetryable` error.
+- `server/engine/ai.ts`: `getGenerativeProvider()` — NOT `getLLMProvider()`;
+  the distinction was review round 1's item 6 and is deliberate. It honours an
+  explicitly configured provider always and refuses an AUTO-SELECTED FreeRide
+  for the two generative surfaces, falling back to `geminiProvider`. And
+  `withRetry` honours a `nonRetryable` error.
 - `server/nvm/revision/rewrite-llm.ts` and
   `server/nvm/generate/llm-generator.ts` call the seam instead of the Gemini
   constant.
+- `server/nvm/generate/llm-generator.ts`'s `IR_SCHEMA`: all 14 `StoryOp` kinds
+  declared as an `anyOf`, one branch per kind, each mirroring `parseOp`. Before
+  this, `ops.items` declared one property — `op`, no payload — so a structured
+  decoder returned bare discriminators, `parseOp` nulled every one and `parseIR`
+  fell back to `stubIR`: **74 of 74 returned candidates stubbed and zero
+  model-authored ops committed over the first 83-call run.** The ContinuityProof
+  collisions that run reported were `stubIR`'s own facts, not the model's.
+  `server/lib/ai-providers/schema.ts` was taught `anyOf`/`oneOf`,
+  `additionalProperties`, explicit type arrays and (round 3) `minItems`/
+  `maxItems`, all of which it had been dropping on the way to the wire. Round 3
+  also closed the two remaining branch defects: `SHIFT_RELATIONSHIP` promised a
+  `pair` shorter than `parseOp` accepts, and `EMOTION` admitted a partial
+  `EmotionState` that made `server/nvm/quality/index.ts:495` compare `NaN > 100`
+  and fail open in silence. `tests/core/llm-generator-schema.test.ts` now
+  synthesises each branch's own minimum payload and requires `parseOp` to accept
+  it.
+- **The re-run on the corrected seam (v2):** `llm_generator_partial_parse`
+  74 -> 4, committed scenes 6/45 -> 16/45, model-authored ops committed 0 -> 74,
+  and the blocking Tier 1 proof moved from ContinuityProof (33 -> 0) to
+  IntentionalProof (17), because the model invents characters rather than using
+  the cast it is given. This is a measurement becoming real, not a quality
+  claim: per the doctor's own AUC figures, health and verdict largely restate
+  scenes-committed. Both tables are in
+  `docs/story-generation/STORY_BENCH_2026-09-13.md` §4 and §4b.
 - `ROADMAP.md`: amendments under P2 and P4 recording the direction and where
   the track sits in the sequence.
 

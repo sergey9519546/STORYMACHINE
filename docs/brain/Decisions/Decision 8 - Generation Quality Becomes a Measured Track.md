@@ -1,7 +1,7 @@
 ---
 type: decision
-updated: 2026-09-13
-sources: [docs/DECISION_LOG.md, ROADMAP.md, scripts/story-bench.mjs, tests/fixtures/story-bench-premises.json, server/lib/ai-providers/openai-compat.ts, docs/story-generation/STORY_BENCH_2026-09-13.md]
+updated: 2026-09-18
+sources: [docs/DECISION_LOG.md, ROADMAP.md, scripts/story-bench.mjs, tests/fixtures/story-bench-premises.json, server/lib/ai-providers/openai-compat.ts, server/nvm/generate/llm-generator.ts, server/lib/ai-providers/schema.ts, tests/core/llm-generator-schema.test.ts, docs/story-generation/STORY_BENCH_2026-09-13.md]
 status: active
 ---
 
@@ -50,8 +50,19 @@ brief for the lane, and the repository's own docs, had wrong:
   generative call sites imported the `geminiProvider` CONSTANT instead of the
   provider seam, so every call threw *Gemini provider not available* and took
   its fallback: fourteen clean passes, a compiled script, a health score, and
-  not one word written by a model. Fixed with `getLLMProvider()`, alongside
-  four adapter guards (see [[Generation - Story Bench]]).
+  not one word written by a model. Fixed with **`getGenerativeProvider()`**
+  (`server/engine/ai.ts:308`), alongside four adapter guards (see
+  [[Generation - Story Bench]]).
+- **And when it did run, it was still not the model's story.** `IR_SCHEMA`
+  declared ops with no payload, so the decoder returned bare discriminators,
+  `parseOp` nulled all of them and `parseIR` fell back to `stubIR`: over the
+  first 83-call run, 74 of 74 candidates stubbed and zero model-authored ops
+  committed. Declaring all 14 `StoryOp` kinds as an `anyOf` mirroring `parseOp`
+  — and teaching `server/lib/ai-providers/schema.ts` the keys it was dropping —
+  took `llm_generator_partial_parse` from 74 to 4 and committed scenes from
+  6/45 to 16/45 in the re-run. That is a measurement becoming real, NOT a
+  quality claim: health, verdict and word count largely restate
+  scenes-committed.
 
 ## Sources
 
