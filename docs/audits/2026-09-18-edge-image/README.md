@@ -234,8 +234,16 @@ success            0
 
 467 of 471 — 99.2% — were pure noise, and **no `:edge` image has ever been
 published**. (The brief's "~470 skipped" is right to one significant figure;
-the exact split is above. The count has since passed 471: this lane's own
-pushes manufactured run 472, which is the defect demonstrating itself.)
+the exact split is above.)
+
+**Live count at review time: 479** (Actions API, 2026-09-18). Runs **472-479
+all concluded `skipped`, and all eight came from this lane's own pushes
+today** — eight more runs manufactured, while fixing the thing that
+manufactures them, by the ordinary act of pushing a branch after every commit
+as `docs/LANE_STANDARD.md` §7 requires. That is the defect demonstrating
+itself on the diff that removes it, and it is the clearest single argument for
+the trigger filter: the cost is not theoretical and it scales with how
+carefully the repository is worked.
 
 ### The cause
 
@@ -290,12 +298,45 @@ reference: *"You can use the `branches` or `branches-ignore` filter to specify
 what branches the triggering workflow must run on in order to trigger your
 workflow."* A CI completion on a lane branch now creates no Edge run at all.
 
+**What the filter does NOT stop.** `workflow_run` has no conclusion filter, so
+a **red** CI run on main still creates one Edge run, which the job-level `if:`
+then skips. That residue is one run per red push to main — against the
+several-per-minute the branch filter removes — and removing it would mean
+abandoning `workflow_run`, and with it the "already passed CI" guarantee that
+is the whole reason this file exists. It is a deliberate remainder. "The fix"
+is a 99%-class reduction, not a total one, and the workflow's own comment now
+says so.
+
 **The job-level `if:` is kept in full**, not trimmed as newly redundant. The
 trigger filter covers the branch only; `conclusion == 'success'` and
-`event == 'push'` are not covered by it at all, since `workflow_run` still
-fires for a failed CI run on main and for a `pull_request`-event CI run
-targeting main. `head_branch == 'main'` is deliberately redundant and kept as
-the third brace.
+`event == 'push'` are not covered by it at all. `head_branch == 'main'` is
+deliberately redundant and kept as the third brace.
+
+#### Correction (round 2, review item 6): why `event == 'push'` is load-bearing
+
+An earlier version of this section, and of `edge.yml`'s own comments, said the
+case `event == 'push'` catches is *"a `pull_request`-event CI run targeting
+main"*. **That is mechanically wrong, and the review caught it.** `branches:`
+on a `workflow_run` trigger matches the upstream run's **`head_branch`** — for
+a `pull_request`-event run, the PR's *head* ref, not its base. A PR from
+`lane/foo` into `main` therefore has `head_branch == 'lane/foo'` and is
+**already excluded by the new filter**. The case described could not occur.
+
+The case that actually survives `branches: [main]` is a pull request whose
+**head branch is itself named `main`** — the ordinary shape of a fork
+contribution, and `ci.yml:16-17` is `pull_request: branches: ["**"]`, so such
+a run exists in this repository. A `workflow_run` workflow runs from the
+**default branch with the repository's own token**, and `publish-edge` holds
+`packages: write`. `event == 'push'` is therefore the control that stops a
+fork's `main` from reaching a registry-write credential: the classic
+**"pwn-request"** shape.
+
+This makes the condition **more** load-bearing than the lane originally
+claimed, not less — it is a token-scope control, not belt and braces. The
+wrong version mattered because the next reader to check it would have found
+it false and could reasonably have concluded the condition was dead code and
+deleted it. The same correction is applied at `edge.yml`'s `on:` block and at
+its `publish-edge` job comment.
 
 ### The comment block
 
@@ -311,7 +352,9 @@ tally, all three failing run IDs, the log excerpt, the Dockerfile fix, the
 ### The guards
 
 Two added to `tests/core/ci-gates-intact.test.ts`, beside its existing
-edge.yml concurrency assertion. Both **shown to fail on unfixed input**:
+edge.yml concurrency assertion, plus a new
+`tests/core/dockerfile-toolchain.test.ts`. All three were **shown to fail on
+unfixed input** in round 1:
 
 - deleting the live `branches: [main]` line → **exit 1**,
   `not ok 31 - edge.yml filters its workflow_run trigger to 'branches: [main]'`.
@@ -320,6 +363,62 @@ edge.yml concurrency assertion. Both **shown to fail on unfixed input**:
 - collapsing the `if:` to `head_branch` alone, as if the trigger filter made
   the other two conditions redundant → **exit 1**,
   `not ok 32 - edge.yml keeps all three job-level 'if:' conditions`.
+
+#### Round 2: all three guards were green on input that cannot work
+
+Round 1 satisfied `docs/LANE_STANDARD.md` §3's letter — each guard was shown
+red on the unfixed file — and missed its point. The reviewer defeated every
+one of the three by an ordinary edit from the family it claims to block:
+
+| defeat | round-1 result | image / workflow |
+|---|---|---|
+| `RUN apk add --no-cache curl && echo "dropped: python3 make g++"` | **11/11 green** | cannot build |
+| `RUN apk add --no-cache python3 make g++ && apk del python3 make g++` | **11/11 green** | cannot build |
+| `RUN npm ci && apk add --no-cache python3 make g++` | **11/11 green** | cannot build |
+| `branches: [main]` moved to a sibling `push:` trigger | **49/49 green** | 467-skipped-runs defect restored |
+| job-level `if:` demoted to a step-level `if:` | **49/49 green** | every CI completion on main creates a real run holding `packages: write` |
+
+The common shape is that all five **move text rather than delete it**, and all
+three guards were reading text rather than structure. The fix in each case is
+a stronger guard, never a narrower one:
+
+- the Dockerfile parser now splits each `RUN` into **shell commands** (`&&`,
+  `||`, `;`, `|`, newlines, quote-aware) and counts a package only when it is
+  an argument of an actual `apk add` **command**, with a later `apk del`
+  taking it away again — and evaluates install-vs-`npm ci` ordering over those
+  steps, so same-instruction and cross-instruction read identically;
+- the workflow assertions now read the **parsed path** —
+  `on.workflow_run.branches` and `jobs.publish-edge.if` — through one
+  indentation-aware block-mapping walk, so a sibling trigger and a step-level
+  `if:` are simply not at the path being asserted.
+
+Every one of the five defeats is now pinned as a permanent fixture, so each is
+prevented forever rather than fixed once. Counts: **21** tests in
+`dockerfile-toolchain.test.ts` (was 11), **51** in `ci-gates-intact.test.ts`
+(was 49), 0 deletions against `origin/main` in the latter.
+
+Round 2 also closed four **false positives** the round-1 parser had on
+Dockerfiles that build correctly — an `ARG`-parameterised package list, a
+`RUN <<EOF` heredoc, `FROM <stage> AS <name>` stage inheritance, and
+`FROM --platform=… <image>` — and replaced the header's *"It fails only
+when…"* with what the guard actually checks and where it still fails closed. A
+guard that cries wolf on ordinary Dockerfiles is a guard that gets deleted.
+
+### A note on this file and the doc-quality hook
+
+`scripts/pre-commit.sh`'s documentation check reports one **high-severity,
+non-blocking** `FILLER CLICHES` hit — the rule that shortens the three-word
+filler phrase beginning `in order` down to a plain `to` — at **line 298 of
+this file** (`docs/audits/2026-09-18-edge-image/README.md`; the round-1 lane
+report cited it as "README.md:290", which reads as the repository README and
+is not where it is). The line is inside an *italicised, quoted* sentence
+lifted verbatim from GitHub's events-that-trigger-workflows reference, and the
+reviewer independently fetched that page and got the same words back.
+
+**It is deliberately left alone.** Editing a quotation to satisfy a prose
+linter would make the citation false, which is a worse defect than the cliché.
+The hook's own output ends `⚠️ WARNING: 1 AI patterns detected (non-blocking)`
+and `✓ Documentation quality check passed`.
 
 ---
 
@@ -343,5 +442,66 @@ edge.yml concurrency assertion. Both **shown to fail on unfixed input**:
   measured rationale at the site.
 - `.github/workflows/edge.yml` — `branches: [main]` on the trigger; comment
   block rewritten; job-level `if:` unchanged.
-- `tests/core/dockerfile-toolchain.test.ts` — new, 11 tests.
-- `tests/core/ci-gates-intact.test.ts` — two tests added, 49 total.
+- `tests/core/dockerfile-toolchain.test.ts` — new, **21 tests** (11 in round 1;
+  round 2 rebuilt the parser and pinned every defeat as a fixture).
+- `tests/core/ci-gates-intact.test.ts` — **51 total** (49 in round 1), two
+  fixtures added in round 2; 281 added / **0 deleted** against `origin/main`.
+- `docs/audits/2026-09-18-edge-image/review.md` — the independent review and
+  the round-2 closure section.
+
+---
+
+## What is proven, and what is not, until the first green push to main
+
+The review drew this boundary precisely and it is worth keeping where a future
+reader will find it. **The `:edge` image is still unpublished**, so several
+claims in this document are established by construction and local evidence
+rather than by a real run.
+
+### Transfers from the evidence here
+
+- **`Dockerfile:55` is what unblocks `npm ci`.** The unfixed file reproduces
+  run 34794216577's error verbatim on a real `node:22-alpine` container, and
+  the fixed one builds. The diagnosis, the minimum package set (`python3` and
+  `make` load-bearing, `g++` deliberate headroom) and the claim that no C++ is
+  compiled are all established independently of CI, across three container
+  builds one package at a time.
+- **The `runner` stage that was built is the shipped one** — sha256-identical
+  text against an independently generated sandbox overlay — and the image it
+  produces boots, serves `/health`, `/ready` and the SPA, and writes SQLite
+  through better-sqlite3's musl prebuild as uid 1000.
+- **The toolchain does not ship**: `python3 python make g++ gcc cc` are all
+  absent from the runner.
+- **GHCR authentication already works on the real runner.** In run
+  34794216577, steps 1-5 — `actions/checkout@v4`, `Log in to GitHub Container
+  Registry`, `Set up Docker Buildx` and `Compute lowercase image name` — all
+  concluded **success**. Only step 6, `Build and push :edge`, failed. So the
+  login half of the publish path is exercised and green; it is the build and
+  the push that are not.
+
+### Does NOT transfer — unexercised until a real green push to main
+
+1. **apk and npm resolution on GitHub's network.** Every build here reached
+   `dl-cdn.alpinelinux.org` and `registry.npmjs.org` through this session's
+   MITM proxy. The CI path is strictly simpler, but "apk resolves
+   python3/make/g++ on a GitHub runner" is inferred, not observed.
+2. **The push itself.** **No `docker push` to ghcr.io has ever succeeded from
+   this repository.** `packages: write`, the lowercased image name, the three
+   OCI labels and the `:edge` tag are therefore **all unexercised**. A
+   package-visibility or org-policy refusal would surface here and nowhere
+   earlier.
+3. **The new `branches: [main]` filter has never fired.** Its semantics are
+   confirmed by GitHub's documentation and by the head_branch correlation
+   above, and the YAML nests it at the right path, but the first real evidence
+   is *the absence* of skipped Edge runs after the next lane push and *the
+   presence of exactly one* after the next green push to main.
+4. **The end-to-end path as one piece.** "A green push to main publishes
+   `:edge`" is untested as a single path. The first green push to `main` after
+   this merges is the test, and it is worth watching that one run rather than
+   assuming it.
+5. **`release.yml`'s `publish` job.** It builds the same `Dockerfile` and was
+   broken for the same reason, so this fix repairs it **by construction** — but
+   no tagged release has been cut to prove it.
+
+None of this is a reason to withhold the merge. It is the honest boundary of
+what a sandbox and a handful of commits can show.

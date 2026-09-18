@@ -76,12 +76,37 @@ name: Edge Image
 # lane/edge-image-real — while the single run that actually executed
 # (34794216577) is the one whose upstream CI really was on main.
 #
+# WHAT THE FILTER DOES NOT STOP (say this plainly — "the fix" is not total):
+# `workflow_run` has no conclusion filter, so a RED CI run on main STILL
+# creates an Edge Image run here, which the job-level `if:` below then skips.
+# That residue is one run per red push to main — a few a week, against the
+# several-per-minute the branch filter removed — and removing it would mean
+# abandoning `workflow_run` and with it the "already passed CI" guarantee that
+# is the whole reason for this file. It is a deliberate remainder, not an
+# oversight.
+#
 # The job-level `if:` below is KEPT as belt and braces, not made redundant:
 # the trigger filter covers the branch only, while the `if:` also requires
-# `conclusion == 'success'` and `event == 'push'` — a failed CI run on main, or
-# a pull_request-event CI run targeting main, still reaches this workflow and
-# must still be refused. tests/core/ci-gates-intact.test.ts asserts both
-# halves stay present so neither can be deleted as "already covered".
+# `conclusion == 'success'` and `event == 'push'`.
+#
+# WHY `event == 'push'` IS THE TOKEN-SCOPE CONTROL (corrected 2026-09-18 —
+# this block previously said the surviving case was "a pull_request-event CI
+# run targeting main", which is mechanically WRONG and would lead the next
+# reader to conclude the condition is dead code):
+# `branches:` matches the upstream run's HEAD branch, so a PR from `lane/foo`
+# into main is ALREADY excluded by the filter — that case cannot occur. The
+# case that actually survives `branches: [main]` is a pull request whose HEAD
+# branch is itself named `main`: the ordinary shape of a fork contribution,
+# and ci.yml's `pull_request: branches: ["**"]` means such a run exists here.
+# A `workflow_run` workflow runs from the DEFAULT branch with the repository's
+# own token, and this job holds `packages: write`, so `event == 'push'` is
+# what stops a fork's `main` from reaching a registry-write credential — the
+# classic "pwn-request" shape, not merely belt and braces. That is a STRONGER
+# reason to keep it than the one this comment used to give.
+# tests/core/ci-gates-intact.test.ts asserts both halves stay present — the
+# trigger filter at the exact path `on.workflow_run.branches`, and all three
+# conditions on the JOB's own `if:` — so neither can be deleted as "already
+# covered", and neither can be demoted to a step.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -103,10 +128,21 @@ jobs:
     # CI completion from creating a run at all; these three conditions are the
     # belt-and-braces check on top of it. The head_branch line is deliberately
     # redundant with that filter; the conclusion and event lines are NOT
-    # covered by it at all — workflow_run still fires for a FAILED CI run on
-    # main, and for a CI run whose own event was `pull_request` against main.
+    # covered by it at all:
+    #   conclusion  — workflow_run still fires for a FAILED CI run on main.
+    #   event       — workflow_run still fires for a pull_request-event CI run
+    #                 whose own HEAD branch is named `main`, i.e. a fork's
+    #                 main. (NOT "a PR targeting main" — `branches:` matches
+    #                 the upstream HEAD branch, so a lane-branch PR into main
+    #                 never gets here. See the `on:` block's corrected note.)
+    #                 This job holds `packages: write`, so that line is a
+    #                 token-scope control against a pwn-request, not padding.
+    # This `if:` must stay at the JOB level. Demoting it to a step would still
+    # create the run, check out the commit and grant `packages: write` before
+    # the step declined — which is most of the blast radius.
     # Do not delete any of the three as "handled by the trigger now"
-    # (tests/core/ci-gates-intact.test.ts asserts all three, and the filter).
+    # (tests/core/ci-gates-intact.test.ts asserts all three ON THE JOB's `if:`,
+    # and the filter at the exact path `on.workflow_run.branches`).
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main' &&
