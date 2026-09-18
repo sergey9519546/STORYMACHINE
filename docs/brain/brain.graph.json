@@ -85,6 +85,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-13 Story Bench Lane.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-18 CI Docs Fast Path",
+      "path": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-18 Edge Image.md",
       "type": "audit",
       "title": "Audit — 2026-09-18 Edge Image",
@@ -1079,6 +1085,18 @@
     {
       "from": "docs/brain/Audits/Audit - 2026-09-13 Story Bench Lane.md",
       "to": "docs/brain/Decisions/Decision 9 - Generation Quality Becomes a Measured Track.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
+      "to": "docs/brain/Gates/Gate - Browser Battery Suites.md"
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 Edge Image.md",

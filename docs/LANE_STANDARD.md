@@ -118,16 +118,30 @@ reviewed-MERGE lane whose two commits had never been pushed. The rules that
 follow from that, each already cheap:
 
 1. A lane works on a named branch `lane/<name>` created from the current
-   main, and runs `git push -u origin lane/<name>` after EVERY commit. A
-   commit that exists only in a worktree is not work that exists. The
-   orchestrator still merges only `--ff-only` and only on MERGE; the
-   branch is deleted from origin after the merge. Since 2026-09-13
-   `.github/workflows/ci.yml` and `security.yml` carry a `concurrency` group
-   keyed on the ref that cancels a branch's own superseded run — main is
-   isolated into its own group per commit (a `github.sha` suffix), never
-   sharing a group with any other run, so nothing about main can be
-   cancelled or dropped — so pushing after every commit costs one CI run in
-   flight per branch, not one run per commit left running to completion. One
+   main, and runs `git push -u origin lane/<name>` at meaningful
+   checkpoints: a completed unit of work, before starting a long-running
+   operation, before handing off to a reviewer, and always before the lane
+   goes idle (ends its turn, waits on something, or hands back). A commit
+   that exists only in a worktree is not work that exists, and the
+   2026-09-07 rebuild that erased every worktree, the session's scratch
+   directory, every local `audit/*` tag, and a reviewed-MERGE lane's two
+   never-pushed commits is why this rule exists — it is not relaxed here,
+   only re-timed: (2026-09-18) "after every commit" was pushing on every
+   keystroke-scale save, which the maintainer flagged directly — "remote
+   repositories are meant for milestone synchronization, not real-time
+   keystroke saving" — and a lane mid-way through one unit of work,
+   between checkpoints, still has everything to lose to the same class of
+   rebuild the old rule was written against. A checkpoint is therefore a
+   judgment call a lane must actually make, not a cadence it can skip: when
+   in doubt, push. The orchestrator still merges only `--ff-only` and only
+   on MERGE; the branch is deleted from origin after the merge. Since
+   2026-09-13 `.github/workflows/ci.yml` and `security.yml` carry a
+   `concurrency` group keyed on the ref that cancels a branch's own
+   superseded run — main is isolated into its own group per commit (a
+   `github.sha` suffix), never sharing a group with any other run, so
+   nothing about main can be cancelled or dropped — so pushing several
+   checkpoints in quick succession still only ever costs one CI run in
+   flight per branch, not one run per push left running to completion. One
    consequence: a report that cites its own branch's CI run id must cite the
    run for the LAST push, not an earlier one — an earlier push's run on the
    same branch is exactly the one the next push's run cancels.

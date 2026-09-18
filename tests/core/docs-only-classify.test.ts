@@ -154,25 +154,23 @@ describe('isDocsPath — the per-file predicate the classifier folds over', () =
 
   it('rejects non-string and empty input rather than throwing', () => {
     assert.equal(isDocsPath(''), false);
-    // @ts-expect-error — deliberately passing a non-string to prove the guard
-    assert.equal(isDocsPath(null), false);
-    // @ts-expect-error — deliberately passing a non-string to prove the guard
-    assert.equal(isDocsPath(undefined), false);
+    // Deliberately passing non-string input to prove the guard — docs-only.mjs
+    // is plain JS (no `checkJs`), so these calls type-check as `any` and need
+    // no suppression; the runtime guard is what is actually under test.
+    assert.equal(isDocsPath(null as unknown as string), false);
+    assert.equal(isDocsPath(undefined as unknown as string), false);
   });
 });
 
 describe('classifyDocsOnly — malformed input fails safe, not open', () => {
   it('a non-array is NOT docs-only', () => {
-    // @ts-expect-error — deliberately wrong type, proving the fail-safe default
-    assert.equal(classifyDocsOnly(null), false);
-    // @ts-expect-error
-    assert.equal(classifyDocsOnly(undefined), false);
-    // @ts-expect-error
-    assert.equal(classifyDocsOnly('docs/foo.md'), false);
+    // Deliberately wrong types, proving the fail-safe default at runtime.
+    assert.equal(classifyDocsOnly(null as unknown as string[]), false);
+    assert.equal(classifyDocsOnly(undefined as unknown as string[]), false);
+    assert.equal(classifyDocsOnly('docs/foo.md' as unknown as string[]), false);
   });
 
   it('a non-string entry inside an otherwise-docs array is NOT docs-only', () => {
-    // @ts-expect-error — deliberately wrong element type
-    assert.equal(classifyDocsOnly(['docs/foo.md', null]), false);
+    assert.equal(classifyDocsOnly(['docs/foo.md', null as unknown as string]), false);
   });
 });
