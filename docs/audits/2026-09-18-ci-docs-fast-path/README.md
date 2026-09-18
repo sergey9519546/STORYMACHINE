@@ -218,7 +218,7 @@ a third. All three are on the list; the list itself is now pinned by
 
 | suite | what it reads | the docs-only edit that breaks it |
 |---|---|---|
-| `tests/routes/root-cause-parity.test.ts:439-450` | `docs/brain/Surfaces/Surface - Root Cause Pipeline.md` — asserts the note quotes six values re-derived from a live run | change `Scenes 2-4, 6-9` in the measurement table |
+| `tests/routes/root-cause-parity.test.ts:439-450` | `docs/brain/Surfaces/Surface - Root Cause Pipeline.md` — asserts the note quotes six values re-derived from a live run | change any of the six, e.g. `Scenes 2-4, 6-9` or the `| root causes | 70 | 69 |` row |
 | `tests/core/scoring-receipt-guard.test.ts:41-46` | the REAL committed `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` | reword one `### … Receipt:` heading |
 | `tests/core/telemetry-docs-truth.test.ts:8-30` | the REAL committed `ROADMAP.md`, thirteen phrases inside its P3 section | drop "not durable" from that section |
 

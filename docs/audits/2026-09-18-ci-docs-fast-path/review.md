@@ -487,7 +487,7 @@ changed files (1):
 docs_only=true
 ```
 
-**Treated as a class, not a flag.** `scripts/classify-docs-only.mjs:39-98` is
+**Treated as a class, not a flag.** `scripts/classify-docs-only.mjs:39-103` is
 a written audit of every git default that can rewrite the changed-file set,
 each verified in a fixture:
 
@@ -507,13 +507,13 @@ luck of which side git prints), plus `docs/a.md -> docs/b.md` staying
 docs-only so the fix cannot be shown to over-fire, a genuine copy, and a
 repo-level `diff.renames=copies`.
 
-**`forced` env fallback:** `classify-docs-only.mjs:245-256` — `DOCS_ONLY_FORCED`,
+**`forced` env fallback:** `classify-docs-only.mjs:245-254` — `DOCS_ONLY_FORCED`,
 wired in `ci.yml:136` from `${{ github.event.forced }}` and OR'd with the
 payload, so neither wire alone is load-bearing.
 
 ### B2 — the missed docs regressions: **closed, and a third found**
 
-`ci.yml:327-349` and `release.yml:178-215` now list **17** files. The three added:
+`ci.yml:329-351` and `release.yml:199-221` now list **17** files. The three added:
 
 | suite | reads |
 |---|---|
@@ -575,12 +575,32 @@ Both previously-missed regressions, and the third, now go RED on the fast
 path; a genuinely inert docs edit still goes GREEN, so the harness can fail in
 both directions.
 
-One note on reproducing regression 1: the review's perturbation
-(`| root causes | 70 | 69 |` -> `| 71 | 68 |`) does **not** fail that suite
-here — `root-cause-parity.test.ts:450` is a whole-file `note.includes(value)`
-substring check, and "70"/"69" still occur elsewhere in the note. The
-perturbation used is `Scenes 2–4, 6–9` -> `Scenes 2–4, 6–10`, which removes a
-value that occurs once. The finding is unaffected; only the witness changed.
+One note on the witness, recorded because the lane got it wrong first. The
+harness above perturbs `Scenes 2–4, 6–9` -> `Scenes 2–4, 6–10` rather than the
+review's `| root causes | 70 | 69 |` -> `| 71 | 68 |`. An earlier draft of this
+closure claimed the review's witness does not fail the suite. **That claim was
+false, and it came from a corrupted measurement** — two copies of the replay
+harness were running concurrently and each was reverting the other's
+perturbation, so case 1 was measured against an already-restored file. Both
+witnesses reproduce, verified in isolation on a clean tree:
+
+```
+$ perl -0pi -e 's/\| root causes \| 70 \| 69 \|/| root causes | 71 | 68 |/' \
+    'docs/brain/Surfaces/Surface - Root Cause Pipeline.md'
+$ node --experimental-strip-types tests/routes/root-cause-parity.test.ts
+# tests 18   # pass 17   # fail 1
+
+$ perl -CSD -0pi -e 's/Scenes 2\x{2013}4, 6\x{2013}9/Scenes 2\x{2013}4, 6\x{2013}10/' \
+    'docs/brain/Surfaces/Surface - Root Cause Pipeline.md'
+$ node --experimental-strip-types tests/routes/root-cause-parity.test.ts
+not ok 5 - the brain note quotes the same six values
+not ok 7 - the scene-span drift measurement is re-measured, not re-typed
+# tests 18   # pass 17
+```
+
+The harness kept the second because it fails two assertions rather than one
+and the string it removes occurs exactly once in the note, but the review's
+number was right and this closure had it wrong.
 
 ### B3 — the impure half: **closed**
 
@@ -660,7 +680,7 @@ docs-only DELETION changes what it derives, so it is on the list it guards.
 
 ### 5 — `before..head` + `cancel-in-progress`: **closed, by widening the range**
 
-`scripts/lib/validated-base.mjs` (new, pure) + `classify-docs-only.mjs:276-290`.
+`scripts/lib/validated-base.mjs` (new, pure) + `classify-docs-only.mjs:276-292`.
 The base is `merge-base(L, before)` where `L` is the tip of the last run of
 this workflow on this ref that completed **successfully**, read from Actions'
 runs API.
@@ -773,7 +793,7 @@ README.
 
 `release.yml`'s unconditional mirror step is measured too: **55 s** on this
 sandbox for the 17 files, 24 s on the runner for the 13-file version. Stated as
-25–60 s in `release.yml:182-186`.
+25–60 s in `release.yml:182-185`.
 
 A second fast-path run, on the **new** classifier (validated base, `actions:
 read`, `--no-renames`), is the run for this closure commit — cited at the end
@@ -962,3 +982,64 @@ skipped/todo are unchanged at 91/1. `tests/e2e/journeys.test.ts` remains the
 Nothing was narrowed, skipped, or widened to make a gate pass, and no assertion
 was weakened. The one place a stated number changed is regression 1's witness
 in the replay harness, and that is called out above.
+
+---
+
+## Round-2 addendum — item 5 fired in the wild, on this branch, during this round
+
+The validated-base fix was written against a fixture. Four commits later it
+caught the real thing, unprompted.
+
+Six pushes to `lane/ci-docs-fast-path` inside eleven minutes, each cancelling
+the last (`ci.yml:45`, `cancel-in-progress` on every ref but `main`):
+
+| run | commit | conclusion |
+|---|---|---|
+| 35298622753 | `e5049d6b` | **success** |
+| 35299806186 | `031617eb` | cancelled |
+| 35299903993 | `d16bae81` | cancelled |
+| 35300227954 | `a0a881ec` | cancelled |
+| 35300544242 | `184c0c67` | cancelled |
+| 35300583675 | `04a94f57` (docs-only) | *this run* |
+
+`04a94f57` changes exactly one file, `docs/audits/2026-09-18-ci-docs-fast-path/review.md`.
+Under the round-1 classifier its range would have been
+`184c0c67..04a94f57` — one docs file — so `docs_only=true`, and the type
+check, the full `npm test`, the metamorphic gate, the build and the entire
+`browser` job would all have been skipped. The branch's only completed run
+would have been green, and **four commits of classifier, workflow and test
+changes — including `184c0c67`, which edits `scripts/classify-docs-only.mjs`
+itself — would never have been type-checked, tested or built by any completed
+run.**
+
+What the shipped classifier printed instead (run 35300583675, job
+105462180143):
+
+```
+docs-only classification: FULL (validated range
+  e5049d6becb8f42164fd27cd595da07a78f286eb..04a94f572ab28ceba00e00169d1eac35c238ea85
+  (widened from `before` 184c0c67c775ff3d972690e35d2a556e89749b4b:
+   last successful run tip e5049d6becb8f42164fd27cd595da07a78f286eb))
+changed files (18):
+```
+
+It resolved the last run of this workflow on this ref that actually completed
+successfully (`e5049d6b`), took the merge base with `before`, and found **18**
+changed files rather than 1. Full run.
+
+This is the review's own scenario — "the branch's only completed run is green,
+and `server/**` changes at `C` were never type-checked, tested or built by any
+completed run" — reproduced by ordinary work rather than by a fixture, and
+closed. Note also that it is the interaction Decision #9 names: pushing at
+**checkpoints** rather than after every commit makes cancellation chains
+longer, so the window this fix closes gets wider, not narrower, under the new
+cadence.
+
+**And the fast path itself, on the new classifier:** the push carrying this
+addendum is docs-only and lands on top of `04a94f57`. If `04a94f57`'s run has
+completed green by then, the validated base IS `before`, the range does not
+widen, and the classification is the ordinary docs-only one — the fast path
+runs. If it has not, the base widens again and the run is FULL, which is the
+fix doing its job rather than a failure. The run id and which of the two
+happened is recorded by the lane in its report; the first fast-path run on the
+OLD classifier is 35296219834 (1 m 19 s), cited in full above.
