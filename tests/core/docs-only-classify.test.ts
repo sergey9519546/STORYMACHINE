@@ -8,6 +8,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { classifyDocsOnly, isDocsPath } from '../../scripts/lib/docs-only.mjs';
+import { pickValidatedBase, workflowFileFromRef } from '../../scripts/lib/validated-base.mjs';
 
 type Case = { name: string; files: string[]; expected: boolean; why: string };
 
@@ -172,5 +173,106 @@ describe('classifyDocsOnly — malformed input fails safe, not open', () => {
 
   it('a non-string entry inside an otherwise-docs array is NOT docs-only', () => {
     assert.equal(classifyDocsOnly(['docs/foo.md', null as unknown as string]), false);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// ROUND 2: the other pure half — scripts/lib/validated-base.mjs.
+//
+// The classifier's base commit is no longer `github.event.before` (which
+// `cancel-in-progress` can leave unvalidated) but the tip of the last run of
+// this workflow, on this ref, that COMPLETED SUCCESSFULLY. Choosing that tip
+// out of an API payload is pure and belongs here; the fetch and the git
+// questions are impure and are driven against real repositories and a
+// loopback API stub in tests/scripts/classify-docs-only.test.ts.
+describe('pickValidatedBase — only a completed, successful, usable tip may be a base', () => {
+  const SHA_A = 'a'.repeat(40);
+  const SHA_B = 'b'.repeat(40);
+  const all = () => true;
+  const none = () => false;
+  const run = (over: Record<string, unknown> = {}) => ({
+    id: 1, status: 'completed', conclusion: 'success', head_sha: SHA_A,
+    run_started_at: '2026-09-18T01:00:00Z', ...over,
+  });
+
+  it('picks the newest usable run', () => {
+    assert.equal(
+      pickValidatedBase(
+        [run({ id: 1, head_sha: SHA_A, run_started_at: '2026-09-18T01:00:00Z' }),
+         run({ id: 2, head_sha: SHA_B, run_started_at: '2026-09-18T02:00:00Z' })],
+        { isUsableSha: all },
+      ),
+      SHA_B,
+      'the API returns newest-first by documentation, but the module sorts explicitly rather than trusting it',
+    );
+  });
+
+  it('skips a run that is not completed, or not a success', () => {
+    assert.equal(pickValidatedBase([run({ status: 'in_progress' })], { isUsableSha: all }), null);
+    assert.equal(pickValidatedBase([run({ conclusion: 'cancelled' })], { isUsableSha: all }), null);
+    assert.equal(pickValidatedBase([run({ conclusion: 'failure' })], { isUsableSha: all }), null);
+    assert.equal(pickValidatedBase([run({ conclusion: null })], { isUsableSha: all }), null);
+  });
+
+  it('skips the currently-executing run, so it cannot nominate its own tip', () => {
+    // A re-run of THIS run would otherwise make the range empty and the
+    // classification meaningless.
+    assert.equal(pickValidatedBase([run({ id: 77 })], { currentRunId: 77, isUsableSha: all }), null);
+    assert.equal(pickValidatedBase([run({ id: 77 })], { currentRunId: '77', isUsableSha: all }), null);
+    assert.equal(pickValidatedBase([run({ id: 78 })], { currentRunId: '77', isUsableSha: all }), SHA_A);
+  });
+
+  it('rejects anything that is not a 40-hex object name', () => {
+    for (const bad of ['', 'HEAD', 'a'.repeat(39), 'a'.repeat(41), 'z'.repeat(40), '../etc/passwd', null, 42, {}]) {
+      assert.equal(pickValidatedBase([run({ head_sha: bad })], { isUsableSha: all }), null, `head_sha ${String(bad)}`);
+    }
+  });
+
+  it('normalizes case but does not invent a SHA', () => {
+    assert.equal(pickValidatedBase([run({ head_sha: 'A'.repeat(40) })], { isUsableSha: all }), 'a'.repeat(40));
+  });
+
+  it('defers to isUsableSha — a tip this checkout cannot use is not a base', () => {
+    // The force-push / rebase / shallow-fetch shape: the recorded tip is real
+    // but is not an ancestor of HEAD in this checkout.
+    assert.equal(pickValidatedBase([run()], { isUsableSha: none }), null);
+    const seen: string[] = [];
+    pickValidatedBase([run({ head_sha: SHA_B }), run({ id: 2, head_sha: SHA_A, run_started_at: '2026-09-18T00:00:00Z' })],
+      { isUsableSha: (s) => { seen.push(s); return false; } });
+    assert.deepEqual(seen, [SHA_B, SHA_A], 'it must keep trying older runs, newest first');
+  });
+
+  it('a malformed payload is not a base (fail closed, never throw)', () => {
+    for (const bad of [null, undefined, 'workflow_runs', 42, {}]) {
+      assert.equal(pickValidatedBase(bad as never, { isUsableSha: all }), null);
+    }
+    assert.equal(pickValidatedBase([null, undefined, 'x', 7] as never, { isUsableSha: all }), null);
+    assert.equal(pickValidatedBase([run()], {} as never), null, 'no isUsableSha means no way to check, so no base');
+  });
+});
+
+describe('workflowFileFromRef — the runs endpoint path may not be steered', () => {
+  it('extracts the workflow file name from Actions\' own GITHUB_WORKFLOW_REF', () => {
+    assert.equal(workflowFileFromRef('o/r/.github/workflows/ci.yml@refs/heads/main'), 'ci.yml');
+    assert.equal(workflowFileFromRef('o/r/.github/workflows/release.yaml@refs/tags/v1'), 'release.yaml');
+  });
+
+  it('refuses anything that is not a plain *.yml/*.yaml basename', () => {
+    // Whatever comes back is pasted into a URL path, so a traversal, an empty
+    // value, or a non-workflow name must yield null and fail the run closed.
+    for (const bad of [
+      '', '   ', 'o/r/.github/workflows/@refs/heads/main',
+      'o/r/.github/workflows/../../../evil@refs/heads/main',
+      'o/r/.github/workflows/ci.txt@refs/heads/main',
+      'o/r/.github/workflows/.yml@refs/heads/main',
+      'o/r/.github/workflows/c i.yml@refs/heads/main',
+      null, undefined, 42, {},
+    ]) {
+      assert.equal(workflowFileFromRef(bad as never), null, `ref ${JSON.stringify(bad)}`);
+    }
+  });
+
+  it('tolerates a missing @ref suffix', () => {
+    assert.equal(workflowFileFromRef('.github/workflows/ci.yml'), 'ci.yml');
   });
 });
