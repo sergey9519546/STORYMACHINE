@@ -398,7 +398,10 @@ test('nothing on the scoring path reads structuralSignals', () => {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) { walk(full); continue; }
       if (!entry.name.endsWith('.ts')) continue;
-      const rel = path.relative(REPO_ROOT, full);
+      // Forward slashes on every OS: the allowlist below is written with `/`,
+      // and on Windows path.relative() returns `analyze\doctor.ts`, which
+      // matched none of it and reported the four allowed files as leaks.
+      const rel = path.relative(REPO_ROOT, full).split(path.sep).join('/');
       // The module itself, its test, its type declaration, and the one
       // doctor.ts line that hangs the block on the report are the only places
       // this identifier is allowed to appear inside the deterministic core.

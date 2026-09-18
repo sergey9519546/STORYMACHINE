@@ -30,8 +30,13 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
+// fileURLToPath, not `new URL(...).pathname`: the pathname keeps `%20` for a
+// space and, on Windows, a leading `/` before the drive (`/C:/...`), so a
+// checkout under "STORYMACHINE V1 REPO" scanned `C:\C:\...%20V1%20REPO\...`
+// and found nothing to scan.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const SCAN_DIR = 'server/engine';
 
