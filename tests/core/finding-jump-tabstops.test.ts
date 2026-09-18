@@ -67,14 +67,24 @@ describe("ScriptDoctorPanel — only the Per-Pass appendix opts out of tab stops
   });
 
   it("Top Priorities IssueCard does not pass jumpFocusable={false}", () => {
-    const top = panel.match(
-      /\{report\.topPriorities\.map\(\(issue, i\) => \(\s*<IssueCard[\s\S]*?\/>\s*\)\)\}/,
-    );
-    assert.ok(top, "Top Priorities must still render IssueCard");
+    // Anchored on the priorities HEADING, not on the list variable: the list
+    // moved from `report.topPriorities` to the shared `panelPriorities`
+    // selection (2026-09-12) and a variable-name anchor silently stopped
+    // matching. The first IssueCard after the heading is the Top Priorities one.
+    const top = panel.match(/\{prioritiesHeadingFor\([\s\S]*?(<IssueCard[\s\S]*?\/>)/);
+    assert.ok(top, "Top Priorities must still render IssueCard under the priorities heading");
     assert.doesNotMatch(
-      top[0],
+      top[1],
       /jumpFocusable=\{false\}/,
       "Top Priorities are an act-on surface — their no-location notes must stay tab stops",
+    );
+    // And it must be the Top Priorities card, not the appendix one further
+    // down: the match has to end before the next Per-Pass Breakdown heading.
+    const start = top.index ?? 0;
+    const perPassAt = panel.indexOf("Per-Pass Breakdown", start);
+    assert.ok(
+      perPassAt > 0 && start + top[0].length < perPassAt,
+      "the IssueCard found under the priorities heading must precede the Per-Pass Breakdown section",
     );
   });
 
