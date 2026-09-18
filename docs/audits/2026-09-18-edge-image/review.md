@@ -798,3 +798,351 @@ grown into this one.
 | `node --experimental-strip-types tests/core/ci-gates-intact.test.ts` | **51 tests, 51 pass, 0 fail** |
 | `git diff origin/main --numstat -- tests/core/ci-gates-intact.test.ts` | **281 added, 0 deleted** |
 | `npm run check-docs` | exit 0 (1 non-blocking hit, the quoted line 298 the review ruled should stay) |
+
+---
+
+# Round-2 re-check — independent reviewer
+
+**Tip reviewed: `7ade7aca58522bd2bf0b713f5b5b2e1001559e92`** (three commits on
+`dd716ec6`, the round-1 review commit; `origin/main` has since moved to
+`76ecacb3`). Fresh worktree `<session scratch>/wt-edge-r2`, `npm ci` from
+clean — the round-1 worktree was not reused. Same reviewer as round 1.
+
+**My round-1 text is unedited.** `git diff dd716ec6..HEAD -- <this file>` is
+**228 added, 0 deleted**; the closure is appended below it, nothing rewritten.
+
+## Verdict: REVISE — bounded, and none of it is rework
+
+**All six items are CLOSED.** I re-ran every one of the nine mutations plus a
+twelve-case kept-working set against the final tip, and every result matches
+the lane's table. The fixes are real, wider than I asked for, and pinned as
+permanent fixtures rather than patched once.
+
+The REVISE is for **three new holes in the round-2 code itself**, found by the
+same method the lane endorsed: inputs on which the guard is GREEN and the
+workflow or image cannot work. Two of them contradict a claim the lane's own
+files make. All three are small and none touches anything already fixed — this
+should be one commit, not a round.
+
+---
+
+## The six items
+
+| # | item | status | evidence |
+|---|---|---|---|
+| 1 | `apkAdds()` was a token search | **CLOSED** | M1 20/21 RED · M2 20/21 RED, with distinct findings |
+| 2 | ordering blind inside one instruction | **CLOSED** | M3 20/21 RED, every finding says `too late` |
+| 3 | header overclaimed; four false positives | **CLOSED** | M6–M9 all 21/21 GREEN; header rewritten with a `where it fails closed` paragraph |
+| 4 | `branches` matched anywhere in `on:` | **CLOSED** | M4 50/51 RED at the exact path |
+| 5 | conditions searched over the whole file | **CLOSED** | M5 50/51 RED **on the job-level-`if:` message** |
+| 6 | `event == 'push'` rationale wrong | **CLOSED** | corrected at all three sites; stronger reading adopted |
+| 7 | residual not named | **CLOSED** | `edge.yml:79-86` states it plainly |
+| 8 | fourth inline stripper | **PARTIALLY CLOSED — correctly** | see the ruling below |
+
+### All nine mutations, re-run by me against `7ade7aca`
+
+Each applied alone to the real file and reverted; `git status --porcelain`
+empty after each.
+
+| # | mutation | round 1 | my round-2 result | want |
+|---|---|---|---|---|
+| M1 | `RUN apk add --no-cache curl && echo "dropped: python3 make g++ (no longer needed)"` | 11/11 GREEN | **20/21 RED** | RED ✓ |
+| M2 | `RUN apk add … python3 make g++ && apk del python3 make g++` | 11/11 GREEN | **20/21 RED** | RED ✓ |
+| M3 | `RUN npm ci && apk add --no-cache python3 make g++` | 11/11 GREEN | **20/21 RED** | RED ✓ |
+| M4 | `branches: [main]` moved to a sibling `push:` trigger | 49/49 GREEN | **50/51 RED** | RED ✓ |
+| M5 | job-level `if:` deleted, demoted to a step-level `if:` | 49/49 GREEN | **50/51 RED** | RED ✓ |
+| M6 | `ARG TOOLCHAIN="python3 make g++"` + `apk add $TOOLCHAIN` | 10/11 red | **21/21 GREEN** | GREEN ✓ |
+| M7 | `RUN <<EOF` heredoc installing the toolchain | 10/11 red | **21/21 GREEN** | GREEN ✓ |
+| M8 | `FROM deps AS builder` running `npm ci` | 9/11 red | **21/21 GREEN** | GREEN ✓ |
+| M9 | `FROM --platform=$BUILDPLATFORM node:22-alpine AS deps` | 9/11 red | **21/21 GREEN** | GREEN ✓ |
+
+The failure messages are diagnostic, not merely non-zero — M2 and M3 produce
+**different** findings from M1, which is what makes the fixtures able to assert
+*which* defect they caught:
+
+```
+M1  stage "deps" runs `npm ci` without installing python3 (run 34794216577 failed exactly this way)
+M2  stage "deps" installs python3 and then removes it (`apk del`) before `npm ci` runs
+M3  stage "deps" installs python3 AFTER `npm ci`, which is too late
+M4  edge.yml's workflow_run trigger must keep `branches: [main]` AT `on.workflow_run.branches` …
+M5  edge.yml's `publish-edge` job must keep a JOB-LEVEL `if:`. A step-level `if:` does not count:
+    the run is still created and still holds `packages: write` before the step is reached.
+```
+
+M5 failing on its **own** dedicated message — the `jobIf !== null` assertion at
+`ci-gates-intact.test.ts:726`, before the three conditions are examined — is
+exactly what the orchestrator asked me to confirm. Confirmed.
+
+### Kept-working set — twelve cases, no regression
+
+| case | round 2 | want |
+|---|---|---|
+| `Dockerfile:55` deleted (prose left) | 20/21 RED | RED ✓ |
+| `Dockerfile:55` commented out | 20/21 RED | RED ✓ |
+| `apk add` in a different stage | 20/21 RED | RED ✓ |
+| `apk add` after `npm ci`, separate `RUN` | 20/21 RED | RED ✓ |
+| split across two `RUN apk add` lines | 21/21 GREEN | GREEN ✓ |
+| backslash-continued `apk add` | 21/21 GREEN | GREEN ✓ |
+| toolchain deleted, trailing `devtools` stage added | 19/21 RED | RED ✓ |
+| comment inside a backslash continuation | 20/21 RED | RED ✓ |
+| live `branches: [main]` deleted | 50/51 RED | RED ✓ |
+| live `branches: [main]` commented out | 50/51 RED | RED ✓ |
+| `if:` deleted, three conditions echoed in a `run: \|` scalar | 50/51 RED | RED ✓ |
+| `branches` deleted, echoed in a `run: \|` scalar | 50/51 RED | RED ✓ |
+
+The last two were **GREEN in round 1** and are now RED — the structural reads
+closed them as a side effect. **Comment-stripping still works with the grown
+prose**: `edge.yml` now contains `branches: [main]` **four** times (three in
+comments at `:60`, `:98`, `:127`; one live at `:114`, up from three total), and
+deleting or commenting the live line is still RED.
+
+### Ruling on item 8 (PARTIALLY CLOSED): honest and right
+
+I rule the partial close **correct, and correctly reported**. `liveLines()`
+exists at `:145`, both lane-added strippers call it, and the three pre-existing
+copies at `:57`, `:82` and `:121` are left alone. The implementer's argument is
+sound on inspection: those three are an `isComment` **predicate consulted while
+walking indentation** — `topLevelConcurrencyBlock` skips comments *and* uses
+the same loop to decide the block boundary — not a stripped-source producer.
+Replacing them is a behaviour change to pre-existing guards, made under a
+"0 deletions" constraint, in a lane about something else. It is recorded in the
+docstring at `:134-140` and in the closure rather than claimed as done, which
+is precisely what `docs/LANE_STANDARD.md` §5 asks. **Close it in whatever
+follow-up next edits this file for its own reasons; do not open one for it.**
+
+### Ruling on the YAML-parser correction: the implementer is right, I was wrong
+
+The orchestrator's premise that "the repo already parses YAML in these tests"
+is **false**, and I verified it rather than accepting the correction:
+
+```
+require.resolve('yaml')    -> NOT RESOLVABLE
+require.resolve('js-yaml') -> NOT RESOLVABLE
+node_modules: no yaml package;  package.json: no yaml dependency
+grep -rl "js-yaml|from 'yaml'|require('yaml')" tests/ scripts/  ->  only this test file itself
+```
+
+The three pre-existing helpers are indentation walks, and the `yaml.safe_load`
+in my round-1 text was my own **Python**, not repository code — an easy thing
+to misread, and the implementer caught it. Generalising the existing walk to a
+key path rather than adding an npm dependency to a test is the right call and
+is what my item 4 actually recommended.
+
+### The two self-reported incidents
+
+**(a) The `git checkout --` that wiped an `edge.yml` edit — recovery
+confirmed.** The final committed tip carries **both** round-2 `edge.yml`
+edits: the residual block (`WHAT THE FILTER DOES NOT STOP`, `:79-86`,
+"one run per red push to main") and the corrected rationale
+(`WHY \`event == 'push'\` IS THE TOKEN-SCOPE CONTROL`, `:92-110`, "HEAD branch
+is itself named `main`"), plus the job-site correction at `:131-141`. M4 and M5
+are RED **against that final tip**, measured above, not against an intermediate
+state. Nothing was lost.
+
+**(b) Neither reviewed fix was reworked — confirmed byte-for-byte.**
+`git diff dd716ec6..HEAD -- Dockerfile` is empty and both blobs hash
+`1b432a22fb385c0b2985055439f9e3099a25b336c7b702979707fecc98523f4a`. For
+`edge.yml`, the comment-stripped live YAML is identical at both SHAs (`diff`
+clean) — every round-2 change to that file is a comment.
+
+---
+
+## REVISE items — new holes in the round-2 code
+
+### R2-1. `splitShellSteps` (`tests/core/dockerfile-toolchain.test.ts:199`) does not stop at an unquoted `#`, so a shell-commented tail reads as live
+
+```dockerfile
+RUN apk add --no-cache curl #&& apk add --no-cache python3 make g++
+```
+```
+guard: 21/21 GREEN        image: cannot build
+```
+
+`#` at the start of a word begins a shell comment, so the splitter's `&&` is
+inside dead text. Verified in the real base image rather than argued:
+
+```
+$ docker run --rm node:22-alpine sh -c 'echo one #&& echo two'
+one
+
+$ docker run --rm node:22-alpine sh -c 'apk add --no-cache curl >/dev/null 2>&1 #&& apk add --no-cache python3 make g++ …
+                                        command -v python3 … '
+python3 NOT installed  <-- guard said GREEN
+```
+
+This one matters because it contradicts the file's own header. `:52-64`
+argues that a checker must survive "someone commenting the RUN line out
+instead, which is the cheaper and likelier edit" — and commenting out the
+*tail* of a RUN line with `#` is the same edit, one character shorter, and the
+guard does not survive it. **Fix:** in `splitShellSteps`, when not inside a
+quote, treat `#` at a word boundary as end-of-line. ~3 lines, plus a fixture.
+
+### R2-2. `splitShellSteps` (`:199`) has no backslash-escape handling, so `\"` closes the quote early
+
+```dockerfile
+RUN apk add --no-cache curl && echo "x \" && apk add --no-cache python3 make g++"
+```
+```
+guard: 21/21 GREEN        image: cannot build
+```
+
+The shell sees one `echo` argument; the splitter sees the `\"` as a closing
+quote and reads a phantom `apk add` step. Verified:
+
+```
+$ docker run --rm node:22-alpine sh -c 'echo "x \" && echo SMUGGLED"'
+x " && echo SMUGGLED          # SMUGGLED never runs
+```
+
+More contrived than R2-1 and I would not hold the lane for it alone, but it is
+the same two-line fix site: honour `\` as an escape in both `splitShellSteps`
+and `shellTokens`.
+
+### R2-3. `yamlBlock`/`yamlScalar` (`ci-gates-intact.test.ts:188`, `:215`) take the FIRST key at each level; a real parser takes the LAST
+
+This is the one I would not merge without. Three mutations, each **51/51
+GREEN**:
+
+| mutation | effective config (real YAML parser) |
+|---|---|
+| a second top-level `on:` whose `workflow_run` has **no** `branches` | `{'workflows': ['CI'], 'types': ['completed']}` — **the 467-skipped-runs defect restored** |
+| a second `if: always()` after the real job-level `if:` | `always()` — **every workflow_run completion publishes, holding `packages: write`** |
+| a second `publish-edge:` job key with no `if:` | same as above |
+
+Confirmed with an actual YAML implementation rather than asserted:
+
+```
+$ python3 -c "import yaml; …two top-level on: keys…"
+effective workflow_run: {'workflows': ['CI'], 'types': ['completed']}
+-> branches present? False
+
+$ python3 -c "import yaml; …duplicate if: …"
+effective if: always()
+```
+
+Those are exactly my round-1 items 4 and 5 restored, through a different edit,
+with the guard green. And **this file already knows about this hazard**:
+`topLevelConcurrencyKeyCount` at `:79-85` exists for precisely it, and its
+docstring says so — *"A second one later in the file wins for a real YAML
+loader — later keys shadow earlier ones — but `topLevelConcurrencyBlock` above
+reads only the FIRST, so a correct first block plus a broken second block would
+read as correct here while the broken one actually governs."* The new helper,
+100 lines below, reintroduces what that one guards.
+
+**Honest caveat on severity:** GitHub's workflow parser very likely *rejects* a
+duplicate mapping key outright, in which case the consequence is a
+`startup_failure` rather than a silently-wrong trigger — loud, not silent. I
+could not confirm that from the documentation (GitHub's workflow-syntax
+reference says nothing about duplicate keys) and did not push a test workflow
+to find out. Either way the guard is green on a workflow that cannot work,
+which is the standard this lane set for itself.
+
+**Fix, mirroring the guard that already exists:** assert the key appears
+**exactly once** at its level as `yamlBlock` descends — a count in the same
+loop that already does `findIndex`, applied to `on`, `jobs`, `publish-edge`,
+`branches` and `if`. ~6 lines, and it makes `topLevelConcurrencyKeyCount`'s
+lesson general instead of `concurrency`-specific.
+
+---
+
+## Notes, not REVISE items
+
+- **The docstring's fail-closed list is right for three of four shapes.**
+  `"on":` (quoted key), `on: {workflow_run: {…}}` (flow mapping), tab
+  indentation and a true alias (`workflow_run: *wr` pointing at a definition
+  with no filter) **all fail CLOSED — RED — as claimed.** The exception is
+  **multi-document files**: `yamlBlock` reads the first document and ignores a
+  second, so a second document with an unfiltered trigger is **GREEN**, not
+  null. Unreachable in practice (Actions does not accept multi-document
+  workflow files), but `:185` says it returns null and it does not. One word
+  in a docstring.
+- **Logic is not read, only presence.** `if: >- true || <the three conditions>`
+  is 51/51 GREEN while the job publishes unconditionally. Closing this means
+  asserting the `if:` *equals* a normalised expected expression, which trades
+  this hole for brittleness against harmless reformatting. I think presence is
+  the right trade; recording it so the next reader knows it was a choice.
+- **`permissions: packages: write` hoisted to the workflow level** is 51/51
+  GREEN and unguarded by any assertion, although `edge.yml:115-118`'s own
+  comment makes job-scoping a deliberate property. New scope, not a regression
+  of my items — worth a line in whatever next touches this file.
+- **`python3-dev make g++`** reads RED even though it would build (apk pulls
+  `python3` in). Conservative, consistent with the documented direction.
+- **`sh -c "apk add …"` and `if …; then apk add …; fi`** both read RED. Also
+  conservative, also consistent.
+- **`docs/LANE_STANDARD.md` §5, minor:** the committed closure's Gates table
+  lists four rows and stops. The full `npm test`, `build`, `honesty-audit`,
+  `check-brain`, `check-no-console`, `check-server-reachability` and
+  `check-scoring-receipt` results reached the orchestrator but are not in the
+  repository record, and §7 exists because scratch-only records are lost. The
+  `git checkout --` incident is likewise recorded nowhere in-repo. Both are
+  worth two lines in the closure.
+
+---
+
+## Gates I ran on `7ade7aca`
+
+| gate | result |
+|---|---|
+| `npm run lint` | exit 0 |
+| `npm run build` | exit 0 |
+| `tests/core/dockerfile-toolchain.test.ts` | **21 tests, 21 pass, 0 fail** |
+| `tests/core/ci-gates-intact.test.ts` | **51 tests, 51 pass, 0 fail** |
+| **`npm test` (once, on the tip)** | **14,084 tests · 13,992 pass · 0 fail · 91 skipped · 1 todo · 402.8 s** |
+| `git diff origin/main --numstat -- tests/core/ci-gates-intact.test.ts` | **281 added, 0 deleted** |
+| `git diff origin/main --numstat -- tests/core/dockerfile-toolchain.test.ts` | **828 added, 0 deleted** |
+| `check-brain` / `check-docs` / `honesty-audit` / `check-no-console` / `check-server-reachability` | exit 0 each |
+| `node scripts/check-scoring-receipt.mjs origin/main..HEAD` | exit 0, "no scoring-path files changed" |
+| `console.*` added under `server/**` | none (no `server/**` change) |
+| key material in the diff | none |
+
+**+12 over my round-1 baseline of 14,072 / 13,980** — exactly the 10 new
+Dockerfile fixtures plus the 2 new `edge.yml` fixtures, nothing else moved.
+The `281 / 0` and `828 / 0` figures hold against both `origin/main` (76ecacb3)
+and the lane's base `be2341ac`. Note that `git diff --stat origin/main..HEAD`
+shows large deletions in `server/**`, `scripts/story-bench.mjs` and friends:
+that is `lane/story-bench`'s work which main now has and this un-rebased branch
+does not, **not** anything this lane removed.
+
+## Merge hazard against the moved main
+
+`origin/main` is now `76ecacb3` (story-bench merged). Trial merge in a scratch
+worktree:
+
+- `76ecacb3` + `lane/edge-image-real` → **CONFLICT in
+  `docs/brain/GRAPH.md` and `docs/brain/brain.graph.json`**, and nothing else.
+- then + `lane/ci-docs-fast-path` → the same two files.
+
+**No new conflict beyond the brain graph I named in round 1** — but the hazard
+is now unconditional rather than order-dependent: in round 1 this lane merged
+cleanly into `be2341ac` and only the second lane conflicted. Story-bench's
+merge regenerated both files, so **this lane now needs a brain regeneration at
+merge time whichever order is used**. Both files are generated: resolve with
+`npm run brain` on the merged tree, then `npm run check-brain`, never a hand
+merge.
+
+## What is still unproven
+
+Unchanged from round 1 and not addressed by round 2, correctly — the lane
+concedes it. `:edge` has still never been published; the build on GitHub's
+network, the `docker push` to ghcr.io, the new `branches: [main]` filter
+actually firing, and `release.yml`'s `publish` job are all still untested. GHCR
+authentication is the one part already proved on the real runner (run
+34794216577 steps 1-5 concluded success). The first green push to `main` after
+the merge is the test.
+
+## Round-3 checklist — one commit, nothing else
+
+1. `dockerfile-toolchain.test.ts:199` — stop `splitShellSteps` at an unquoted
+   `#` at a word boundary; fixture for `RUN apk add … curl #&& apk add … python3 make g++`.
+2. `dockerfile-toolchain.test.ts:199` and `:236` — honour `\` as an escape in
+   both the splitter and `shellTokens`; fixture for the `echo "x \" && apk add …"` shape.
+3. `ci-gates-intact.test.ts:188`/`:215` — require each key on the path to be
+   unique at its level (the `topLevelConcurrencyKeyCount` lesson, generalised);
+   fixtures for a duplicate `on:`, a duplicate job-level `if:` and a duplicate
+   `publish-edge:`.
+4. `ci-gates-intact.test.ts:185` — the docstring's multi-document claim; and two
+   lines in the closure for the omitted gates and the `checkout --` incident.
+
+Items 1-3 are the ones that matter, and item 3 most of all. **Do not re-open
+anything from rounds 1 or 2** — all six items are closed and all nine mutations
+verified by me at `7ade7aca`.
