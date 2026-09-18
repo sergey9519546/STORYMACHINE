@@ -1488,3 +1488,157 @@ describe('CI gate integrity — the docs-only fast path may not mis-gate a step'
     );
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// ADDED IN ROUND 3 of lane/ci-docs-fast-path. `lane/edge-image-real` merged
+// first, so this lane is the one that "merges second" and owns the fix for
+// the cross-lane cost regression its own round-1 review named.
+//
+// THE REGRESSION. ci.yml's docs-only fast path finishes a documentation push
+// in ~1-2 minutes instead of ~9 and still concludes `success`. A `success` on
+// `main` is exactly what triggers edge.yml, so without a gate there the
+// pushes this lane just made cheap were the ones buying a full
+// `docker build --push` of an image with identical contents. edge.yml cannot
+// read CI's answer — a `workflow_run` payload carries head_sha/head_branch/
+// conclusion, never the upstream run's job outputs — so it re-derives.
+//
+// What is pinned here is the WIRING. The predicate itself, the two
+// `.dockerignore` facts it rests on, and the step's real shell body run
+// against real repositories all live in tests/core/edge-docs-gate.test.ts.
+// Nothing below deletes or relaxes an edge-lane assertion; `yamlScalar`'s
+// exact-path reads and its every-key-unique rule are used as they are.
+describe('CI gate integrity — edge.yml does not rebuild an image the commit cannot change', () => {
+  const edgePath = path.join(root, '.github/workflows/edge.yml');
+  const edge = fs.readFileSync(edgePath, 'utf8');
+  // Comment-stripped, for the same reason the edge lane's own assertions
+  // strip: edge.yml's prose quotes the very strings these look for, so a raw
+  // match keeps reporting green after the LIVE line is deleted.
+  const edgeLive = edge.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
+
+  const SKIP_WHEN_UNCHANGED = "steps.docsonly.outputs.docs_only != 'true'";
+  /** The steps that must not run when the image cannot have changed. */
+  const GATED_STEPS = [
+    'Log in to GitHub Container Registry',
+    'Set up Docker Buildx',
+    'Build and push :edge',
+  ];
+
+  it('the gate step exists, with the id the conditions below reference', () => {
+    assert.match(
+      edgeLive,
+      /^\s+id:\s*docsonly\s*$/m,
+      'edge.yml must keep a step with `id: docsonly`. Every `if:` below reads `steps.docsonly.outputs`, '
+      + 'and a step output that does not exist is the empty string — which reads as "not docs-only" and '
+      + 'builds. Safe, but it makes the gate silently dead, so the id is pinned.',
+    );
+  });
+
+  it('the checkout fetches two commits, or the gate has nothing to diff', () => {
+    assert.match(
+      edgeLive,
+      /fetch-depth:\s*2/,
+      'edge.yml\'s checkout must keep `fetch-depth: 2`. The gate diffs `<head_sha>^..<head_sha>`; on a '
+      + 'depth-1 checkout the parent does not resolve, the step fails open, and EVERY push rebuilds — the '
+      + 'gate would be dead while looking present.',
+    );
+  });
+
+  it('the gate uses the narrow IMAGE predicate, not ci.yml\'s docs predicate', () => {
+    // This is the defect the naive patch would have shipped. `.dockerignore`
+    // re-includes `!server/**`, `!src/**`, `!public/**`, and committed `*.md`
+    // files live under those trees — they are in the build context and in the
+    // image. `classifyDocsOnly` calls them docs; `canSkipImageBuild` does not.
+    assert.match(
+      edgeLive,
+      /canSkipImageBuild/,
+      'edge.yml must gate on `canSkipImageBuild` from scripts/lib/docs-only.mjs',
+    );
+    assert.doesNotMatch(
+      edgeLive,
+      /\bclassifyDocsOnly\b/,
+      'edge.yml must NOT gate on `classifyDocsOnly`: it treats server/**/*.md as documentation, which is '
+      + 'right for CI and wrong for the image. See tests/core/edge-docs-gate.test.ts.',
+    );
+    assert.match(
+      edgeLive,
+      /scripts\/lib\/docs-only\.mjs/,
+      'one implementation of the allowlist — the same module ci.yml\'s classifier imports, not a second '
+      + 'copy of the rules in YAML',
+    );
+    assert.match(
+      edgeLive,
+      /git diff --name-only --no-renames/,
+      'the gate must diff with `--no-renames`. Git prints only a detected rename\'s DESTINATION, so '
+      + '`git mv server/x.ts docs/x.md` would otherwise look like a documentation change while deleting a '
+      + 'file out of the image — the same hole this lane closed in ci.yml\'s classifier.',
+    );
+  });
+
+  it('every build step carries EXACTLY the skip condition, and no other step does', () => {
+    // Same reasoning as ci.yml's polarity pin: `!= 'true'` and `== 'false'`
+    // look interchangeable and are not. An unset output is the empty string,
+    // so `== 'false'` is FALSE on every run and the image would never be
+    // built again — a silent end to :edge, with this file green.
+    const lines = edgeLive.split('\n');
+    const stepIf = (name: string): string | null => {
+      const start = lines.findIndex((l) => l.trim() === `- name: ${name}`);
+      if (start === -1) return null;
+      const indent = lines[start].indexOf('-');
+      for (let i = start + 1; i < lines.length; i++) {
+        if (lines[i].trim() === '') continue;
+        if (lines[i].search(/\S/) <= indent) break;
+        const m = /^\s*if:\s*(.+?)\s*$/.exec(lines[i]);
+        if (m) return m[1];
+      }
+      return null;
+    };
+    for (const name of GATED_STEPS) {
+      assert.ok(lines.some((l) => l.trim() === `- name: ${name}`), `edge.yml must keep the step "${name}"`);
+      assert.equal(
+        stepIf(name),
+        SKIP_WHEN_UNCHANGED,
+        `edge.yml's "${name}" must carry exactly \`if: ${SKIP_WHEN_UNCHANGED}\`. Any other expression `
+        + 'either rebuilds when it cannot matter or — far worse — stops publishing :edge entirely.',
+      );
+    }
+    // The gate step itself must stay unconditional: a condition on it would
+    // leave the output unset, which reads as "build" and makes the gate dead.
+    assert.equal(
+      stepIf('Skip the image build for a commit outside the build context'),
+      null,
+      'the gate step must not itself be conditional',
+    );
+  });
+
+  it('the job-level `if:` is untouched, and the gate was not demoted into it', () => {
+    // The edge lane's own guard reads jobs.publish-edge.if at an exact path
+    // and requires every key on that path to occur once. Adding steps must not
+    // disturb it, and the docs gate must NOT be folded into the job `if:`:
+    // doing so would need the diff before the checkout exists.
+    const jobIf = yamlScalar(edge, ['jobs', 'publish-edge', 'if']);
+    assert.ok(jobIf, 'edge.yml must keep its job-level `if:` at jobs.publish-edge.if');
+    for (const condition of [
+      "github.event.workflow_run.conclusion == 'success'",
+      "github.event.workflow_run.head_branch == 'main'",
+      "github.event.workflow_run.event == 'push'",
+    ]) {
+      assert.ok(jobIf.includes(condition), `edge.yml's job-level if: must keep \`${condition}\``);
+    }
+    assert.doesNotMatch(
+      jobIf,
+      /docs_only|steps\./,
+      'the docs gate belongs in a step, not the job `if:` — a job-level condition is evaluated before any '
+      + 'step runs, so there is no checkout and no diff to classify yet',
+    );
+  });
+
+  it('edge.yml does not try to import CI\'s classification across workflows', () => {
+    assert.doesNotMatch(
+      edgeLive,
+      /needs\.classify|needs:\s*classify/,
+      'a `workflow_run` payload carries head_sha/head_branch/conclusion, NOT the upstream run\'s job '
+      + 'outputs, and `needs:` cannot name a job in another workflow. If this ever appears it is a '
+      + 'misunderstanding that would read as an empty string and silently disable the gate.',
+    );
+  });
+});

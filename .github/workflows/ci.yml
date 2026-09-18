@@ -319,13 +319,14 @@ jobs:
       # reasoned exclusion allowlist. Do not edit this list by hand without
       # that test agreeing — and never edit it to make that test pass.
       #
-      # Measured wall time for all SEVENTEEN, this sandbox, run individually:
-      # 55 s total (41.3 s for the sixteen others plus 13.7 s for
-      # docs-gating-set.test.ts, which parses every test file; slowest of the
-      # rest: rule-test-coverage 8.6 s, public-benchmark 6.4 s,
-      # honesty-audit-claims 5.3 s, root-cause-parity 5.3 s). On the runner the
-      # thirteen-file version of this step took 24 s (run 35296219834, step 12).
-      # Against a ~7-minute `npm test` plus a ~5-minute browser job.
+      # Measured wall time for all EIGHTEEN, this sandbox, run individually:
+      # ~56 s total (41.3 s for the sixteen originals, 13.7 s for
+      # docs-gating-set.test.ts, which parses every test file, and 0.6 s for
+      # edge-docs-gate.test.ts; slowest of the rest: rule-test-coverage 8.6 s,
+      # public-benchmark 6.4 s, honesty-audit-claims 5.3 s, root-cause-parity
+      # 5.3 s). On the runner the seventeen-file version of this step took 44 s
+      # (run 35301550263, step 12). Against a ~7-minute `npm test` plus a
+      # ~5-minute browser job.
       - name: Run docs-gating tests (docs-only fast path)
         if: needs.classify.outputs.docs_only == 'true'
         run: |
@@ -336,6 +337,7 @@ jobs:
             tests/core/coverage-letter.test.ts \
             tests/core/docs-gating-set.test.ts \
             tests/core/documentation-truth.test.ts \
+            tests/core/edge-docs-gate.test.ts \
             tests/core/finding-jump.test.ts \
             tests/core/honesty-audit-claims.test.ts \
             tests/core/p0-sample-drift.test.ts \

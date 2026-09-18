@@ -82,3 +82,88 @@ export function classifyDocsOnly(changedFiles) {
   if (!Array.isArray(changedFiles) || changedFiles.length === 0) return false;
   return changedFiles.every((f) => isDocsPath(f));
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// A SECOND, STRICTER QUESTION — added 2026-09-18 for `.github/workflows/edge.yml`.
+//
+// `classifyDocsOnly()` above answers "which CI gates can this push possibly
+// affect". `edge.yml` asks something different: "can this commit change the
+// IMAGE". Those are not the same question, and answering the second with the
+// first is a bug — a real one, caught before it shipped:
+//
+//   `.dockerignore` denies `**` and then re-includes `!server/**`, `!src/**`,
+//   `!public/**`. Thirteen committed `*.md` files live under those trees
+//   (`server/nvm/kernel/README.md`, `server/nvm/revision/WAVE_QUALITY_GUARANTEE.md`,
+//   …). They ENTER the build context — verified by building a probe image
+//   with `COPY . .` and listing it — and `Dockerfile:91` copies
+//   `/app/server` into the runner stage, so they are in the published image.
+//   `classifyDocsOnly(['server/nvm/kernel/README.md'])` is `true`, because
+//   `**/*.md` is docs for CI's purposes. Gating the image build on THAT
+//   predicate would skip a rebuild for a commit that genuinely changes the
+//   image — the mirror image of the rename hole in
+//   scripts/classify-docs-only.mjs, and the same class of defect.
+//
+// So this predicate is deliberately NARROWER than `isDocsPath`, and it is
+// narrow in the one direction that is safe: a file it declines to vouch for
+// simply causes a rebuild.
+//
+// A path is outside the Docker build context if and only if:
+//   - its first segment is `docs` — `.dockerignore` denies `docs` and
+//     `docs/**` explicitly, on top of the blanket `**`; or
+//   - it is a ROOT-LEVEL `*.md` (no `/` at all) — denied by the blanket `**`
+//     with no negation re-including it.
+// Everything else, including a `*.md` under any allowlisted source tree,
+// is treated as possibly-in-context.
+//
+// THE TWO ASSUMPTIONS ARE PINNED, NOT ASSUMED. `tests/core/edge-docs-gate.test.ts`
+// reads the real `.dockerignore` and fails if the blanket `**` deny is gone,
+// if any negation could re-include `docs/**`, or if any negation could
+// re-include a root `*.md`. A future `!CHANGELOG.md` therefore breaks a test
+// rather than silently making this predicate wrong.
+//
+// FAILURE DIRECTION IS THE OPPOSITE OF THE ONE ABOVE, on purpose. For CI, an
+// unclassifiable input must run every gate: guessing wrong there means a gate
+// silently skipped. For the image, an unclassifiable input must BUILD:
+// guessing wrong there means `:edge` is missing or stale, which is visible and
+// recoverable, while over-building costs one runner slot. Both directions are
+// "the failure that is cheap to notice", which is why they point opposite
+// ways.
+
+/**
+ * True if `file` provably cannot enter the Docker build context, and so
+ * cannot change the published image's filesystem.
+ * @param {string} file
+ * @returns {boolean}
+ */
+export function isOutsideDockerBuildContext(file) {
+  if (typeof file !== 'string') return false;
+  const normalized = file.trim().replace(/\\/g, '/').replace(/^\.\//, '');
+  if (normalized === '') return false;
+  if (/^docs\//.test(normalized)) return true;
+  if (!normalized.includes('/') && /\.md$/i.test(normalized)) return true;
+  return false;
+}
+
+/**
+ * True if EVERY entry in `changedFiles` is outside the Docker build context
+ * AND the set is non-empty — i.e. rebuilding the image would reproduce the
+ * same filesystem. An empty or malformed set is deliberately NOT skippable:
+ * the caller cannot tell a genuine no-op from a diff it failed to compute,
+ * and for the image the conservative answer is "build".
+ *
+ * NOTE what this does NOT claim. The image is a function of the context AND
+ * the build-args, and `edge.yml` passes `GIT_SHA=<head_sha>`, which moves on
+ * every commit. Skipping therefore leaves `:edge`'s `ENV GIT_SHA` and its
+ * `org.opencontainers.image.revision` label naming the last commit that was
+ * actually built, not `main`'s tip. That is a deliberate, stated trade — see
+ * edge.yml's own comment on the gate, and the audit README for the retagging
+ * alternative (`docker buildx imagetools create`) if the revision label must
+ * track the tip.
+ *
+ * @param {unknown} changedFiles
+ * @returns {boolean}
+ */
+export function canSkipImageBuild(changedFiles) {
+  if (!Array.isArray(changedFiles) || changedFiles.length === 0) return false;
+  return changedFiles.every((f) => isOutsideDockerBuildContext(f));
+}
