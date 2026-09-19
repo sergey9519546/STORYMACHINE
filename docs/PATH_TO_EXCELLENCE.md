@@ -56,6 +56,19 @@ portability and a feature-length regression: #261 (long-path-safe `npm test`), #
 (OS-independent brain graph), #263 (Windows test-suite fixes, owner-measure-e2e on
 PRs), #267 (tab-stop split).
 
+Later, 2026-09-19: the ranked findings in `SESSION_REPORT_2026-09-19.md` §4 were
+substantially closed by lanes that ran later the same day — rows 1, 2, 4, 9, 11,
+12, 13, 14, 15, 17 and 19 fixed and lane-recorded under `docs/audits/2026-09-19-*/`
+(themeHint/approvedSpans prompt inputs, locked spans, revise-route budget,
+generator honesty, harness honesty, doctor-pool fallback, converge contract, and
+the receipt gate's in-place-rewrite blind spot), plus a chore removing 17 tracked
+`.pyc` files. One integration regression surfaced in the independent full-suite
+verification that followed the merges — a claims-register line-anchor drifted six
+lines when the generator-honesty edit landed — and was fixed by re-anchoring it.
+Final head `8933fb0a`, `RUN_E2E=1 npm test`: 14,469 tests, 0 failures, 98 skipped
+(env-gated). Rows 3, 5, 6, 7, 8, 10, 16 and 18 remain open; see
+`SESSION_REPORT_2026-09-19.md` §7 for the row-by-row mapping and commits.
+
 **2026-09-13 — CI green, and the story track begins: four defects only
 the runner could show, the owner's run as one command, and generation
 measured before it is tuned.** The GitHub Actions account block lifted at

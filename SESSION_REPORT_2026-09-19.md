@@ -159,3 +159,64 @@ Ranked by leverage × evidence. IDs refer to the Phase 1 reports (A = unfinished
 4. **Visibility.** The 2026-08-03 decision to make the repo private is unexecuted (verified public today); the description still reads "3,216 corpus-measured rules".
 5. **The generation track needs a key to be measured.** Nothing in #1–#4 of §4 can be verified end-to-end without `AI_*` in `.env`. Is the bench meant to be runnable by agents, and if so where does the key live?
 6. **Were the five P0 records real?** Every signal says harness output (labels, content-hash-as-SHA, five sessions in 90 minutes, the 2026-08-08 audit's own words). If they were real, restore them with `git checkout 5a125054 -- docs/user-validation/sessions/` — the new test will then require them to be counted.
+
+## 7. Addendum — rows of §4 closed later in this session
+
+§4 above was written at `5ec6a1db`. Lanes that ran later in this same
+session closed most of its ranked rows before the session ended. This
+section maps each closed row to the commit that actually changed the code
+and to its lane record, verified against `git show --stat` rather than
+restated from memory. Two rows below did not match the description handed
+to the verifying pass; both are corrected here and the correction is noted.
+
+| §4 row | What closed it | Commit(s) | Lane record | Status |
+|---|---|---|---|---|
+| 1 | `themeHint` now reaches `buildSystemPreamble()` as a labelled "SCENE BEAT" line, sanitized through `sanitizeForPrompt` with a 300-char cap; absent/empty/whitespace-only/non-string leaves the preamble byte-identical | `5d27c7d3` | `docs/audits/2026-09-19-generation-prompt-inputs/` (corrected — the directory is `generation-prompt-inputs`, not `prompt-inputs`) | VERIFIED |
+| 2 | `approvedSpanInstructions()`'s `reason` is sanitized to a single line (120 chars, `sanitizeSingleLine`) before it reaches the prompt, and `approvedSpansSurvive()` rejects a rewrite whose revised text no longer contains a locked span's original text verbatim (`reason: 'approved_span_lost'`) | `5d27c7d3` (reason sanitization), `f70ab07d` (span-survival check) | `docs/audits/2026-09-19-generation-prompt-inputs/` for the reason fix; `docs/audits/2026-09-19-locked-spans/` for the survival check (corrected — the commit handed to this pass, `31d83cb6`, is the prompt-inputs lane record, not a code commit; the code commits are `5d27c7d3` and `f70ab07d`) | VERIFIED |
+| 4 | `/api/nvm/revise` and `/revise-stream` now run under `REVISE_BUDGET` (`AI_BUDGET_REVISE_TIMEOUT_MS`/`AI_BUDGET_REVISE_MAX_ATTEMPTS`), wired through `runWithBudgetContext()`/`withDeadline()` as `/converge` already was; 503 `AI_BUDGET_DEADLINE_EXCEEDED` on the POST route, a terminal `revision_error` SSE event plus prompt `ensureEnded()` on the stream route (an await-ordering bug in that ordering was found and fixed in the same commit) | `520a3891` | `docs/audits/2026-09-19-revise-deadline/` | VERIFIED |
+| 9 | `parseOp` now validates every `UPDATE_BELIEF.belief` field the way `APPRAISE_EMOTION` already was, and synthesises a deterministic `belief_<8-hex sha256(charId\|proposition)>` id when the model omits one, instead of silently letting the dispatcher's id-keyed upsert collapse two distinct beliefs into one; `SHIFT_RELATIONSHIP`/`UPDATE_READER_STATE` deltas are now type-checked | `3312b2d9` | `docs/audits/2026-09-19-generator-honesty/` | VERIFIED |
+| 11 | `reassembleFountainScenes` inserts the missing `\n` terminator after a relocated scene slice that lacked one, instead of welding it onto the next scene's heading; `AUC24_DEGRADATION_ID` bumped to `shuffle-drop/v3` per the repo's own bump-on-any-output-change rule; `AUC24_FLOOR` untouched (no table has ever been locked) | `d98a5b1a` | `docs/audits/2026-09-19-harness-honesty/` | VERIFIED |
+| 12 | A worker whose lazy `import('./doctor.ts')` fails now posts a distinct `load_failed` message instead of a per-job error the pool never saw; the pool latches `poolDisabled` off that signal and runs the in-flight (and all later) jobs in-process; `/health` reports `doctorPool.poolDisabled` / `poolDisabledReason`; an over-budget in-process fallback is logged; output-identity harness still 45/45 byte-identical | `9c25f79a` | `docs/audits/2026-09-19-doctor-pool-fallback/` | VERIFIED |
+| 13 | `SceneTargetSchema`/`ConvergeBudgetSchema` replace the `.passthrough()` object with only `sceneIdx` validated, applied to `/converge`, `/converge-arc` and converge-stream's query-parsed `sceneFunction`; `finalIR`/`finalComposite`/`finalValuation`/`finalQuality` are now all recomputed from the one `finalIR` the loop actually returns (previously `finalComposite` could describe a different IR than `finalIR` in the budget-exhausted, nothing-passed-Tier-1 branch); added explicit `tier1Passed`; `maxIterations` validated instead of accepting `-1` (off-by-one fixed: `<=` → `<`); deviation noted per the brief: `tensionTarget` is capped at 1,000,000, not 100, because a select test's `999999` fixture is a deliberate unreachable-ceiling probe | `32a2a848` | `docs/audits/2026-09-19-converge-contract/` | VERIFIED |
+| 14 | `isStubIR()` is now the single place that distinguishes a stub IR from a real one; `provenance.model` carries the resolved candidate model instead of the hard-coded `'gemini'`; a `null` entry in `causalLinks` is filtered out instead of stubbing the whole scene's candidates | `3312b2d9` | `docs/audits/2026-09-19-generator-honesty/` | VERIFIED |
+| 15 | `tests/core/story-graph-corpus-auc.test.ts` no longer `return`s from inside `describe()` (which registered zero tests, invisible even to the skip count) — it now registers every `it()` with node:test's `{ skip }` option naming the reason, matching `real-script-corpus.test.ts`'s own unset/broken/valid pattern | `d98a5b1a` | `docs/audits/2026-09-19-harness-honesty/` (corrected — the commit handed to this pass, `96582e9b`, is the harness-honesty lane record; the code fix is in the same commit as row 11, `d98a5b1a`) | VERIFIED |
+| 17 | `extractEntries()` grouped only ADDED diff lines by a `### <date>` heading among them, so an in-place rewrite of an existing entry's fields that left the heading text untouched was invisible to it; alone this failed safe, but with a second, unrelated, well-formed entry anywhere in the same range it validated only that entry and reported the whole range `ok:true` even with a `PENDING OWNER MEASUREMENT` entry sitting in it — reproduced against the unmodified gate, then fixed by validating entries via hunk line-number overlap rather than heading detection alone; six in-place PENDING-to-measured shapes now covered | `f0985997` (fix), `67a9ca0e` (tests) | `docs/audits/2026-09-19-receipt-gate-inplace/` | VERIFIED |
+| 19 | 17 tracked `.pyc` files removed under `scripts/**` (the §4 estimate of "~60" was not measured; the verified count was 17); `__pycache__/` and `*.pyc` added to `.gitignore` | `e2c636d7` | none (chore; no audit directory) | VERIFIED |
+
+Two items outside the table, recorded here because they touch the same
+window of work but are not §4 rows:
+
+The converge-stream timeout branch had the same await-ordering defect fixed
+in row 4's commit for `/revise-stream`: on timeout it awaited the abandoned
+`convergeScene()` operation before returning, which is before the outer
+`finally { ensureEnded(); }` could close the SSE response, so a truly hung
+provider call left the connection open indefinitely after the terminal
+`converge_error` event had already been written. Fixed in `3f409bd9`
+(`tests/routes/nvm-converge-stream-timeout.test.ts`) by emitting the
+terminal event, letting the abandoned operation settle in the background
+unawaited, and calling `ensureEnded()` immediately. `converge-arc`
+deliberately keeps its await, because `appendGhost` runs inside that
+operation and must complete before the response ends.
+
+The independent full-suite verification that ran after these lanes merged
+caught one integration regression: the generator-honesty edit (`3312b2d9`)
+added ten lines to `scripts/story-bench.mjs` above the
+"THIS PACKET IS THE SEED OF THAT SET" anchor line, moving it from line 998
+to line 1004 — six lines outside the honesty audit's ±3 window around the
+line number recorded in `docs/CLAIMS_REGISTER.md` row 120. Fixed by
+re-anchoring that row's line number to the new position, with no change to
+the claim itself (`8933fb0a`).
+
+Final verified state at `8933fb0a`: `RUN_E2E=1 npm test` — 14,469 tests, 0
+failures, 98 skipped (env-gated).
+
+Rows still open after this session, for the next one: row 3 (all 14
+revision passes diagnose the pre-revision document; on the scoring path),
+row 5 (two scene grammars), row 6 (a bare `.`-prefix line is read as a
+forced scene heading), row 7 (the AUC-24 gate's 2026-10-01 expiry — owner
+decision), row 8 (nine parked scoring branches — owner decision), row 10
+(`IntentionalProof` self-grounding), row 16 (the blind-pair harness reads
+1 of 6 — a number to lead with, not a fix), and row 18 (dead-weight v5.0
+tests). The locked-spans lane (row 2) also documented, without fixing, that
+approved-span line indices go stale from pass 2 onward in `pipeline.ts`
+(scoring path); file that under row 3.
