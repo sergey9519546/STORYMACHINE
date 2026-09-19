@@ -40,9 +40,14 @@ import {
   toTestArgs,
   windowsQuotedLength,
 } from '../../scripts/lib/test-batches.mjs';
+import { testReporterFlags } from '../../scripts/lib/test-reporter.mjs';
 
 const REPO = path.resolve(import.meta.dirname, '../..');
 const FLAGS = ['--experimental-strip-types', '--test'];
+// What run-tests.mjs itself puts before the files: FLAGS plus the reporter it
+// names (scripts/lib/test-reporter.mjs). The spawn test below pipes the
+// runner's stdout, so the runner is not on a TTY and asks for TAP.
+const RUNNER_FLAGS = [...FLAGS, ...testReporterFlags(false)];
 const NODE = 'C:\\Program Files\\nodejs\\node.exe';
 
 /** The environment for a nested `node` that must not think it is a node:test
@@ -273,10 +278,10 @@ describe('scripts/run-tests.mjs — the spawn it actually makes', () => {
       for (const [i, s] of spawns.entries()) {
         assert.equal(s.command, process.execPath, `spawn ${i + 1}: the same node that ran the runner`);
         assert.equal(s.cwd, REPO, `spawn ${i + 1}: cwd must be the repository root, or repo-relative paths resolve against the caller's directory`);
-        assert.deepEqual(s.args.slice(0, FLAGS.length), FLAGS, `spawn ${i + 1}`);
+        assert.deepEqual(s.args.slice(0, RUNNER_FLAGS.length), RUNNER_FLAGS, `spawn ${i + 1}`);
         const length = commandLineLength([s.command, ...s.args]);
         assert.ok(length <= COMMAND_LINE_BUDGET, `spawn ${i + 1}: ${length}-character command line, over the ${COMMAND_LINE_BUDGET} budget`);
-        seen.push(...s.args.slice(FLAGS.length));
+        seen.push(...s.args.slice(RUNNER_FLAGS.length));
       }
       const absolute = seen.filter((f) => path.isAbsolute(f) || f.includes('\\'));
       assert.deepEqual(absolute.slice(0, 3), [], `${absolute.length} file argument(s) are not repo-relative with forward slashes — an absolute path puts the checkout's own path on the command line once per file`);

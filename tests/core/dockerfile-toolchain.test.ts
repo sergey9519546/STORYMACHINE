@@ -13,7 +13,8 @@
 //     npm error gyp ERR! cwd /app/node_modules/better-sqlite3
 //     ERROR: failed to build: failed to solve: process "/bin/sh -c npm ci" did not complete successfully: exit code: 1
 //
-// `FROM node:22-alpine` carries no python3/make/g++. .github/workflows/
+// `FROM node:22-alpine`, the base then, carries no python3/make/g++, and nor
+// does node:24-alpine, the base since 2026-09-18. .github/workflows/
 // release.yml's `publish` job builds this same Dockerfile and would have
 // failed identically, so the entire container delivery path was broken and
 // nothing in the repository noticed. The fix adds
@@ -33,7 +34,9 @@
 // UPSTREAM of the compiler: node-gyp's `configure` step runs gyp, a Python
 // program, before it can evaluate binding.gyp at all, and its `build` step
 // then runs make over the empty generated makefiles. Measured 2026-09-18 on
-// node:22-alpine, one package at a time:
+// node:22-alpine, one package at a time, and repeated the same day on
+// node:24-alpine when the base moved (docs/audits/2026-09-18-node-24/), with
+// the same result at every layer:
 //     python3 alone  -> configure passes, then "gyp ERR! ... not found: make"
 //     python3 + make -> npm ci exit 0, nothing compiled, runtime resolves
 //                       prebuilds/linuxmusl-x64.node
@@ -118,7 +121,8 @@ function escapeForRegExp(text: string): string {
  *   R2-1  `RUN apk add --no-cache curl #&& apk add --no-cache python3 make g++`
  *         An unquoted `#` at a WORD BOUNDARY starts a shell comment, so the
  *         `&&` and everything after it is dead text. Round-2 guard: 21/21
- *         GREEN. Measured in the shipped base image, not argued:
+ *         GREEN. Measured in the base image shipped at the time, not argued
+ *         (and re-measured on node:24-alpine, same busybox sh, same output):
  *           docker run --rm node:22-alpine sh -c 'echo one #&& echo two'  -> `one`
  *           docker run --rm node:22-alpine sh -c 'echo a#b'               -> `a#b`
  *         The second is why the boundary test matters: a `#` mid-word is an
@@ -374,8 +378,8 @@ function parentStage(stage: Stage, stages: readonly Stage[]): Stage | null {
 }
 
 /**
- * The libc family a base image implies. `node:22-alpine` is musl; the Debian
- * variants (`node:22`, `-slim`, `-bookworm`) are glibc. A native `.node` built
+ * The libc family a base image implies. `node:24-alpine` is musl; the Debian
+ * variants (`node:24`, `-slim`, `-bookworm`) are glibc. A native `.node` built
  * for one cannot be loaded by the other, and the runner stage copies
  * node_modules wholesale out of `builder`, so a stage that disagrees with the
  * others breaks at require() time rather than at build time. Callers must pass
@@ -668,8 +672,9 @@ describe('Dockerfile toolchain guard — it can actually fail', () => {
   // Round-3 review, items R2-1 and R2-2. Both passed the round-2 guard 21/21
   // while producing an image that CANNOT build, and both are the same parser
   // bug class as items 1 and 2: the splitter did not know where a shell
-  // command actually ends. Shell behaviour verified in the shipped base image
-  // (`docker run --rm node:22-alpine sh -c …`), not argued from the spec.
+  // command actually ends. Shell behaviour verified in the base image shipped
+  // at the time (`docker run --rm node:22-alpine sh -c …`) and again on
+  // node:24-alpine, not argued from the spec.
   // ---------------------------------------------------------------------
 
   it('is not satisfied by an `apk add` hidden behind a shell `#` comment (review item R2-1)', () => {

@@ -46,16 +46,24 @@ name: Edge Image
 #     npm error gyp ERR! stack Error: Could not find any Python installation to use
 #     npm error gyp ERR! cwd /app/node_modules/better-sqlite3
 #
-# `FROM node:22-alpine` carries no python3/make/g++, which node-gyp needs to
-# run at all. release.yml's `publish` job builds the same Dockerfile and would
-# have failed identically, so the whole container delivery path was broken and
-# nothing noticed. Fixed 2026-09-18 by adding `apk add --no-cache python3 make
-# g++` to the Dockerfile's `deps` stage — see that file's comment for why
-# node-gyp runs even though better-sqlite3 ships a bundled musl prebuild, and
+# `FROM node:22-alpine`, the base at the time, carries no python3/make/g++,
+# which node-gyp needs to run at all; node:24-alpine, the base since
+# 2026-09-18, carries none of them either. release.yml's `publish` job builds
+# the same Dockerfile and would have failed identically, so the whole
+# container delivery path was broken and nothing noticed. Fixed 2026-09-18 by
+# adding `apk add --no-cache python3 make g++` to the Dockerfile's `deps`
+# stage — see that file's comment for why node-gyp runs even though
+# better-sqlite3 ships a bundled musl prebuild, and
 # tests/core/dockerfile-toolchain.test.ts for the guard that keeps it there.
 # The fixed image was built and booted end to end (/health 200, /ready 200,
-# container HEALTHCHECK healthy, better-sqlite3 exercised at runtime);
-# evidence in docs/audits/2026-09-18-edge-image/README.md.
+# container HEALTHCHECK healthy, better-sqlite3 exercised at runtime) on
+# node:22-alpine, evidence in docs/audits/2026-09-18-edge-image/README.md. The
+# node:24-alpine image was built and booted the same way (/health 200, /ready
+# 200, better-sqlite3 exercised at runtime); its HEALTHCHECK is covered in
+# docs/audits/2026-09-18-node-24/README.md, which found the probe fails on a
+# Docker host that maps `localhost` to ::1, on the node:22 image too.
+# That probe now targets 127.0.0.1 and was measured healthy on such a host
+# (docs/audits/2026-09-18-healthcheck-ipv4/README.md).
 #
 # WHY THE TRIGGER FILTERS ON `branches: [main]`:
 # `workflow_run` fires on EVERY completion of CI, on EVERY branch. Without the
@@ -168,8 +176,98 @@ jobs:
           # has moved to since (workflow_run's checkout defaults to the
           # workflow FILE's own ref, which is not what we want to build).
           ref: ${{ github.event.workflow_run.head_sha }}
+          # Two commits, not one: the gate below diffs `<head_sha>^..<head_sha>`
+          # and a depth-1 checkout has no parent to diff against. Nothing else
+          # here reads history, so 2 is the whole requirement.
+          fetch-depth: 2
+
+      # ────────────────────────────────────────────────────────────────────
+      # Do not rebuild an image this commit cannot have changed.
+      #
+      # WHY THIS EXISTS. `.github/workflows/ci.yml` gained a docs-only fast
+      # path on 2026-09-18: a push whose every file is documentation now
+      # finishes CI in ~1-2 minutes instead of ~9. It still concludes
+      # `success`, and a `success` on `main` is exactly what triggers this
+      # workflow — so without this gate, the pushes that were just made cheap
+      # were the ones buying a full `docker build --push`. Measured on the
+      # lane that found it: run 34793742299 was a docs-only push to `main`
+      # that concluded `success` and triggered edge run 34794216577.
+      #
+      # WHY IT RE-DERIVES INSTEAD OF IMPORTING CI'S ANSWER. This is a
+      # `workflow_run` workflow. The `github.event.workflow_run` payload
+      # carries `head_sha`, `head_branch` and `conclusion` — NOT the upstream
+      # run's job outputs. `needs.classify.outputs.docs_only` is unreachable
+      # from here, and so is any `needs:` on a job in another workflow. That
+      # is established; do not try to bridge it.
+      #
+      # WHY NOT `classifyDocsOnly`, THE PREDICATE ci.yml USES. Because it
+      # answers a different question and would be WRONG here.
+      # `classifyDocsOnly` treats any `**/*.md` as documentation, which is
+      # right for "which CI gates can this affect". But `.dockerignore`
+      # re-includes `!server/**`, `!src/**` and `!public/**`, and thirteen
+      # committed `*.md` files live under those trees; `Dockerfile:91` copies
+      # `/app/server` into the runner stage, so they are IN the image.
+      # Gating on `classifyDocsOnly` would skip a rebuild for a commit that
+      # genuinely changes the image. `canSkipImageBuild` is the narrower
+      # predicate — `docs/**` and root-level `*.md` only — and
+      # `tests/core/edge-docs-gate.test.ts` pins the two `.dockerignore`
+      # facts it rests on.
+      #
+      # FAILURE DIRECTION IS DELIBERATELY THE OPPOSITE OF ci.yml's. There, an
+      # input the classifier cannot resolve runs every gate, because guessing
+      # wrong means a gate silently skipped. Here, an input this step cannot
+      # resolve BUILDS, because guessing wrong means a missing or stale
+      # `:edge` — visible and recoverable — while over-building costs one
+      # runner slot. `<head_sha>^` does not exist for a root commit or after a
+      # shallow fetch, and the classifier could fail for reasons nobody
+      # predicted; every one of those paths writes `docs_only=false` and exits
+      # 0, so this step can never fail the job or block a publish.
+      #
+      # WHAT SKIPPING GIVES UP, stated rather than discovered later: the image
+      # is a function of the context AND the build-args, and `GIT_SHA` below
+      # moves on every commit. A skipped build leaves `:edge`'s `ENV GIT_SHA`
+      # and its `org.opencontainers.image.revision` label naming the last
+      # commit actually built, not `main`'s tip. If that label must track the
+      # tip, retagging the existing manifest (`docker buildx imagetools
+      # create`) is the cheap answer, not a rebuild — see
+      # docs/audits/2026-09-18-ci-docs-fast-path/README.md.
+      - name: Skip the image build for a commit outside the build context
+        id: docsonly
+        env:
+          # Via env, not inline `${{ }}` in the script: the value is a
+          # GitHub-supplied SHA rather than user input, but the repository's
+          # posture is that no expression is interpolated into a shell body.
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -uo pipefail
+          if ! FILES=$(git diff --name-only --no-renames "${HEAD_SHA}^" "${HEAD_SHA}" 2>&1); then
+            echo "cannot diff ${HEAD_SHA}^..${HEAD_SHA} (root commit, shallow fetch, or an unresolvable parent) — building"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "changed files:"
+          printf '%s\n' "$FILES" | sed 's/^/  /'
+          # `--no-renames` for the same reason ci.yml's classifier carries it:
+          # git prints only a detected rename's DESTINATION, so `git mv
+          # server/x.ts docs/x.md` would otherwise look like a docs-only
+          # change while deleting a file that is in the image. One
+          # implementation of the allowlist, imported from the same module
+          # ci.yml's classifier uses — dependency-free, no `npm ci` needed.
+          if ! RESULT=$(printf '%s\n' "$FILES" | node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import { canSkipImageBuild } from "./scripts/lib/docs-only.mjs";
+            const files = readFileSync(0, "utf8").split("\n").map((s) => s.trim()).filter(Boolean);
+            process.stdout.write("docs_only=" + (canSkipImageBuild(files) ? "true" : "false") + "\n");
+          '); then
+            echo "classifier failed — building"
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$RESULT"
+          echo "$RESULT" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
+        if: steps.docsonly.outputs.docs_only != 'true'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -177,6 +275,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
+        if: steps.docsonly.outputs.docs_only != 'true'
         uses: docker/setup-buildx-action@v3
 
       # Same lowercasing reasoning as release.yml: ghcr.io requires a
@@ -187,6 +286,7 @@ jobs:
         run: echo "name=${REGISTRY}/${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push :edge
+        if: steps.docsonly.outputs.docs_only != 'true'
         uses: docker/build-push-action@v5
         with:
           context: .

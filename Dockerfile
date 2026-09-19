@@ -1,4 +1,4 @@
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 
 # ── Native-addon build toolchain (deps stage ONLY) ───────────────────────────
@@ -14,8 +14,10 @@ WORKDIR /app
 # identically — the whole container delivery path was broken.
 #
 # WHY node-gyp RUNS AT ALL, and what it actually does here (measured
-# 2026-09-18, three layered container builds — see
-# docs/audits/2026-09-18-edge-image/README.md):
+# 2026-09-18 on node:22-alpine, three layered container builds — see
+# docs/audits/2026-09-18-edge-image/README.md — and repeated the same day on
+# node:24-alpine when the base moved to Node 24, with the same result at every
+# layer — see docs/audits/2026-09-18-node-24/README.md):
 # better-sqlite3 13.0.3 DOES ship a musl prebuild. It is bundled inside the
 # npm tarball (node_modules/better-sqlite3/prebuilds/linuxmusl-x64.node,
 # alongside linuxmusl-arm64 and the glibc/darwin/win32 variants) — it is not
@@ -29,9 +31,10 @@ WORKDIR /app
 # So NO C++ is compiled for this platform. The failure is upstream of that:
 # node-gyp's own `configure` step runs gyp, which is a Python program, before
 # it can ever evaluate binding.gyp's conditions, and its `build` step then
-# invokes make on the (empty) generated makefiles. node:22-alpine ships
-# neither.
-# Measured, one package at a time, on this exact image:
+# invokes make on the (empty) generated makefiles. node:24-alpine ships
+# neither, and neither did node:22-alpine before it.
+# Measured, one package at a time, on node:22-alpine and again on
+# node:24-alpine (node-gyp 12.4.0, bundled with npm 11.19.0):
 #   python3 alone       -> configure passes, then "gyp ERR! stack Error: not found: make"
 #   python3 + make      -> npm ci EXIT 0; build/Release/ holds no
 #                          better_sqlite3.node (the targets compiled nothing);
@@ -47,9 +50,9 @@ WORKDIR /app
 # copies node_modules wholesale from here and runs no `npm ci` of its own, and
 # runner must stay slim. The toolchain does not reach the shipped image.
 #
-# musl/glibc consistency: all three stages are node:22-alpine, so the musl
+# musl/glibc consistency: all three stages are node:24-alpine, so the musl
 # prebuild that resolves here is the one the runner loads. Moving ANY stage to
-# a glibc base (node:22-slim/bookworm) without moving all of them would carry
+# a glibc base (node:24-slim/bookworm) without moving all of them would carry
 # a musl .node into a glibc runtime, or vice versa, and break at require()
 # time, not at build time.
 RUN apk add --no-cache python3 make g++
@@ -61,13 +64,13 @@ COPY package*.json ./
 # run server.ts directly, with no separate compile step for the server.
 RUN npm ci
 
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
@@ -113,7 +116,7 @@ COPY --from=builder /app/tsconfig.json ./tsconfig.json
 RUN mkdir -p /app/data/sessions
 
 # ── Run as non-root ──────────────────────────────────────────────────────────
-# node:22-alpine ships a preexisting, unprivileged `node` user/group (uid/gid
+# node:24-alpine ships a preexisting, unprivileged `node` user/group (uid/gid
 # 1000, created by the upstream image) — no separate useradd/addgroup needed.
 # Everything COPY'd above lands owned by root (Docker's default COPY
 # behavior), so `node` couldn't read/write any of it without the chown below;

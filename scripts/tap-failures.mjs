@@ -3,9 +3,11 @@
 //
 // WHY THIS EXISTS (2026-09-13, ci-concurrency lane round 2, item 7): the
 // GitHub Actions job-log API returns only the LAST ~100 KB of a job's log.
-// `npm test` (scripts/run-tests.mjs) runs ~13,800 tests over ~7 minutes and
-// node:test's non-TTY reporter is TAP — a full stream far bigger than
-// 100 KB. Found reading a red run (34741928418) whose job summary said
+// `npm test` (scripts/run-tests.mjs) runs ~13,800 tests over ~7 minutes and,
+// piped, prints TAP — a full stream far bigger than 100 KB. (Piped output is
+// TAP because run-tests.mjs asks for it; through Node 22 it was merely
+// node:test's non-TTY default, and Node 23+ defaults to `spec` instead — see
+// scripts/lib/test-reporter.mjs.) Found reading a red run (34741928418) whose job summary said
 // "# fail 2" with no way to name the two failures from the API: the `not
 // ok` lines and their diagnostics had already scrolled out of the readable
 // tail. This script pulls just the failing tests (a `not ok` line plus its

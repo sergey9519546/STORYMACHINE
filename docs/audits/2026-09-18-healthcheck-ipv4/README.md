@@ -4,7 +4,7 @@ Lane `lane/healthcheck-ipv4`, branched from `origin/main` at `8b6a60c1`.
 
 The container `HEALTHCHECK` reported `unhealthy` on every probe while the
 server was up. This was found by the Node 24 lane
-(PR #264, its audit record's Finding B) on both a node:22-alpine
+(`docs/audits/2026-09-18-node-24/README.md`, Finding B) on both a node:22-alpine
 image built from `main` and a node:24-alpine build, and was deliberately left
 out of that lane. This lane fixes it. The guard added for it found a second
 defect in the same compose healthcheck: a non-default `PORT` broke the
@@ -199,7 +199,7 @@ one that does not, which is the property the brief asked for.
 
 Local, Node 24.21.0, Windows, worktree `C:\Users\serge\wt-healthcheck`
 (dependencies installed with `npm ci --ignore-scripts`, because this machine
-has no registered Visual Studio; see PR #264's audit record, Finding C):
+has no registered Visual Studio; see `docs/audits/2026-09-18-node-24/README.md`, Finding C):
 `npm run lint` 0 · `check-no-console` 0 · `check-server-reachability` 0 ·
 `honesty-audit` 0 · `build` 0 ·
 `check-scoring-receipt origin/main..HEAD`: no scoring-path files changed ·
@@ -229,7 +229,7 @@ range.
   sentence quoting it, are left as written.** Both are dated observations
   that were true on their host. This record explains the host dependence
   instead of rewriting them. `edge.yml`'s paragraph is also being edited by
-  the open Node 24 lane (#264).
+  the Node 24 lane (#264, merged), which now points at this record.
 - **Host-side `curl http://localhost:3000/…`** examples (README,
   `docker-compose.yml`'s header) are unchanged. Docker publishes the port on
   both address families of the host, and host `curl` falls back between

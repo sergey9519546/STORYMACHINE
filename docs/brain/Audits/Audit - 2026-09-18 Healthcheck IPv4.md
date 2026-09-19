@@ -10,7 +10,8 @@ status: active
 **Directory:** `docs/audits/2026-09-18-healthcheck-ipv4/` — one lane record for
 `lane/healthcheck-ipv4`, branched from `8b6a60c1`. The container healthcheck
 reported `unhealthy` on every probe while the server answered 200. The Node 24
-lane found this (PR #264, its Finding B) and left it for a lane of its own.
+lane found this ([[Audit - 2026-09-18 Node 24]], its Finding B) and left it
+for a lane of its own.
 
 ## The defect
 
@@ -58,7 +59,7 @@ parser as the toolchain guard, now in `tests/helpers/dockerfile.ts`, rather
 than a second copy. It was shown red on the unfixed files (1 finding in the
 Dockerfile, 2 in compose) before it was shown green.
 
-**Related:** [[Audit - 2026-09-18 Edge Image]], [[Patterns]],
+**Related:** [[Audit - 2026-09-18 Edge Image]], [[Audit - 2026-09-18 Node 24]], [[Patterns]],
 `docs/LANE_STANDARD.md`, `docs/audits/2026-09-18-healthcheck-ipv4/README.md`.
 
 ## Sources

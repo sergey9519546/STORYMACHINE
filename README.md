@@ -26,7 +26,7 @@ README or in `CONTRIBUTING.md` grants it. See `docs/DECISION_LOG.md`
 
 ## Run Locally
 
-**Prerequisites:** Node.js matching `>=22.13.0 || >=24` (the test suite runs via `node --experimental-strip-types`, and CI pins Node 22)
+**Prerequisites:** Node.js matching `>=22.13.0 || >=24` (the test suite runs via `node --experimental-strip-types`; CI and the Docker image pin Node 24 LTS)
 
 1. Install dependencies:
    `npm install`

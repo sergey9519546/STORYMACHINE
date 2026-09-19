@@ -10,7 +10,7 @@ name: Security
 #     hatch was removed.
 #   - codeql: semantic code scanning for the JavaScript/TypeScript surface.
 #
-# Matches ci.yml conventions (Node 22, checkout@v4, setup-node@v4 with
+# Matches ci.yml conventions (Node 24, checkout@v4, setup-node@v4 with
 # cache: npm). See docs/AGENT_HANDOFF.md §"P1 — security residual" for
 # context on the open DNS-rebinding/resolve-and-pin work this complements.
 on:
@@ -86,7 +86,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "npm"
 
       - name: Install dependencies

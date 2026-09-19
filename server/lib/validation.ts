@@ -774,6 +774,16 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 675_000;
 // the two cases they are in BEFORE re-deriving — because on a machine of that
 // class re-deriving cannot help.
 //
+// NODE 24 (2026-09-18). The committed table was measured on Node 22 (its
+// `machine.node`); CI and the Docker image moved to Node 24 LTS that day. Two
+// same-day pairs of calibration runs, Node 22 against Node 24 on the same
+// runner CPU model, measured Node 24 cheaper on every row of both pairs, so
+// the table was deliberately NOT re-locked: the Node 22 derivation is the
+// more conservative of the two. Re-locking from those runs would have moved
+// this constant for a reason that has nothing to do with Node — which CPU the
+// runner drew. The runs and the comparison are in
+// docs/audits/2026-09-18-node-24/README.md.
+//
 // WHAT WOULD LET BOTH BOUNDS RISE, AND IT IS NOT A PAIR CAP (2026-09-13 review,
 // finding 7 — this supersedes the "cap the O(distinct²) pair count" pointer in
 // item (d) of the weight bound's 2026-09-12 derivation above, which is left as

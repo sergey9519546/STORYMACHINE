@@ -84,7 +84,10 @@ is 374 notes beside 605 jump controls — before this change the panel offered
 ONE control in Coverage and said nothing at all about the rest. Only 29 of
 those 374 are TAB STOPS: the note is focusable on the act-on surfaces (top
 priorities, root-cause headlines, expander-revealed member rows) and not in
-the Per-Pass Breakdown appendix, which is a list to read. Measured focusable
+the Per-Pass Breakdown appendix, which is a list to read. That split is
+locked by `tests/core/finding-jump-tabstops.test.ts` (source) and by
+`P2-featurelen` counting `[data-no-location-focusable]` separately from
+`[data-no-location]` — reverting the appendix flag fails both. Measured focusable
 elements in the Full Report: 1,640 -> 1,295 on the fixture, 291 -> 211 on the
 built-in sample. The reason stays in `title` and in `aria-label` on a
 `role="note"`, so screen-reader reading order is unaffected either way.
@@ -215,6 +218,7 @@ magnitude still prints; nothing is removed.
   `tests/core/doctor-analysis-budget.test.ts`,
   `tests/routes/doctor-analysis-budget.test.ts`,
   `tests/core/finding-jump.test.ts`,
+  `tests/core/finding-jump-tabstops.test.ts`,
   `tests/core/scriptide-render-loop-guard.test.ts`
 - `src/lib/priorities-copy.ts`; `server/lib/strengths-copy.ts`; `server/lib/scene-ranges.ts`
 - `src/lib/diagnostic-copy.ts`; `src/lib/percentile-copy.ts`
