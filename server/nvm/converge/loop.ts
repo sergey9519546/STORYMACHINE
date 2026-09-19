@@ -32,6 +32,7 @@ import { applyStoryOps } from '../ops/dispatcher.ts';
 import { queryPolicy } from '../selfplay/mine.ts';
 import { computeTopology } from '../valuation/topology.ts';
 import { makePrng, randInt } from '../repro/seed.ts';
+import { alignCandidateCast, type CastAlignment } from './cast-alignment.ts';
 
 // Pick an operator not yet tried in this convergence session; if all have been tried, pick randomly.
 function pickUntried(
@@ -59,6 +60,25 @@ export interface ConvergeStep {
   ghostReason?: GhostReason;
   /** Abridged writers' room transcript for this candidate. */
   writersRoomSummary?: string;
+  /**
+   * The cast-alignment step's own record for this candidate
+   * (server/nvm/converge/cast-alignment.ts), attached beside `tier1Results`
+   * because the two are read together: alignment is what the proof saw BEFORE
+   * it ran.
+   *
+   * PRESENT WHENEVER THE FEATURE RAN — including, deliberately, when it failed
+   * (`applied: false` with a reason and a redacted error). A step that reached
+   * Tier 1 through a silently-skipped alignment is exactly the shape of failure
+   * this repository keeps finding (STORY_BENCH §1), so the record is not
+   * conditional on success.
+   *
+   * ABSENT when TYPESAFE_CAST_ALIGNMENT is unset — the feature's default. That
+   * keeps this loop's output byte-identical to what it was before the feature
+   * existed on every deployment that has not opted in; the disabled case is a
+   * configuration state, not an event worth recording on 3 candidates × 8
+   * iterations of every converge.
+   */
+  castAlignment?: CastAlignment;
 }
 
 // Deliverable 1 (close the generate→audit→select loop): previously every
@@ -310,8 +330,21 @@ export async function convergeScene(
     }> = [];
 
     for (let ci = 0; ci < candidates.length; ci++) {
-      const candidate = candidates[ci];
+      let candidate = candidates[ci];
       const candidateId = `c${iter}-${ci}`;
+      // Cast alignment (2026-09-19) — OFF unless TYPESAFE_CAST_ALIGNMENT=1, in
+      // which case model-invented character names are resolved to the cast
+      // already in `state` before the proof reads them. It sits HERE, and not
+      // inside the generator, because this is the last point at which the
+      // candidate is still just an IR and the first at which the thing that
+      // would reject it (runTier1, immediately below) is about to look. It
+      // never throws and returns the same object when it changes nothing, so
+      // with the flag off the next line sees exactly what it always saw.
+      // The loop carries no AbortSignal of its own (the route's budget races
+      // the whole operation instead — server/routes/nvm/converge.ts), so none
+      // is forwarded; the adapter's own 10 s timeout is the deadline.
+      const castAlignmentOutcome = await alignCandidateCast(candidate, state, { target });
+      candidate = castAlignmentOutcome.ir;
       const tier1Results = runTier1(candidate, state);
       const passed = tier1Passes(tier1Results);
       // Apply candidate ops to get post-transition state before valuing — otherwise
@@ -376,6 +409,9 @@ export async function convergeScene(
         writersRoomSummary: roomResult
           ? `dominant=${roomResult.dominantCritic} op=${roomResult.suggestedOperator ?? 'none'} consensus=${roomResult.consensus}`
           : undefined,
+        castAlignment: castAlignmentOutcome.alignment.reason === 'disabled'
+          ? undefined
+          : castAlignmentOutcome.alignment,
       };
       history.push(step);
       budget.onStep?.(step);
