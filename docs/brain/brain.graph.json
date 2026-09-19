@@ -127,6 +127,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Locked Spans",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
       "type": "audit",
       "title": "Audit — 2026-09-19 Revise Deadline",
@@ -1312,6 +1318,18 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md",
       "to": "docs/brain/Patterns.md"
     },
     {
