@@ -177,11 +177,31 @@ export function parseOp(raw: Record<string, unknown>): StoryOp | null {
         const amount = delta['amount'];
         const reason = delta['reason'];
         if (typeof dimension !== 'string' || dimension === '') return null;
-        if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < -1 || amount > 1) return null;
-        if (typeof reason !== 'string') return null;
+        // Out-of-range-but-finite is recoverable the same way UPDATE_BELIEF's
+        // confidence is above: clamp into the declared bound (-1..1, per
+        // RelationshipDelta's own comment) rather than dropping the whole op.
+        // Dropping an op is not local — parseIR falls back to stubIR when
+        // `ops` empties out, so a one-op candidate with amount:2 used to
+        // degrade to a stub over a value that was still a usable direction and
+        // magnitude. A non-numeric or NaN amount carries no usable magnitude
+        // to clamp, so those are still rejected.
+        if (typeof amount !== 'number' || !Number.isFinite(amount)) return null;
+        const clampedAmount = Math.max(-1, Math.min(1, amount));
+        if (clampedAmount !== amount) {
+          logger.debug('llm_relationship_amount_clamped', { dimension, raw: amount, clamped: clampedAmount });
+        }
+        // `reason` is a required `string` on RelationshipDelta (StoryOp.ts),
+        // not a required NON-EMPTY string, so `null` — the usual JSON spelling
+        // of "the model left this absent" — is treated as absent and mapped to
+        // '', matching the confidence policy's "recover what's recoverable"
+        // stance. A genuinely missing (undefined) or non-string, non-null
+        // `reason` is still rejected: unlike a numeric delta, there is no
+        // sensible default to reconstruct from nothing typed at all.
+        if (reason !== null && typeof reason !== 'string') return null;
+        const resolvedReason = reason === null ? '' : reason;
         return {
           op: 'SHIFT_RELATIONSHIP', pair: pair as [string, string],
-          delta: { dimension, amount, reason } as unknown as StoryOp & { op: 'SHIFT_RELATIONSHIP' } extends { delta: infer D } ? D : never,
+          delta: { dimension, amount: clampedAmount, reason: resolvedReason } as unknown as StoryOp & { op: 'SHIFT_RELATIONSHIP' } extends { delta: infer D } ? D : never,
         };
       }
       case 'ADVANCE_OBJECT_ARC': {
@@ -216,13 +236,26 @@ export function parseOp(raw: Record<string, unknown>): StoryOp | null {
         // this branch) — unlike SHIFT_RELATIONSHIP above, an empty object must
         // still parse. What must not happen is a PRESENT field of the wrong
         // type reaching the dispatcher unchecked, so each key is validated
-        // only when the model actually sent it.
+        // only when the model actually sent it. `null` is treated the same as
+        // "not sent" for every field here: it is the usual JSON spelling of
+        // "absent", and every field on this delta is already optional, so
+        // there is no information lost by dropping a null one rather than
+        // rejecting the whole op over it — the same "recover what's
+        // recoverable" stance as `confidence` and (now) SHIFT_RELATIONSHIP's
+        // `amount` above.
+        const cleanedDelta: Record<string, unknown> = {};
         for (const key of ['suspense', 'curiosity', 'investment'] as const) {
           const v = delta[key];
-          if (v !== undefined && (typeof v !== 'number' || !Number.isFinite(v))) return null;
+          if (v === undefined || v === null) continue;
+          if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+          cleanedDelta[key] = v;
         }
-        if (delta['knownFact'] !== undefined && typeof delta['knownFact'] !== 'string') return null;
-        return { op, delta: delta as unknown as StoryOp & { op: 'UPDATE_READER_STATE' } extends { delta: infer D } ? D : never };
+        const knownFact = delta['knownFact'];
+        if (knownFact !== undefined && knownFact !== null) {
+          if (typeof knownFact !== 'string') return null;
+          cleanedDelta['knownFact'] = knownFact;
+        }
+        return { op, delta: cleanedDelta as unknown as StoryOp & { op: 'UPDATE_READER_STATE' } extends { delta: infer D } ? D : never };
       }
       case 'RECORD_VISUAL_FACT': {
         if (typeof raw['fact'] !== 'string') return null;
@@ -260,11 +293,28 @@ function parseIR(raw: unknown, spec: GenerationSpec, idx: number, model: string)
   // bad link. Guarding object-ness per element means a malformed link is
   // DROPPED, matching every other per-element validation in this file, rather
   // than degrading the whole scene's candidates to stubs.
+  // Finding 2 (2026-09-19 adversarial review of 3312b2d9): the guard above
+  // checked `opIdx` alone and let a link with a missing/malformed `causedBy`
+  // through untyped. CausalLink.causedBy is `string[]` (NarrativeTransitionIR.ts),
+  // and every consumer assumes it — server/nvm/quality/index.ts:702 does
+  // `for (const causedBy of link.causedBy)`, server/nvm/proof/tier4/attribution.ts
+  // reads `cl.causedBy.length`, server/nvm/room/critics/skeptic.ts:51 the same —
+  // so a link surviving as `{opIdx: 0}` (no causedBy at all) or with `causedBy`
+  // not an array threw a TypeError out of `buildCausalGraph`, which
+  // `runQualityEngine` calls with no try/catch around it and `convergeScene`
+  // calls per candidate (loop.ts:370) with none either, escaping all the way
+  // to the route as an HTTP 500 for the whole request — not just a dropped
+  // link. Matching the field-by-field discipline every other branch in this
+  // file uses: require `causedBy` to be an array, and every element a string,
+  // before accepting the link at all. A malformed link is dropped here, same
+  // as a malformed op is dropped by parseOp — never fatal.
   const rawCausalLinks = Array.isArray(obj['causalLinks']) ? obj['causalLinks'] as unknown[] : [];
   const causalLinks = rawCausalLinks.filter(
     (link): link is CausalLink =>
       link !== null && typeof link === 'object' && Number.isInteger((link as { opIdx?: unknown }).opIdx)
-      && (link as { opIdx: number }).opIdx >= 0 && (link as { opIdx: number }).opIdx < ops.length,
+      && (link as { opIdx: number }).opIdx >= 0 && (link as { opIdx: number }).opIdx < ops.length
+      && Array.isArray((link as { causedBy?: unknown }).causedBy)
+      && (link as { causedBy: unknown[] }).causedBy.every((c): c is string => typeof c === 'string'),
   );
 
   return {

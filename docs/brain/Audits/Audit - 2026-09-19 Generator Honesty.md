@@ -81,6 +81,15 @@ merging all six lanes), so `brain-coverage.test.ts`'s freshness check
 content-level brain check ((a)-(d), (f), (g)) passes with this note in
 place.
 
+**2026-09-19 (generator-parse-hardening lane), post-merge adversarial
+findings fixed in the same file:** a `causalLink` missing/malformed
+`causedBy` used to 500 the whole converge request (Finding 2), and
+`SHIFT_RELATIONSHIP.delta.amount`/`UPDATE_READER_STATE`'s `null` fields
+used to drop the whole op inconsistently with `confidence`'s clamp policy
+(Finding 6) — see "§ Review findings fixed" in
+`docs/audits/2026-09-19-generator-honesty/README.md` for both fixes, the
+fail-first test output, and the policy chosen.
+
 **Related:** [[Audit - 2026-09-13 Story Bench Lane]],
 [[Audit - 2026-09-19 Harness Honesty]], [[Patterns]],
 `docs/audits/2026-09-19-generator-honesty/README.md`.

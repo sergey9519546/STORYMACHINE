@@ -285,3 +285,134 @@ and `tests/core/openai-compat-generation-guards.test.ts` (both
 - `tests/core/llm-generator-schema.test.ts`
 - `tests/core/openai-compat-generation-guards.test.ts`
 - `SESSION_REPORT_2026-09-19.md` §4, rows 9 and 14
+
+## § Review findings fixed (2026-09-19, generator-parse-hardening lane)
+
+Two findings from an adversarial review of commit `3312b2d9`
+(generator-honesty, this same audit) landed after the lane above closed.
+Fixed in `server/nvm/generate/llm-generator.ts` on branch
+`lane/generator-parse-hardening` off `1e7779de`.
+
+### Finding 2 (HIGH, CONFIRMED by probe) — a causalLink with no `causedBy` 500s the request
+
+`parseIR`'s per-element `causalLinks` filter (added by the generator-honesty
+lane to stop a `null` element throwing) checked only that `opIdx` was a valid
+in-range integer. A link shaped `{"opIdx": 0}` — no `causedBy` at all — or
+`{"opIdx": 0, "causedBy": "x"}` (not an array) or `{"opIdx": 0, "causedBy":
+[1]}` (array of the wrong element type) all satisfied that check and were
+kept as-is. Every consumer of `CausalLink.causedBy` assumes it is a
+`string[]` with no defensive check of its own:
+`server/nvm/quality/index.ts:702` does `for (const causedBy of
+link.causedBy)`, `server/nvm/proof/tier4/attribution.ts:23,42` reads
+`cl.causedBy.length`, and `server/nvm/room/critics/skeptic.ts:51` the same.
+`runQualityEngine` calls `buildCausalGraph` with no try/catch, and
+`convergeScene` (`server/nvm/converge/loop.ts:370`) calls
+`runQualityEngine` per candidate with no try/catch around that either, so a
+`TypeError: link.causedBy is not iterable` (or `.length` on `undefined`)
+escaped all the way to the route handler as an HTTP 500 for the whole
+converge request — not merely a dropped link.
+
+**Fix:** the filter now also requires `Array.isArray(link.causedBy)` and
+that every element of that array is a `string`, before the link is kept.
+A link failing either check is dropped, exactly like a malformed op is
+dropped by `parseOp` — never fatal. Comment added in
+`server/nvm/generate/llm-generator.ts` at the filter explaining why (which
+consumers assume the shape and where the 500 came from).
+
+### Finding 6 (MEDIUM, REASONED) — two opposite policies for the same class of malformed field
+
+`belief.confidence` out of range, NaN, or a string like `"0.5"` was
+defaulted to `0.5` with a debug log — the op survives. But
+`SHIFT_RELATIONSHIP.delta.amount` of `1.0000001` or `2` returned `null`,
+dropping the whole op, and `UPDATE_READER_STATE` with an explicit
+`knownFact: null` (the ordinary JSON spelling of "the model left this
+absent") also returned `null`. Dropping an op is not local: `parseIR` falls
+back to `stubIR` when `ops` empties out, so one out-of-range `amount` on a
+one-op candidate silently degraded the whole candidate to a structural stub.
+
+**Policy chosen (matches `confidence`'s "recover what's recoverable"
+stance, `confidence`'s own policy is unchanged):**
+
+- `SHIFT_RELATIONSHIP.delta.amount`: a finite numeric value outside
+  `[-1, 1]` is now clamped into that range (`Math.max(-1, Math.min(1,
+  amount))`) and logged at `logger.debug('llm_relationship_amount_clamped',
+  { dimension, raw, clamped })`. A non-numeric or `NaN` amount is still
+  rejected — there is no usable magnitude to clamp from `'big'` or `NaN`,
+  unlike a numeric value that is merely out of bound. A missing/empty
+  `dimension` is still rejected (unchanged — it names the axis, and there is
+  nothing to default it to).
+- `SHIFT_RELATIONSHIP.delta.reason`: `RelationshipDelta.reason` is a
+  required `string` (`server/nvm/ops/StoryOp.ts`), not a required
+  *non-empty* string — `parseOp` never checked for emptiness — so an empty
+  string is a value the type already permits. An explicit `reason: null` is
+  now treated as absent and mapped to `''`. A genuinely missing (`undefined`)
+  or non-string, non-`null` `reason` is still rejected: unlike a numeric
+  delta there is no sensible content to reconstruct from nothing typed at
+  all.
+- `UPDATE_READER_STATE.delta`: every field (`suspense`, `curiosity`,
+  `investment`, `knownFact`) is already optional on `ReaderStateDelta`. An
+  explicit `null` on any of them is now treated identically to the field
+  being absent (skipped, not copied into the parsed delta) rather than
+  failing the wrong-type check that used to apply to non-`undefined` values.
+  A present field of any other wrong type (e.g. `suspense: 'high'`) is still
+  rejected, unchanged.
+
+One pre-existing test asserted the OLD reject-on-out-of-range behaviour for
+`SHIFT_RELATIONSHIP.delta.amount` (`tests/core/llm-generator-parse.test.ts`,
+"SHIFT_RELATIONSHIP.delta.amount out of the -1..1 range is rejected"); it was
+updated in this lane to assert the new clamp-to-1 behaviour instead, since
+the whole point of Finding 6 is that this is an intentional policy change,
+not a regression.
+
+### Tests — fail-first, then fixed
+
+Added to `tests/core/llm-generator-parse.test.ts`: a `Finding 2` describe
+block (four `causalLinks` shapes — `{opIdx:0}` no `causedBy`, `causedBy:
+'x'`, `causedBy: [1]`, and the well-formed `causedBy: ['e1']` — asserting
+only the last survives, the candidate is not stubbed, and `buildCausalGraph`
+(imported from `server/nvm/quality/index.ts`, which exports it and is pure)
+does not throw on the parsed IR); and a `Finding 6` describe block (amount
+`2`/`-1.5`/`1.0000001` clamp to `1`/`-1`/`1`; `'big'`/`NaN` still `null`;
+`UPDATE_READER_STATE` `{knownFact: null}` and `{suspense: null}` both parse
+with the field absent from the delta; `{suspense: 'high'}` still `null`).
+
+Run BEFORE the fix (`node --experimental-strip-types --test
+tests/core/llm-generator-parse.test.ts`) — 3 of 20 subtests failed, quoting
+the assertion output:
+
+```
+not ok - Finding 2 (HIGH): ... only the well-formed link survives
+  AssertionError: 4 !== 1  (expected 1, actual 4 — every malformed link
+  still survived the filter)
+
+not ok - Finding 6 (MEDIUM): ... an out-of-range but finite amount is clamped
+  AssertionError: assert.ok(high && high.op === 'SHIFT_RELATIONSHIP')
+  (actual: null — amount:2 was still rejected outright)
+
+not ok - Finding 6 (MEDIUM): ... UPDATE_READER_STATE treats an explicit null
+  on an optional field as absent, not a type error
+  AssertionError: assert.ok(withNullKnownFact && ...)
+  (actual: null — {knownFact: null} was still rejected outright)
+```
+
+(`# tests 20 / # pass 17 / # fail 3`)
+
+Run AFTER the fix (same command): `# tests 20 / # pass 20 / # fail 0`.
+
+### Gates (this lane)
+
+| Gate | Result |
+|---|---|
+| `tests/core/llm-generator-parse.test.ts` | 20/20 pass |
+| `tests/core/llm-generator-schema.test.ts` | 17/17 pass |
+| `tests/core/openai-compat-generation-guards.test.ts` | 22/22 pass |
+| `tests/scripts/story-bench.test.ts` | 38/38 pass |
+| `tests/nvm/converge/cast-alignment.test.ts` | 19/19 pass |
+| `tests/core/converge-loop-contract.test.ts` | 3/3 pass |
+| `npm run lint` (`tsc --noEmit`) | exit 0, no errors |
+| `npm run check-no-console` | exit 0 — "310 file(s) under server/ checked ... all proven unreachable" (unchanged) |
+| `node scripts/check-scoring-receipt.mjs 1e7779de..HEAD` | exit 0 — "no scoring-path files changed. OK." |
+| `node --experimental-strip-types --test tests/core/brain-coverage.test.ts` | only sub-test (e) fails (brain graph freshness — this lane adds a brain note but does not run `npm run brain`, per its brief), all other sub-tests pass |
+
+Not run (per this lane's brief): the full `npm test`, `npm run brain`. Not
+pushed.
