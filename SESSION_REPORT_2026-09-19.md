@@ -220,3 +220,71 @@ decision), row 8 (nine parked scoring branches — owner decision), row 10
 tests). The locked-spans lane (row 2) also documented, without fixing, that
 approved-span line indices go stale from pass 2 onward in `pipeline.ts`
 (scoring path); file that under row 3.
+
+### 7.1 Later in the session: review round and row 10
+
+1. **Row 10 closed** — `IntentionalProof` now grounds against an optional
+caller-supplied `SceneTarget.cast` (`IntentionalGroundingOptions { cast?,
+allowIntroduce? }` threaded through `runTier1` and cast alignment); with no
+cast, behaviour is byte-identical to `1e7779de`, pinned by a committed 6-IR
+x 2-state equivalence baseline; with a cast, an invented self-grounded name
+is blocked and a cast member referenced before any belief passes (the
+17-blocks case). `proofsToConstraints` under a cast no longer tells the
+model to introduce the name; the preamble carries a sanitized single-line
+CAST record. `converge-stream` does not take `cast` (query-parsed scalars
+only); `allowIntroduce` is live in the API but inert in today's loop
+because no constraint source emits `must_introduce_character` under a
+cast. The bench now sends the premise cast, so bench runs before and
+after `24476027` are not comparable. Commit `24476027`, record
+`docs/audits/2026-09-19-cast-grounding/`.
+
+2. **An adversarial read-only review of the six merged lanes** (after the
+gate-runner verification) found ten findings; the four that mattered were
+fixed the same session:
+   - BLOCKER, a regression introduced by `f0985997`: the receipt gate's
+   in-place detector counted any hunk inside any old entry as "gained a new
+   entry", so a scoring change plus a typo fix in an old receipt passed the
+   gate (branch PASS, `53f6e377` FAIL, confirmed by probe in both
+   directions). Fixed in `96c9581c`: in-place entries validate but never
+   count toward existence; two ATTACK tests plus a structural-only variant
+   added. Record: `docs/audits/2026-09-19-receipt-gate-inplace/README.md`
+   § "Regression found in review and fixed".
+   - HIGH, pre-existing: a causal link without `causedBy` survived
+   `parseIR`'s filter and threw out of `buildCausalGraph` as an HTTP 500 on
+   `/api/nvm/converge`; plus `parseOp`'s inconsistent policies (an
+   out-of-range relationship amount dropped the op and could stub the
+   candidate; `null` optional fields were rejected). Fixed in `b12159a0`:
+   `causedBy` must be a string array; amounts clamp like confidence; `null`
+   is absent. Record: generator-honesty README § "Review findings fixed".
+   - MEDIUM x2 in `approvedSpansSurvive`: CRLF originals with a span at EOF
+   false-rejected a correct rewrite (normalize before split now); two-blank-
+   line spans and out-of-range spans passed vacuously (an excerpt must
+   contain non-whitespace; when every span is skipped the rewrite is
+   rejected with `approved_spans_unchecked`; a one-line excerpt must keep
+   its occurrence count). Fixed in `bfa8eb88`. Record: locked-spans README
+   § "Review findings fixed".
+   - LOW x2 in the doctor pool: the disabled reason exposed absolute paths
+   on unauthenticated `/health` (now stripped to `<path>` and capped at 200
+   chars); the settle order armed an idle timer on a dropped slot
+   (reordered). Fixed in `7bb2a6e1`. Output identity re-verified 45/45.
+   - Recorded, not fixed: `finalComposite` on the budget-exhausted path now
+   describes the returned IR instead of 0, so `converge-arc`'s
+   `meanComposite`/`arcScore` before and after `32a2a848` are not comparable
+   (no arc number is cited anywhere as a claim); clearing the Arc Planner's
+   iterations box now yields a 400 instead of a zero-iteration run;
+   receipt-gate heading identity is string-exact.
+
+3. **Process finding, twice in one session**: after every lane that edits
+`scripts/story-bench.mjs` or `tests/scripts/story-bench.test.ts`, the
+claims-register line anchors in `docs/CLAIMS_REGISTER.md` rows 119-120 go
+stale and `tests/core/honesty-audit-claims.test.ts` fails on the full
+suite; both times the failing merge had already been pushed as a
+checkpoint on targeted tests. Rule for the next session: a lane that
+touches a file cited by a `path:line anchor:"..."` pointer in
+CLAIMS_REGISTER.md must run `tests/core/honesty-audit-claims.test.ts` in
+its own gate table (cite this file's row numbers), and the orchestrator
+must run it before any checkpoint push. The two fix commits are `8933fb0a`
+and `0edb6df2`.
+
+4. Final verified state after this round: `RUN_E2E=1 npm test` at head
+`0edb6df2` — 14,512 tests, 0 failures, 98 skipped (env-gated), 1 todo.

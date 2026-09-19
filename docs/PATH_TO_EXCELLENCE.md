@@ -68,6 +68,15 @@ lines when the generator-honesty edit landed — and was fixed by re-anchoring i
 Final head `8933fb0a`, `RUN_E2E=1 npm test`: 14,469 tests, 0 failures, 98 skipped
 (env-gated). Rows 3, 5, 6, 7, 8, 10, 16 and 18 remain open; see
 `SESSION_REPORT_2026-09-19.md` §7 for the row-by-row mapping and commits.
+A later review round the same day closed row 10 (`IntentionalProof` now
+grounds against an optional caller-supplied cast instead of the candidate
+IR) and fixed four of ten findings from an adversarial read-only review of
+the six merged lanes — a receipt-gate regression, a generator parse-error
+path, two locked-span edge cases, and two doctor-pool low-severity issues —
+plus re-anchored the claims register a second time after the same anchor
+drift recurred; see `SESSION_REPORT_2026-09-19.md` §7.1. Final head
+`0edb6df2`, `RUN_E2E=1 npm test`: 14,512 tests, 0 failures, 98 skipped
+(env-gated), 1 todo.
 
 **2026-09-13 — CI green, and the story track begins: four defects only
 the runner could show, the owner's run as one command, and generation
