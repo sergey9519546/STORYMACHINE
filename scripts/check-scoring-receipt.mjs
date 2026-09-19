@@ -836,16 +836,39 @@ export function extractEntries(lines) {
  * Returns { ok, problems }.
  *
  * `structuralOnly: true` keeps the "a new dated entry must exist" requirement
- * but skips per-entry content validation. That mode exists for ONE caller:
- * release.yml, which checks a whole release window (previous v* tag → this
- * tag) rather than a single change. Content validation is a property of the
- * moment an entry is written — an honest entry cites the branch SHA it was
- * measured at, and after that branch is squash-merged the SHA is no longer in
- * the repository at all (verified: the 2026-08-04 craft-spec and 2026-08-07
- * pilot entries both cite SHAs that no longer resolve, and both are honest).
- * Re-validating them months later manufactures failures on exactly the
- * carefully-written receipts this guard is meant to encourage. Entry content
- * is validated where it can be validated: in CI, on the range that adds it.
+ * but skips per-entry content validation for a BRAND-NEW entry. That mode
+ * exists for ONE caller: release.yml, which checks a whole release window
+ * (previous v* tag → this tag) rather than a single change. Content
+ * validation is a property of the moment an entry is written — an honest
+ * entry cites the branch SHA it was measured at, and after that branch is
+ * squash-merged the SHA is no longer in the repository at all (verified: the
+ * 2026-08-04 craft-spec and 2026-08-07 pilot entries both cite SHAs that no
+ * longer resolve, and both are honest). Re-validating them months later
+ * manufactures failures on exactly the carefully-written receipts this guard
+ * is meant to encourage. Entry content is validated where it can be
+ * validated: in CI, on the range that adds it.
+ *
+ * BUG FOUND AND FIXED 2026-09-19 (regression from the in-place detector added
+ * earlier the same day, docs/audits/2026-09-19-receipt-gate-inplace/): an
+ * earlier version of this function folded `inPlace` into the EXISTENCE test
+ * (`entries.length === 0 && inPlace.length === 0`) — since
+ * `entriesModifiedInPlace` finds an entry by hunk line-number OVERLAP with no
+ * requirement about what changed, editing so much as one word inside ANY old
+ * entry (a typo fix in a `Corpus fingerprint` line, or an appended
+ * `- **Note:** …` bullet — the exact move this function's own error string
+ * calls out: "Appending lines to an existing entry is not a receipt for a new
+ * scoring change") made `inPlace.length` nonzero and satisfied "this range
+ * added a receipt entry", even though nothing new was added and the touched
+ * entry was already well-formed. `checkReceiptForRange` then printed
+ * "gained a well-formed new entry in the same range. OK." for a range that
+ * gained no entry at all. The fix: `inPlace` entries contribute VALIDATION,
+ * never EXISTENCE. Their validation also runs BEFORE the existence check —
+ * and in BOTH modes, `structuralOnly` included — because a still-PENDING
+ * entry rewritten in place beside an unrelated well-formed entry (C-DANGER
+ * below) has to fail by name in a whole-release-window scan just as much as
+ * in a single-change one; `structuralOnly` only ever excused a BRAND-NEW
+ * entry's field validation (release.yml's own reasoning above), never an
+ * existing entry's.
  */
 export function checkReceiptForRange(range, opts = {}) {
   const { structuralOnly = false, ...entryOpts } = opts;
@@ -860,7 +883,23 @@ export function checkReceiptForRange(range, opts = {}) {
   // overlap against the target tree's full entry spans instead of by diff
   // content, and skips anything `entries` already recognized.
   const inPlace = entriesModifiedInPlace(range, new Set(entries.map((e) => e.heading)));
-  if (entries.length === 0 && inPlace.length === 0) {
+
+  // In-place entries are validated FIRST, and unconditionally of
+  // `structuralOnly` — see the bug note above. A problem found here (most
+  // often PENDING, but any validateEntry() rule applies) fails the range by
+  // name regardless of whether this range also happens to add a brand-new
+  // entry elsewhere.
+  const problems = [];
+  for (const entry of inPlace) {
+    for (const p of validateEntry(entry, entryOpts)) problems.push(`${entry.heading}\n      ${p}`);
+  }
+  if (problems.length > 0) return { ok: false, problems };
+
+  // Existence: only a brand-new entry (recognized by `extractEntries` because
+  // its OWN heading line was added) counts. An in-place rewrite that reached
+  // this point was validated above and found clean, but a clean edit to an
+  // existing entry is still not a receipt for a NEW scoring change.
+  if (entries.length === 0) {
     return {
       ok: false,
       problems: [
@@ -871,8 +910,7 @@ export function checkReceiptForRange(range, opts = {}) {
     };
   }
   if (structuralOnly) return { ok: true, problems: [] };
-  const problems = [];
-  for (const entry of [...entries, ...inPlace]) {
+  for (const entry of entries) {
     for (const p of validateEntry(entry, entryOpts)) problems.push(`${entry.heading}\n      ${p}`);
   }
   return { ok: problems.length === 0, problems };

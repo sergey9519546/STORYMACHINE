@@ -52,3 +52,10 @@ exit codes are in the directory's README.
 **What it did not do:** no real-corpus measurement (this lane's change is
 gate tooling, not scoring code), no `npm run brain` (per the lane brief —
 this note satisfies the staleness guard without regenerating the graph).
+
+**2026-09-19 (fix lane, `lane/receipt-gate-existence`):** an adversarial
+reviewer's probe found this lane's own fix had introduced a NEW false pass —
+`checkReceiptForRange()` counted ANY in-place edit to an old entry (a typo
+fix, an appended bullet) as EXISTENCE of a new one — fixed by making
+in-place entries contribute validation only, never existence; see
+"§ Regression found in review and fixed" in the directory's README.

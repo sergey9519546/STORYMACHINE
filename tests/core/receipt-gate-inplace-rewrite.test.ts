@@ -85,8 +85,8 @@ function baseGuardEnv(): Record<string, string | undefined> {
   return base;
 }
 
-function runGuard(dir: string, before: string, after: string) {
-  return spawnSync(process.execPath, [guardScript], {
+function runGuard(dir: string, before: string, after: string, extraArgs: string[] = []) {
+  return spawnSync(process.execPath, [guardScript, ...extraArgs], {
     cwd: dir,
     encoding: 'utf8',
     env: {
@@ -313,6 +313,107 @@ describe('receipt gate — rewriting a PENDING entry IN PLACE', () => {
         'appending after an untouched, already-valid entry must not drag that entry into re-validation.'
         + `\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
       );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+/** Case base for the existence-test regression below: a repo with a
+ *  scoring-path file and a fully MEASURED, well-formed entry ALREADY FILED —
+ *  the state each attack edits IN PLACE without adding anything new. */
+function fileBaseWithMeasuredEntry(): { dir: string; before: string } {
+  const dir = mkRepo();
+  writeFile(dir, DOCTOR_REL, 'export const health = 1;\n');
+  writeFile(dir, RECEIPT_REL, '# Measurement Receipts Ledger\n');
+  const initSha = commitAll(dir, 'init, no entry yet');
+  writeFile(dir, RECEIPT_REL, `# Measurement Receipts Ledger\n${entryBlock(MEASURED_HEADING, fieldsMeasured(initSha))}`);
+  const before = commitAll(dir, 'file a well-formed, fully measured entry (the state later edits rewrite in place)');
+  return { dir, before };
+}
+
+// REGRESSION (2026-09-19, docs/audits/2026-09-19-receipt-gate-inplace/,
+// introduced by the in-place detector added earlier the same day): an
+// earlier version of checkReceiptForRange() folded `inPlace` into the
+// EXISTENCE test (`entries.length === 0 && inPlace.length === 0`).
+// `entriesModifiedInPlace` finds an entry by hunk line-number OVERLAP with no
+// requirement about what changed inside it, so ANY edit inside ANY old entry
+// satisfied "this range added a receipt entry" — even a one-word typo fix or
+// an appended Note bullet, the exact move the gate's own error string
+// forbids. The branch printed, untruthfully, "gained a well-formed new entry
+// in the same range. OK." Fixed: `inPlace` entries contribute VALIDATION,
+// never EXISTENCE, and their validation runs BEFORE the existence check in
+// BOTH modes (structuralOnly included), so a still-PENDING in-place rewrite
+// still fails by name (see C-DANGER above) while a clean in-place edit with
+// no new entry correctly fails with "gained no new entry".
+describe('receipt gate — REGRESSION: an in-place edit must never count as a NEW entry (existence test)', () => {
+  it('ATTACK A: a one-word typo fix inside a previous, valid, measured entry\'s Corpus fingerprint line, no new entry — must FAIL', () => {
+    const { dir, before } = fileBaseWithMeasuredEntry();
+    try {
+      writeFile(dir, DOCTOR_REL, 'export const health = 2;\n');
+      // Only the corpus fingerprint text changes (one-word typo fix); the
+      // heading and every other field are byte-identical to `before`. No new
+      // entry is added anywhere in this range.
+      const fixedFields = fieldsMeasured(before).map((line) => (
+        line.startsWith('- **Corpus fingerprint:**')
+          ? '- **Corpus fingerprint:** 71-script manifest (typo fixed)'
+          : line
+      ));
+      writeFile(dir, RECEIPT_REL, `# Measurement Receipts Ledger\n${entryBlock(MEASURED_HEADING, fixedFields)}`);
+      const after = commitAll(dir, 'typo fix inside a previous valid entry, plus an unrelated scoring change');
+
+      const r = runGuard(dir, before, after);
+      assert.equal(
+        r.status,
+        1,
+        'a typo fix inside an existing entry must not be read as a receipt for a NEW scoring change '
+        + `(the 2026-09-19 false-pass regression).\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+      );
+      assert.match(r.stderr, /gained no new entry/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('ATTACK B: one appended "- **Note:** …" bullet on a previous valid entry, no new entry — must FAIL', () => {
+    const { dir, before } = fileBaseWithMeasuredEntry();
+    try {
+      writeFile(dir, DOCTOR_REL, 'export const health = 2;\n');
+      const fields = [...fieldsMeasured(before)];
+      fields.splice(fields.length - 1, 0, '- **Note:** clarifying an already-measured entry, not a new measurement.');
+      writeFile(dir, RECEIPT_REL, `# Measurement Receipts Ledger\n${entryBlock(MEASURED_HEADING, fields)}`);
+      const after = commitAll(dir, 'append a Note bullet to a previous valid entry, plus an unrelated scoring change');
+
+      const r = runGuard(dir, before, after);
+      assert.equal(
+        r.status,
+        1,
+        'appending a bullet to an existing entry must not be read as a receipt for a NEW scoring change '
+        + `(the exact move the gate's own error string forbids).\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+      );
+      assert.match(r.stderr, /gained no new entry/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('ATTACK B, --structural-only mode (release.yml\'s whole-window check): the same append must still FAIL', () => {
+    const { dir, before } = fileBaseWithMeasuredEntry();
+    try {
+      writeFile(dir, DOCTOR_REL, 'export const health = 2;\n');
+      const fields = [...fieldsMeasured(before)];
+      fields.splice(fields.length - 1, 0, '- **Note:** clarifying an already-measured entry, not a new measurement.');
+      writeFile(dir, RECEIPT_REL, `# Measurement Receipts Ledger\n${entryBlock(MEASURED_HEADING, fields)}`);
+      const after = commitAll(dir, 'append a Note bullet to a previous valid entry (structural-only range)');
+
+      const r = runGuard(dir, before, after, ['--structural-only']);
+      assert.equal(
+        r.status,
+        1,
+        'structural-only mode (release.yml) must not be fooled by an in-place append either — it still '
+        + `requires a NEW entry.\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+      );
+      assert.match(r.stderr, /gained no new entry/);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
