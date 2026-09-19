@@ -66,15 +66,17 @@ describe('resolveViteCacheDir', () => {
   it('honours VITE_CACHE_DIR, and two values give two directories', () => {
     const a = resolveViteCacheDir({ repoRoot: REPO, env: { [VITE_CACHE_DIR_ENV]: '/tmp/cache-a' } });
     const b = resolveViteCacheDir({ repoRoot: REPO, env: { [VITE_CACHE_DIR_ENV]: '/tmp/cache-b' } });
-    assert.equal(a, '/tmp/cache-a');
-    assert.equal(b, '/tmp/cache-b');
+    // The resolver path.resolve()s the value, as Vite does — '/tmp/cache-a' on
+    // POSIX, '<current drive>:\tmp\cache-a' on Windows — so the expectation does too.
+    assert.equal(a, path.resolve('/tmp/cache-a'));
+    assert.equal(b, path.resolve('/tmp/cache-b'));
     assert.notEqual(a, b);
   });
 
   it('resolves a relative VITE_CACHE_DIR against the repository root, as Vite does', () => {
     assert.equal(
       resolveViteCacheDir({ repoRoot: '/srv/checkout-one', env: { [VITE_CACHE_DIR_ENV]: '.cache/vite' } }),
-      path.join('/srv/checkout-one', '.cache/vite'),
+      path.resolve('/srv/checkout-one', '.cache/vite'),
     );
   });
 
@@ -177,7 +179,7 @@ describe('allocateViteCacheSlot', () => {
 
   it('steps aside when the caller already named a cache', () => {
     const slot = allocateViteCacheSlot({ repoRoot: REPO, env: { [VITE_CACHE_DIR_ENV]: '/tmp/caller-owned' } });
-    assert.equal(slot.dir, '/tmp/caller-owned');
+    assert.equal(slot.dir, path.resolve('/tmp/caller-owned'));
     assert.equal(slot.source, 'caller');
     assert.equal(slot.slot, null);
     slot.release();
@@ -403,6 +405,25 @@ describe('the wiring, not just the helper', () => {
         assert.equal(run.status, 0, `supervisor (${variant}) did not finish: ${run.stderr}`);
         const outcome = JSON.parse(run.stdout) as { code: number | null; signal: string | null };
 
+        if (process.platform === 'win32') {
+          // Windows has no catchable SIGTERM: Node documents that kill() with
+          // it terminates the process "forcefully and abruptly (similar to
+          // 'SIGKILL')", so neither this module's handler nor the gate's own
+          // ever runs, and mechanism 1 (vite-cache-dir.mjs's header) cannot
+          // exist there. What protects a Windows run is mechanism 2 — the one
+          // that also covers SIGKILL on POSIX: the dead holder's lock is stale,
+          // and the next allocation reclaims that slot instead of skipping it.
+          const lock = path.join(base, 'slot-0.lock');
+          assert.ok(existsSync(lock), `(${variant}) the forced kill leaves the holder's lock behind — the case mechanism 2 exists for`);
+          const reclaim = allocateViteCacheSlot({ repoRoot, env: {} });
+          try {
+            assert.equal(reclaim.slot, 0, `(${variant}) a dead holder's slot must be reclaimed, not skipped for the next one`);
+          } finally {
+            reclaim.release();
+          }
+          continue;
+        }
+
         assert.deepEqual(
           existsSync(base) ? readdirSync(base).filter(e => e.endsWith('.lock')) : [],
           [],
@@ -422,7 +443,13 @@ describe('the wiring, not just the helper', () => {
     }
   });
 
-  it('re-installs a signal handler that already fired once, for a process that legitimately keeps allocating', async () => {
+  it('re-installs a signal handler that already fired once, for a process that legitimately keeps allocating', {
+    // The property is that a SIGTERM handler fires, removes itself and is
+    // re-attached. On Windows kill('SIGTERM') terminates the process outright
+    // (see the test above), so no handler fires even once; the Windows backstop,
+    // stale-lock reclaim, is asserted in that test's win32 branch.
+    skip: process.platform === 'win32' && 'Windows has no catchable SIGTERM — kill() terminates the process, so no handler can fire',
+  }, async () => {
     // The gap this closes (2026-09-13 review round 2, observation (c)):
     // installExitHooks() used to run at most once for the whole process. A
     // holder with its own non-exiting SIGTERM handler survives the first

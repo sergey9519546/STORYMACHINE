@@ -403,7 +403,9 @@ describe('the scene-span drift measurement is re-measured, not re-typed', () => 
 
   it('the fixture it names is the fixture it was measured on', () => {
     assert.equal(M.fixture, 'tests/fixtures/feature-length/assembled-feature.fountain');
-    assert.ok(FIXTURE.endsWith(M.fixture.replace(/^tests\//, '')),
+    // FIXTURE is a native path; compare it with `/` so a Windows `\` does not
+    // read as a different fixture.
+    assert.ok(FIXTURE.split(path.sep).join('/').endsWith(M.fixture.replace(/^tests\//, '')),
       `this suite loads ${FIXTURE}, which is not the fixture the measurement names`);
   });
 
