@@ -35,6 +35,16 @@ P0 fielding is authorized. There are **0 valid documented human sessions** and
 there is **no P0 verdict**. Automated P0-S01 through P0-S05 harness files are
 ignored, are not human-research evidence, and were not committed.
 
+*(Correction, 2026-09-19: this was true when written on 2026-08-08. It became
+false four days later — merge commit `5a125054` (2026-08-12) added
+`docs/user-validation/sessions/P0-S01.md` through `P0-S05.md` to `main`,
+present in neither of that merge's two parents, contradicting the explicit
+decision at `docs/superpowers/plans/2026-08-08-main-consolidation.md:74`
+("Do not add ignored P0-S01 through P0-S05 harness records to Git"). The five
+files remained tracked until removed on 2026-09-19; see `PHASE_TRACKER.md`'s
+2026-09-19 decision-log row for the full incident. This audit entry is left
+as written above per this repository's no-rewrite-history convention.)*
+
 The P1 structural gate remains unmet. In particular,
 `p1/reagan-fit-structural-deduction` at
 `b1846fec5fff7004117b32debe8fd11fb1397a2c` cannot merge without a new
