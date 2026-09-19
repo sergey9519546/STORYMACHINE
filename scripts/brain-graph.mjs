@@ -51,10 +51,19 @@ export const GRAPH_MD_PATH = path.join(VAULT_ROOT, 'GRAPH.md');
 
 const CHECK_ONLY = process.argv.includes('--check');
 
-/** Recursively list every *.md file under `dir`, skipping dotfiles/dirs (e.g. .obsidian). */
+/** A repo-relative path with forward slashes on every OS. The graph is
+ *  committed, and CI (Linux) regenerates it to check freshness, so a Windows
+ *  run must not write `docs\brain\...` — that rewrote every node and edge and
+ *  made a fresh graph read as stale on the other OS. */
+const toRepoPath = (file) => path.relative(REPO_ROOT, file).split(path.sep).join('/');
+
+/** Recursively list every *.md file under `dir`, skipping dotfiles/dirs (e.g. .obsidian).
+ *  Entries are sorted by code unit — the order libuv's scandir already returns
+ *  on Linux — because Windows returns them case-insensitively, which reorders
+ *  the committed nodes and edges for no change in the vault. */
 function listMarkdownFiles(dir) {
   const out = [];
-  for (const entry of readdirSync(dir)) {
+  for (const entry of readdirSync(dir).sort()) {
     if (entry.startsWith('.')) continue;
     const full = path.join(dir, entry);
     const st = statSync(full);
@@ -108,7 +117,7 @@ export function buildGraph() {
   const errors = [];
 
   for (const file of files) {
-    const rel = path.relative(REPO_ROOT, file);
+    const rel = toRepoPath(file);
     const text = readFileSync(file, 'utf8');
     const fm = frontmatter(text);
     if (!fm) {
@@ -130,7 +139,7 @@ export function buildGraph() {
   /** @type {{from:string,to:string}[]} */
   const edges = [];
   for (const file of files) {
-    const rel = path.relative(REPO_ROOT, file);
+    const rel = toRepoPath(file);
     const text = readFileSync(file, 'utf8');
     const stripped = stripCode(text);
     for (const target of wikilinkTargets(stripped)) {
