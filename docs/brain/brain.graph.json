@@ -109,6 +109,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Converge Contract",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md",
       "type": "audit",
       "title": "Audit — 2026-09-19 Converge Stream Close",
@@ -1264,6 +1270,18 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md",
       "to": "docs/brain/Patterns.md"
     },
     {
