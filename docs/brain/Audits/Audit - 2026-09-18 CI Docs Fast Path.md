@@ -82,7 +82,7 @@ had no tests:
 Round 2 also closed the `before..head` + `cancel-in-progress` hole (a lane
 branch could read green over code no completed run tested) by classifying
 from the last SUCCESSFUL completed run on the ref — see
-[[Decision 9 - Lanes Push at Checkpoints]] for why that interaction matters
+[[Decision 10 - Lanes Push at Checkpoints]] for why that interaction matters
 more, not less, under the new push cadence — and pinned every gate's exact
 `if:` expression in `ci-gates-intact.test.ts` (+182/-0, additions only) after
 showing that copy-pasting the fast-path condition onto "Type check" left all
@@ -110,7 +110,7 @@ synchronization, not real-time keystroke saving" — while keeping the
 `audit/*` tag, and an unpushed reviewed lane erased) as the reason the
 durability property itself is not relaxed, only re-timed. `CLAUDE.md`'s own
 restatement of the rule was updated to match, and round 2 recorded the
-instruction itself as [[Decision 9 - Lanes Push at Checkpoints]].
+instruction itself as [[Decision 10 - Lanes Push at Checkpoints]].
 
 **Two false statements this lane's round 1 carried, both corrected in round
 2:** that `edge.yml` was "currently non-functional per the account-level
@@ -130,7 +130,7 @@ mirror assertion, which this lane had to satisfy rather than weaken),
 [[Audit - 2026-09-13 CI Green]] (the concurrency-group work this lane's
 `classify` job sits beside), [[Gate - Browser Battery Suites]] (the job this
 lane makes conditionally skippable), [[Gate - Docs-Gating Set]],
-[[Decision 9 - Lanes Push at Checkpoints]], `docs/LANE_STANDARD.md` §7.
+[[Decision 10 - Lanes Push at Checkpoints]], `docs/LANE_STANDARD.md` §7.
 
 ## Sources
 
@@ -145,4 +145,4 @@ lane makes conditionally skippable), [[Gate - Docs-Gating Set]],
 - `tests/core/ci-gates-intact.test.ts`
 - `docs/LANE_STANDARD.md`
 - `CLAUDE.md`
-- `docs/DECISION_LOG.md` — Decision #9
+- `docs/DECISION_LOG.md` — Decision #10

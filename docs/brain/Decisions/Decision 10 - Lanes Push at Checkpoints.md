@@ -1,11 +1,18 @@
 ---
 type: decision
-updated: 2026-09-18
+updated: 2026-09-19
 sources: [docs/DECISION_LOG.md, docs/LANE_STANDARD.md, CLAUDE.md, docs/audits/2026-09-18-ci-docs-fast-path/README.md, scripts/lib/validated-base.mjs, .github/workflows/ci.yml]
 status: active
 ---
 
-# Decision #9 — Lanes Push at Checkpoints, Not at Every Commit (2026-09-18)
+# Decision #10 — Lanes Push at Checkpoints, Not at Every Commit (2026-09-18)
+
+**Renumbered 2026-09-19.** This entry was originally logged as "Decision #9",
+duplicating the number already used by
+[[Decision 9 - Generation Quality Becomes a Measured Track]] (2026-09-13).
+The docs-truth lane renumbered this, the later entry, to #10 and updated
+every by-number citation of it; see `docs/DECISION_LOG.md`'s revision
+history on this entry for why the earlier one was left as #9.
 
 `docs/LANE_STANDARD.md` §7 item 1 said, since the 2026-09-07 sandbox rebuild
 erased every worktree, the session's scratch directory, every local `audit/*`
@@ -60,7 +67,7 @@ boundary instead).
 
 ## Sources
 
-- `docs/DECISION_LOG.md` — "Decision #9"
+- `docs/DECISION_LOG.md` — "Decision #10"
 - `docs/LANE_STANDARD.md` §7 item 1, `CLAUDE.md` (the gotcha restating it)
 - `docs/audits/2026-09-18-ci-docs-fast-path/README.md`
 - `scripts/lib/validated-base.mjs`, `.github/workflows/ci.yml`

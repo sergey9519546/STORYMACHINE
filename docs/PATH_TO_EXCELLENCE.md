@@ -1,6 +1,6 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-13, main @ 16b669f6 (ten session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**State as of 2026-09-19, main @ 28754489 (eleven session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -34,6 +34,27 @@ Product-surface verification was covered by the orchestrator's own full
 browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
+
+**2026-09-18 — Node 24, the container path, the healthcheck, and the docs-only fast
+path.** Four audited lanes, plus four merged PRs. `lane/node-24` moved `setup-node`
+and all three Dockerfile stages from 22 to 24 LTS, matching the owner's move off
+Node 25.2.1 (past end of life) to 24.21.0 LTS
+(`docs/audits/2026-09-18-node-24/README.md`). `lane/edge-image-real` found
+`edge.yml`'s Docker image had never once built since the 2026-09-13 account-block
+lift — three real runs, three failures, `better-sqlite3`'s `node-gyp rebuild`
+missing Python in the build image (`docs/audits/2026-09-18-edge-image/README.md`).
+`lane/healthcheck-ipv4` found the container `HEALTHCHECK` reporting `unhealthy` on
+every probe — `server.ts` binds `0.0.0.0` only and busybox `wget` resolves
+`localhost` to `::1` first — plus a non-default `PORT` breaking compose; both fixed
+(`docs/audits/2026-09-18-healthcheck-ipv4/README.md`). `lane/ci-docs-fast-path`
+measured a markdown-only push running the full `test` + `browser` CI pair, rejected
+a blanket `paths-ignore` (`honesty-audit`/`check-brain` read parts of `docs/**`),
+and added classify jobs instead
+(`docs/audits/2026-09-18-ci-docs-fast-path/README.md`) — also where [[Decision 10 -
+Lanes Push at Checkpoints]] was decided. Four more merged PRs fixed Windows
+portability and a feature-length regression: #261 (long-path-safe `npm test`), #262
+(OS-independent brain graph), #263 (Windows test-suite fixes, owner-measure-e2e on
+PRs), #267 (tab-stop split).
 
 **2026-09-13 — CI green, and the story track begins: four defects only
 the runner could show, the owner's run as one command, and generation

@@ -1,7 +1,8 @@
 # STORYMACHINE — Project Memory
 
 Orientation: `docs/UNIFIED_STATE_2026-09-02.md` (one reconciliation of every
-branch/PR/stash/orphan — start here for "where is everything?") ·
+branch/PR/stash/orphan — start here for "where is everything?"; see its
+2026-09-19 addendum for current branch state) ·
 `docs/PATH_TO_EXCELLENCE.md` (current lane sequence and live
 status — start here for "what do I do next?") · `ROADMAP.md` (canonical
 demand-driven phase semantics) · `NORTH_STAR.md` (product constitution) ·
@@ -43,8 +44,13 @@ node --experimental-strip-types tests/<area>/<file>.test.ts   # one file, fast
 ```
 
 Run the file(s) you touched, then the full `npm test` (0 failures required)
-before every push. CI runs lint + test + build on every branch, plus a
-`console.` grep over `server/**` — a hit fails the build.
+before every push. CI runs lint + test + build on every branch, plus
+`npm run check-no-console` (`scripts/check-no-console.mjs`), which derives
+its exemptions from `tsconfig.json`'s `exclude` quarantine and only allows
+one after proving that path unreachable from `server.ts`'s import graph —
+a raw recursive grep for `console.` under `server/**` shows ~600 hits today
+while the gate passes, but the rule it enforces is unchanged: no new
+`console.*` in server code actually reachable at runtime.
 
 ## Security constraints (must always hold)
 
@@ -111,12 +117,12 @@ before every push. CI runs lint + test + build on every branch, plus a
   therefore push `lane/<name>` at meaningful checkpoints — a completed unit
   of work, before a long-running operation, before handing off to a reviewer,
   and always before the lane goes idle — and **when in doubt, push**. The
-  cadence is "checkpoints", not "every commit" (Decision #9, 2026-09-18:
+  cadence is "checkpoints", not "every commit" (Decision #10, 2026-09-18:
   "remote repositories are meant for milestone synchronization, not real-time
   keystroke saving"), but the durability property is not relaxed by that, only
   re-timed: between checkpoints a lane still has everything to lose to the
   same class of rebuild. Reviews are committed under `docs/audits/` before the
-  merge; see `docs/LANE_STANDARD.md` §7 and `docs/DECISION_LOG.md` Decision #9.
+  merge; see `docs/LANE_STANDARD.md` §7 and `docs/DECISION_LOG.md` Decision #10.
 - Parallel sessions ship concurrently: pull the integration branch and check
   `git log` before starting any implementation work. Do not assume `main` or
   any other branch name; use the current session's designated branch.

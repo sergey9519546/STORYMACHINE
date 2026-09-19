@@ -1051,7 +1051,7 @@ including each guard's recorded pre-fix failure);
 
 ---
 
-## Decision #9: Lanes Push at Checkpoints, Not at Every Commit (2026-09-18)
+## Decision #10: Lanes Push at Checkpoints, Not at Every Commit (2026-09-18)
 
 **Context**: `docs/LANE_STANDARD.md` §7 item 1 has said, since the 2026-09-07
 sandbox rebuild that erased every worktree, the session's scratch directory,
@@ -1138,7 +1138,16 @@ decision to argue with instead of a sentence in a §7 someone rewrote.
 `lane/ci-docs-fast-path`, recording the instruction that round 1 acted on and
 did not log. The round-1 review approved the §7 rewrite as written and asked
 only for this entry and for `CLAUDE.md` to lead with the durability reason
-rather than the objection; both are done in the same change.
+rather than the objection; both are done in the same change. **Renumbered
+2026-09-19** from "Decision #9" to "Decision #10" — this entry and Decision
+#9 ("Generation Quality Becomes a Measured Track…", 2026-09-13, above) had
+been given the same number when this entry was created; the docs-truth lane
+renumbered the later (2026-09-18) entry and updated every by-number citation
+of it (`CLAUDE.md`, `docs/LANE_STANDARD.md` §7, `docs/brain/**`) rather than
+the earlier one, since the earlier entry is cited by number from
+`docs/story-generation/STORY_BENCH_2026-09-13.md` and
+`docs/CLAIMS_REGISTER.md` row 119 and renumbering it would have required
+touching files outside that lane's scope.
 
 ---
 
