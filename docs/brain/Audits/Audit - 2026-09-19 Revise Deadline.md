@@ -93,7 +93,9 @@ and duration, not what the pipeline produces.
 
 **Related:** [[Generation - Story Bench]],
 [[Audit - 2026-09-19 TypeSafe Cast Alignment]],
-[[Audit - 2026-09-19 Generation Prompt Inputs]], [[Patterns]],
+[[Audit - 2026-09-19 Generation Prompt Inputs]],
+[[Audit - 2026-09-19 Converge Stream Close]] (the follow-up this README's §6
+named, which fixes the identical bug on `converge-stream`), [[Patterns]],
 `docs/LANE_STANDARD.md`,
 `docs/audits/2026-09-19-revise-deadline/README.md`.
 

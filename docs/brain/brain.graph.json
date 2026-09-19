@@ -109,6 +109,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Converge Stream Close",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md",
       "type": "audit",
       "title": "Audit — 2026-09-19 Generation Prompt Inputs",
@@ -1249,6 +1255,18 @@
       "to": "docs/brain/Patterns.md"
     },
     {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
       "from": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md",
       "to": "docs/brain/Decisions/Decision 8 - Necessity Certificate is Form-Checked Never Judged.md"
     },
@@ -1311,6 +1329,10 @@
     {
       "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
       "to": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md"
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
