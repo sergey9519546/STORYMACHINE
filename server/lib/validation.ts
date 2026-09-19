@@ -2480,14 +2480,63 @@ export const InjectOpsBodySchema = z.object({
   label: z.string().max(256).optional(),
 });
 
+// The six SceneFunction values server/nvm/ir/NarrativeTransitionIR.ts declares
+// and server/nvm/generate/llm-generator.ts's IR_SCHEMA enumerates for the LLM
+// response schema — one list, so a target's declared function and a
+// generated candidate's function are always checked against the same set.
+export const SCENE_FUNCTIONS = [
+  'advance_plot', 'reveal_character', 'build_tension',
+  'provide_relief', 'set_up_payoff', 'establish_world',
+] as const;
+
+// 2026-09-19 converge-contract lane (C12): SceneTarget used to be
+// `z.object({ sceneIdx: z.number() }).passthrough()` — everything the
+// convergence loop (server/nvm/converge/loop.ts) actually treats as a typed
+// SceneTarget (server/nvm/generate/proof-spec.ts) arrived unvalidated. A
+// string `tensionTarget` silently made `valuationScore >= target.tensionTarget`
+// meaningless (a string comparison that is never true the way the caller
+// expects), and free-text members flowed into the generation prompt with no
+// bound on their size. `activeMechanisms`/`tensionTarget`/`qualityTarget`/
+// `themeHint`/`necessity` are now all typed; `.passthrough()` is dropped
+// because neither client that builds this body (scripts/story-bench.mjs,
+// src/components/ArcPlannerPanel.tsx) sends any field beyond these.
+//
+// `tensionTarget`'s upper bound is deliberately generous (not the 0-100 a
+// "target score" name suggests) — deriveTensionLedger's totalTension is an
+// unbounded sum across open narrative positions, not a 0-100 score, and
+// tests/routes/nvm-converge-select.test.ts deliberately sends 999999 as an
+// "unreachable ceiling" fixture to exercise the budget-exhausted path. A
+// 0-100 cap would 400 that fixture. `.finite()` still rejects Infinity/NaN.
+export const SceneTargetSchema = z.object({
+  sceneIdx: z.number().int().min(0),
+  sceneFunction: z.enum(SCENE_FUNCTIONS),
+  activeMechanisms: z.array(noControlChars.max(64)).max(24),
+  tensionTarget: z.number().finite().min(0).max(1_000_000),
+  qualityTarget: z.number().min(0).max(100).optional(),
+  themeHint: noControlChars.max(300).optional(),
+  necessity: NecessityCertificateSchema.optional(),
+});
+
+// H6's documented default (loop.ts: `maxIterations * candidatesPerIteration`)
+// times the route's own per-request cap keeps a single request's worst case
+// bounded; the per-field caps below are the loop's own hard ceiling as
+// already enforced (inconsistently, with no lower bound) at the route level
+// (server/routes/nvm/converge.ts: `Math.min(Number(rawBudget.maxIterations ??
+// 4), 10)` — no `Math.max`, so -1 passed through unclamped and ran the loop
+// zero times, landing in loop.ts's last-resort synthesized-IR path). Moving
+// the bound here means a malformed budget 400s with a field-named error
+// instead of silently degenerating.
+export const ConvergeBudgetSchema = z.object({
+  maxIterations: z.number().int().min(1).max(10).optional(),
+  candidatesPerIteration: z.number().int().min(1).max(5).optional(),
+  maxLLMCalls: z.number().int().min(1).optional(),
+}).optional();
+
 export const ConvergeBodySchema = z.object({
   sessionId: sessionIdField,
-  target: z.object({ sceneIdx: z.number() }).passthrough(),
+  target: SceneTargetSchema,
   seed: z.number().optional(),
-  budget: z.object({
-    maxIterations: z.number().optional(),
-    candidatesPerIteration: z.number().optional(),
-  }).passthrough().optional(),
+  budget: ConvergeBudgetSchema,
 });
 
 // POST /api/nvm/converge/commit — the missing back-half of generate→audit→select
@@ -2516,9 +2565,15 @@ export const ConvergeCommitBodySchema = z.object({
   summary: z.string().max(500).optional(),
 });
 
+// C12: per-scene targets share SceneTargetSchema with POST /api/nvm/converge
+// (server/routes/nvm/converge.ts documents them as the same request shape —
+// see this route's `budget` reuse below) — was `z.array(z.unknown())`, so an
+// arc's scenes were exactly as unvalidated as a single converge target.
 export const ConvergeArcBodySchema = z.object({
   sessionId: sessionIdField,
-  scenes: z.array(z.unknown()).min(1).max(8),
+  scenes: z.array(SceneTargetSchema).min(1).max(8),
+  seed: z.number().optional(),
+  budget: ConvergeBudgetSchema,
 });
 
 // POST /api/nvm/whatif/explore — What-If Lab compose endpoint (Run 6).

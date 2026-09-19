@@ -165,6 +165,16 @@ export interface ConvergeResult {
    * this candidate's ops and re-proves them against current session state.
    */
   winner: ConvergeWinner | null;
+  /**
+   * C11 fix (2026-09-19 converge-contract lane): true iff at least one
+   * candidate this run ever passed Tier 1 — equivalently, `winner !== null`.
+   * Exists as its own field (rather than making callers infer it from
+   * `winner`) so a consumer that reads `ir` for diagnostics — which is ALWAYS
+   * populated, winner or not — has an explicit, unambiguous signal for "this
+   * is a rejected/synthesized candidate, not a Tier-1-passing one" without
+   * re-deriving it from `winner === null`.
+   */
+  tier1Passed: boolean;
 }
 
 export interface ConvergeBudget {
@@ -486,6 +496,10 @@ export async function convergeScene(
           tension: winner.valuation,
           quality: winner.quality,
         },
+        // convergedThisIter only ever holds candidates that passed Tier 1
+        // (buffered above under `if (passed && tensionMet && qualityMet)`),
+        // so reaching this branch at all means Tier 1 was passed.
+        tier1Passed: true,
       };
     }
 
@@ -508,7 +522,11 @@ export async function convergeScene(
   // callers can detect low-craft fallbacks.
   // lastCandidates[-1] would be undefined when the array is empty, so guard the index.
   let finalIR = best ?? (lastCandidates.length > 0 ? lastCandidates[lastCandidates.length - 1] : null);
-  if (!finalIR && llmCallCount <= llmCallLimit) {
+  // C11 fix: was `<=`, which let this fallback fire even after llmCallCount had
+  // already reached llmCallLimit inside the main loop above (i.e. it spent a
+  // (maxLLMCalls + 1)th generation). `<` means this only spends a generation
+  // when the main loop actually left budget unused.
+  if (!finalIR && llmCallCount < llmCallLimit) {
     llmCallCount++;
     const fallback = await generate(buildGenerationSpec(state, target), 1);
     finalIR = fallback[0] ?? null;
@@ -525,11 +543,26 @@ export async function convergeScene(
       ops: [],
       preconditions: [],
       postconditions: [],
-      provenance: { origin: 'model_generated', createdAt: Date.now() },
+      // C11 fix: `model: 'stub'` matches llm-generator.ts's stubIR() convention
+      // (grepped: server/nvm/generate/llm-generator.ts's stubIR() and
+      // `stubbedFromLLM` check both key off `provenance.model === 'stub'`) so a
+      // consumer that already filters stub-vs-real output by that field catches
+      // this synthesized, never-proof-passed IR too, instead of it reading as
+      // ordinary model output because `origin` says 'model_generated'.
+      provenance: { origin: 'model_generated', createdAt: Date.now(), model: 'stub' },
     } as unknown as NarrativeTransitionIR;
   }
   const finalLedger = deriveTensionLedger(applyStoryOps(state, finalIR.ops), target.sceneIdx);
   const finalQReport = runQualityEngine(finalIR, state);
+  // C11 fix: previously this was `bestComposite` (or 0 when nothing passed
+  // Tier 1) — describing `best`, not `finalIR`, whenever the two diverged
+  // (finalIR falls back to the last-evaluated candidate, or the synthesized
+  // stub, exactly when best is null). Recomputing from `finalIR` with the
+  // loop's own composite formula means finalComposite/finalValuation/
+  // finalQuality always describe the SAME ir — the one this function returns.
+  const finalTensionNorm = normalizeTension(finalLedger.totalTension, target.tensionTarget);
+  const rawFinalComposite = 0.6 * finalTensionNorm + 0.4 * finalQReport.score;
+  const finalComposite = isFinite(rawFinalComposite) ? rawFinalComposite : 0;
   const safeBestComposite = (!isFinite(bestComposite) || isNaN(bestComposite)) ? 0 : bestComposite;
 
   // Deliverable 1: the budget-exhausted path's "winner" is exactly the argmax the
@@ -548,12 +581,14 @@ export async function convergeScene(
     converged: false,
     finalValuation: finalLedger.totalTension,
     finalQuality: finalQReport.score,
-    finalComposite: safeBestComposite,
+    finalComposite,
     ghosts,
     candidates: candidateRecords,
     roomTranscript: lastRoomResult?.critiques,
     winner: (bestCandidateId && best)
       ? { candidateId: bestCandidateId, ir: best, composite: safeBestComposite, tension: bestValuation, quality: bestQualityScore }
       : null,
+    // See ConvergeResult.tier1Passed's doc — equivalent to `winner !== null` here.
+    tier1Passed: bestCandidateId !== null,
   };
 }
