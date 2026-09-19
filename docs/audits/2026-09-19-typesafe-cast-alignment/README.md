@@ -194,11 +194,14 @@ All run on this lane's HEAD.
 | `npm run brain` / `npm run check-brain` | 0 | graph regenerated, every wikilink resolves |
 | `RUN_E2E=1 npm test` | 0 | tests 14380, suites 2488, **pass 14286, fail 0**, skipped 93, todo 1 (332.8 s) |
 
-**The two fail-first assertions.** Both new test files contain case (c) — the
-only case that rewrites anything — as a pair: `intentionalProof(ir, state).pass`
-is asserted **false** on the unaligned IR *before* the alignment runs, and
-**true** on the aligned one after. The "before" half fails first, so a rewrite
-that quietly did nothing cannot pass the test.
+**The two fail-first assertions.** `tests/nvm/converge/cast-alignment.test.ts`
+contains case (c) — the only case that rewrites anything — as a pair:
+`intentionalProof(ir, state).pass` is asserted **false** on the unaligned IR
+*before* the alignment runs, and **true** on the aligned one after. The "before"
+half fails first, so a rewrite that quietly did nothing cannot pass the test.
+`tests/core/typesafe-adapter.test.ts` tests the adapter only (missing key, HTTP
+error, malformed body, timeout, cache, log-line redaction) and never calls
+intentionalProof. *(Corrected 2026-09-19 by the independent verifier.)*
 
 **The flag-off property, tested rather than asserted in prose.**
 `tests/nvm/converge/cast-alignment.test.ts` runs `convergeScene` with the flag
