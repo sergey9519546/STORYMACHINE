@@ -1051,6 +1051,97 @@ including each guard's recorded pre-fix failure);
 
 ---
 
+## Decision #9: Lanes Push at Checkpoints, Not at Every Commit (2026-09-18)
+
+**Context**: `docs/LANE_STANDARD.md` §7 item 1 has said, since the 2026-09-07
+sandbox rebuild that erased every worktree, the session's scratch directory,
+every local `audit/*` tag and a reviewed-MERGE lane whose two commits had
+never been pushed, that a lane "runs `git push -u origin lane/<name>` after
+EVERY commit." `CLAUDE.md` restated the same rule. On 2026-09-18 the
+maintainer objected to the cadence directly: **"remote repositories are meant
+for milestone synchronization, not real-time keystroke saving."** A standing
+standard was changed on that instruction, and an instruction that changes a
+standing standard belongs here rather than only in the diff that acted on it —
+the round-1 review of `lane/ci-docs-fast-path` named its absence as the gap
+(review item 12).
+
+**The Question**: Does the durability rule that came out of the 2026-09-07
+rebuild stay as "push after every commit", or does it become a judgment call
+about when a push is warranted — and if the latter, what stops the property
+it protects from being lost along with the cadence?
+
+**Options Considered**:
+
+1. **Keep "after every commit".** Maximum durability: the worst case is one
+   commit's work. It is also what the maintainer objected to, and the
+   objection is about a real thing — a lane that commits at keystroke scale
+   pushes at keystroke scale, and the remote stops being a record of
+   milestones.
+2. **Push only at the end of a lane.** The 2026-09-07 failure exactly: two
+   reviewed commits existed only in a worktree when the rebuild came.
+3. **Push at meaningful checkpoints, with the exposure stated and a
+   tiebreaker.** A completed unit of work, before starting a long-running
+   operation, before handing off to a reviewer, and always before the lane
+   goes idle — where "idle" means ends its turn, waits on something, or hands
+   back. Chosen.
+4. Rely on the sandbox not being rebuilt. Not a real option; it is rebuilt
+   without warning, and CLAUDE.md says so.
+
+**Decision**: Option 3. §7 item 1 now reads "at meaningful checkpoints",
+enumerates the four, and says **when in doubt, push**. The rule's
+justification is unchanged and still stated in full: the property is not
+relaxed, only re-timed.
+
+**Rationale**: The four checkpoints cover every boundary at which work can be
+lost to a rebuild the lane cannot see coming. "Always before the lane goes
+idle" is the load-bearing one — it forces a push before any point at which
+the lane stops running, which is the only moment a rebuild can catch it
+having done nothing about its exposure. What the change genuinely gives up is
+stated rather than hidden: **a lane midway through one unit of work, between
+checkpoints, still has everything to lose.** That is a smaller window than
+"only at the end of a lane" and a larger one than "after every commit", and
+"when in doubt, push" is the tiebreaker that keeps the judgment honest rather
+than letting "meaningful" drift toward "rarely".
+
+Concurrency made the old cadence cheaper than it looks, which is why this is
+about the record rather than about CI cost: since 2026-09-13 `ci.yml` and
+`security.yml` carry a `concurrency` group keyed on the ref, so several
+pushes in quick succession cost one CI run in flight per branch, not one run
+per push. `main` is isolated into its own group per commit and is never
+cancelled or dropped.
+
+**Implications**:
+
+- A lane that ends its turn with unpushed commits is out of standard, and
+  that is the one hard line left in the rule.
+- A report citing its own branch's CI run id must cite the run for the LAST
+  push; an earlier push's run on the same branch is exactly the one the next
+  push's run cancels.
+- The cadence change interacts with the docs-only fast path landed the same
+  day. `cancel-in-progress` plus a `before..head` classification could leave
+  a lane branch green over code no completed run ever tested; fewer pushes
+  makes that window wider, not narrower. The fast path therefore classifies
+  from the last SUCCESSFUL completed run on the ref rather than from
+  `github.event.before` — see `scripts/lib/validated-base.mjs` and
+  `docs/audits/2026-09-18-ci-docs-fast-path/README.md`.
+- `CLAUDE.md` and `docs/LANE_STANDARD.md` state the same rule and must stay
+  in agreement; both now point here.
+
+**Expected Outcomes**: no lane reports work that exists only in a worktree;
+the remote's branch history reads as units of work rather than saves; and the
+next proposal to change a durability rule on a verbal instruction has a
+decision to argue with instead of a sentence in a §7 someone rewrote.
+
+**Status**: Active
+
+**Revision History**: 2026-09-18 — created in round 2 of
+`lane/ci-docs-fast-path`, recording the instruction that round 1 acted on and
+did not log. The round-1 review approved the §7 rewrite as written and asked
+only for this entry and for `CLAUDE.md` to lead with the durability reason
+rather than the objection; both are done in the same change.
+
+---
+
 ## Decision Template (for future entries)
 
 **Context**: What situation prompted this decision?

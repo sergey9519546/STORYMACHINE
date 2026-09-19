@@ -55,8 +55,93 @@ permissions:
   contents: read
 
 jobs:
+  # Docs-only fast-path classifier (2026-09-18, docs/audits/2026-09-18-ci-docs-
+  # fast-path/README.md). Computes whether THIS push's changed-file set falls
+  # entirely inside the conservative docs allowlist (docs/**, **/*.md) — see
+  # scripts/lib/docs-only.mjs for the matching rules and their failure
+  # direction (anything it cannot positively prove is docs-only classifies as
+  # a full run). A SEPARATE JOB, not a step inside `test`: `browser` below
+  # needs to skip at the JOB level (no checkout, no `npm ci`, no Chromium
+  # download — the ~5-minute cost this exists to remove lives in that
+  # provisioning, not only in the battery step), and a step cannot gate its
+  # own job's `if:`. `test` and `browser` both `needs: classify`.
+  #
+  # WHAT THAT SERIALIZATION COSTS, measured rather than waved at (round-2
+  # review item 8, which found the original "a few seconds" unquantified).
+  # Run 35294788628 (a FULL run on this lane): the `classify` job occupied
+  # 01:18:33 -> 01:18:41, EIGHT seconds, and `test`/`browser` were not created
+  # until 01:18:43 — about 10 s of added wall time, plus one extra runner
+  # slot, on EVERY full run, which is the majority of runs. Against the
+  # docs-only saving it is still a large net win — run 35296219834, the first
+  # real fast-path run on this branch, took 01:39:37 -> 01:40:56, 1 m 19 s in
+  # total, against the 9 m 03 s a docs-only push cost before this lane
+  # (run 34793742299 on main) — but it is a real cost and it is stated here
+  # rather than discovered later.
+  #
+  # RANGE, and why it is not `github.event.before` (round-2 review item 5).
+  # `cancel-in-progress` above cancels a lane branch's in-flight run on the
+  # next push. A push carrying a `server/**` change whose run is cancelled by
+  # a following docs-only push would, chaining from `before`, leave the branch
+  # with one completed GREEN run over code nothing ever tested. The classifier
+  # therefore diffs from `merge-base(<tip of the last SUCCESSFUL run of this
+  # workflow on this ref>, before)` — see scripts/lib/validated-base.mjs. In
+  # the ordinary case that tip IS `before` and the range is unchanged.
+  #
+  # THIS JOB NEVER SKIPS ANYTHING ITSELF. It only ever adds information; every
+  # check that gates a docs change today (honesty-audit, check-docs,
+  # check-brain, and the docs-gating test files run below) still runs on
+  # every docs push, unconditionally. Only checks that cannot be affected by a
+  # docs/**-or-**/*.md-only change (build, the full `npm test`, metamorphic,
+  # no-console/server-reachability grep, the scoring-receipt guard, and the
+  # whole browser battery) are skipped, and only when this job says so.
+  classify:
+    runs-on: ubuntu-latest
+    # Narrowest grant that lets the classifier ask which run of THIS workflow,
+    # on THIS ref, last COMPLETED SUCCESSFULLY — the only commit it is willing
+    # to treat as already validated (round-2 review item 5; the full argument
+    # is in scripts/lib/validated-base.mjs's header). `actions: read` is
+    # read-only over workflow-run metadata and is scoped to this job alone, so
+    # the `test` and `browser` jobs below keep the workflow-level
+    # `contents: read` and nothing else. Without this grant the runs API
+    # answers 403, the classifier cannot establish a validated base, and every
+    # push classifies FULL — the safe direction, and legible in the step's own
+    # log rather than silent.
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Same reason as the test job below: the classifier diffs against a
+          # `before` SHA that must actually resolve in this checkout — and, as
+          # of round 2, also against the tip of the last successful run on
+          # this ref, which can be several pushes back.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Classify changed files (docs-only fast path)
+        id: classify
+        env:
+          DOCS_ONLY_BEFORE_SHA: ${{ github.event.before }}
+          # Round-2 review item 6: `before` had an explicit env wire and
+          # `forced` did not, so a force-push whose payload could not be read
+          # silently classified as an ordinary push. Both are wired now; the
+          # script ORs this with the payload, so neither one alone is
+          # load-bearing.
+          DOCS_ONLY_FORCED: ${{ github.event.forced }}
+          # Used only to authenticate the workflow-runs query above. Scoped by
+          # the job-level `permissions:` block to read-only Actions metadata.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/classify-docs-only.mjs
+
   test:
     runs-on: ubuntu-latest
+    needs: classify
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,7 +159,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Skipped on a docs-only push: tsc type-checks the TypeScript project
+      # tree, which a docs/**-or-**/*.md-only change cannot touch (tsconfig.json
+      # has no `include` targeting markdown, and is itself outside the docs
+      # allowlist — a change to it fails classify-docs-only.mjs's classification).
       - name: Type check
+        if: needs.classify.outputs.docs_only != 'true'
         run: npm run lint
 
       # Mechanical enforcement of CLAUDE.md's "no console.* under server/**"
@@ -97,7 +187,10 @@ jobs:
       # is dead by walking the import graph out from server.ts/server/app.ts.
       # An exemption covering code the server can reach fails the build, so a
       # third occurrence cannot be introduced by editing a list.
+      # Skipped on a docs-only push: this scans server/**, which such a push
+      # by definition never touches.
       - name: Enforce no console.* under server/
+        if: needs.classify.outputs.docs_only != 'true'
         run: npm run check-no-console
 
       # Dead-code tripwire for server/**: static BFS from server.ts, failing on
@@ -108,7 +201,10 @@ jobs:
       # Blocking, and it passes today by construction: everything currently
       # unreachable is allowlisted BY NAME with a reason. It removes nothing —
       # it only stops the pile growing while the owner decides what to keep.
+      # Skipped on a docs-only push: static BFS from server.ts over server/**,
+      # which such a push by definition never touches.
       - name: Server dead-code tripwire (reachability from server.ts)
+        if: needs.classify.outputs.docs_only != 'true'
         run: npm run check-server-reachability
 
       # G0-08: user-facing honesty string audit — fails the build on
@@ -160,7 +256,12 @@ jobs:
       # HTTPS calls to the AI provider (passing only because failures degrade)
       # — a flake source, an outbound network dependency, and a posture the
       # suite was never meant to test. The full suite passes keyless.
+      # Skipped on a docs-only push in favor of the narrower "Run docs-gating
+      # tests" step below — see that step's comment for which files still run
+      # and why, and docs/audits/2026-09-18-ci-docs-fast-path/README.md for
+      # the full accounting of every check kept vs skipped.
       - name: Run tests (keyless — analysis-only posture)
+        if: needs.classify.outputs.docs_only != 'true'
         # RUN_E2E gates tests/e2e/journeys.test.ts — the only full-stack test
         # (boots a real server, drives the writer journey over HTTP). It was
         # skipped on every CI run since it was written; first executed
@@ -197,6 +298,63 @@ jobs:
         run: |
           set -o pipefail
           npm test 2>&1 | tee test-output.tap
+
+      # Runs ONLY on a docs-only push, in place of the full `npm test` above.
+      # This is the set of test files that can actually FAIL on a
+      # docs/**-or-**/*.md-only change — each one reads committed documentation
+      # (a brain note, a claims-register row, a generated rulebook page, the
+      # P0 sample report, a measurement receipt, the ROADMAP's P3 section,
+      # README/CONTRIBUTING prose) and asserts it still matches what the live
+      # generator or a citing source claims.
+      #
+      # THIS LIST IS NOT HAND-PICKED AND IS NOT ALLOWED TO BE. Round 1 selected
+      # it by judgment from a grep and missed two suites that gate docs
+      # (tests/routes/root-cause-parity.test.ts and
+      # tests/core/scoring-receipt-guard.test.ts); extending the same
+      # derivation found a third (tests/core/telemetry-docs-truth.test.ts,
+      # which reads the real ROADMAP.md). The set is now derived MECHANICALLY
+      # and pinned by tests/core/docs-gating-set.test.ts, which recomputes the
+      # candidates from tests/** and fails when a suite that reads committed
+      # documentation appears in neither this list nor that test's explicit,
+      # reasoned exclusion allowlist. Do not edit this list by hand without
+      # that test agreeing — and never edit it to make that test pass.
+      #
+      # Measured wall time for all EIGHTEEN, this sandbox, run individually:
+      # ~56 s total (41.3 s for the sixteen originals, 13.7 s for
+      # docs-gating-set.test.ts, which parses every test file, and 0.6 s for
+      # edge-docs-gate.test.ts; slowest of the rest: rule-test-coverage 8.6 s,
+      # public-benchmark 6.4 s, honesty-audit-claims 5.3 s, root-cause-parity
+      # 5.3 s). On the runner the seventeen-file version of this step took 44 s
+      # (run 35301550263, step 12). Against a ~7-minute `npm test` plus a
+      # ~5-minute browser job.
+      - name: Run docs-gating tests (docs-only fast path)
+        if: needs.classify.outputs.docs_only == 'true'
+        run: |
+          set -e
+          for f in \
+            tests/core/brain-coverage.test.ts \
+            tests/core/claims-row-citations.test.ts \
+            tests/core/coverage-letter.test.ts \
+            tests/core/docs-gating-set.test.ts \
+            tests/core/documentation-truth.test.ts \
+            tests/core/edge-docs-gate.test.ts \
+            tests/core/finding-jump.test.ts \
+            tests/core/honesty-audit-claims.test.ts \
+            tests/core/p0-sample-drift.test.ts \
+            tests/core/public-benchmark.test.ts \
+            tests/core/rule-test-coverage.test.ts \
+            tests/core/rulebook-links.test.ts \
+            tests/core/rulebook.test.ts \
+            tests/core/scoring-receipt-guard.test.ts \
+            tests/core/telemetry-docs-truth.test.ts \
+            tests/routes/root-cause-parity.test.ts \
+            tests/scripts/owner-measure-plan.test.ts \
+            tests/scripts/smoke-gate-serve-mode.test.ts \
+          ; do
+            echo "::group::$f"
+            node --experimental-strip-types "$f"
+            echo "::endgroup::"
+          done
 
       # 2026-09-13 (ci-concurrency round 2, item 7): the GitHub job-log API
       # returns only the LAST ~100 KB of a job's log. This step's TAP stream
@@ -258,7 +416,10 @@ jobs:
       # $GITHUB_EVENT_PATH directly, so dropping this env block does not
       # silently reopen the hole — but wire it anyway, it is the explicit
       # contract. (Pinned by tests/core/scoring-receipt-guard.test.ts.)
+      # Skipped on a docs-only push: by definition no scoring-path file
+      # changed, so the guard has nothing to require a receipt for.
       - name: Scoring-path change requires a measurement receipt
+        if: needs.classify.outputs.docs_only != 'true'
         env:
           PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: npm run check-scoring-receipt
@@ -278,10 +439,16 @@ jobs:
       # Hard metamorphic invariants must hold; empty_verbosity is a known-failing
       # witness (verbosity bias) and does not fail this step — see
       # evals/scoring/runner/metamorphic-lib.ts + docs/scoring/VERBOSITY_BIAS_2026-07-11.md.
+      # Skipped on a docs-only push: exercises the scoring engine over fixture
+      # scripts, which such a push by definition never touches.
       - name: Metamorphic scoring gate
+        if: needs.classify.outputs.docs_only != 'true'
         run: npm run test:metamorphic
 
+      # Skipped on a docs-only push: the built bundle is a function of
+      # src/**/server/**/package.json, none of which such a push touches.
       - name: Build
+        if: needs.classify.outputs.docs_only != 'true'
         run: npm run build
         env:
           GEMINI_API_KEY: "test-key-ci"
@@ -332,8 +499,24 @@ jobs:
   # browser-infrastructure flake is legible as such instead of being mixed into
   # the unit-test signal. `playwright` is a pinned devDependency, so the
   # installed browser build always matches the client driving it.
+  #
+  # SKIPPED WHOLESALE on a docs-only push (job-level `if:`, not a per-step
+  # one): none of these eight suites can be affected by a docs/**-or-**/*.md
+  # -only change, and skipping at job level also skips checkout/`npm ci`/the
+  # Chromium download — the actual ~5-minute cost, not only the battery step
+  # itself. Verified safe to skip entirely rather than "run but report success
+  # quickly": `main`'s branch protection has no required status checks at all
+  # (GitHub API, 2026-09-18 — `GET /repos/.../branches/main` returned
+  # `"protected": false` and `required_status_checks.enforcement_level: "off"`,
+  # empty `contexts`/`checks`), so a job that does not run (rather than one
+  # that runs and reports "success") cannot block anything that currently
+  # depends on it. If that ever changes, this job's `if:` needs to change to a
+  # cheap-pass shape instead of a skip — see the audit README for the
+  # reasoning this leans on.
   browser:
     runs-on: ubuntu-latest
+    needs: classify
+    if: needs.classify.outputs.docs_only != 'true'
     steps:
       - uses: actions/checkout@v4
 

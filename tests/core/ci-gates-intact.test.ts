@@ -1306,3 +1306,339 @@ describe('CI gate integrity — blocking gates must stay blocking', () => {
     }
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// ADDED IN ROUND 2 of lane/ci-docs-fast-path (review item 10). Everything
+// above this line is byte-identical to `origin/main`; nothing above was
+// relaxed to make anything below pass.
+//
+// THE BLIND SPOT THIS CLOSES. Before the docs-only fast path, no ci.yml gate
+// step carried an `if:` at all. Seven of them now do. The assertions above
+// can see a gate that is `continue-on-error`, a gate whose `if:` contains a
+// literal `false`, and a gate that vanished from release.yml — but not a gate
+// whose `if:` is merely WRONG. Changing `ci.yml`'s
+//
+//     if: needs.classify.outputs.docs_only != 'true'
+//
+// to `== 'false'` skips the type check on EVERY run, because an unset or
+// absent output is the empty string and `'' == 'false'` is false in a GitHub
+// expression. Verified against this file before these tests existed: all 47
+// assertions stayed green under exactly that one-character-class mutation.
+//
+// So the polarity is pinned, and so is the exact SET of steps allowed to
+// carry a condition at all. A new `if:` on a gate that is supposed to run
+// unconditionally — honesty-audit, check-brain, the unverified-gates report —
+// fails here rather than quietly halving what CI proves.
+describe('CI gate integrity — the docs-only fast path may not mis-gate a step', () => {
+  const ci = fs.readFileSync(ciYml, 'utf8');
+  const release = fs.readFileSync(releaseYml, 'utf8');
+
+  /** The exact `if:` expression a step carries, or null when it carries none. */
+  function stepIf(source: string, stepName: string): string | null {
+    const block = stepBlock(source, stepName);
+    if (!block) return null;
+    const m = /^\s*if:\s*(.+?)\s*$/m.exec(block);
+    return m ? m[1] : null;
+  }
+
+  const SKIP_ON_DOCS_ONLY = "needs.classify.outputs.docs_only != 'true'";
+  const ONLY_ON_DOCS_ONLY = "needs.classify.outputs.docs_only == 'true'";
+
+  /**
+   * Every ci.yml step that is allowed to carry an `if:`, and the EXACT
+   * expression it must carry. A step absent from this map must carry no `if:`
+   * at all. Adding a row is the deliberate, reviewable act of putting one
+   * more check behind a condition.
+   */
+  const ALLOWED_CONDITIONS: Record<string, string> = {
+    // The seven hard gates the fast path skips, because a docs/**-or-**/*.md
+    // change provably cannot affect them. See ci.yml's per-step comments.
+    'Type check': SKIP_ON_DOCS_ONLY,
+    'Enforce no console.* under server/': SKIP_ON_DOCS_ONLY,
+    'Server dead-code tripwire (reachability from server.ts)': SKIP_ON_DOCS_ONLY,
+    'Run tests (keyless — analysis-only posture)': SKIP_ON_DOCS_ONLY,
+    'Scoring-path change requires a measurement receipt': SKIP_ON_DOCS_ONLY,
+    'Metamorphic scoring gate': SKIP_ON_DOCS_ONLY,
+    'Build': SKIP_ON_DOCS_ONLY,
+    // The one step that runs ONLY on the fast path — the opposite polarity,
+    // pinned just as hard. Flipping it to `!=` would run the narrow docs set
+    // on every full run and NOTHING on a docs-only push.
+    'Run docs-gating tests (docs-only fast path)': ONLY_ON_DOCS_ONLY,
+    // Pre-existing `always()` steps, unrelated to the fast path. They are
+    // listed so that this map is the complete account of conditions in the
+    // file rather than a partial one.
+    'Print test failure summary': 'always()',
+    'Upload full test output (TAP)': 'always()',
+    'Report unverified gates': 'always()',
+  };
+
+  it('every conditional ci.yml step carries EXACTLY its intended condition', () => {
+    const wrong: string[] = [];
+    for (const [name, expected] of Object.entries(ALLOWED_CONDITIONS)) {
+      const actual = stepIf(ci, name);
+      if (actual !== expected) wrong.push(`"${name}": expected \`${expected}\`, found \`${actual ?? '(no if:)'}\``);
+    }
+    assert.deepEqual(
+      wrong,
+      [],
+      'A gate\'s `if:` is part of the gate. `!= \'true\'` and `== \'false\'` look interchangeable and are not: '
+      + 'an unset output is the empty string, so `== \'false\'` is FALSE on every run and the step never runs. '
+      + 'If a condition genuinely needs to change, change this map in the same diff.',
+    );
+  });
+
+  it('no other ci.yml step has quietly become conditional', () => {
+    const unexpected = stepNames(ci)
+      .filter((name) => !(name in ALLOWED_CONDITIONS))
+      .filter((name) => stepIf(ci, name) !== null);
+    assert.deepEqual(
+      unexpected,
+      [],
+      'these ci.yml steps carry an `if:` without being in this test\'s ALLOWED_CONDITIONS map. The docs-only '
+      + 'fast path is the only reason any gate in this file is conditional; a new condition on honesty-audit, '
+      + 'check-brain, check-docs or anything else is a gate that stops running, and it must be a decision in a '
+      + 'diff rather than a line nobody reviewed.',
+    );
+  });
+
+  it("the whole `browser` job is gated on exactly the skip-on-docs-only expression", () => {
+    // A job-level `if:`, not a step-level one — stepBlock() cannot see it.
+    // The eight-suite battery is the single largest thing the fast path skips
+    // (~5 minutes including the Chromium download), so its polarity matters
+    // most: `== 'false'` here would skip the entire browser battery on every
+    // push, forever, with every other assertion in this file green.
+    const m = /^ {2}browser:\n(?: {4}.*\n|\n)*?/m.exec(ci);
+    assert.ok(m, 'ci.yml must keep a `browser:` job');
+    const jobBlock = ci.slice(ci.indexOf('\n  browser:\n'));
+    const header = jobBlock.slice(0, jobBlock.indexOf('\n    steps:'));
+    const ifLine = /^ {4}if:\s*(.+?)\s*$/m.exec(header);
+    assert.ok(ifLine, 'the browser job must keep its job-level `if:`');
+    assert.equal(
+      ifLine[1],
+      SKIP_ON_DOCS_ONLY,
+      'the browser job must skip on a docs-only push and run on every other push. Any other expression here '
+      + 'either runs the battery when it cannot matter or — far worse — skips it when it does.',
+    );
+  });
+
+  it('the classify job grants itself exactly `contents: read` + `actions: read`', () => {
+    // The job needs `actions: read` to ask which run of this workflow on this
+    // ref last completed successfully (scripts/lib/validated-base.mjs). That
+    // is the ONLY reason ci.yml departs from the workflow-level
+    // `contents: read`, and a widened grant here would hand a token with more
+    // rights to a job that runs `npm`-free but still runs code from the
+    // checkout.
+    const classify = ci.slice(ci.indexOf('\n  classify:\n'));
+    const header = classify.slice(0, classify.indexOf('\n    steps:'));
+    const permsIdx = header.indexOf('\n    permissions:');
+    assert.notEqual(permsIdx, -1, 'the classify job must declare its own `permissions:` block');
+    const perms: string[] = [];
+    for (const line of header.slice(permsIdx + 1).split('\n').slice(1)) {
+      if (line.trim() === '' || line.trim().startsWith('#')) continue;
+      // A sibling key at job level (`outputs:`, `steps:`, `runs-on:`) ends the
+      // block — without this the `outputs:` mapping below it reads as a grant.
+      if (line.search(/\S/) <= 4) break;
+      perms.push(line.trim());
+    }
+    assert.deepEqual(
+      perms,
+      ['contents: read', 'actions: read'],
+      'the classify job must grant read-only checkout access plus read-only Actions metadata, and nothing else',
+    );
+  });
+
+  it('release.yml never wires `classify` into anything (its copy stays inert)', () => {
+    // release.yml carries a mirrored `classify` job only because this file's
+    // step-for-step mirror rule requires every ci.yml step to have a
+    // counterpart. Its output is deliberately unused: `publish` needs
+    // `[test, browser]`, and a job skipped because a `needs` dependency FAILED
+    // leaves the run at `failure` — so wiring `needs: classify` into
+    // release.yml's `test` job would let a broken classifier turn a tag push
+    // into a release that never publishes. The review asked for this to be
+    // mechanical rather than a comment; here it is.
+    const live = release
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('#'))
+      .join('\n');
+    assert.doesNotMatch(
+      live,
+      /needs\.classify/,
+      'release.yml must not reference `needs.classify`. A release runs every gate unconditionally; putting '
+      + 'the classifier on that path trades a guaranteed release for ~30 seconds.',
+    );
+    assert.doesNotMatch(
+      live,
+      /^ {4}needs:\s*(\[[^\]]*\bclassify\b[^\]]*\]|classify\b)/m,
+      'no release.yml job may declare `needs: classify` — see above',
+    );
+  });
+
+  it('release.yml runs the docs-gating step unconditionally (no `if:` at all)', () => {
+    assert.equal(
+      stepIf(release, 'Run docs-gating tests (docs-only fast path)'),
+      null,
+      'release.yml\'s mirrored docs-gating step must stay unconditional. It re-runs files `npm test` already '
+      + 'ran, which costs 25-45 s on a milestone event and buys the guarantee that a release depends on no '
+      + 'classifier at all.',
+    );
+    assert.equal(
+      stepIf(release, 'Classify changed files (docs-only fast path)'),
+      null,
+      'release.yml\'s mirrored classify step must stay unconditional too — it is inert, not gated',
+    );
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// ADDED IN ROUND 3 of lane/ci-docs-fast-path. `lane/edge-image-real` merged
+// first, so this lane is the one that "merges second" and owns the fix for
+// the cross-lane cost regression its own round-1 review named.
+//
+// THE REGRESSION. ci.yml's docs-only fast path finishes a documentation push
+// in ~1-2 minutes instead of ~9 and still concludes `success`. A `success` on
+// `main` is exactly what triggers edge.yml, so without a gate there the
+// pushes this lane just made cheap were the ones buying a full
+// `docker build --push` of an image with identical contents. edge.yml cannot
+// read CI's answer — a `workflow_run` payload carries head_sha/head_branch/
+// conclusion, never the upstream run's job outputs — so it re-derives.
+//
+// What is pinned here is the WIRING. The predicate itself, the two
+// `.dockerignore` facts it rests on, and the step's real shell body run
+// against real repositories all live in tests/core/edge-docs-gate.test.ts.
+// Nothing below deletes or relaxes an edge-lane assertion; `yamlScalar`'s
+// exact-path reads and its every-key-unique rule are used as they are.
+describe('CI gate integrity — edge.yml does not rebuild an image the commit cannot change', () => {
+  const edgePath = path.join(root, '.github/workflows/edge.yml');
+  const edge = fs.readFileSync(edgePath, 'utf8');
+  // Comment-stripped, for the same reason the edge lane's own assertions
+  // strip: edge.yml's prose quotes the very strings these look for, so a raw
+  // match keeps reporting green after the LIVE line is deleted.
+  const edgeLive = edge.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
+
+  const SKIP_WHEN_UNCHANGED = "steps.docsonly.outputs.docs_only != 'true'";
+  /** The steps that must not run when the image cannot have changed. */
+  const GATED_STEPS = [
+    'Log in to GitHub Container Registry',
+    'Set up Docker Buildx',
+    'Build and push :edge',
+  ];
+
+  it('the gate step exists, with the id the conditions below reference', () => {
+    assert.match(
+      edgeLive,
+      /^\s+id:\s*docsonly\s*$/m,
+      'edge.yml must keep a step with `id: docsonly`. Every `if:` below reads `steps.docsonly.outputs`, '
+      + 'and a step output that does not exist is the empty string — which reads as "not docs-only" and '
+      + 'builds. Safe, but it makes the gate silently dead, so the id is pinned.',
+    );
+  });
+
+  it('the checkout fetches two commits, or the gate has nothing to diff', () => {
+    assert.match(
+      edgeLive,
+      /fetch-depth:\s*2/,
+      'edge.yml\'s checkout must keep `fetch-depth: 2`. The gate diffs `<head_sha>^..<head_sha>`; on a '
+      + 'depth-1 checkout the parent does not resolve, the step fails open, and EVERY push rebuilds — the '
+      + 'gate would be dead while looking present.',
+    );
+  });
+
+  it('the gate uses the narrow IMAGE predicate, not ci.yml\'s docs predicate', () => {
+    // This is the defect the naive patch would have shipped. `.dockerignore`
+    // re-includes `!server/**`, `!src/**`, `!public/**`, and committed `*.md`
+    // files live under those trees — they are in the build context and in the
+    // image. `classifyDocsOnly` calls them docs; `canSkipImageBuild` does not.
+    assert.match(
+      edgeLive,
+      /canSkipImageBuild/,
+      'edge.yml must gate on `canSkipImageBuild` from scripts/lib/docs-only.mjs',
+    );
+    assert.doesNotMatch(
+      edgeLive,
+      /\bclassifyDocsOnly\b/,
+      'edge.yml must NOT gate on `classifyDocsOnly`: it treats server/**/*.md as documentation, which is '
+      + 'right for CI and wrong for the image. See tests/core/edge-docs-gate.test.ts.',
+    );
+    assert.match(
+      edgeLive,
+      /scripts\/lib\/docs-only\.mjs/,
+      'one implementation of the allowlist — the same module ci.yml\'s classifier imports, not a second '
+      + 'copy of the rules in YAML',
+    );
+    assert.match(
+      edgeLive,
+      /git diff --name-only --no-renames/,
+      'the gate must diff with `--no-renames`. Git prints only a detected rename\'s DESTINATION, so '
+      + '`git mv server/x.ts docs/x.md` would otherwise look like a documentation change while deleting a '
+      + 'file out of the image — the same hole this lane closed in ci.yml\'s classifier.',
+    );
+  });
+
+  it('every build step carries EXACTLY the skip condition, and no other step does', () => {
+    // Same reasoning as ci.yml's polarity pin: `!= 'true'` and `== 'false'`
+    // look interchangeable and are not. An unset output is the empty string,
+    // so `== 'false'` is FALSE on every run and the image would never be
+    // built again — a silent end to :edge, with this file green.
+    const lines = edgeLive.split('\n');
+    const stepIf = (name: string): string | null => {
+      const start = lines.findIndex((l) => l.trim() === `- name: ${name}`);
+      if (start === -1) return null;
+      const indent = lines[start].indexOf('-');
+      for (let i = start + 1; i < lines.length; i++) {
+        if (lines[i].trim() === '') continue;
+        if (lines[i].search(/\S/) <= indent) break;
+        const m = /^\s*if:\s*(.+?)\s*$/.exec(lines[i]);
+        if (m) return m[1];
+      }
+      return null;
+    };
+    for (const name of GATED_STEPS) {
+      assert.ok(lines.some((l) => l.trim() === `- name: ${name}`), `edge.yml must keep the step "${name}"`);
+      assert.equal(
+        stepIf(name),
+        SKIP_WHEN_UNCHANGED,
+        `edge.yml's "${name}" must carry exactly \`if: ${SKIP_WHEN_UNCHANGED}\`. Any other expression `
+        + 'either rebuilds when it cannot matter or — far worse — stops publishing :edge entirely.',
+      );
+    }
+    // The gate step itself must stay unconditional: a condition on it would
+    // leave the output unset, which reads as "build" and makes the gate dead.
+    assert.equal(
+      stepIf('Skip the image build for a commit outside the build context'),
+      null,
+      'the gate step must not itself be conditional',
+    );
+  });
+
+  it('the job-level `if:` is untouched, and the gate was not demoted into it', () => {
+    // The edge lane's own guard reads jobs.publish-edge.if at an exact path
+    // and requires every key on that path to occur once. Adding steps must not
+    // disturb it, and the docs gate must NOT be folded into the job `if:`:
+    // doing so would need the diff before the checkout exists.
+    const jobIf = yamlScalar(edge, ['jobs', 'publish-edge', 'if']);
+    assert.ok(jobIf, 'edge.yml must keep its job-level `if:` at jobs.publish-edge.if');
+    for (const condition of [
+      "github.event.workflow_run.conclusion == 'success'",
+      "github.event.workflow_run.head_branch == 'main'",
+      "github.event.workflow_run.event == 'push'",
+    ]) {
+      assert.ok(jobIf.includes(condition), `edge.yml's job-level if: must keep \`${condition}\``);
+    }
+    assert.doesNotMatch(
+      jobIf,
+      /docs_only|steps\./,
+      'the docs gate belongs in a step, not the job `if:` — a job-level condition is evaluated before any '
+      + 'step runs, so there is no checkout and no diff to classify yet',
+    );
+  });
+
+  it('edge.yml does not try to import CI\'s classification across workflows', () => {
+    assert.doesNotMatch(
+      edgeLive,
+      /needs\.classify|needs:\s*classify/,
+      'a `workflow_run` payload carries head_sha/head_branch/conclusion, NOT the upstream run\'s job '
+      + 'outputs, and `needs:` cannot name a job in another workflow. If this ever appears it is a '
+      + 'misunderstanding that would read as an empty string and silently disable the gate.',
+    );
+  });
+});
