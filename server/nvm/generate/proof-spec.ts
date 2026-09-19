@@ -21,7 +21,12 @@ export interface SceneTarget {
   activeMechanisms: string[];
   tensionTarget: number;   // 0–100 desired tension after this scene
   qualityTarget?: number;  // 0–100 minimum quality score (default 60)
-  themeHint?: string;      // nudge toward a theme argument
+  /** The caller's stated content for THIS scene — e.g. "the letter arrives
+   *  unopened" — not a theme-arc argument despite the name. buildSystemPreamble()
+   *  states it, when present and non-empty, as a labelled "SCENE BEAT" line
+   *  (2026-09-19, generation-prompt-inputs lane). Before that lane it was
+   *  declared here and read by nothing; see the comment at its use site. */
+  themeHint?: string;
   /** The author's four stated reasons this scene exists — why now, why here,
    *  why these characters, and what makes it unavoidable
    *  (server/lib/necessity-certificate.ts). Authored at outline time on the
@@ -376,6 +381,46 @@ export function buildSystemPreamble(
     .map((c, i) => `${i + 1}. [${c.kind}] ${sanitizeForPrompt(c.description, 400)}`)
     .join('\n');
 
+  // Scene beat injection (2026-09-19, generation-prompt-inputs lane). Until
+  // this change, `target.themeHint` — the caller's stated content for THIS
+  // scene, e.g. "the letter arrives unopened" — was declared on SceneTarget
+  // (:24) and read by nothing: the bench's beats are hand-authored per scene
+  // (docs/story-generation/STORY_BENCH_2026-09-13.md §1) and every one of
+  // them was discarded before the prompt, so the model generated
+  // "advance_plot at tension 45" with no subject
+  // (SESSION_REPORT_2026-09-19.md §4 rank 1). server/nvm/converge/
+  // cast-alignment.ts already reads the same field for a different purpose
+  // and says so at its read site: "themeHint is read HERE and nowhere else in
+  // the pipeline ... Wiring it into generation is a different lane." This is
+  // that lane.
+  //
+  // Placed adjacent to PROOF CONSTRAINTS, the one place in this preamble that
+  // literally states the scene's tension target (the `must_reach_tension`
+  // constraint below) — sceneFunction itself is never printed as prose here
+  // either; it only routes craftBlock's per-scene emphasis above.
+  //
+  // Deliberately NOT added to buildGenerationSpec's constraints list (see
+  // buildGenerationSpec below): no proof in server/nvm/proof/** verifies that
+  // a scene matches its stated beat, so listing it among the numbered PROOF
+  // CONSTRAINTS — a list of what the proof kernel actually checks — would
+  // claim a check that does not exist. The necessity certificate above made
+  // the identical decision for the identical reason (see its comment); this
+  // is preamble-only, matching that precedent rather than inventing a new
+  // 'must_dramatize' constraint kind that would only double-state the same
+  // text without adding a verified check.
+  //
+  // sanitizeForPrompt (not sanitizeSingleLine): themeHint is prose-shaped free
+  // text, like state.authorIntent.theme just above (the existing `themeBlock`
+  // uses the same function, same quoting style). It strips control characters
+  // and truncates but deliberately preserves LF for legitimate multi-line
+  // beats, exactly as prompt-utils.ts documents. A hostile themeHint (a forged
+  // header, an "ignore previous instructions" line) still arrives quoted and
+  // labelled as scene-beat DATA rather than as an unattributed prompt line —
+  // the same risk profile the existing themeBlock already accepts.
+  const themeHintBlock = (typeof target?.themeHint === 'string' && target.themeHint.trim().length > 0)
+    ? `SCENE BEAT (what THIS scene must dramatize): "${sanitizeForPrompt(target.themeHint, 300)}"`
+    : '';
+
   return [
     'You are a story compiler generating a NarrativeTransitionIR.',
     `Known characters: ${knownChars}. Active facts: ${activeFacts}.`,
@@ -385,6 +430,7 @@ export function buildSystemPreamble(
     necessityBlock,
     craftBlock,
     '',
+    themeHintBlock,
     'PROOF CONSTRAINTS (your output must satisfy all of these):',
     constraintLines,
     '',
