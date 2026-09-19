@@ -329,3 +329,88 @@ identity harness proves no report byte moved.
   lane changes that.
 * **Not pushed** (per the lane brief). `lane/doctor-pool-fallback` exists
   locally only.
+
+## 8. § Review findings fixed (span-check-hardening lane, 2026-09-19)
+
+An adversarial review of this lane's commit (`9c25f79a`) found two LOW
+defects in `doctor-pool.ts`, fixed on `lane/span-check-hardening` from
+`1e7779de`.
+
+**Finding 7 (LOW, confirmed) — `poolDisabledReason` leaked absolute
+filesystem paths onto the unauthenticated `/health`.** The reason string
+passed to `disablePool()` is, in every real-world trigger, built by
+interpolating a raw `Error.message` — a failed dynamic `import()` in
+Node's ESM loader reports `Cannot find module '<absolute path>' imported
+from <absolute path>`, naming both the missing module and
+`doctor-worker.ts` itself by their full on-disk paths. `GET /health` is
+explicitly unauthenticated (route-capabilities' documented exemption list),
+so this server's directory layout — home directory name, deployment path,
+username on some hosts — was legible to anyone who could reach that route,
+for the life of the process once the latch fired. **Fix:**
+`sanitizeDisabledReason()` strips absolute path segments (POSIX: two or
+more `/segment` components in a row; Windows: a drive-letter path) with the
+literal placeholder `<path>`, then caps the result at 200 characters, and
+`disablePool()` applies it before the reason is ever stored or logged. The
+module-not-found WORDING is left untouched — only the path segments are
+replaced — so the reason still names the class of failure ("worker could
+not load the doctor module: Cannot find module '<path>' imported from
+<path>") without naming the box. Confirmed against a real load failure
+(the same `DOCTOR_WORKER_DOCTOR_MODULE` injection this lane's own tests
+use): the specifier name and every absolute path segment are gone from
+`doctorPoolStatus().disabledReason` and from `GET /health`'s
+`doctorPool.poolDisabledReason`, replaced by `<path>`, while `Cannot find
+module` and `could not load the doctor module` still appear.
+`tests/core/doctor-pool-load-failure.test.ts`'s assertion that the reason
+"carries the underlying loader message" (checking for the literal
+specifier `__doctor_module_that_does_not_exist__`) necessarily changed —
+that substring is exactly what sanitization now removes — to instead assert
+`Cannot find module` survives, the specifier does not, the `<path>`
+placeholder appears, and the length is capped at 200.
+`tests/routes/doctor-pool-disabled-health.test.ts` needed no change: its
+existing assertion (`/could not load the doctor module/`) never asserted on
+the raw path.
+
+**Finding 8 (LOW, confirmed) — a dropped slot could arm an idle timer.**
+`handleWorkerEnvironmentFailure()` called `dropSlot(slot)` — which removes
+the slot from the `slots` array and clears any idle timer on it — *before*
+`setBusy(slot, false)`, the opposite order from every other settlement path
+in this file (`finishJob`, `onRunBudgetExceeded`, the abort handler in
+`dispatch()`), all of which mark the slot idle first and only then drop it.
+No live idle-timer defect was reproducible against the current source —
+`setBusy()` only refs/unrefs the worker handle and nothing on this specific
+path re-arms `armIdleTimer()` afterward — but the inverted order was real
+and was the one place in the file where a slot no longer in `slots` could
+still be acted on by a call ordinarily paired with pool membership,
+leaving a latent trap for a future edit near either line. **Fix:** swapped
+the order so `setBusy(slot, false)` (guarded on `active` being set, as
+before) runs before `dropSlot(slot)`, matching every other caller in the
+file; `disablePool(reason)` and the in-process retry are otherwise
+unchanged. Verified with the existing pool tests
+(`tests/core/doctor-pool-load-failure.test.ts`,
+`tests/core/doctor-worker-pool.test.ts`,
+`tests/core/doctor-pool-warm-state.test.ts`,
+`tests/routes/ready.test.ts`,
+`tests/routes/doctor-pool-disabled-health.test.ts`) — all pass unchanged,
+consistent with this being an ordering hardening rather than a behavior
+change.
+
+Gates (`lane/span-check-hardening`, from `1e7779de`):
+
+| Gate | Result |
+|---|---|
+| `tests/core/doctor-pool-load-failure.test.ts` | pass — 6/6 (assertion updated for finding 7) |
+| `tests/routes/doctor-pool-disabled-health.test.ts` | pass — 2/2 (unmodified) |
+| `tests/core/doctor-worker-pool.test.ts` | pass — 9/9 |
+| `tests/core/doctor-pool-warm-state.test.ts` | pass — 13/13 |
+| `tests/routes/ready.test.ts` | pass — 10/10 |
+| `npm run lint` (`tsc --noEmit`) | pass, no errors |
+| `npm run check-no-console` | pass — 310 file(s) checked, all proven unreachable |
+| `node scripts/check-scoring-receipt.mjs 1e7779de..HEAD` | pass — "no scoring-path files changed. OK." |
+| `node scripts/check-doctor-output-identity.mjs --compare`, baseline `git archive 1e7779de` (both sides `GIT_SHA=dev`) | `OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).` |
+
+Files touched by this hardening: `server/nvm/analyze/doctor-pool.ts`,
+`tests/core/doctor-pool-load-failure.test.ts`, this section, and
+`docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md` (one pointer
+line). `doctor-worker.ts` was not touched — the sanitization lives entirely
+on the coordinator side, at the one place (`disablePool()`) every trigger
+already funnels through.

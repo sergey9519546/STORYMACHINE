@@ -91,16 +91,42 @@ function approvedSpanInstructions(spans: ApprovedSpan[], lines: string[]): strin
  * `revision_rewrite_rejected_locked_span` below).
  *
  * `skipped` holds the index of each span that could not be checked at all —
- * a non-finite or out-of-range `startLine`/`endLine` — and so is excluded
- * from `ok`/`lost` rather than silently counted as either surviving or lost.
- * This mirrors `approvedSpanInstructions`'s own tolerance of malformed input
- * (`approvedSpans` reaches this module as `z.array(z.unknown())`, force-cast
- * upstream — see that function's doc comment) instead of throwing on it.
+ * a non-finite or out-of-range `startLine`/`endLine`, or (2026-09-19 review
+ * finding 4(i)) an excerpt with no non-whitespace content, which is
+ * unfalsifiable (a bare `includes` on `"\n"` or `""` matches almost any
+ * revision) — and so is excluded from `ok`/`lost` rather than silently
+ * counted as either surviving or lost. This mirrors `approvedSpanInstructions`'s
+ * own tolerance of malformed input (`approvedSpans` reaches this module as
+ * `z.array(z.unknown())`, force-cast upstream — see that function's doc
+ * comment) instead of throwing on it.
+ *
+ * `checked` is `spans.length - skipped.length` — how many spans this call
+ * actually verified. Finding 4(ii): when it is 0 while `spans.length > 0`,
+ * NOTHING was verified at all (every span was out-of-range or unfalsifiable),
+ * so `ok: true` in that case is not a real "survived" — `llmRewrite` treats
+ * `checked === 0 && spans.length > 0` as unenforceable and rejects the
+ * rewrite rather than reporting a lock it never actually checked.
  */
 export interface ApprovedSpanSurvival {
   ok: boolean;
   lost: number[];
   skipped: number[];
+  checked: number;
+}
+
+/** Non-overlapping substring occurrence count. Used only by the short-excerpt
+ *  duplicate-detection check below (finding 4(iii)) — never on anything that
+ *  gets logged, so there is no verbatim-text-in-logs concern here. */
+function countOccurrences(haystack: string, needle: string): number {
+  if (needle.length === 0) return 0;
+  let count = 0;
+  let from = 0;
+  for (;;) {
+    const at = haystack.indexOf(needle, from);
+    if (at === -1) return count;
+    count++;
+    from = at + needle.length;
+  }
 }
 
 /** Collapse CRLF/CR to LF so a provider that normalizes line endings on its
@@ -131,7 +157,20 @@ export function approvedSpansSurvive(
   revisedText: string,
   spans: ApprovedSpan[],
 ): ApprovedSpanSurvival {
-  const lines = originalFountain.split('\n');
+  // Normalize BEFORE splitting into lines (2026-09-19 review finding 3). The
+  // old order split the RAW original on '\n' first, so a CRLF document left
+  // every line carrying a trailing '\r' — including the last line of a span
+  // that ends the document — and only the JOINED excerpt was normalized
+  // afterward, which turned that trailing '\r' into a fabricated trailing
+  // '\n' the source text never had. A span ending the document then demanded
+  // a newline after the locked text that the original excerpt never
+  // contained, and a correct LLM answer (which commonly has no trailing
+  // newline) was rejected as having "lost" it. Normalizing the whole
+  // document up front means every line here is already LF-only, so an
+  // end-of-document excerpt carries exactly the terminator the source put
+  // there — none — whether the original was CRLF, CR, or LF.
+  const normalizedOriginal = normalizeLineEndings(originalFountain);
+  const lines = normalizedOriginal.split('\n');
   const normalizedRevised = normalizeLineEndings(revisedText);
   const lost: number[] = [];
   const skipped: number[] = [];
@@ -152,9 +191,32 @@ export function approvedSpansSurvive(
     // (e.g. a prior pass shortened it) still checks the portion that exists,
     // rather than being thrown out along with genuinely invalid spans.
     const clampedEnd = Math.min(endLine, lines.length);
-    const excerpt = normalizeLineEndings(lines.slice(startLine - 1, clampedEnd).join('\n'));
-    if (excerpt.length === 0) {
+    // `lines` is already LF-normalized, so joining it back never reintroduces
+    // a terminator the source didn't have — no second normalize needed here.
+    const excerpt = lines.slice(startLine - 1, clampedEnd).join('\n');
+    // Finding 4(i): an excerpt with no non-whitespace content (e.g. a span
+    // over two blank lines, which joins to "\n") is unfalsifiable — `includes`
+    // trivially matches almost any multi-line revision, including one that
+    // replaced the whole document. A single blank line already excerpts to
+    // "" and was already caught by the old `excerpt.length === 0` check;
+    // `.trim()` extends that to any number of blank lines.
+    if (excerpt.trim().length === 0) {
       skipped.push(index);
+      return;
+    }
+    // Finding 4(iii): a single non-blank line (a slugline, a lone "CUT TO:")
+    // may legitimately be RELOCATED elsewhere in the document — this function
+    // deliberately does not enforce position or order — but a bare `includes`
+    // also passes when the model deleted one of several identical
+    // occurrences and left another one standing. For an excerpt this short,
+    // additionally require that the revision contains at least as many
+    // occurrences of it as the original did, so a net deletion is caught even
+    // though a same-text relocation still is not.
+    const nonBlankLineCount = excerpt.split('\n').filter(l => l.trim().length > 0).length;
+    if (nonBlankLineCount <= 1) {
+      const originalCount = countOccurrences(normalizedOriginal, excerpt);
+      const revisedCount = countOccurrences(normalizedRevised, excerpt);
+      if (revisedCount < originalCount) lost.push(index);
       return;
     }
     if (!normalizedRevised.includes(excerpt)) {
@@ -162,7 +224,7 @@ export function approvedSpansSurvive(
     }
   });
 
-  return { ok: lost.length === 0, lost, skipped };
+  return { ok: lost.length === 0, lost, skipped, checked: spans.length - skipped.length };
 }
 
 /**
@@ -178,7 +240,13 @@ async function llmRewrite(
 ): Promise<RewriteResult & { reason?: string; lostSpans?: number[] }> {
   const { fountain, issues, passName, approvedSpans, storyContext, priorPassResults } = input;
 
-  const lines = fountain.split('\n');
+  // Normalized so the excerpt shown to the model in approvedSpanInstructions
+  // below is built from the exact same lines approvedSpansSurvive checks
+  // against post-rewrite — a CRLF draft would otherwise show the LLM an
+  // excerpt with stray '\r's baked into a "must remain unchanged" block that
+  // the survival check (which normalizes first) does not actually require
+  // verbatim (see approvedSpansSurvive's doc comment, finding 3).
+  const lines = normalizeLineEndings(fountain).split('\n');
   const issueBlock = issues
     .map(i => {
       const loc = sanitizeForPrompt(i.location, 120);
@@ -300,6 +368,23 @@ async function llmRewrite(
       // unchanged fountain below, where every approved span trivially
       // survives (it IS the original).
       const survival = approvedSpansSurvive(fountain, text, approvedSpans);
+      // Finding 4(ii): if every approved span was skipped — malformed/OOR
+      // metadata, or an excerpt with no checkable content — `checked` is 0
+      // and NOTHING about this rewrite was actually verified against the
+      // lock the caller asked for. `survival.ok` would read `true` in that
+      // case (vacuously — `lost` is empty because nothing was ever compared),
+      // which would make an unenforceable lock look like an honored one.
+      // Reject instead, the same way a genuinely lost span is rejected: keep
+      // the unchanged draft rather than accept a rewrite the caller has no
+      // actual assurance preserved what they locked.
+      if (approvedSpans.length > 0 && survival.checked === 0) {
+        logger.warn('revision_rewrite_locked_spans_unchecked', {
+          passName,
+          skippedSpanIndices: survival.skipped,
+          totalApprovedSpans: approvedSpans.length,
+        });
+        return { revised: fountain, usedLLM: false, reason: 'approved_spans_unchecked' };
+      }
       if (survival.skipped.length > 0) {
         // Malformed/out-of-range span metadata, not a rewrite defect — log
         // it for visibility (never the span text) and keep checking the rest.

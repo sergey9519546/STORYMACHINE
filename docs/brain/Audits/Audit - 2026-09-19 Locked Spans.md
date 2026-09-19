@@ -72,6 +72,15 @@ both pass, as do `tests/core/llm-seam-wiring.test.ts`,
 `tests/routes/nvm-revision*.test.ts` gate files. `npm run lint` and
 `npm run check-no-console` are clean.
 
+**Update (2026-09-19, span-check-hardening lane, from `1e7779de`).** An
+adversarial review of this commit (`f70ab07d`) confirmed two more defects in
+`approvedSpansSurvive` — a CRLF/end-of-document false-rejection (finding 3)
+and two vacuously-passing excerpt shapes, blank-line spans and duplicated
+single lines (finding 4) — both fixed with new hardening tests; see
+`docs/audits/2026-09-19-locked-spans/README.md` §8 "Review findings fixed"
+for the full account. Nothing in this note's account above became wrong; the
+fix narrows what "survived" is allowed to mean.
+
 **Note on this note.** Per this lane's explicit instruction, `npm run brain`
 was not run, so `docs/brain/brain.graph.json`/`GRAPH.md` do not yet include
 this note — `tests/core/brain-coverage.test.ts` checks (e)/(e2)/(f)/(g),

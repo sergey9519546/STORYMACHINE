@@ -83,6 +83,18 @@ that never arrives. The main suite instead uses
 from — pointed at a module that does not resolve, it reproduces the failure
 **inside the shipped worker file**, which a copy of that file never could.
 
+**Update (2026-09-19, span-check-hardening lane, from `1e7779de`).** An
+adversarial review of this commit (`9c25f79a`) confirmed two LOW defects:
+`poolDisabledReason` interpolated a raw `Error.message` — absolute
+filesystem paths included — onto the unauthenticated `/health` (finding 7,
+fixed by `sanitizeDisabledReason()`, capped at 200 chars, path segments
+replaced with `<path>`), and `handleWorkerEnvironmentFailure()` dropped a
+slot before marking it idle, the reverse of every other settlement path in
+the file (finding 8, fixed by reordering). See
+`docs/audits/2026-09-19-doctor-pool-fallback/README.md` §8 "Review findings
+fixed" for the full account; the doctor output-identity harness re-ran
+45/45 byte-identical.
+
 ## Why it is safe to have merged
 
 Nothing on the scoring path changed: `node scripts/check-scoring-receipt.mjs
