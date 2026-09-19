@@ -113,6 +113,78 @@ three days; and each deliverable its commit messages claim is present in main
 the SettingsPanel `sm-panel` fix). Its apparent "additions" against main are
 older versions of files main has since rewritten — most visibly
 `temporal-consistency.ts`, where wip holds the pre-perf-fix implementation.
+*(Corrected 2026-09-19 — see the addendum below: this file-level finding
+stands, but the §4 cleanup list's "fully absorbed" framing overstated it as
+a branch safe to fast-forward-merge; it is not.)*
+
+#### Addendum — 2026-09-19: branch state after Node 24, the container-path
+and healthcheck fixes, and seven scoring/calibration branches the earlier
+sweeps never listed
+
+Taken against `origin/main` @ `28754489` (`git fetch --prune origin`, then
+`git rev-list --left-right --count origin/main...origin/<b>` for
+behind/ahead and `git merge-tree --write-tree origin/main origin/<b>` for
+merge cleanliness, on every remaining `origin/*` branch except main).
+
+**The four branches this doc and its 2026-09-11 addendum marked safe to
+delete are now gone from the remote:** `claude/dev-environment-setup-xnijw0`,
+`codex/quarantine-2026-08-08-prototypes`, `worktree-agent-a4074ed623bfade27`,
+and `lane/exports-producer-tier` no longer appear in `git branch -r`.
+
+**Correction, not deletion, of the 2026-09-02 "fully absorbed" claim on
+`wip/phase-w-ui-checkpoint`.** §4's cleanup list below still names it
+"verified fully absorbed" and offers `git push origin --delete
+wip/phase-w-ui-checkpoint` as safe. The file-content finding above (zero
+files main lacks) is not retracted. But the branch itself is still on the
+remote, still 3 commits ahead of `origin/main` (now 604 behind, tip
+`a8a7c06c`, unchanged from 2026-09-02), and `git merge-tree --write-tree
+origin/main origin/wip/phase-w-ui-checkpoint` exits 1 with 10 `CONFLICT`
+lines (`scripts/verify-p2-p3-surfaces.mjs`, `ScriptIDE.tsx`,
+`SettingsPanel.tsx`, `CoverageSummary.tsx`, `ScriptDoctorPanel.tsx`,
+`ShipPanel.tsx` (add/add), `Toolbar.tsx`, `scriptide-draft-store.ts`,
+`coverage-handoff.test.ts` (add/add), `scriptide-draft-store.test.ts`) — main
+has since rewritten every one of those files. "Fully absorbed" is true of
+the *content*; it is not true of the *branch*, which cannot be merged
+cleanly. Deleting the ref loses no content per the check above, but nobody
+should read "fully absorbed" as "mergeable."
+
+**Nine branches created after 2026-09-11 that neither this doc nor its
+addenda ever listed:**
+
+| Branch | Tip | Behind / ahead of `origin/main` | `merge-tree` | Disposition |
+|---|---|---|---|---|
+| `calibrate/voice-bound-2026-09-13` | `c66ca57f` | 163 / 2 | CONFLICT (4 lines) | superseded — its finding landed on main independently as `e5458290` |
+| `calibrate/voice-bound-2026-09-13b` | `e4db6c77` | 163 / 3 | CONFLICT (4 lines) | superseded, same as above |
+| `calibrate/voice-bound-2026-09-13c` | `4653a78e` | 163 / 4 | CONFLICT (4 lines) | superseded, same as above |
+| `calibrate/voice-bound-2026-09-13d` | `213795e7` | 163 / 5 | CONFLICT (6 lines) | superseded, same as above |
+| `scoring/adversarial-2026-09-12` | `4cf5b2f3` | 304 / 43 | CONFLICT (13 lines) | PENDING OWNER MEASUREMENT — first link in a single deepening chain with the two below |
+| `scoring/forced-cue` | `089bec91` | 304 / 59 | CONFLICT (15 lines) | PENDING OWNER MEASUREMENT — second link, stacked on `scoring/adversarial-2026-09-12` |
+| `scoring/renderer-residuals` | `a4df0c49` | 304 / 72 | CONFLICT (16 lines) | PENDING OWNER MEASUREMENT — third link, stacked on `scoring/forced-cue` |
+| `lane/healthcheck-ipv4` | `17e6bfe3` | 1 / 0 | clean (exit 0) | **merged** — PR #265, `docs/audits/2026-09-18-healthcheck-ipv4/` |
+| `lane/node-24` | `faeb759a` | 7 / 0 | clean (exit 0) | **merged** — PR #264, `docs/audits/2026-09-18-node-24/` |
+
+The four `calibrate/voice-bound-2026-09-13*` branches are four attempts at
+the same voice-weight-bound derivation named in the 2026-09-13 session
+record (`docs/PATH_TO_EXCELLENCE.md`); none needs merging because the
+derivation they were chasing landed on main independently in commit
+`e5458290`. `scoring/adversarial-2026-09-12`, `scoring/forced-cue`, and
+`scoring/renderer-residuals` are not three independent branches but one
+chain, each stacked on the last, all three still carrying PENDING receipt
+entries per `scripts/check-scoring-receipt.mjs` — none may merge until
+`npm run measure-real` runs against the local corpus and the PENDING entries
+are rewritten in place, per the sequence this doc's 2026-09-11 addendum
+already describes. `lane/healthcheck-ipv4` and `lane/node-24` are the two
+branches actually behind, not ahead: both are wholly contained in
+`origin/main` (0 commits ahead, merge-tree clean) because both PRs merged.
+
+**Also on record as of 2026-09-19:** `tests/fixtures/auc24-table.json` still
+does not exist (`ls` confirms), so `tests/core/auc24-table.test.ts` still
+skips on every CI run with no corpus. `scripts/report-unverified-gates.mjs`
+still carries `expires: '2026-10-01'` for that gap, and its own header
+sanctions a deliberate, reviewed date move as option (c) — moving the date
+is not itself dishonest if it is done in a diff a reviewer can see, as
+opposed to quietly, which is why this doc records the expiry rather than
+either asserting it will be met or assuming it has been extended.
 
 ### Pull requests (15 reviewed, all states)
 
@@ -227,6 +299,13 @@ Five items. None is blocked on engineering; all five need the owner.
    no amount of engineering substitutes for.
 
 **Branch cleanup** (optional, safe — all four are verified fully absorbed):
+*(as of the 2026-09-19 addendum in §1: the first three, plus
+`lane/exports-producer-tier`, are confirmed gone from the remote already.
+`wip/phase-w-ui-checkpoint` is unchanged and still on the remote — its
+content is absorbed, per the file-level check above, but "fully absorbed"
+should not be read as "safe to fast-forward-merge": it does not, per the
+2026-09-19 `merge-tree` check. Deleting it loses no content; it just cannot
+be merged as a branch.)*
 
 ```
 git push origin --delete claude/dev-environment-setup-xnijw0

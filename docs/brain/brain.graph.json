@@ -163,6 +163,12 @@
       "path": "docs/brain/Decisions/Decision 1 - User Validation First.md"
     },
     {
+      "id": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md",
+      "type": "decision",
+      "title": "Decision #10 — Lanes Push at Checkpoints, Not at Every Commit (2026-09-18)",
+      "path": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md"
+    },
+    {
       "id": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md",
       "type": "decision",
       "title": "Decision #2 — Retire the P0 Hard-Gate (2026-08-11)",
@@ -209,12 +215,6 @@
       "type": "decision",
       "title": "Decision #9 — Generation Quality Becomes a Measured Track (2026-09-13)",
       "path": "docs/brain/Decisions/Decision 9 - Generation Quality Becomes a Measured Track.md"
-    },
-    {
-      "id": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md",
-      "type": "decision",
-      "title": "Decision #9 — Lanes Push at Checkpoints, Not at Every Commit (2026-09-18)",
-      "path": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md"
     },
     {
       "id": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
@@ -685,6 +685,12 @@
       "path": "docs/brain/Sessions/Session - 2026-09-13 CI Green and the Story Track.md"
     },
     {
+      "id": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md",
+      "type": "session",
+      "title": "Session — 2026-09-18: Node 24, the Container Path, the Healthcheck, and the Docs Fast Path",
+      "path": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md"
+    },
+    {
       "id": "docs/brain/Surfaces/Surface - Collab Room.md",
       "type": "surface",
       "title": "Surface — Collab Room",
@@ -1128,11 +1134,11 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
-      "to": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md"
+      "to": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md"
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
-      "to": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md"
+      "to": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md"
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
@@ -1156,7 +1162,7 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
-      "to": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md"
+      "to": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md"
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 Edge Image.md",
@@ -1391,6 +1397,22 @@
       "to": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md"
     },
     {
+      "from": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md",
+      "to": "docs/brain/Decisions/Decision 9 - Generation Quality Becomes a Measured Track.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md",
+      "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
+    },
+    {
       "from": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md",
       "to": "docs/brain/Decisions/Decision 1 - User Validation First.md"
     },
@@ -1445,18 +1467,6 @@
     {
       "from": "docs/brain/Decisions/Decision 9 - Generation Quality Becomes a Measured Track.md",
       "to": "docs/brain/Generation/Generation - Story Bench.md"
-    },
-    {
-      "from": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md",
-      "to": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md"
-    },
-    {
-      "from": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md",
-      "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
-    },
-    {
-      "from": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md",
-      "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
     },
     {
       "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
@@ -2609,6 +2619,26 @@
     {
       "from": "docs/brain/Sessions/Session - 2026-09-13 CI Green and the Story Track.md",
       "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 Edge Image.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 Healthcheck IPv4.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md",
+      "to": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",
