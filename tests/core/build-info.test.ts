@@ -20,7 +20,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, chmodSync, copyFileSync, linkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { readCommitFromCheckout, commit } from '../../server/lib/build-info.ts';
@@ -100,9 +100,39 @@ describe('server/lib/build-info.ts — engine commit identity', () => {
   it('a stalling `git` does not hang module load — it times out and falls back to "dev"', () => {
     const shimDir = mkdtempSync(path.join(tmpdir(), 'build-info-slow-git-'));
     try {
-      const shimPath = path.join(shimDir, 'git');
-      writeFileSync(shimPath, '#!/bin/sh\nsleep 30\necho deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n');
-      chmodSync(shimPath, 0o755);
+      // Windows keeps the variable as `Path`; adding a second `PATH` key would
+      // hand the child two of them. Replace whichever spelling is there.
+      const pathKey = Object.keys(process.env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH';
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        GIT_SHA: '',
+        [pathKey]: `${shimDir}${path.delimiter}${process.env[pathKey] ?? ''}`,
+      };
+      if (process.platform === 'win32') {
+        // build-info.ts runs `git` with no shell, and without a shell Windows
+        // only launches `git`, `git.com` or `git.exe` — never a `#!/bin/sh`
+        // script (the shim below used to be skipped there, the real git
+        // answered, and the test read a real SHA). So the stalling git is an
+        // executable: this node binary under the name git.exe, with a preload
+        // that stalls ONLY when the running program is that git.exe. The node
+        // process importing build-info.ts loads the same preload and goes on.
+        const gitExe = path.join(shimDir, 'git.exe');
+        try { linkSync(process.execPath, gitExe); } catch { copyFileSync(process.execPath, gitExe); }
+        const preload = path.join(shimDir, 'stall-as-git.cjs');
+        writeFileSync(preload, [
+          "if (require('path').basename(process.execPath).toLowerCase() === 'git.exe') {",
+          '  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 30000);',
+          "  console.log('deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');",
+          '  process.exit(0);',
+          '}',
+          '',
+        ].join('\n'));
+        env.NODE_OPTIONS = `${process.env.NODE_OPTIONS ?? ''} --require ${JSON.stringify(preload)}`.trim();
+      } else {
+        const shimPath = path.join(shimDir, 'git');
+        writeFileSync(shimPath, '#!/bin/sh\nsleep 30\necho deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n');
+        chmodSync(shimPath, 0o755);
+      }
 
       const start = Date.now();
       const out = execFileSync(
@@ -111,7 +141,7 @@ describe('server/lib/build-info.ts — engine commit identity', () => {
         {
           cwd: REPO_ROOT,
           encoding: 'utf8',
-          env: { ...process.env, GIT_SHA: '', PATH: `${shimDir}:${process.env.PATH ?? ''}` },
+          env,
           timeout: 15_000, // outer safety net for THIS test, not the mechanism under test
         },
       ).trim();
@@ -124,7 +154,8 @@ describe('server/lib/build-info.ts — engine commit identity', () => {
         + 'the pre-fix behavior hung at 8s+ against a 30s sleeping git',
       );
     } finally {
-      rmSync(shimDir, { recursive: true, force: true });
+      // Retries: on Windows the killed git.exe can hold its image for a moment.
+      rmSync(shimDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     }
   });
 });

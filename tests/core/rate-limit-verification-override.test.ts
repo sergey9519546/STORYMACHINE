@@ -134,7 +134,9 @@ describe('no deployment path sets it', () => {
   it('only session-store reads it, and no deployment file names it', () => {
     const offenders: string[] = [];
     for (const file of deploymentFiles()) {
-      const rel = path.relative(REPO, file);
+      // Forward slashes on every OS, or the reader's own `server\lib\...` path
+      // on Windows fails the exemption below and is reported as an offender.
+      const rel = path.relative(REPO, file).split(path.sep).join('/');
       if (rel === 'server/lib/session-store.ts') continue; // the reader
       if (readFileSync(file, 'utf8').includes(VAR)) offenders.push(rel);
     }

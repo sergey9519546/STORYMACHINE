@@ -353,9 +353,12 @@ describe('deterministic core boundary (retrospective #5)', () => {
       + result.dlopened.join('\n  '),
     );
 
+    // fileURLToPath, not `new URL(u).pathname`: the pathname is `/C:/...` on
+    // Windows and keeps `%20` for a space, so every loaded module resolved
+    // outside REPO_ROOT and this list came back empty.
     const repoFiles = result.loaded
       .filter(u => u.startsWith('file:'))
-      .map(u => path.relative(REPO_ROOT, new URL(u).pathname).replace(/\\/g, '/'))
+      .map(u => path.relative(REPO_ROOT, fileURLToPath(u)).replace(/\\/g, '/'))
       .filter(f => !f.startsWith('..') && !f.startsWith('node_modules/'));
     assert.ok(repoFiles.length > 20, 'the load hook recorded nothing — the probe is broken, not passing');
 

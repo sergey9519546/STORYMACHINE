@@ -101,7 +101,10 @@ function walkFountain(dir: string): string[] {
   if (!existsSync(abs)) return [];
   const out: string[] = [];
   for (const entry of readdirSync(abs).sort()) {
-    const rel = path.join(dir, entry);
+    // Repo paths with `/` on every OS: the checks below match on
+    // `data/screenplays`, which a Windows `data\screenplays\...` never did, so
+    // the corpus count read 0 there. (fs accepts `/` on Windows too.)
+    const rel = path.posix.join(dir, entry);
     if (statSync(path.join(REPO, rel)).isDirectory()) out.push(...walkFountain(rel));
     else if (entry.endsWith('.fountain')) out.push(rel);
   }

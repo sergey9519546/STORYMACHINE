@@ -82,9 +82,21 @@ before every push. CI runs lint + test + build on every branch, plus a
   (documented at the site — it cost a real bug hunt).
 - The revision pipeline's 14-pass execution order is still live. The old
   wave-rotation order is retired history — never use it to choose new work.
-- OneDrive hazard: direct file-tool writes to the mounted repo can truncate
-  files and introduce CRLF diff inflation. Edit in a clone, copy back with
-  byte verification, commit via Windows-side git.
+- The owner's checkout is no longer on OneDrive (moved 2026-09-18 to a local,
+  unsynced folder), so edit it in place. The old "edit in a clone, copy back
+  with byte verification" routine existed only because OneDrive sync
+  truncated files and inflated CRLF diffs; it applies again only if a
+  checkout is ever put under a synced folder.
+- Windows (the owner's machine): plain `npm ci` fails. better-sqlite3 ships
+  `binding.gyp` and no install script, so npm runs `node-gyp rebuild`, which
+  aborts with "Could not find any Visual Studio installation" before noticing
+  the package bundles `prebuilds/win32-x64.node`. Use
+  `npm ci --ignore-scripts`, then `npm run setup-hooks` under Git Bash (it is
+  what the skipped `prepare` would have run). Visual Studio is not needed.
+  Tests must hold on Windows too: build repo paths with `/` (not a raw
+  `path.relative`), convert module URLs with `fileURLToPath` (never
+  `new URL(...).pathname`), and remember `kill('SIGTERM')` there is a hard
+  kill that runs no handler.
 - The real-corpus harness (`tests/core/real-script-corpus.test.ts`) is
   env-gated (`REAL_SCRIPT_CORPUS_DIR`); its manifest must be re-locked
   whenever a rule change shifts a produced script's health/verdict/
