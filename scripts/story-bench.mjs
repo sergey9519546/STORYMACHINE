@@ -56,6 +56,7 @@ import { fetch as undiciFetch, Agent } from 'undici';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isStubIR } from '../server/nvm/generate/llm-generator.ts';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = path.join(REPO, 'tests', 'fixtures', 'story-bench-premises.json');
@@ -676,8 +677,13 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
       // stubIR's own ops — so a run in which every committed scene is a stub
       // measured the transport and the stub generator, not generation. The
       // first run of this bench was exactly that, in all six premises, and the
-      // table could not show it.
-      const fromModel = ir?.provenance?.model !== undefined && ir.provenance.model !== 'stub';
+      // table could not show it. Routed through llm-generator.ts's own
+      // `isStubIR` (2026-09-19, generator-honesty) rather than re-deriving the
+      // `=== 'stub'` check here, so the ONE place that knows what counts as a
+      // stub is the module that produces stubs — `ir` here is the plain JSON
+      // this script got back over HTTP, not a class instance, but isStubIR
+      // only reads `.provenance.model`, so it works on either.
+      const fromModel = ir?.provenance?.model !== undefined && !isStubIR(ir);
       if (fromModel) committedNonStub++;
       modelAuthoredOps += fromModel ? ir.ops.length : 0;
       console.log(

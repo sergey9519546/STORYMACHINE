@@ -3,10 +3,28 @@
 // JSON response into NarrativeTransitionIR candidates.
 // Falls back to a structural stub if the LLM is unavailable or fails.
 
-import type { NarrativeTransitionIR, SceneFunction } from '../ir/NarrativeTransitionIR.ts';
+import { createHash } from 'node:crypto';
+import type { CausalLink, NarrativeTransitionIR, SceneFunction } from '../ir/NarrativeTransitionIR.ts';
 import type { StoryOp } from '../ops/StoryOp.ts';
 import type { CandidateGenerator, GenerationSpec } from './proof-spec.ts';
 import { logger } from '../../lib/logger.ts';
+
+// ── Stub identifiability (2026-09-19, generator-honesty) ─────────────────────
+// `provenance.origin` stays 'model_generated' for BOTH a real LLM candidate and
+// a structural stub — ProvenanceProof (server/nvm/proof/tier1/provenance.ts)
+// and every route that stamps `origin: 'model_generated'` treat that value as
+// "not user-authored", which a stub also is, so widening the ProvenanceOrigin
+// union to add a 'stub' value would require re-auditing every one of those
+// call sites for a distinction they don't currently need. `provenance.model`
+// is already the field that tells the two apart (stubIR sets it to the literal
+// 'stub'; a parsed candidate now carries the model that actually answered —
+// see the `model` param on parseIR below), so this helper makes that the ONE
+// place the distinction is made, instead of every caller re-deriving its own
+// `=== 'stub'` check. scripts/story-bench.mjs and
+// tests/core/openai-compat-generation-guards.test.ts route through it.
+export function isStubIR(ir: NarrativeTransitionIR): boolean {
+  return ir.provenance.model === 'stub';
+}
 
 // ── Structural stub (used when LLM is unavailable) ────────────────────────────
 
@@ -73,8 +91,53 @@ export function parseOp(raw: Record<string, unknown>): StoryOp | null {
       case 'UPDATE_BELIEF': {
         const belief = raw['belief'];
         const charId = raw['charId'];
-        if (!isObj(belief) || typeof belief['proposition'] !== 'string' || typeof charId !== 'string') return null;
-        return { op: 'UPDATE_BELIEF', charId, belief: belief as unknown as StoryOp & { op: 'UPDATE_BELIEF' } extends { belief: infer B } ? B : never };
+        if (!isObj(belief) || typeof charId !== 'string') return null;
+        if (typeof belief['proposition'] !== 'string' || belief['proposition'].trim() === '') return null;
+        const proposition = belief['proposition'];
+        // `id` used to be cast through unchecked, so two id-less UPDATE_BELIEFs
+        // for the same character were indistinguishable to the dispatcher's
+        // `b.id === op.belief.id` upsert (server/nvm/ops/dispatcher.ts:34-39)
+        // and the second silently REPLACED the first — verified by probe: two
+        // distinct UPDATE_BELIEFs in, one belief out. Synthesising a
+        // deterministic id from (charId, proposition) fixes that without
+        // rejecting the op: rejecting would re-stub the whole candidate when
+        // `ops` empties out (parseIR falls back to stubIR at ops.length===0),
+        // which is a worse failure than accepting a model that simply forgot
+        // to name its own belief. The hash is deterministic so the SAME
+        // proposition repeated for the same character upserts onto its own
+        // prior belief rather than duplicating, matching the one thing an
+        // id-less model payload can still promise: identity by content.
+        const rawId = belief['id'];
+        const id = typeof rawId === 'string' && rawId.trim() !== ''
+          ? rawId
+          : `belief_${createHash('sha256').update(`${charId}|${proposition}`).digest('hex').slice(0, 8)}`;
+        const rawConfidence = belief['confidence'];
+        const confidenceValid = typeof rawConfidence === 'number' && Number.isFinite(rawConfidence)
+          && rawConfidence >= 0 && rawConfidence <= 1;
+        if (!confidenceValid) {
+          logger.debug('llm_belief_confidence_defaulted', { charId, id, raw: rawConfidence });
+        }
+        const confidence: number = confidenceValid ? (rawConfidence as number) : 0.5;
+        const rawSource = belief['source'];
+        const source: 'witnessed' | 'told' | 'inferred' =
+          rawSource === 'witnessed' || rawSource === 'told' || rawSource === 'inferred' ? rawSource : 'inferred';
+        // Defaults mirror scripts/story-bench.mjs's castGroundingOps: a turn
+        // index of 0 and a synthetic event id derived from the belief's own id
+        // rather than an empty string, so a downstream reader that keys on
+        // source_event_id (e.g. character-advocate.ts's "witnessed with no
+        // source_event_id" objection) sees a non-empty, traceable value.
+        const rawSourceEventId = belief['source_event_id'];
+        const source_event_id = typeof rawSourceEventId === 'string' && rawSourceEventId !== ''
+          ? rawSourceEventId
+          : `llm_${id}`;
+        const rawAcquiredAt = belief['acquired_at'];
+        const acquired_at = typeof rawAcquiredAt === 'number' && Number.isFinite(rawAcquiredAt)
+          ? rawAcquiredAt
+          : 0;
+        return {
+          op: 'UPDATE_BELIEF', charId,
+          belief: { id, proposition, confidence, source, source_event_id, acquired_at },
+        };
       }
       case 'APPRAISE_EMOTION': {
         const emotion = raw['emotion'];
@@ -100,8 +163,26 @@ export function parseOp(raw: Record<string, unknown>): StoryOp | null {
       case 'SHIFT_RELATIONSHIP': {
         const pair = raw['pair'];
         if (!Array.isArray(pair) || pair.length < 2 || typeof pair[0] !== 'string' || typeof pair[1] !== 'string') return null;
-        if (!isObj(raw['delta'])) return null;
-        return { op: 'SHIFT_RELATIONSHIP', pair: pair as [string, string], delta: raw['delta'] as unknown as StoryOp & { op: 'SHIFT_RELATIONSHIP' } extends { delta: infer D } ? D : never };
+        const delta = raw['delta'];
+        // RelationshipDelta was cast through on an `isObj` check alone, the
+        // exact class of defect APPRAISE_EMOTION was fixed for above: `{}` or
+        // a string satisfied `isObj`'s absence-of-check (a string fails isObj
+        // too, but the missing per-field validation meant a malformed-but-
+        // object-shaped delta reached the dispatcher and NarrativeState with
+        // `dimension`/`amount`/`reason` undefined). `amount` is bounded to
+        // -1..1 per StoryOp.ts's own comment ("signed, -1..1"). A bad delta
+        // rejects only THIS op — the candidate's other ops are unaffected.
+        if (!isObj(delta)) return null;
+        const dimension = delta['dimension'];
+        const amount = delta['amount'];
+        const reason = delta['reason'];
+        if (typeof dimension !== 'string' || dimension === '') return null;
+        if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < -1 || amount > 1) return null;
+        if (typeof reason !== 'string') return null;
+        return {
+          op: 'SHIFT_RELATIONSHIP', pair: pair as [string, string],
+          delta: { dimension, amount, reason } as unknown as StoryOp & { op: 'SHIFT_RELATIONSHIP' } extends { delta: infer D } ? D : never,
+        };
       }
       case 'ADVANCE_OBJECT_ARC': {
         if (typeof raw['objectId'] !== 'string' || typeof raw['toState'] !== 'string') return null;
@@ -126,8 +207,22 @@ export function parseOp(raw: Record<string, unknown>): StoryOp | null {
         if (typeof raw['claimId'] !== 'string') return null;
         return { op, claimId: raw['claimId'], move: (raw['move'] ?? 'support') as StoryOp & { op: 'ADVANCE_THEME_ARGUMENT' } extends { move: infer M } ? M : never };
       case 'UPDATE_READER_STATE': {
-        if (!isObj(raw['delta'])) return null;
-        return { op, delta: raw['delta'] as unknown as StoryOp & { op: 'UPDATE_READER_STATE' } extends { delta: infer D } ? D : never };
+        const delta = raw['delta'];
+        if (!isObj(delta)) return null;
+        // Every ReaderStateDelta field is OPTIONAL (server/nvm/ops/StoryOp.ts),
+        // so `{}` is a legitimate delta (IR_SCHEMA's READER_STATE_DELTA
+        // declares no `required` list, and llm-generator-schema.test.ts's
+        // "accepts the SMALLEST payload" check synthesises exactly `{}` for
+        // this branch) — unlike SHIFT_RELATIONSHIP above, an empty object must
+        // still parse. What must not happen is a PRESENT field of the wrong
+        // type reaching the dispatcher unchecked, so each key is validated
+        // only when the model actually sent it.
+        for (const key of ['suspense', 'curiosity', 'investment'] as const) {
+          const v = delta[key];
+          if (v !== undefined && (typeof v !== 'number' || !Number.isFinite(v))) return null;
+        }
+        if (delta['knownFact'] !== undefined && typeof delta['knownFact'] !== 'string') return null;
+        return { op, delta: delta as unknown as StoryOp & { op: 'UPDATE_READER_STATE' } extends { delta: infer D } ? D : never };
       }
       case 'RECORD_VISUAL_FACT': {
         if (typeof raw['fact'] !== 'string') return null;
@@ -148,7 +243,7 @@ export function parseOp(raw: Record<string, unknown>): StoryOp | null {
   }
 }
 
-function parseIR(raw: unknown, spec: GenerationSpec, idx: number): NarrativeTransitionIR {
+function parseIR(raw: unknown, spec: GenerationSpec, idx: number, model: string): NarrativeTransitionIR {
   const obj = (raw && typeof raw === 'object') ? raw as Record<string, unknown> : {};
   const rawOps = Array.isArray(obj['ops']) ? obj['ops'] as unknown[] : [];
   const ops: StoryOp[] = rawOps
@@ -156,6 +251,21 @@ function parseIR(raw: unknown, spec: GenerationSpec, idx: number): NarrativeTran
     .filter((o): o is StoryOp => o !== null);
 
   if (ops.length === 0) return stubIR(spec, idx);
+
+  // `causalLinks` used to do `typeof link.opIdx` with no object check first —
+  // one `null` element in the array (a model emitting a link it couldn't
+  // resolve, or a lossy JSON round-trip) threw `Cannot read properties of
+  // null` OUT OF parseIR into makeLLMCandidateGenerator's outer catch, which
+  // stubs ALL n candidates requested for the scene, not just the one with the
+  // bad link. Guarding object-ness per element means a malformed link is
+  // DROPPED, matching every other per-element validation in this file, rather
+  // than degrading the whole scene's candidates to stubs.
+  const rawCausalLinks = Array.isArray(obj['causalLinks']) ? obj['causalLinks'] as unknown[] : [];
+  const causalLinks = rawCausalLinks.filter(
+    (link): link is CausalLink =>
+      link !== null && typeof link === 'object' && Number.isInteger((link as { opIdx?: unknown }).opIdx)
+      && (link as { opIdx: number }).opIdx >= 0 && (link as { opIdx: number }).opIdx < ops.length,
+  );
 
   return {
     transitionId: String(obj['transitionId'] ?? `llm-${spec.target.sceneIdx}-${idx}-${Date.now()}`),
@@ -166,11 +276,14 @@ function parseIR(raw: unknown, spec: GenerationSpec, idx: number): NarrativeTran
     ops,
     preconditions: Array.isArray(obj['preconditions']) ? obj['preconditions'] as string[] : [],
     postconditions: Array.isArray(obj['postconditions']) ? obj['postconditions'] as string[] : [],
-    provenance: { origin: 'model_generated', createdAt: Date.now(), model: 'gemini' },
-    causalLinks: Array.isArray(obj['causalLinks'])
-      ? (obj['causalLinks'] as Array<{ opIdx: number; causedBy: string[] }>)
-          .filter(link => typeof link.opIdx === 'number' && link.opIdx >= 0 && link.opIdx < ops.length)
-      : undefined,
+    // `model` used to be hard-coded 'gemini' for every parsed IR, regardless of
+    // the configured provider — an openai-compat deployment's model-authored
+    // candidates were mislabeled with a provider that never ran. The caller
+    // passes the actual `candidateModel` it resolved via `ai.modelForTask()`
+    // (server/engine/ai.ts), which already reads AI_MODEL/GEMINI_MODEL/the
+    // per-task tier — the same string the call was made with.
+    provenance: { origin: 'model_generated', createdAt: Date.now(), model },
+    causalLinks: causalLinks.length > 0 ? causalLinks : undefined,
   };
 }
 
@@ -453,10 +566,10 @@ export function makeLLMCandidateGenerator(): CandidateGenerator {
       const parsed = JSON.parse(text) as { candidates?: unknown[] };
       const rawCandidates = parsed.candidates ?? [];
 
-      const irs = rawCandidates.slice(0, n).map((c, i) => parseIR(c, spec, i));
+      const irs = rawCandidates.slice(0, n).map((c, i) => parseIR(c, spec, i, candidateModel));
       // Track how many candidates degraded to stubs (empty/invalid ops) so quality
       // erosion is visible. parseIR returns a stub when ops parse to empty.
-      const stubbedFromLLM = irs.filter(ir => ir.provenance.model === 'stub').length;
+      const stubbedFromLLM = irs.filter(isStubIR).length;
       if (stubbedFromLLM > 0) {
         logger.warn('llm_generator_partial_parse', {
           sceneIdx: spec.target.sceneIdx,
