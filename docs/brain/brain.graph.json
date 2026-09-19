@@ -109,6 +109,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Cast Grounding",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md",
       "type": "audit",
       "title": "Audit — 2026-09-19 Converge Contract",
@@ -1282,6 +1288,22 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md",
       "to": "docs/brain/Patterns.md"
     },
     {
