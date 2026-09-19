@@ -83,6 +83,89 @@ function approvedSpanInstructions(spans: ApprovedSpan[], lines: string[]): strin
 }
 
 /**
+ * Result of checking whether every approved span survived a rewrite.
+ *
+ * `lost` holds the INDEX of each span (into the `spans` array passed in)
+ * whose excerpt could not be found, verbatim, in the revised text — never the
+ * span text itself, so a caller can log this safely (see
+ * `revision_rewrite_rejected_locked_span` below).
+ *
+ * `skipped` holds the index of each span that could not be checked at all —
+ * a non-finite or out-of-range `startLine`/`endLine` — and so is excluded
+ * from `ok`/`lost` rather than silently counted as either surviving or lost.
+ * This mirrors `approvedSpanInstructions`'s own tolerance of malformed input
+ * (`approvedSpans` reaches this module as `z.array(z.unknown())`, force-cast
+ * upstream — see that function's doc comment) instead of throwing on it.
+ */
+export interface ApprovedSpanSurvival {
+  ok: boolean;
+  lost: number[];
+  skipped: number[];
+}
+
+/** Collapse CRLF/CR to LF so a provider that normalizes line endings on its
+ *  way back doesn't register as having deleted the locked text. No other
+ *  normalization (whitespace, case, …) — the promise is VERBATIM survival. */
+function normalizeLineEndings(text: string): string {
+  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+/**
+ * THE ENFORCEMENT (2026-09-19, locked-spans lane; SESSION_REPORT_2026-09-19.md
+ * §4 rank 2 / logic audit C3). Before this function, "approved spans are
+ * never changed" was a sentence in the prompt (`approvedSpanInstructions`
+ * above) and nothing else — `evaluateRewrite` (./rewrite.ts) checks only
+ * finish-reason and a length ratio, so a model that deleted the locked pages
+ * and padded elsewhere was ACCEPTED (probe p9 in the session: locked text
+ * gone, `usedLLM: true`). This function is the missing check: for each
+ * approved span, take the excerpt from the ORIGINAL fountain — the same
+ * lines the prompt showed — and require it to appear, unchanged, as a
+ * contiguous substring of the revised text.
+ *
+ * Pure and exported so the excerpt/survival logic is unit-testable without a
+ * provider (tests/core/approved-spans-enforced.test.ts). `llmRewrite` below
+ * is the only caller that turns a failing result into a rejected rewrite.
+ */
+export function approvedSpansSurvive(
+  originalFountain: string,
+  revisedText: string,
+  spans: ApprovedSpan[],
+): ApprovedSpanSurvival {
+  const lines = originalFountain.split('\n');
+  const normalizedRevised = normalizeLineEndings(revisedText);
+  const lost: number[] = [];
+  const skipped: number[] = [];
+
+  spans.forEach((span, index) => {
+    const { startLine, endLine } = span;
+    const validRange =
+      Number.isFinite(startLine) &&
+      Number.isFinite(endLine) &&
+      startLine >= 1 &&
+      endLine >= startLine &&
+      startLine <= lines.length;
+    if (!validRange) {
+      skipped.push(index);
+      return;
+    }
+    // "clamped to the document": a stale endLine past the current document
+    // (e.g. a prior pass shortened it) still checks the portion that exists,
+    // rather than being thrown out along with genuinely invalid spans.
+    const clampedEnd = Math.min(endLine, lines.length);
+    const excerpt = normalizeLineEndings(lines.slice(startLine - 1, clampedEnd).join('\n'));
+    if (excerpt.length === 0) {
+      skipped.push(index);
+      return;
+    }
+    if (!normalizedRevised.includes(excerpt)) {
+      lost.push(index);
+    }
+  });
+
+  return { ok: lost.length === 0, lost, skipped };
+}
+
+/**
  * Attempt an LLM prose rewrite. Returns original if LLM unavailable or fails.
  *
  * rewrite.ts::rewritePass owns the two short-circuits that used to open this
@@ -90,7 +173,9 @@ function approvedSpanInstructions(spans: ApprovedSpan[], lines: string[]): strin
  * registered rewriter when either applies — so by the time control reaches
  * here, an LLM call is genuinely intended.
  */
-async function llmRewrite(input: RewriteInput): Promise<RewriteResult> {
+async function llmRewrite(
+  input: RewriteInput,
+): Promise<RewriteResult & { reason?: string; lostSpans?: number[] }> {
   const { fountain, issues, passName, approvedSpans, storyContext, priorPassResults } = input;
 
   const lines = fountain.split('\n');
@@ -207,7 +292,38 @@ async function llmRewrite(input: RewriteInput): Promise<RewriteResult> {
 
     const verdict = evaluateRewrite(text, fountain.length, finishReason);
     if (verdict.accept) {
-      return { revised: text, usedLLM: true };
+      // LOCKED-SPAN ENFORCEMENT — see approvedSpansSurvive's doc comment.
+      // evaluateRewrite's finish-reason/length checks say nothing about
+      // WHICH text survived; a model can delete every approved span and pad
+      // elsewhere to clear the 0.80 ratio. Checked only on the accept path:
+      // a rejected-by-evaluateRewrite draft already falls back to the
+      // unchanged fountain below, where every approved span trivially
+      // survives (it IS the original).
+      const survival = approvedSpansSurvive(fountain, text, approvedSpans);
+      if (survival.skipped.length > 0) {
+        // Malformed/out-of-range span metadata, not a rewrite defect — log
+        // it for visibility (never the span text) and keep checking the rest.
+        logger.warn('revision_rewrite_locked_span_skipped', {
+          passName,
+          skippedSpanIndices: survival.skipped,
+          totalApprovedSpans: approvedSpans.length,
+        });
+      }
+      if (survival.ok) {
+        return { revised: text, usedLLM: true };
+      }
+      // A locked span did not survive — reject the rewrite exactly as the
+      // finish-reason/length guards above do: keep the unchanged draft. The
+      // log line and returned `reason` name which spans (by index) and how
+      // many; never the span or draft text, so this stays safe to log at
+      // `warn` in production.
+      logger.warn('revision_rewrite_rejected_locked_span', {
+        passName,
+        lostSpanIndices: survival.lost,
+        lostSpanCount: survival.lost.length,
+        totalApprovedSpans: approvedSpans.length,
+      });
+      return { revised: fountain, usedLLM: false, reason: 'approved_span_lost', lostSpans: survival.lost };
     }
     // Rejected — log why so silent quality loss is observable, then keep original.
     logger.warn('revision_rewrite_rejected', {
