@@ -10,7 +10,7 @@ import {
   withSessionCommand, aiLimiter,
 } from '../../lib/session-store.ts';
 import {
-  validate, ConvergeBodySchema, ConvergeArcBodySchema,
+  validate, ConvergeBodySchema, ConvergeArcBodySchema, SCENE_FUNCTIONS,
 } from '../../lib/validation.ts';
 import { logger } from '../../lib/logger.ts';
 import {
@@ -154,6 +154,11 @@ router.post('/api/nvm/converge', aiLimiter, validate(ConvergeBodySchema), withSe
     winner: result.winner,
     candidates: result.candidates,
     roomTranscript: result.roomTranscript,
+    // C11: explicit alongside `ir`/`winner` — see ConvergeResult.tier1Passed's
+    // doc (server/nvm/converge/loop.ts). Equivalent to `winner !== null`, but a
+    // caller reading `ir` (always populated, winner or not) for diagnostics
+    // gets an unambiguous flag instead of re-deriving it from `winner`.
+    tier1Passed: result.tier1Passed,
   });
 }));
 
@@ -183,7 +188,15 @@ router.get('/api/nvm/converge-stream', aiLimiter, withSessionCommand(async (req,
 
     const q = req.query as Record<string, string>;
     const sceneIdx = Math.max(0, parseInt(q['sceneIdx'] ?? '0', 10) || 0);
-    const sceneFunction = (q['sceneFunction'] ?? 'build_tension') as import('../../nvm/generate/proof-spec.ts').SceneTarget['sceneFunction'];
+    // C12: was an unchecked cast — any query string flowed straight into
+    // SceneTarget.sceneFunction, which the generation prompt and IR both
+    // trust as one of the six declared values. Falls back to the same
+    // 'build_tension' default the unchecked cast used when absent OR invalid.
+    const rawSceneFunction = q['sceneFunction'];
+    const sceneFunction: import('../../nvm/generate/proof-spec.ts').SceneTarget['sceneFunction'] =
+      (SCENE_FUNCTIONS as readonly string[]).includes(rawSceneFunction ?? '')
+        ? (rawSceneFunction as import('../../nvm/generate/proof-spec.ts').SceneTarget['sceneFunction'])
+        : 'build_tension';
     const tensionTarget = Math.max(0, Math.min(200, parseFloat(q['tensionTarget'] ?? '60') || 60));
     const qualityTarget = Math.max(0, Math.min(100, parseFloat(q['qualityTarget'] ?? '60') || 60));
     const maxIterations = Math.min(10, Math.max(1, parseInt(q['maxIterations'] ?? '4', 10) || 4));
@@ -323,6 +336,7 @@ router.get('/api/nvm/converge-stream', aiLimiter, withSessionCommand(async (req,
         winner: result.winner,
         candidates: result.candidates,
         roomTranscript: result.roomTranscript,
+        tier1Passed: result.tier1Passed,
         history: result.history.map(s => ({
           iteration: s.iteration,
           candidateId: s.candidateId,
@@ -442,6 +456,7 @@ router.post('/api/nvm/converge-arc', aiLimiter, validate(ConvergeArcBodySchema),
         ghostCount: result.ghosts.length,
         opCount: result.ir.ops.length,
         sceneFunction: result.ir.sceneFunction,
+        tier1Passed: result.tier1Passed,
       });
 
       totalComposite += result.finalComposite;
