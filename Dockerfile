@@ -158,8 +158,24 @@ EXPOSE 3000
 # warmDoctorPool()'s own doc comment, server/nvm/analyze/doctor-pool.ts, the
 # one place this figure is defined) with headroom for a slower/loaded host,
 # while staying well under the 30s poll interval below.
+#
+# 127.0.0.1, NOT `localhost` (2026-09-18, docs/audits/2026-09-18-healthcheck-
+# ipv4/README.md). server.ts binds 0.0.0.0, which serves IPv4 only. Whether
+# `localhost` means IPv4 inside this container is up to the Docker HOST:
+# Docker Desktop 29.2.1 writes `::1 localhost` into /etc/hosts, busybox wget
+# takes ::1 and does not fall back, and every probe was refused — the
+# container sat `unhealthy` with /ready answering 200 from the host. A
+# literal 127.0.0.1 needs no name resolution and is served by a 0.0.0.0 bind
+# on every host. Binding dual-stack instead was rejected: it would expose the
+# server on IPv6 everywhere and change the form of every IPv4 client address
+# (`::ffff:a.b.c.d`) that rate limiting, logs and the loopback-only admin
+# routes read. The container port is 3000 (EXPOSE above); to serve on
+# another host port, publish it (`-p 8080:3000`) rather than setting PORT
+# inside the container, which would move the server off the port this probes.
+# tests/core/healthcheck-address.test.ts derives the address server.ts serves
+# and fails if this probe stops targeting it.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3000/ready || exit 1
+  CMD wget -qO- http://127.0.0.1:3000/ready || exit 1
 
 # tsx-in-prod is a documented tradeoff (no separate server compile step — see
 # the `deps` stage comment above): it still boots correctly as the non-root
