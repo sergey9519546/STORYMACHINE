@@ -104,9 +104,15 @@ largely restate scenes-committed, per the AUC figures below.
 
 - **Neither generative call site goes through `generateContent()`**, so
   neither gets its 30 s `withTimeout` or its 3-attempt `withRetry`. They call
-  `provider.generate()` directly, with no deadline. A slow model simply blocks
-  until the route's own budget (`AI_BUDGET_CONVERGE_TIMEOUT_MS`, 180 s per
-  converge) fires.
+  `provider.generate()` directly, with no deadline of their own. A slow model
+  simply blocks until the route's own budget fires —
+  `AI_BUDGET_CONVERGE_TIMEOUT_MS` (180 s per converge) for the candidate-
+  generation site. Until [[Audit - 2026-09-19 Revise Deadline]], the revision
+  pipeline's site (`rewrite-llm.ts`, up to 14 sequential calls) had NO such
+  backstop at all — §4c below is the consequence that was actually measured:
+  a client-side `headersTimeout` was mistaken for the server's own deadline,
+  because the server did not have one. It now does
+  (`AI_BUDGET_REVISE_TIMEOUT_MS`, default 900 s for the whole 14-pass run).
 - **One candidate-generation call measured 15–78 s** against the configured
   reasoning model (n = 6, median ~26 s; 391 prompt tokens, 1,370–2,306
   completion tokens, of which most are `reasoning_content`). Capping

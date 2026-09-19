@@ -121,6 +121,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Revise Deadline",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
       "type": "audit",
       "title": "Audit — 2026-09-19 TypeSafe Cast Alignment",
@@ -1291,6 +1297,26 @@
       "to": "docs/brain/Patterns.md"
     },
     {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "to": "docs/brain/Generation/Generation - Story Bench.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "to": "docs/brain/Generation/Generation - Story Bench.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
       "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
       "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
     },
@@ -1745,6 +1771,10 @@
     {
       "from": "docs/brain/Generation/Generation - Story Bench.md",
       "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Generation/Generation - Story Bench.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
     },
     {
       "from": "docs/brain/Generation/Generation - Story Bench.md",

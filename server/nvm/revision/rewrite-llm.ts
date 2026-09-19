@@ -26,6 +26,7 @@
 
 import { logger } from '../../lib/logger.ts';
 import { sanitizeForPrompt, sanitizeSingleLine } from '../../lib/prompt-utils.ts';
+import { consumeAiAttempt, isAiBudgetExceededError } from '../../lib/ai-budget.ts';
 import { getGenerativeProvider, modelForTask } from '../../engine/ai.ts';
 import { buildCraftPromptSection, looksLikeAnimationGenre } from '../generate/craft-spec.ts';
 import type { ApprovedSpan } from './passes/types.ts';
@@ -179,6 +180,21 @@ async function llmRewrite(input: RewriteInput): Promise<RewriteResult> {
     const estInputTokens = Math.ceil(fountain.length / 4);
     const maxOutputTokens = Math.min(32_768, Math.max(8_192, Math.ceil(estInputTokens * 1.5)));
 
+    // ATTEMPT CEILING (2026-09-19, revise-deadline lane): the one provider
+    // call this function makes, counted against whichever server/routes/nvm/
+    // revision.ts REVISE_BUDGET is active — see that file's header comment
+    // for why the ceiling lives here rather than at a wrapped-function seam
+    // like converge.ts's. A no-op outside an active budget context
+    // (server/lib/ai-budget.ts's consumeAiAttempt() doc comment), so this is
+    // inert for every keyless/no-budget caller, including every existing
+    // test in this repository. Placed INSIDE this try/catch, on purpose: once
+    // the ceiling (or the budget's own deadline) is hit, an over-budget
+    // attempt degrades through the EXACT SAME path as "no API key" or "the
+    // provider threw" — fall back to the unchanged draft for this pass — so
+    // the visible behavior of exhausting the budget is indistinguishable from
+    // losing the provider mid-pipeline, not a new failure mode to design for.
+    consumeAiAttempt();
+
     const response = await provider.generate({
       model: modelForTask('REVISION'),
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -199,8 +215,15 @@ async function llmRewrite(input: RewriteInput): Promise<RewriteResult> {
       inputChars: fountain.length, outputChars: text.length,
     });
   } catch (err) {
-    // No key or LLM error — log then fall back to the unchanged draft.
-    logger.warn('revision_rewrite_failed', { passName, message: (err as Error).message });
+    // No key, LLM error, or the AI budget (attempts/deadline) was exhausted —
+    // log which one (distinctly for the budget case, so the ceiling doing its
+    // job is observable rather than looking like an ordinary provider
+    // failure) then fall back to the unchanged draft.
+    if (isAiBudgetExceededError(err)) {
+      logger.warn('revision_rewrite_budget_exceeded', { passName, code: err.code, message: err.message });
+    } else {
+      logger.warn('revision_rewrite_failed', { passName, message: (err as Error).message });
+    }
   }
 
   return { revised: fountain, usedLLM: false };
