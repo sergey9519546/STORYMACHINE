@@ -151,6 +151,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Receipt Gate Inplace.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Receipt Gate Inplace",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Receipt Gate Inplace.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
       "type": "audit",
       "title": "Audit — 2026-09-19 Revise Deadline",
@@ -1393,6 +1399,14 @@
     {
       "from": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md",
       "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Receipt Gate Inplace.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Receipt Gate Inplace.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
