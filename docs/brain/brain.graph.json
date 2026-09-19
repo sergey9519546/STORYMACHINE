@@ -121,6 +121,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Generator Honesty.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Generator Honesty",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Generator Honesty.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
       "type": "audit",
       "title": "Audit — 2026-09-19 Harness Honesty",
@@ -1290,6 +1296,18 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Generator Honesty.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 Story Bench Lane.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Generator Honesty.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Generator Honesty.md",
       "to": "docs/brain/Patterns.md"
     },
     {
