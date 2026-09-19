@@ -46,16 +46,22 @@ name: Edge Image
 #     npm error gyp ERR! stack Error: Could not find any Python installation to use
 #     npm error gyp ERR! cwd /app/node_modules/better-sqlite3
 #
-# `FROM node:22-alpine` carries no python3/make/g++, which node-gyp needs to
-# run at all. release.yml's `publish` job builds the same Dockerfile and would
-# have failed identically, so the whole container delivery path was broken and
-# nothing noticed. Fixed 2026-09-18 by adding `apk add --no-cache python3 make
-# g++` to the Dockerfile's `deps` stage — see that file's comment for why
-# node-gyp runs even though better-sqlite3 ships a bundled musl prebuild, and
+# `FROM node:22-alpine`, the base at the time, carries no python3/make/g++,
+# which node-gyp needs to run at all; node:24-alpine, the base since
+# 2026-09-18, carries none of them either. release.yml's `publish` job builds
+# the same Dockerfile and would have failed identically, so the whole
+# container delivery path was broken and nothing noticed. Fixed 2026-09-18 by
+# adding `apk add --no-cache python3 make g++` to the Dockerfile's `deps`
+# stage — see that file's comment for why node-gyp runs even though
+# better-sqlite3 ships a bundled musl prebuild, and
 # tests/core/dockerfile-toolchain.test.ts for the guard that keeps it there.
 # The fixed image was built and booted end to end (/health 200, /ready 200,
-# container HEALTHCHECK healthy, better-sqlite3 exercised at runtime);
-# evidence in docs/audits/2026-09-18-edge-image/README.md.
+# container HEALTHCHECK healthy, better-sqlite3 exercised at runtime) on
+# node:22-alpine, evidence in docs/audits/2026-09-18-edge-image/README.md. The
+# node:24-alpine image was built and booted the same way (/health 200, /ready
+# 200, better-sqlite3 exercised at runtime); its HEALTHCHECK is covered in
+# docs/audits/2026-09-18-node-24/README.md, which found the probe fails on a
+# Docker host that maps `localhost` to ::1, on the node:22 image too.
 #
 # WHY THE TRIGGER FILTERS ON `branches: [main]`:
 # `workflow_run` fires on EVERY completion of CI, on EVERY branch. Without the

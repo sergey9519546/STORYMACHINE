@@ -18,7 +18,7 @@ Repository") for the open decision on whether that changes.
 
 ## Dev setup
 
-Requires Node.js >=22.13.0 || >=24 (CI pins Node 22).
+Requires Node.js >=22.13.0 || >=24 (CI and the Docker image pin Node 24 LTS).
 
 ```bash
 npm ci          # install pinned deps
