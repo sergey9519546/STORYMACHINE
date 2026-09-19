@@ -115,6 +115,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Harness Honesty",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
       "type": "audit",
       "title": "Audit — 2026-09-19 TypeSafe Cast Alignment",
@@ -1254,6 +1260,34 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
       "to": "docs/brain/Patterns.md"
     },
     {
