@@ -121,6 +121,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Doctor Pool Fallback",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md",
       "type": "audit",
       "title": "Audit — 2026-09-19 Generation Prompt Inputs",
@@ -1294,6 +1300,26 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md",
+      "to": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md",
+      "to": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md",
       "to": "docs/brain/Patterns.md"
     },
     {
