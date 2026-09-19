@@ -40,6 +40,25 @@ const ROOT = path.resolve(import.meta.dirname, '../..');
 const EDGE_YML = path.join(ROOT, '.github/workflows/edge.yml');
 const DOCKERIGNORE = path.join(ROOT, '.dockerignore');
 
+/** The bash that runs the extracted step. On Windows a bare `bash` resolves to
+ *  C:\Windows\System32\bash.exe — WSL's launcher, which runs the script inside
+ *  a Linux distro that cannot see this checkout's Windows paths: the step
+ *  wrote nothing and every case read ''. Git for Windows ships a real bash
+ *  beside git itself (<git root>/bin/bash.exe, found from `git --exec-path`,
+ *  which is <git root>/<mingw64|clangarm64>/libexec/git-core). Null only when
+ *  no such bash exists, and the executed-step suite then says so as a skip. */
+function posixBash(): string | null {
+  if (process.platform !== 'win32') return 'bash';
+  try {
+    const gitRoot = path.resolve(execFileSync('git', ['--exec-path'], { encoding: 'utf8' }).trim(), '..', '..', '..');
+    return [path.join(gitRoot, 'bin', 'bash.exe'), path.join(gitRoot, 'usr', 'bin', 'bash.exe')]
+      .find((p) => fs.existsSync(p)) ?? null;
+  } catch {
+    return null;
+  }
+}
+const BASH = posixBash();
+
 /** `.dockerignore`'s live patterns, comments and blanks removed. */
 function dockerignorePatterns(): string[] {
   return fs.readFileSync(DOCKERIGNORE, 'utf8')
@@ -166,7 +185,9 @@ describe('canSkipImageBuild — narrower than classifyDocsOnly, in the safe dire
 // EXTRACTED FROM edge.yml ITSELF, so a wiring mistake — a dropped
 // `--no-renames`, a wrong module path, a failure direction inverted — fails
 // here rather than on `main`.
-describe('edge.yml\'s gate step, extracted and executed', () => {
+describe('edge.yml\'s gate step, extracted and executed', {
+  skip: BASH === null && 'no POSIX bash: on Windows this needs Git for Windows\' bash (System32\\bash.exe is WSL)',
+}, () => {
   const tmpRoots: string[] = [];
 
   function stepBody(): string {
@@ -239,7 +260,7 @@ describe('edge.yml\'s gate step, extracted and executed', () => {
     let stdout = '';
     let code = 0;
     try {
-      stdout = execFileSync('bash', ['step.sh'], {
+      stdout = execFileSync(BASH ?? 'bash', ['step.sh'], {
         cwd: dir, encoding: 'utf8',
         env: {
           PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: dir,

@@ -675,7 +675,13 @@ describe('classify-docs-only.mjs — every unresolvable input fails CLOSED', () 
     assert.match(r.stdout, /does not resolve in this checkout/);
   });
 
-  it('a path git has to C-quote (control character) is NOT docs-only', () => {
+  it('a path git has to C-quote (control character) is NOT docs-only', {
+    // The fixture needs a file whose NAME holds a newline. Windows cannot
+    // create one, and Windows git refuses the path outright even in the index
+    // ("error: Invalid path", core.protectNTFS) — so no Windows repository can
+    // contain it. The classifier runs in CI on Linux, where this case runs.
+    skip: process.platform === 'win32' && 'Windows cannot create, nor git on Windows index, a path containing a control character',
+  }, () => {
     const repo = makeRepo();
     write(repo, 'README.md', '# fixture\n');
     const a = commit(repo, 'A');
