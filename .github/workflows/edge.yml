@@ -62,6 +62,8 @@ name: Edge Image
 # 200, better-sqlite3 exercised at runtime); its HEALTHCHECK is covered in
 # docs/audits/2026-09-18-node-24/README.md, which found the probe fails on a
 # Docker host that maps `localhost` to ::1, on the node:22 image too.
+# That probe now targets 127.0.0.1 and was measured healthy on such a host
+# (docs/audits/2026-09-18-healthcheck-ipv4/README.md).
 #
 # WHY THE TRIGGER FILTERS ON `branches: [main]`:
 # `workflow_run` fires on EVERY completion of CI, on EVERY branch. Without the

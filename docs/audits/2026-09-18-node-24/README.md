@@ -309,6 +309,11 @@ and fixing it changes the readiness contract that `docker-compose.yml`,
 `tests/routes/ready.test.ts` and route-capabilities all describe. It is filed
 as a separate task, not folded into a runtime bump.
 
+**Fixed afterwards** in its own lane, #265: both probes now target
+`127.0.0.1`, guarded by `tests/core/healthcheck-address.test.ts`, and
+measured healthy on this host. See
+`docs/audits/2026-09-18-healthcheck-ipv4/README.md`.
+
 ---
 
 ## Finding C — a fresh `npm ci` fails on the owner's Windows machine (environment, not fixed here)

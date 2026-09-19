@@ -80,7 +80,17 @@ services:
       # OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
 
       # ── Server config ──
-      PORT: ${PORT:-3000}
+      # PORT is deliberately NOT passed into the container (2026-09-18,
+      # docs/audits/2026-09-18-healthcheck-ipv4/README.md). The container
+      # port is 3000: `ports:` above maps "${PORT:-3000}:3000" and the
+      # healthcheck below probes 3000. This line used to read
+      # `PORT: ${PORT:-3000}`, which moved the SERVER to $PORT as well — so
+      # any PORT other than 3000 left the mapping and the healthcheck both
+      # pointing at a container port nothing listened on (measured: host
+      # requests reset, container unhealthy). PORT now picks the HOST port
+      # only, which is what the mapping always said it did.
+      # tests/core/healthcheck-address.test.ts fails if compose moves the
+      # server's port away from the one its healthcheck probes.
 
       # ── Session persistence and growth bounds (server/lib/session-store.ts) ──
       # SESSION_DB_DIR is left at the image's own default (./data/sessions,
@@ -178,7 +188,11 @@ services:
       # ("~2.1–2.7 s on an idle box, up to ~3.9 s under load (measured
       # 2026-09-04/05)" — warmDoctorPool()'s own doc comment,
       # server/nvm/analyze/doctor-pool.ts) with headroom.
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/ready"]
+      # 127.0.0.1, not `localhost`, for the reason the Dockerfile's
+      # HEALTHCHECK comment gives: the server binds 0.0.0.0 (IPv4 only), and
+      # on a Docker host that maps `localhost` to ::1 first (Docker Desktop
+      # 29.2.1 does) busybox wget is refused on every probe.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/ready"]
       interval: 30s
       timeout: 5s
       start_period: 15s
