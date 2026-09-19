@@ -109,6 +109,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 TypeSafe Cast Alignment",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
       "type": "branch",
       "title": "Branch — Adversarial 2026-09-12",
@@ -1222,6 +1228,26 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "to": "docs/brain/Generation/Generation - Story Bench.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
       "to": "docs/brain/Patterns.md"
     },
     {
