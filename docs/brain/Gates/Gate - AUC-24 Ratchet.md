@@ -41,9 +41,11 @@ error rather than a tie. Consequences:
 * **`AUC24_FLOOR` is untouched at 0.622.** Moving a floor is a measurement's
   job, and a recipe that degrades strictly more aggressively is exactly where a
   guessed floor would be a guess wearing a gate's clothes.
-* `AUC24_DEGRADATION_ID` is bumped to `shuffle-drop/v2`, so an old-recipe table
-  can never be compared to a new measurement —
-  `tests/core/auc24-table.test.ts` refuses it.
+* `AUC24_DEGRADATION_ID` is bumped to `shuffle-drop/v2` (and again, 2026-09-19,
+  to `shuffle-drop/v3`, for the reassembly fix that stops a degradation from
+  welding two scenes together on a script with no trailing newline — see
+  `scripts/lib/auc.ts`), so an old-recipe table can never be compared to a
+  new measurement — `tests/core/auc24-table.test.ts` refuses it.
 * On the 32 committed scripts of [[Gate - Public Benchmark]] the new
   segmentation produces byte-identical output (0 of 32 differ), which is why
   neither shuffle-drop floor there moved.
