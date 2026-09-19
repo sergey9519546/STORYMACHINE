@@ -21,6 +21,7 @@ import type { GhostReason } from '../repro/ghost-ledger.ts';
 import type { WritersRoomResult, Critique } from '../room/room.ts';
 import type { DirectorPolicy } from '../selfplay/mine.ts';
 import { runTier1, tier1Passes, runTier2, runTier3, tier3Rank, failedProofs } from '../proof/kernel.ts';
+import type { IntentionalGroundingOptions } from '../proof/tier1/intentional.ts';
 import { deriveTensionLedger } from '../valuation/futures.ts';
 import { runQualityEngine } from '../quality/index.ts';
 import { runWritersRoom } from '../room/room.ts';
@@ -289,6 +290,38 @@ export async function convergeScene(
       systemPreamble,
     };
 
+    // ── Cast grounding (2026-09-19) ──────────────────────────────────────────
+    // What IntentionalProof is allowed to treat as an existing character. When
+    // the caller supplied `target.cast`, the proof stops letting a candidate
+    // ground its own invented names (server/nvm/proof/tier1/intentional.ts) and
+    // the cast is the ground truth instead.
+    //
+    // `allowIntroduce` keeps the G9 inversion legal in the one case that could
+    // otherwise contradict itself: if the spec this candidate was generated
+    // against TOLD it to introduce a character, the proof must not then block
+    // it for doing so. It is derived from THIS iteration's constraint list, not
+    // from a second list, so the instruction and the proof cannot drift.
+    //
+    // Note what it is worth today: with a cast supplied, proofsToConstraints no
+    // longer emits `must_introduce_character` at all (it emits the act-through-
+    // the-cast constraint instead), and no other constraint source in the loop
+    // emits that kind — so this list is empty on every iteration of the current
+    // pipeline. It is wired from the spec rather than hardcoded to `[]` because
+    // the proof's allowance and the spec's instruction are the same fact, and
+    // the lane that adds a second constraint source should not have to discover
+    // that they were only accidentally in agreement.
+    //
+    // `undefined` when the caller named no cast: runTier1 then behaves exactly
+    // as it did before this lane existed.
+    const grounding: IntentionalGroundingOptions | undefined = target.cast === undefined
+      ? undefined
+      : {
+          cast: target.cast,
+          allowIntroduce: specConstraints
+            .filter(c => c.kind === 'must_introduce_character' && typeof c.detail === 'string' && c.detail.length > 0)
+            .map(c => c.detail as string),
+        };
+
     let candidates: NarrativeTransitionIR[];
     // G2→G1: Writers' Room drives mutation operator selection after iteration 0.
     // G13→G1: Director Policy (from corpus) biases operator when room has no consensus.
@@ -353,9 +386,11 @@ export async function convergeScene(
       // The loop carries no AbortSignal of its own (the route's budget races
       // the whole operation instead — server/routes/nvm/converge.ts), so none
       // is forwarded; the adapter's own 10 s timeout is the deadline.
-      const castAlignmentOutcome = await alignCandidateCast(candidate, state, { target });
+      // `grounding` is the SAME object handed to runTier1 on the next line, so
+      // the set alignment offers as options is the set the proof accepts.
+      const castAlignmentOutcome = await alignCandidateCast(candidate, state, { target, grounding });
       candidate = castAlignmentOutcome.ir;
-      const tier1Results = runTier1(candidate, state);
+      const tier1Results = runTier1(candidate, state, grounding);
       const passed = tier1Passes(tier1Results);
       // Apply candidate ops to get post-transition state before valuing — otherwise
       // every candidate in an iteration gets the identical pre-transition tension score,
@@ -506,7 +541,7 @@ export async function convergeScene(
     if (best) {
       // Merge Tier 1 + Tier 2 failures so the next GenerationSpec includes
       // both hard-block fixes and quality-gate guidance.
-      const t1Failures = failedProofs(runTier1(best, state));
+      const t1Failures = failedProofs(runTier1(best, state, grounding));
       const t2Failures = failedProofs(runTier2(best, state));
       currentFailures = [...t1Failures, ...t2Failures];
       // Quality-aware (Wave 27): capture quality warnings from best candidate

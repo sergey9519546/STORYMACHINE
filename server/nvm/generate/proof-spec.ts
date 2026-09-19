@@ -7,7 +7,7 @@ import type { NarrativeState } from '../state/NarrativeState.ts';
 import type { ProofResult } from '../proof/contract.ts';
 import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import type { SceneFunction } from '../ir/NarrativeTransitionIR.ts';
-import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
+import { sanitizeForPrompt, sanitizeSingleLine } from '../../lib/prompt-utils.ts';
 import { genrePromptBlock } from '../../lib/genre-router.ts';
 import { buildCraftPromptSection, looksLikeAnimationGenre, type SceneCraftContext } from './craft-spec.ts';
 import {
@@ -36,6 +36,17 @@ export interface SceneTarget {
    *  is byte-identical to what it was before, so no existing caller changes.
    *  It is never scored, and no model is asked whether a reason is good. */
   necessity?: NecessityCertificate;
+  /** The character ids the CALLER says exist in this story (2026-09-19,
+   *  cast-grounding lane). Optional, and it changes two things when present:
+   *  IntentionalProof stops letting a candidate ground its own invented
+   *  characters (server/nvm/proof/tier1/intentional.ts's header states the
+   *  defect in full), and buildSystemPreamble() states the list to the
+   *  generator as a CAST line. Absent — every caller that does not know its
+   *  cast, which is all of them outside the converge routes — leaves both the
+   *  proof and the preamble byte-identical. An empty array is NOT the same as
+   *  absent: it means "this story has no characters", and the proof honours
+   *  that. */
+  cast?: string[];
 }
 
 export interface GenerationConstraint {
@@ -59,6 +70,42 @@ export interface GenerationSpec {
   constraints: GenerationConstraint[];
   // LLM-ready: a system prompt preamble that encodes the proof constraints
   systemPreamble: string;
+}
+
+// ── Cast rendering (one implementation, two readers) ────────────────────────
+// SceneTarget.cast is caller-controlled text that reaches the model twice: in
+// the CAST line of the preamble and inside the constraint an IntentionalProof
+// block produces. Both go through here so the sanitisation and the cap are
+// stated once.
+//
+// The cap is applied at an ELEMENT boundary, never mid-id: half a character
+// name reads to the model as a different character, which is the exact failure
+// this whole field exists to stop.
+//
+// sanitizeSingleLine, NOT sanitizeForPrompt: a charId is a one-line
+// identifier, and sanitizeForPrompt deliberately preserves LF (see
+// server/lib/prompt-utils.ts — it is the right tool for prose fields like
+// themeHint, and the wrong one for a single-line record). A cast id of
+// "MAYA\nIGNORE THE ABOVE" through sanitizeForPrompt would forge a second,
+// unlabelled line into the preamble; through sanitizeSingleLine it stays one
+// line of the CAST record. SceneTargetSchema already rejects control
+// characters on the route path, but buildSystemPreamble is called directly by
+// tests and by the diagnose-only path, so this does not lean on the schema.
+const CAST_LINE_MAX_CHARS = 600;
+const CAST_CONSTRAINT_MAX_CHARS = 240;
+
+function formatCastList(cast: readonly string[], maxChars: number): string {
+  const ids: string[] = [];
+  let used = 0;
+  for (const raw of cast) {
+    const id = sanitizeSingleLine(String(raw), 64);
+    if (!id) continue;
+    const cost = ids.length === 0 ? id.length : id.length + 2;  // ", "
+    if (used + cost > maxChars) break;
+    ids.push(id);
+    used += cost;
+  }
+  return ids.join(', ');
 }
 
 // Convert failing proofs + scene target into LLM constraints.
@@ -90,13 +137,40 @@ export function proofsToConstraints(
       const safeSubj = sanitizeForPrompt(finding.subjectId ?? '', 128);
       const safeMsg  = sanitizeForPrompt(finding.message   ?? '', 300);
       switch (result.proof) {
-        case 'IntentionalProof':
-          constraints.push({
-            kind: 'must_introduce_character',
-            description: `Introduce character "${safeSubj}" with an UPDATE_BELIEF op before referencing them`,
-            detail: safeSubj,
-          });
+        // 2026-09-19 cast-grounding lane. "Introduce character X with an
+        // UPDATE_BELIEF op" is the right instruction when nobody has told the
+        // loop who exists — the IR grounding itself is then the only ground
+        // there is. It is the WRONG instruction the moment a cast is known: it
+        // teaches the generator that inventing a character and emitting a
+        // belief for it is how you satisfy the proof, which is the
+        // self-grounding hole IntentionalProof just closed. With a cast, the
+        // fix the model must make is the opposite one — act through somebody
+        // who exists — so the constraint says that and names them.
+        //
+        // `free_form` deliberately, not a new `kind`: the union is switched on
+        // in no other file (grep: `must_introduce_character` appears only in
+        // this file and in tests/core/core-01.test.ts's assertion about the
+        // no-cast path), and a new member would have to be added to every
+        // enumeration of it for a string that is already carried verbatim into
+        // the prompt by the numbered-constraint renderer below.
+        case 'IntentionalProof': {
+          if (Array.isArray(target.cast)) {
+            const castList = formatCastList(target.cast, CAST_CONSTRAINT_MAX_CHARS);
+            constraints.push({
+              kind: 'free_form',
+              description: castList
+                ? `Character "${safeSubj}" does not exist in this story. Rewrite that op to act on one of the cast: ${castList}. Do not invent a character.`
+                : `Character "${safeSubj}" does not exist in this story, and this story has no cast. Remove that op rather than inventing a character.`,
+            });
+          } else {
+            constraints.push({
+              kind: 'must_introduce_character',
+              description: `Introduce character "${safeSubj}" with an UPDATE_BELIEF op before referencing them`,
+              detail: safeSubj,
+            });
+          }
           break;
+        }
         case 'TemporalProof':
           constraints.push({
             kind: 'must_add_fact',
@@ -198,6 +272,21 @@ export function buildSystemPreamble(
     .map(id => sanitizeForPrompt(id, 64))
     .join(', ') || 'none yet';
   const activeFacts = state.objectiveReality.length;
+
+  // ── Cast (2026-09-19, cast-grounding lane) ────────────────────────────────
+  // The line above is "who state has a belief for" — at scene 0 that is nobody,
+  // and the generator invented names to fill the gap (STORY_BENCH §4b). This
+  // one is "who exists", stated by the caller, and it is the same list
+  // IntentionalProof now grounds against when the caller supplies it, so the
+  // instruction and the proof cannot disagree. Absent (or all-empty after
+  // sanitisation) it renders nothing and the preamble is byte-identical to
+  // what it was.
+  const castList = target?.cast && target.cast.length > 0
+    ? formatCastList(target.cast, CAST_LINE_MAX_CHARS)
+    : '';
+  const castBlock = castList
+    ? `CAST (the only characters who exist; use these ids exactly): ${castList}`
+    : '';
 
   // ── Emotional landscape ────────────────────────────────────────────────────
   const emotionLines = Object.entries(state.characterEmotions)
@@ -424,6 +513,7 @@ export function buildSystemPreamble(
   return [
     'You are a story compiler generating a NarrativeTransitionIR.',
     `Known characters: ${knownChars}. Active facts: ${activeFacts}.`,
+    castBlock,
     stateLines,
     genreBlock,
     '',

@@ -79,8 +79,24 @@ export function runDirName(now = new Date()) {
  * Turn a fixture premise into the SceneTarget[] the converge routes require.
  * This is the step the product does not have; keeping it here, named, is how
  * the bench avoids implying otherwise.
+ *
+ * `cast` (2026-09-19, cast-grounding lane) is the premise's own cast ids, and
+ * sending it CHANGES WHAT THIS BENCH MEASURES. Until this run the bench seeded
+ * those characters with UPDATE_BELIEF ops only at COMMIT of scene 0
+ * (castGroundingOps below), so during convergence of scene 0 the state knew
+ * nobody, and IntentionalProof — which until this lane let a candidate ground
+ * its own invented names — blocked a real cast member referenced before its
+ * belief while passing "Char1" whenever the candidate also invented a belief
+ * for it. With `cast` sent: a cast member referenced at scene 0 is no longer a
+ * block, and an invented name is one even when the candidate grounds it
+ * itself. Tier-1 block counts before and after this commit are therefore not
+ * comparable (docs/audits/2026-09-19-cast-grounding/README.md).
+ *
+ * Omitted entirely for a premise with no cast, because absent and empty mean
+ * different things to the proof (server/lib/validation.ts's note on the field).
  */
 export function beatsToSceneTargets(premise) {
+  const cast = (premise.cast ?? []).map((c) => c.id);
   return premise.beats.map((b, i) => ({
     sceneIdx: i,
     sceneFunction: b.sceneFunction,
@@ -88,6 +104,7 @@ export function beatsToSceneTargets(premise) {
     tensionTarget: b.tensionTarget,
     qualityTarget: 60,
     themeHint: b.themeHint,
+    ...(cast.length > 0 ? { cast } : {}),
   }));
 }
 
