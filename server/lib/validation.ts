@@ -2617,6 +2617,19 @@ export const ReviseBodySchema = z.object({
   title: z.string().max(256).optional(),
 });
 
+// GET /api/nvm/revise-stream's query-string counterpart to ReviseBodySchema
+// above (2026-09-19, revise-deadline lane) — same two fields the SSE route
+// actually reads (`req.query.sessionId` via sessionId(), `?title=`), same
+// bounds, so a malformed value gets the same 400 shape the POST route already
+// gives instead of a 200 SSE stream carrying a generic `revision_error` event.
+// approvedSpans has no query-string equivalent (the SSE route never accepts
+// approved spans — it always calls runRevisionPipeline with []), so it is not
+// part of this schema.
+export const ReviseStreamQuerySchema = z.object({
+  sessionId: sessionIdField,
+  title: z.string().max(256).optional(),
+});
+
 // POST /api/scriptide/doctor — stateless (no sessionId): raw Fountain text OR
 // a Final Draft (.fdx) export in, ScriptDoctorReport out. Callers submit
 // EXACTLY ONE of `fountain` / `fdx` — never both, never neither — enforced by
@@ -3381,6 +3394,30 @@ export function validateParams(schema: z.ZodTypeAny) {
     const result = schema.safeParse(req.params);
     if (!result.success) {
       const msg = result.error.issues[0]?.message ?? 'Invalid request parameters';
+      const path = result.error.issues[0]?.path.join('.') ?? '';
+      res.status(400).json({ error: path ? `${path}: ${msg}` : msg });
+      return;
+    }
+    next();
+  };
+}
+
+// Usage:  app.get('/api/foo', validateQuery(FooQuerySchema), handler)
+// Same 400 shape as validate()/validateParams() above, applied to req.query
+// instead of req.body — for GET routes (e.g. a query-driven SSE stream) that
+// take request-shaping input on the query string rather than a JSON body.
+// (2026-09-19, revise-deadline lane): GET /api/nvm/revise-stream was the
+// first caller — before this it flushed SSE headers and only THEN read
+// req.query inside a try/catch that turned any error, including a malformed
+// value, into a 200-status SSE `*_error` event rather than a clean 400.
+// Running as middleware ahead of the handler fixes that ordering: a bad query
+// is rejected before headers are ever sent, the same way validate() rejects a
+// bad body before a route does any work.
+export function validateQuery(schema: z.ZodTypeAny) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      const msg = result.error.issues[0]?.message ?? 'Invalid query parameters';
       const path = result.error.issues[0]?.path.join('.') ?? '';
       res.status(400).json({ error: path ? `${path}: ${msg}` : msg });
       return;
