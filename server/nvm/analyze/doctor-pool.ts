@@ -262,8 +262,46 @@ let poolDisabled = false;
 /** Why it latched, in one operator-readable sentence — null while it has not.
  *  Reported by doctorPoolStatus() and by GET /health, because before this
  *  lane the latch was observable only as a rising `inProcessRuns`, which an
- *  ordinary deep read produces as well (C10). */
+ *  ordinary deep read produces as well (C10). Sanitized — see
+ *  sanitizeDisabledReason() below (2026-09-19 review finding 7) — before it
+ *  is ever stored, since GET /health is unauthenticated. */
 let poolDisabledReason: string | null = null;
+
+/** Cap on the stored/reported disabled reason (2026-09-19 review finding 7). */
+const DISABLED_REASON_MAX_LEN = 200;
+
+/** An absolute POSIX-style path: two or more `/segment` components in a row.
+ *  Deliberately requires 2+ segments so an incidental single `/` (a fraction
+ *  in prose, a flag like `-1/2`) is never mistaken for a path. */
+const UNIX_ABS_PATH_RE = /(?:\/[\w.@-]+){2,}/g;
+/** An absolute Windows path: a drive letter, colon, backslash, then one or
+ *  more backslash-separated components, stopping at whitespace or a quote —
+ *  the owner's machine is Windows (CLAUDE.md), so this reason can carry one
+ *  of these too. */
+const WINDOWS_ABS_PATH_RE = /[A-Za-z]:\\[^\s'"]+/g;
+
+/**
+ * Strip absolute filesystem paths out of a pool-disabled reason, and cap its
+ * length, before it is ever stored (2026-09-19 review finding 7). The raw
+ * `Error.message` from a failed dynamic import names the FULL absolute path
+ * to both the missing module and to doctor-worker.ts itself — e.g. `Cannot
+ * find module '/home/writer/app/server/nvm/analyze/…ts' imported from
+ * '/home/writer/app/server/nvm/analyze/doctor-worker.ts'` — and
+ * `poolDisabledReason` reaches GET /health, which is unauthenticated: an
+ * operator's server layout should not be legible to anyone who can reach that
+ * route. The module-not-found WORDING ("Cannot find module", "could not load
+ * the doctor module", …) is deliberately left alone — only path segments are
+ * replaced with the literal placeholder `<path>` — so the reason stays
+ * diagnostic (still names the class of failure) without naming the box.
+ */
+function sanitizeDisabledReason(reason: string): string {
+  const withoutPaths = reason
+    .replace(WINDOWS_ABS_PATH_RE, '<path>')
+    .replace(UNIX_ABS_PATH_RE, '<path>');
+  return withoutPaths.length > DISABLED_REASON_MAX_LEN
+    ? withoutPaths.slice(0, DISABLED_REASON_MAX_LEN)
+    : withoutPaths;
+}
 
 /** Latch property (4) ON, once. Idempotent by construction: the guard is what
  *  makes `doctor_pool_disabled` exactly ONE line per process rather than one
@@ -273,8 +311,8 @@ let poolDisabledReason: string | null = null;
 function disablePool(reason: string): void {
   if (poolDisabled) return;
   poolDisabled = true;
-  poolDisabledReason = reason;
-  logger.warn('doctor_pool_disabled', { reason });
+  poolDisabledReason = sanitizeDisabledReason(reason);
+  logger.warn('doctor_pool_disabled', { reason: poolDisabledReason });
 }
 
 /** Test-only: un-latch, so one test file can exercise the environment case
@@ -804,14 +842,27 @@ function respawnWarmWorkerAfterTerminate(reason: 'budget' | 'cancel' | 'purge'):
  * that message's exit-code backstop. Idempotent: disablePool() latches once,
  * dropSlot() is a no-op on a slot already gone, and the job is only settled
  * if the slot still holds one.
+ *
+ * ORDER (2026-09-19 review finding 8): `setBusy(slot, false)` runs BEFORE
+ * `dropSlot(slot)`, not after. Every other settlement path in this file
+ * (finishJob, onRunBudgetExceeded, the abort handler in dispatch()) marks the
+ * slot idle first and only then removes it from `slots` — dropSlot() also
+ * clears the slot's idle timer, and the one place that used to run in the
+ * opposite order left `slots.indexOf(slot)` already `-1` by the time
+ * anything downstream of `setBusy` could act on membership. Nothing here
+ * currently re-arms an idle timer on this path, but matching the order every
+ * other caller uses removes the one place a future edit near either call
+ * could reintroduce a timer racing a slot that is no longer in the pool.
  */
 function handleWorkerEnvironmentFailure(slot: WorkerSlot, reason: string): void {
   const active = slot.active;
-  dropSlot(slot);
-  disablePool(reason);
   if (active) {
     slot.active = undefined;
     setBusy(slot, false);
+  }
+  dropSlot(slot);
+  disablePool(reason);
+  if (active) {
     // Disarm the budget before retrying in-process: from here on there is no
     // worker to terminate, so a budget that fired would reject the caller
     // while the main thread kept running the analysis to completion — the

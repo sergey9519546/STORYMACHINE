@@ -142,8 +142,18 @@ describe('doctor pool — a worker that cannot load the doctor (C9)', () => {
       status.disabledReason ?? '', /could not load the doctor module/,
       'the reason names the load failure rather than a generic worker error',
     );
-    assert.match(status.disabledReason ?? '', /__doctor_module_that_does_not_exist__/,
-      'and carries the underlying loader message');
+    // 2026-09-19 review finding 7: the reason is sanitized before it is ever
+    // stored, so it keeps the module-not-found WORDING ("Cannot find
+    // module") but no longer names the actual file — that used to be an
+    // absolute filesystem path (including this box's directory layout) and
+    // this field reaches the unauthenticated GET /health.
+    assert.match(status.disabledReason ?? '', /Cannot find module/,
+      'the underlying loader wording survives sanitization');
+    assert.doesNotMatch(status.disabledReason ?? '', /__doctor_module_that_does_not_exist__/,
+      'the specific module path is sanitized away, not carried verbatim');
+    assert.match(status.disabledReason ?? '', /<path>/,
+      'sanitized path segments are replaced with the placeholder');
+    assert.ok((status.disabledReason ?? '').length <= 200, 'the reason is capped at 200 chars');
 
     // Both submissions were served on the main thread, and the slot that
     // failed was dropped rather than kept and re-fed (the pre-fix behaviour

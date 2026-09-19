@@ -207,3 +207,110 @@ run, per this lane's instructions.
 Not touched: `server/nvm/revision/rewrite.ts`, `server/nvm/revision/pipeline.ts`,
 `server/lib/validation.ts`, `server/routes/nvm/revision.ts` — all off-limits
 or out of scope for this lane.
+
+## 8. § Review findings fixed (span-check-hardening lane, 2026-09-19)
+
+An adversarial review of this commit (`f70ab07d`) and of the doctor-pool
+lane's commit (`9c25f79a`) found two confirmed defects in
+`approvedSpansSurvive`/`llmRewrite`, fixed on `lane/span-check-hardening`
+from `1e7779de`. Both are additive hardening on top of §2-§6 above; the
+enforcement mechanism, the log-line contract, and the "never log span or
+draft text" guarantee are unchanged.
+
+**Finding 3 (MEDIUM, confirmed) — CRLF originals with an end-of-document
+span false-rejected a correct rewrite.** `approvedSpansSurvive` built the
+excerpt from `originalFountain.split('\n')` *before* `normalizeLineEndings`
+ran, so on a CRLF original every line — including the excerpt's own last
+line — kept its trailing `\r`. Only the *joined* excerpt was normalized
+afterward, which turned that trailing `\r` into a synthesized `\n` the
+source document never actually had at that position. For a span ending the
+document, that meant the check demanded a trailing newline after the locked
+text that the excerpt itself never contained, and an LLM answer with no
+trailing newline (the common case) was rejected as having "lost" text that,
+verbatim, it had not lost at all. Probe (from the review): original
+`"INT. ROOM - DAY\r\nAction one.\r\nLOCKED LINE.\r\n"`, span
+`{startLine:3,endLine:3}`, revision
+`"INT. ROOM - NIGHT\nAction rewritten.\nLOCKED LINE."` (no trailing
+newline) — pre-fix `{ok:false, lost:[0]}`; an equivalent LF original passed.
+**Fix:** normalize the whole document with `normalizeLineEndings` *before*
+`.split('\n')`, so every line — including the last one of an
+end-of-document span — is already LF-only, and the excerpt built by
+`.slice(...).join('\n')` never carries a terminator the source did not put
+there, regardless of whether the original was CRLF, CR, or LF. The owner
+works on Windows (CLAUDE.md), so this is a real-draft case, not a synthetic
+one. `llmRewrite`'s own `lines` (used to build the prompt's "APPROVED — DO
+NOT CHANGE" excerpt in `approvedSpanInstructions`) is normalized the same
+way, so the excerpt the model is shown and the excerpt the survival check
+verifies against are built from identical text — they had been able to
+diverge (CRLF vs. the check's normalized view) before this fix, even though
+nothing depended on that divergence yet.
+
+**Finding 4 (MEDIUM, confirmed) — the check was presence-anywhere, and two
+excerpt shapes passed vacuously.** `normalizedRevised.includes(excerpt)`
+is unfalsifiable for two kinds of excerpt: (a) a span over two (or more)
+blank lines joins to `"\n"`, which `includes` matches against almost any
+multi-line revision — the review reproduced a rewrite that replaced the
+*entire* document passing this check; and (b) a single duplicated line (a
+lone `"CUT TO:"`, a repeated slugline) survives `includes` even when the
+revision deleted one of several identical occurrences and left another one
+standing elsewhere — the "lock" was satisfied by a copy the pass never
+touched, not by the one it was asked to protect. A third case,
+`{startLine:0,endLine:2}`, was already `skipped` (as designed), but
+`ok:true` with nothing actually checked was indistinguishable from
+`ok:true` because everything genuinely survived. **Fixes**, all in
+`approvedSpansSurvive`:
+(i) an excerpt is only checkable if it has at least one non-whitespace
+character (`excerpt.trim().length === 0` → `skipped`, extending the
+existing single-blank-line case to any run of blank lines);
+(ii) the function now returns `checked: number` (`spans.length -
+skipped.length`), and `llmRewrite` treats `approvedSpans.length > 0 &&
+survival.checked === 0` as **not enforced**: it logs
+`revision_rewrite_locked_spans_unchecked` at warn and rejects the rewrite
+with `reason: 'approved_spans_unchecked'`, keeping the original draft — a
+lock the caller asked for but that could not be checked at all must not
+silently read as honored;
+(iii) for an excerpt of at most one non-blank line, the check additionally
+requires the revision's occurrence count of that excerpt to be `>=` the
+original's occurrence count (both counted over the whole normalized
+document, via a small non-overlapping `countOccurrences` helper) — so
+dropping one of two `"CUT TO:"` lines is now caught, while relocating the
+single occurrence elsewhere in the document — allowed by design; this file
+does not enforce position or order — still passes. Multi-line excerpts (two
+or more non-blank lines) keep the plain `includes` check: the trade-off is
+unchanged there, and positional/order enforcement was explicitly out of
+scope for this hardening.
+
+**Trade-off, stated plainly:** `approved_spans_unchecked` is a new way for a
+pass to fall back to the unchanged draft even when the model returned a
+perfectly good rewrite, whenever every approved span it was given happened
+to be malformed or blank-only. That is intentional — a caller who explicitly
+locked a span gets either a verified guarantee or their original text back,
+never a rewrite nobody actually checked against the lock they asked for.
+
+Tests: `tests/core/approved-spans-enforced.test.ts` gained the CRLF/EOF
+probe from finding 3 (plus a "still catches a genuine loss" control), the
+two-blank-line-span and `startLine:0` "rejected as unchecked" cases (pure,
+and live through `rewritePass` with a fake provider), and the
+duplicated-single-line deletion case from finding 4(iii) (plus a relocation
+control proving position is still unenforced by design). Every existing
+full-object `deepEqual` assertion on `approvedSpansSurvive`'s return value
+was updated for the new `checked` field.
+
+Gates (`lane/span-check-hardening`, from `1e7779de`):
+
+| Gate | Result |
+|---|---|
+| `tests/core/approved-spans-enforced.test.ts` | pass — 22/22 (was 15/15 before this hardening) |
+| `tests/core/approved-span-sanitization.test.ts` | pass — 7/7 (unmodified) |
+| `tests/routes/nvm-revision.test.ts` | pass — 12/12 |
+| `tests/routes/nvm-revision-budget.test.ts` | pass — 5/5 |
+| `tests/core/llm-seam-wiring.test.ts` | pass — 7/7 |
+| `tests/core/pure-core-boundary.test.ts` | pass — 6/6 |
+| `npm run lint` (`tsc --noEmit`) | pass, no errors |
+| `npm run check-no-console` | pass — 310 file(s) checked, all proven unreachable |
+| `node scripts/check-scoring-receipt.mjs 1e7779de..HEAD` | pass — "no scoring-path files changed. OK." |
+
+Files touched by this hardening: `server/nvm/revision/rewrite-llm.ts`,
+`tests/core/approved-spans-enforced.test.ts`, this section, and
+`docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md` (one pointer line).
+`rewrite.ts` and `pipeline.ts` were not touched, as before.
