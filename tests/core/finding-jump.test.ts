@@ -142,6 +142,19 @@ describe("finding-jump — root-cause headline and member rules", () => {
     assert.equal(t.kind === "jump" && t.endLine, 40);
   });
 
+  it("names the scene that CONTAINS startLine when that disagrees with sceneIdxs[0]", () => {
+    // The button scrolls to startLine. A cluster whose first member-scene
+    // index is 2 (1-based scene 3) but whose envelope starts in scene 2
+    // must not say "Jump to scene 3" and then land in scene 2.
+    const t = jumpTargetForFinding(
+      { sceneIdxs: [2], startLine: 11, endLine: 40 },
+      SPANS,
+    );
+    assert.equal(t.kind === "jump" && t.label, "Jump to scene 2");
+    assert.equal(t.kind === "jump" && t.startLine, 11);
+    assert.equal(t.kind === "jump" && t.sceneNumber, 2);
+  });
+
   it("gives a document-family root cause (no span) the whole-draft reason", () => {
     const t = jumpTargetForFinding({ sceneIdxs: [], startLine: undefined, endLine: undefined }, SPANS);
     assert.equal(t.kind === "none" && t.reason, NO_LOCATION_DOCUMENT_REASON);

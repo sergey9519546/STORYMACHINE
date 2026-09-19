@@ -456,6 +456,25 @@ before 2026-10-01, the Actions account block, the licence, the visibility
 toggle, and the Node 24 base image. The `audit/2026-09-07/*` tags no longer
 exist anywhere.
 
+**2026-09-07 — feature length, render loop, FindingJump.** Nothing in the
+repository ran at the length the product is for (largest committed Fountain
+was 12 scenes). A 231-scene CC0 assembly landed, and four defects that only
+appear at that length shipped unseen: React #185 from a per-keystroke
+no-op `setSaveStatus` (fixed with `useIdempotentState`; title-page autofill
+and `coverageStale` closed as the same ratchet through other setters);
+Coverage offered one jump control for 554 anchored findings (one
+`FindingJump` now names every finding by its anchor tier, and unlocatable
+ones render a reason instead of nothing); root-cause cards stated two
+counts with one word (issues vs rules, both shown where they differ); the
+appendix "no location" notes were 345 extra tab stops (act-on notes stay
+tab stops; the appendix is not). Round 2 made the browser step fail-first
+(`typeWithoutDrainGaps`) and restored the shape-guard floor round 1 had
+lowered. Round 3 locked the tab-stop split in `P2-featurelen` and in
+`tests/core/finding-jump-tabstops.test.ts` (fail-first: removing
+`jumpFocusable={false}` fails that test). Jump headlines now name the scene
+that contains `startLine` when that disagrees with `sceneIdxs[0]`. GitHub
+Actions remains owner-blocked (jobs die in ~2s with no runner).
+
 **2026-09-06 — current, synced, upgraded.** The owner asked for everything
 still open to be taken care of and the project brought current. Three
 lanes, nine review rounds, none merged on the first pass:

@@ -459,7 +459,13 @@ export default function ScriptIDE({
   const sampleEverInstalledRef = useRef(false);
   // Coverage freshness: after user edits, diagnosis is considered stale until
   // they re-open Coverage / re-run doctor (quiet intelligence, not a nag stack).
-  const [coverageStale, setCoverageStale] = useState(false);
+  // useIdempotentState, not useState (round-3, 2026-09-07): handleScriptChange
+  // writes true on EVERY keystroke, and after the first of a burst that is
+  // the value already held. Same window as saveStatus — mutateDraft has just
+  // put a pending update on this fiber, so React's own same-value bail-out
+  // cannot absorb the repeat. The write stays unconditional (a real
+  // false→true still has to land); only the setter changed.
+  const [coverageStale, setCoverageStale] = useIdempotentState(false);
   /** CoverageSummary's OWN `run()`, published up via its onRegisterRun prop —
    *  null whenever that panel is not mounted. See rerunCoverage below. */
   const coverageRunRef = useRef<(() => void) | null>(null);

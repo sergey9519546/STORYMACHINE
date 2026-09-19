@@ -1,0 +1,3 @@
+# Persona-prompt composition tooling. Prompt Poet's pinned tokenizer supports
+# this environment on Python 3.12.
+prompt-poet==0.0.52

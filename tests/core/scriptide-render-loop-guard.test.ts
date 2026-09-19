@@ -116,6 +116,25 @@ describe("idempotent-state core — a repeat write never reaches the consumer", 
 describe("ScriptIDE render-loop guard — save status never schedules a no-op update", () => {
   const scriptIde = read("../../src/components/ScriptIDE.tsx");
 
+  it("declares coverageStale with useIdempotentState, not a raw useState", () => {
+    // Round-3 (2026-09-07): handleScriptChange writes true on every
+    // keystroke. After the first of a burst that is the value already held,
+    // and mutateDraft has just put a pending update on the same fiber — the
+    // same window React's own bail-out cannot absorb. The write stays
+    // unconditional (see the handleScriptChange assertion below); only the
+    // setter changed.
+    assert.match(
+      scriptIde,
+      /const \[coverageStale, setCoverageStale\] = useIdempotentState\(/,
+      "ScriptIDE.tsx must declare coverageStale via useIdempotentState — a raw useState is the same ratchet as saveStatus through a different setter",
+    );
+    assert.doesNotMatch(
+      scriptIde,
+      /const \[coverageStale, setCoverageStale\] = useState/,
+      "coverageStale must not be a raw useState",
+    );
+  });
+
   it("declares saveStatus with useIdempotentState, not a raw useState", () => {
     assert.match(
       scriptIde,
@@ -196,6 +215,14 @@ describe("ScriptIDE render-loop guard — save status never schedules a no-op up
       [...new Set(setStateCalls)].sort(),
       ["setCoverageStale("],
       `handleScriptChange schedules ${setStateCalls.length} state write(s) beyond mutateDraft: ${[...new Set(setStateCalls)].join(", ")}`,
+    );
+    // The staleness write stays unconditional, straight after mutateDraft —
+    // the fix is useIdempotentState on the declaration, not an
+    // `if (!coverageStale)` guard here (which would also read a stale closure).
+    assert.match(
+      handler[0],
+      /mutateDraft\(text\);[^\n]*\n\s*setCoverageStale\(true\);/,
+      "handleScriptChange must write setCoverageStale(true) unconditionally, directly after mutateDraft",
     );
   });
 });
