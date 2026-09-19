@@ -61,6 +61,40 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # Mirrors ci.yml's step name (tests/core/ci-gates-intact.test.ts requires
+  # every ci.yml step name to have a counterpart here, with an identical run
+  # body). UNLIKE ci.yml, its output is deliberately UNUSED below: neither
+  # `test` nor `browser` in this file gates on it, and both keep running
+  # unconditionally regardless of what this job reports. A release (a `v*`
+  # tag push or a manual workflow_dispatch) is a rare, deliberate, milestone
+  # event, not the frequent small-push case the docs-only fast path exists
+  # for (CLAUDE.md/LANE_STANDARD.md) — correctness matters more than the few
+  # seconds this would save here, so this workflow always runs every gate,
+  # exactly as it did before the fast path existed.
+  classify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Classify changed files (docs-only fast path)
+        id: classify
+        env:
+          DOCS_ONLY_BEFORE_SHA: ${{ github.event.before }}
+          DOCS_ONLY_FORCED: ${{ github.event.forced }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/classify-docs-only.mjs
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -140,6 +174,55 @@ jobs:
         run: |
           set -o pipefail
           npm test 2>&1 | tee test-output.tap
+
+      # Mirrors ci.yml's step name and run body (tests/core/ci-gates-intact.
+      # test.ts requires both). UNCONDITIONAL here — no `if:` — and that is a
+      # decision, re-taken in round 2 after the review measured the cost.
+      #
+      # THE COST: this re-runs, on every release, eighteen files the full
+      # `npm test` above has already run. Measured ~56 s on the lane's sandbox
+      # and 44 s on the runner for the seventeen-file version (run 35301550263,
+      # step 12). Call it 45-60 s per release.
+      #
+      # WHY IT IS STILL UNCONDITIONAL: the only way to skip it is
+      # `if: needs.classify.outputs.docs_only == 'true'`, which requires
+      # `needs: classify` on this job — and that would put the `classify` job
+      # on the release's critical path. `publish` needs `[test, browser]`; a
+      # job skipped because a `needs` dependency FAILED leaves the run at
+      # `failure`, so a broken classifier would turn a tag push into a release
+      # that does not publish, to save under a minute on a milestone event that
+      # happens a few times a year. Keeping `classify` inert here is worth far
+      # more than the 45-60 s. The inertness is not left to this comment:
+      # tests/core/ci-gates-intact.test.ts asserts release.yml contains no
+      # `needs.classify` reference at all, so wiring one in later fails the
+      # build rather than quietly changing what a release depends on.
+      - name: Run docs-gating tests (docs-only fast path)
+        run: |
+          set -e
+          for f in \
+            tests/core/brain-coverage.test.ts \
+            tests/core/claims-row-citations.test.ts \
+            tests/core/coverage-letter.test.ts \
+            tests/core/docs-gating-set.test.ts \
+            tests/core/documentation-truth.test.ts \
+            tests/core/edge-docs-gate.test.ts \
+            tests/core/finding-jump.test.ts \
+            tests/core/honesty-audit-claims.test.ts \
+            tests/core/p0-sample-drift.test.ts \
+            tests/core/public-benchmark.test.ts \
+            tests/core/rule-test-coverage.test.ts \
+            tests/core/rulebook-links.test.ts \
+            tests/core/rulebook.test.ts \
+            tests/core/scoring-receipt-guard.test.ts \
+            tests/core/telemetry-docs-truth.test.ts \
+            tests/routes/root-cause-parity.test.ts \
+            tests/scripts/owner-measure-plan.test.ts \
+            tests/scripts/smoke-gate-serve-mode.test.ts \
+          ; do
+            echo "::group::$f"
+            node --experimental-strip-types "$f"
+            echo "::endgroup::"
+          done
 
       # Mirrors ci.yml's failure-summary step — see that file's comment for
       # the incident (GitHub's ~100 KB job-log truncation hiding a red run's

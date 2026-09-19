@@ -82,9 +82,21 @@ before every push. CI runs lint + test + build on every branch, plus a
   (documented at the site — it cost a real bug hunt).
 - The revision pipeline's 14-pass execution order is still live. The old
   wave-rotation order is retired history — never use it to choose new work.
-- OneDrive hazard: direct file-tool writes to the mounted repo can truncate
-  files and introduce CRLF diff inflation. Edit in a clone, copy back with
-  byte verification, commit via Windows-side git.
+- The owner's checkout is no longer on OneDrive (moved 2026-09-18 to a local,
+  unsynced folder), so edit it in place. The old "edit in a clone, copy back
+  with byte verification" routine existed only because OneDrive sync
+  truncated files and inflated CRLF diffs; it applies again only if a
+  checkout is ever put under a synced folder.
+- Windows (the owner's machine): plain `npm ci` fails. better-sqlite3 ships
+  `binding.gyp` and no install script, so npm runs `node-gyp rebuild`, which
+  aborts with "Could not find any Visual Studio installation" before noticing
+  the package bundles `prebuilds/win32-x64.node`. Use
+  `npm ci --ignore-scripts`, then `npm run setup-hooks` under Git Bash (it is
+  what the skipped `prepare` would have run). Visual Studio is not needed.
+  Tests must hold on Windows too: build repo paths with `/` (not a raw
+  `path.relative`), convert module URLs with `fileURLToPath` (never
+  `new URL(...).pathname`), and remember `kill('SIGTERM')` there is a hard
+  kill that runs no handler.
 - The real-corpus harness (`tests/core/real-script-corpus.test.ts`) is
   env-gated (`REAL_SCRIPT_CORPUS_DIR`); its manifest must be re-locked
   whenever a rule change shifts a produced script's health/verdict/
@@ -95,8 +107,16 @@ before every push. CI runs lint + test + build on every branch, plus a
   issue volume.
 - The sandbox is rebuilt without warning (2026-09-07: every worktree, the
   scratch directory, local tags and an unpushed reviewed lane were erased).
-  Lanes push `lane/<name>` after every commit; reviews are committed under
-  `docs/audits/` before the merge; see `docs/LANE_STANDARD.md` §7.
+  **A commit that exists only in a worktree is not work that exists.** Lanes
+  therefore push `lane/<name>` at meaningful checkpoints — a completed unit
+  of work, before a long-running operation, before handing off to a reviewer,
+  and always before the lane goes idle — and **when in doubt, push**. The
+  cadence is "checkpoints", not "every commit" (Decision #9, 2026-09-18:
+  "remote repositories are meant for milestone synchronization, not real-time
+  keystroke saving"), but the durability property is not relaxed by that, only
+  re-timed: between checkpoints a lane still has everything to lose to the
+  same class of rebuild. Reviews are committed under `docs/audits/` before the
+  merge; see `docs/LANE_STANDARD.md` §7 and `docs/DECISION_LOG.md` Decision #9.
 - Parallel sessions ship concurrently: pull the integration branch and check
   `git log` before starting any implementation work. Do not assume `main` or
   any other branch name; use the current session's designated branch.

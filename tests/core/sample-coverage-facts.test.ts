@@ -61,7 +61,9 @@ describe('the committed sample-coverage facts are what the sample produces today
       'the generated module on disk is not what the generator produces — hand-edited, '
         + 'or the emitter changed without a regeneration',
     );
-    assert.equal(path.relative(REPO, FACTS_FILE), 'src/lib/sample-coverage-facts.ts');
+    // Compared with forward slashes, so this pins WHERE the generator writes
+    // on every OS rather than which separator the OS uses.
+    assert.equal(path.relative(REPO, FACTS_FILE).split(path.sep).join('/'), 'src/lib/sample-coverage-facts.ts');
   });
 
   it('the facts are substantive, not sentinels (a withheld report must not silently pass)', () => {

@@ -28,7 +28,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
-  copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync,
+  copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -62,6 +62,32 @@ function git(repo: string, args: string[]) {
   const res = sh('git', ['-C', repo, ...args]);
   assert.equal(res.status, 0, `git ${args.join(' ')} failed: ${res.stderr}`);
   return res.stdout.trim();
+}
+
+/** node_modules is not cloned; every tool on these trees needs it. On Windows
+ *  this is a directory JUNCTION, which needs no privilege or Developer Mode (a
+ *  symlink does); elsewhere the type argument is ignored and it is the same
+ *  symlink `ln -s` made. The fixtures used to shell out to `ln`, which is not
+ *  on a Windows PATH — the call failed silently and every run then died on
+ *  `Cannot find package 'zod'` inside the clone. `rmSync` in each `after`
+ *  removes the link itself, never the node_modules it points at. */
+function linkNodeModules(repo: string): void {
+  symlinkSync(path.join(REPO, 'node_modules'), path.join(repo, 'node_modules'), 'junction');
+}
+
+/** Every fixture plan's baseline: a branch the fixture pins to its own base
+ *  commit and publishes to the clone's `origin`, exactly as it does its step
+ *  branches. The plans used to read the SOURCE checkout's branch with
+ *  `rev-parse --abbrev-ref HEAD` — which a pull_request CI run answers with the
+ *  literal "HEAD" (it checks out a detached merge commit), so the script went
+ *  looking for `origin/HEAD`, which a clone of a detached repository does not
+ *  have. That failed every PR run (PR #261, run 35402535278: 21 + 4 subtests)
+ *  and no push run, because a push run stands on a named branch. */
+const BASELINE_BRANCH = 'fixture/baseline';
+function pinBaseline(repo: string, sha: string): string {
+  git(repo, ['branch', BASELINE_BRANCH, sha]);
+  git(repo, ['push', '--quiet', 'origin', BASELINE_BRANCH]);
+  return BASELINE_BRANCH;
 }
 
 const REPORT_BRANCH = 'scoring/fixture-report';
@@ -131,8 +157,7 @@ describe('owner:measure end to end, on the committed public corpus', () => {
     git(clone, ['remote', 'set-url', 'origin', clone]);
     git(clone, ['config', 'user.email', 'fixture@example.invalid']);
     git(clone, ['config', 'user.name', 'owner-measure fixture']);
-    // node_modules is not cloned; every tool on these trees needs it.
-    sh('ln', ['-s', path.join(REPO, 'node_modules'), path.join(clone, 'node_modules')]);
+    linkNodeModules(clone);
     for (const rel of UNDER_TEST) copyFileSync(path.join(REPO, rel), path.join(clone, rel));
 
     // The operator's explicit "this checkout is disposable" marker. Fixture
@@ -141,6 +166,7 @@ describe('owner:measure end to end, on the committed public corpus', () => {
     writeFileSync(path.join(clone, '.owner-measure-throwaway'), 'owner-measure e2e fixture\n', 'utf8');
 
     baseSha = git(clone, ['rev-parse', 'HEAD']);
+    const baselineRef = pinBaseline(clone, baseSha);
 
     // The fixture branch: one scoring-path change and one PENDING receipt
     // entry, built in its own worktree so the clone's checkout never stands on
@@ -195,7 +221,7 @@ describe('owner:measure end to end, on the committed public corpus', () => {
       updated: '2026-09-13',
       note: notePath,
       remote: 'origin',
-      baseline: { ref: git(clone, ['rev-parse', '--abbrev-ref', 'HEAD']), reason: 'the fixture baseline, measured first' },
+      baseline: { ref: baselineRef, reason: 'the fixture baseline, measured first' },
       steps: [
         {
           id: 'fixture', branch: FIXTURE_BRANCH, tip: fixtureTip, base: baseSha,
@@ -483,9 +509,10 @@ describe('a REJECTED step: nothing re-locked, the table locked on the baseline',
     git(repo, ['remote', 'set-url', 'origin', repo]);
     git(repo, ['config', 'user.email', 'fixture@example.invalid']);
     git(repo, ['config', 'user.name', 'owner-measure fixture']);
-    sh('ln', ['-s', path.join(REPO, 'node_modules'), path.join(repo, 'node_modules')]);
+    linkNodeModules(repo);
     writeFileSync(path.join(repo, FIXTURE_MARKER), 'throwaway\n', 'utf8');
     const base = git(repo, ['rev-parse', 'HEAD']);
+    const baselineRef = pinBaseline(repo, base);
     const build = path.join(dir, 'build');
     const branch = 'scoring/fixture-reject';
     git(repo, ['worktree', 'add', '--quiet', '-b', branch, build, base]);
@@ -506,7 +533,7 @@ describe('a REJECTED step: nothing re-locked, the table locked on the baseline',
     ].join('\n'), 'utf8');
     writeFileSync(path.join(repo, 'reject-plan.json'), `${JSON.stringify({
       schemaVersion: 1, updated: '2026-09-13', note: notePath, remote: 'origin',
-      baseline: { ref: git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']), reason: 'the baseline' },
+      baseline: { ref: baselineRef, reason: 'the baseline' },
       steps: [{
         id: 'reject-me', branch, tip, base, when: 'always', gate: 'accept-reject',
         reason: 'the step this fixture rejects at the prompt',
@@ -698,6 +725,7 @@ describe('the stale-tip stop', () => {
     const branch = 'scoring/stale-fixture';
     git(repo, ['branch', branch, real]);
     git(repo, ['push', '--quiet', 'origin', branch]);
+    const baselineRef = pinBaseline(repo, real);
 
     const notePath = 'docs/brain/Owner/Owner - Stale Fixture.md';
     writeFileSync(path.join(repo, notePath), [
@@ -706,7 +734,7 @@ describe('the stale-tip stop', () => {
     ].join('\n'), 'utf8');
     writeFileSync(path.join(repo, 'stale-plan.json'), `${JSON.stringify({
       schemaVersion: 1, updated: '2026-09-13', note: notePath, remote: 'origin',
-      baseline: { ref: git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']), reason: 'baseline' },
+      baseline: { ref: baselineRef, reason: 'baseline' },
       steps: [{
         id: 'stale', branch, tip: wrong, base: real, when: 'always',
         gate: 'report', reason: 'a step whose recorded tip is wrong',
@@ -760,7 +788,10 @@ describe('the output directory can never be inside the repository', () => {
   });
   it('accepts an XDG state path, and a home fallback', () => {
     const xdg = resolveOutDir(REPO, { date: '2026-09-13', env: { XDG_STATE_HOME: '/var/state' }, home: '/home/o' });
-    assert.equal(xdg, path.join('/var/state/storymachine/owner-measure/2026-09-13'));
+    // XDG_STATE_HOME is resolved to an absolute path — '/var/state' on POSIX,
+    // '<current drive>:\var\state' on Windows — so the expectation resolves it
+    // the same way instead of assuming a POSIX root.
+    assert.equal(xdg, path.join(path.resolve('/var/state'), 'storymachine/owner-measure/2026-09-13'));
     const home = resolveOutDir(REPO, { date: '2026-09-13', env: {}, home: '/home/o' });
     assert.equal(home, path.join('/home/o/.storymachine/owner-measure/2026-09-13'));
   });

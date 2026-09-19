@@ -30,6 +30,14 @@ README or in `CONTRIBUTING.md` grants it. See `docs/DECISION_LOG.md`
 
 1. Install dependencies:
    `npm install`
+
+   **On Windows without Visual Studio**, that fails at `better-sqlite3`: npm
+   runs its implicit `node-gyp rebuild`, and node-gyp stops at "Could not find
+   any Visual Studio installation" even though the package ships a ready
+   `prebuilds/win32-x64.node` and would compile nothing. Install with
+   `npm ci --ignore-scripts` instead, then run `npm run setup-hooks` from Git
+   Bash (or with `npm_config_script_shell` pointing at Git Bash's `bash.exe`)
+   to install the git hook the skipped `prepare` script would have.
 2. Copy `.env.example` to `.env` and fill in your key:
    `cp .env.example .env`
    Then set `GEMINI_API_KEY` to your Gemini API key — or skip this step

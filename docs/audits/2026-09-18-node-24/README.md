@@ -17,7 +17,7 @@ two pre-existing defects found along the way, which it does not fix.
 
 | file | change |
 |---|---|
-| `.github/workflows/ci.yml` (×2), `release.yml` (×2), `security.yml`, `calibrate-voice-bound.yml` | `node-version: "22"` → `"24"`; `security.yml`'s "matches ci.yml conventions (Node 22 …)" comment |
+| `.github/workflows/ci.yml` (×3), `release.yml` (×3), `security.yml`, `calibrate-voice-bound.yml` | `node-version: "22"` → `"24"`; `security.yml`'s "matches ci.yml conventions (Node 22 …)" comment. The third step in each of `ci.yml` and `release.yml` is the `classify` job the docs fast-path lane added while this PR was open, merged in still pinned to 22 |
 | `Dockerfile` | `FROM node:22-alpine` → `node:24-alpine` in `deps`, `builder` and `runner`; the comments that describe the current base (the toolchain it lacks, the libc-consistency rule, the `node` user) |
 | `.github/workflows/edge.yml` | the comment that described the base image, which now names both the historical base and the current one |
 | `README.md`, `CONTRIBUTING.md` | "CI pins Node 22" → "CI and the Docker image pin Node 24 LTS" |
@@ -272,13 +272,18 @@ shown **red on unfixed input** before being shown green:
 | helper returning `[]` (Node's own default) | 3 pass, **2 fail** (the helper pin and the piped-TAP check) |
 | this lane | 5 pass |
 
-Open PR #261 (`fix/test-runner-enametoolong`) rewrites the same spawn into
-`runTestBatches({ flags: ['--experimental-strip-types', '--test'], … })`.
-Whichever merges second resolves that by putting
+PR #261 (`fix/test-runner-enametoolong`) merged first and rewrote the same
+spawn into `runTestBatches({ flags: ['--experimental-strip-types', '--test'], … })`.
+The merge of `main` into this lane puts
 `...testReporterFlags(process.stdout.isTTY)` after `'--test'` in `flags`,
-where the spawn-arguments check still matches. That PR's
-`scripts/lib/test-batches.mjs` header also says "CI tees the combined output
-into one TAP file", which is only true with this fix.
+where the spawn-arguments check still matches. #261's
+`tests/scripts/run-tests-spawn.test.ts` read every spawn argument after
+`['--experimental-strip-types', '--test']` as a test file, so it failed on
+the merged runner ("every file argument must exist", 17 pass / 1 fail). It
+now expects `[...FLAGS, ...testReporterFlags(false)]` (the test pipes the
+runner's stdout) and passes 18 of 18. #261's `scripts/lib/test-batches.mjs`
+header says "CI tees the combined output into one TAP file", which is
+only true on Node 23+ with this fix.
 
 ---
 

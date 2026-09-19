@@ -1,12 +1,14 @@
-import { spawnSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import { runTestBatches, toTestArgs } from './lib/test-batches.mjs';
 import { testReporterFlags } from './lib/test-reporter.mjs';
 
 // Keep the suite boundary explicit: experimental engine/V5 test trees are not
 // part of the current P0 research gate. Passing literal glob strings to Node's
 // test runner runs zero tests on Windows, so discover the intended files here
-// and pass concrete paths directly to Node.
+// and pass concrete paths directly to Node — repo-relative, glob-free, and in
+// more than one spawn once one command line would be too long for Windows
+// (scripts/lib/test-batches.mjs says why each of those holds).
 //
 // WHY THE COVERAGE CHECK BELOW EXISTS: this list is what `npm test` means, and
 // a test file that is not under one of these roots does not run — silently. An
@@ -180,11 +182,9 @@ if (NOT_RUN.length > 0) {
 // The reporter is named, not left to node:test's default: Node 23+ defaults to
 // `spec` even when piped, and CI's failure summary reads this output as TAP.
 // scripts/lib/test-reporter.mjs has the measurement.
-const result = spawnSync(
-  process.execPath,
-  ['--experimental-strip-types', '--test', ...testReporterFlags(process.stdout.isTTY), ...testFiles],
-  { stdio: 'inherit' },
-);
-
-if (result.error) throw result.error;
-process.exitCode = result.status ?? 1;
+process.exitCode = runTestBatches({
+  command: process.execPath,
+  flags: ['--experimental-strip-types', '--test', ...testReporterFlags(process.stdout.isTTY)],
+  files: toTestArgs(REPO_ROOT, testFiles),
+  cwd: REPO_ROOT,
+});
