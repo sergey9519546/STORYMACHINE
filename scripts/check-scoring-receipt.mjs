@@ -428,6 +428,157 @@ export function addedReceiptLines(range) {
 }
 
 // ---------------------------------------------------------------------------
+// In-place rewrites: an entry whose OWN heading line was not touched
+// ---------------------------------------------------------------------------
+//
+// BUG FOUND 2026-09-19 (docs/audits/2026-09-19-receipt-gate-inplace/): every
+// function above builds an "entry" purely from the CONTENT of lines a diff
+// added, in file order, with grouping starting only at a `###` heading among
+// THOSE lines. That is exactly right for a brand-new entry (100% of its lines
+// are added), but it silently drops an EXISTING entry whose fields were
+// rewritten in place while its heading text stayed byte-identical — the
+// heading is unchanged, so `git diff --unified=0` never emits it as a `+`
+// line, so it never starts a group, so every field line changed underneath it
+// is either (a) orphaned — added before any recognized heading, and
+// `extractEntries()`'s own docstring says lines there "belong to no entry and
+// are ignored" — or (b), worse, misattributed to whatever LATER heading the
+// diff stream happens to hit next.
+//
+// Reproduced two ways in the audit's fixtures: alone, a body-only rewrite of
+// a still-PENDING-headed entry correctly still fails the range (no entry is
+// ever recognized, so "gained no new entry" fires) — safe, but for the wrong
+// reason, and it stops being safe the moment a SECOND, genuinely well-formed
+// entry is anywhere else in the same range. With that second entry present,
+// `extractEntries()` finds exactly one entry (the second one), it validates
+// clean, and `checkReceiptForRange` returns `ok: true` — a scoring-path range
+// where the only entry it actually inspected has nothing to do with the
+// change, while an entry whose heading STILL reads PENDING sits right there
+// in the file, never once passed to `validateEntry`. That is a false pass.
+//
+// The fix does not touch how a brand-new entry is found — `extractEntries()`
+// keeps doing exactly that. It adds a second, independent detector that finds
+// entries the first one cannot see: it reads the diff's HUNK HEADERS (not
+// their content) to get the changed line NUMBERS in the range's target
+// tree, reads that tree's FULL current receipt text, and asks which entries'
+// line SPANS (heading through the line before the next heading) overlap a
+// changed line number. An entry found this way is validated against its
+// FULL current body, not a partial diff view, and any entry `extractEntries`
+// already recognized is skipped here so the two detectors never double-count
+// the same entry.
+
+/** Parse `@@ -a,b +c,d @@` hunk headers from a `--unified=0` diff of ONE file
+ *  into the NEW-file 1-indexed line ranges each hunk touches (the `+c,d`
+ *  side). `d` omitted means 1 line; `d` present as `0` is a pure-deletion
+ *  hunk, whose single insertion POINT is `c` — that point is still reported
+ *  (as the single-line range `[c, c]`) so a line removed without a
+ *  replacement is not invisible to the overlap check below. */
+export function parseUnifiedZeroHunks(diffText) {
+  const ranges = [];
+  const HUNK_RE = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/;
+  for (const line of diffText.split('\n')) {
+    const m = HUNK_RE.exec(line);
+    if (!m) continue;
+    const start = Number(m[1]);
+    const count = m[2] === undefined ? 1 : Number(m[2]);
+    ranges.push(count === 0 ? [start, start] : [start, start + count - 1]);
+  }
+  return ranges;
+}
+
+/** The right-hand ref of a two-point range (`A..B` / `A...B`), defaulting to
+ *  `HEAD` when it is omitted — git's own default for an open-ended range.
+ *  Returns null for a single-ref range, which diffs against the working tree
+ *  instead (see `isSingleRefRange`). */
+export function rangeRightRef(range) {
+  if (isSingleRefRange(range)) return null;
+  const m = range.match(/\.\.\.?(.*)$/);
+  const right = m ? m[1].trim() : '';
+  return right || 'HEAD';
+}
+
+/** The receipt file's full text on the NEW side of `range`: the working tree
+ *  for a single-ref range (which is what it is diffed against), or the
+ *  content at the range's right-hand ref for a two-point range — the exact
+ *  tree `git diff --unified=0 range`'s `+` side line numbers are relative to.
+ *  Returns null when the file does not exist there. */
+function receiptTargetText(range) {
+  if (isSingleRefRange(range)) {
+    const abs = path.join(ROOT, RECEIPT_PATH);
+    return existsSync(abs) ? readFileSync(abs, 'utf8') : null;
+  }
+  try {
+    return git(['show', `${rangeRightRef(range)}:${RECEIPT_PATH}`]);
+  } catch {
+    return null;
+  }
+}
+
+/** Every entry in `lines` (the FULL file, not just added lines), with its
+ *  0-indexed `[start, end)` span: `start` is the heading's own index, `end`
+ *  is the index of the next heading (or `lines.length`). Unlike
+ *  `extractEntries()`, this sees an entry whose heading text is unchanged.
+ *
+ *  Also computes `contentEnd`: `end` with any trailing BLANK lines trimmed
+ *  off. This is what the overlap check below actually uses, and it is not a
+ *  cosmetic nicety — measured 2026-09-19 (docs/audits/2026-09-19-receipt-
+ *  gate-inplace/): appending a brand-new entry right after an untouched one
+ *  inserts a blank separator line ahead of the new heading, and that
+ *  inserted blank line's line NUMBER falls, by plain index arithmetic,
+ *  inside the PRECEDING entry's `[start, end)` span — so the overlap check
+ *  read a clean append of an unrelated entry as an in-place edit of the one
+ *  before it, and (with `alreadyRecognized` correctly excluding the new
+ *  entry it belongs to) validated that unrelated, untouched entry as if this
+ *  range had rewritten it. `contentEnd` excludes exactly that separator, so
+ *  a hunk that touches nothing but the blank line ahead of a new heading no
+ *  longer overlaps the entry above it. */
+function entriesWithSpans(lines) {
+  const entries = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = ENTRY_HEADING_RE.exec(lines[i].trim());
+    if (!m) continue;
+    if (entries.length > 0) entries[entries.length - 1].end = i;
+    entries.push({ date: m[1], heading: lines[i].trim(), start: i, end: lines.length });
+  }
+  for (const entry of entries) {
+    let contentEnd = entry.end;
+    while (contentEnd > entry.start + 1 && lines[contentEnd - 1].trim() === '') contentEnd--;
+    entry.contentEnd = contentEnd;
+  }
+  return entries;
+}
+
+/** Entries the range modified in place without touching their own heading
+ *  line — see the section header above for why these are otherwise
+ *  invisible. `alreadyRecognized` is the set of heading strings
+ *  `extractEntries()` already found in this same range; an entry here is
+ *  skipped when its heading is in that set, so the two detectors never
+ *  report the same entry twice. Returns `{ heading, lines }` objects shaped
+ *  exactly like `extractEntries()`'s, but with the entry's FULL current body
+ *  (every field, not only the ones this range's diff happened to change). */
+function entriesModifiedInPlace(range, alreadyRecognized) {
+  let diffText;
+  try {
+    diffText = git(['diff', '--unified=0', range, '--', RECEIPT_PATH]);
+  } catch {
+    return [];
+  }
+  const hunkRanges = parseUnifiedZeroHunks(diffText);
+  if (hunkRanges.length === 0) return [];
+  const targetText = receiptTargetText(range);
+  if (targetText === null) return [];
+  const lines = targetText.split('\n');
+  const found = [];
+  for (const span of entriesWithSpans(lines)) {
+    if (alreadyRecognized.has(span.heading)) continue;
+    const spanStart1 = span.start + 1; // 1-indexed heading line number
+    const spanEnd1 = span.contentEnd; // 1-indexed number of the entry's last NON-BLANK line
+    const overlaps = hunkRanges.some(([hs, he]) => hs <= spanEnd1 && he >= spanStart1);
+    if (overlaps) found.push({ heading: span.heading, lines: lines.slice(span.start + 1, span.end) });
+  }
+  return found;
+}
+
+// ---------------------------------------------------------------------------
 // Receipt entry validation
 // ---------------------------------------------------------------------------
 //
@@ -703,7 +854,13 @@ export function checkReceiptForRange(range, opts = {}) {
     return { ok: false, problems: [`${RECEIPT_PATH} gained no content in this range.`] };
   }
   const entries = extractEntries(addedReceiptLines(range));
-  if (entries.length === 0) {
+  // See "In-place rewrites" above: an entry rewritten in place without
+  // touching its own heading line is invisible to `entries` above no matter
+  // how thoroughly its fields changed. `inPlace` finds those by line-number
+  // overlap against the target tree's full entry spans instead of by diff
+  // content, and skips anything `entries` already recognized.
+  const inPlace = entriesModifiedInPlace(range, new Set(entries.map((e) => e.heading)));
+  if (entries.length === 0 && inPlace.length === 0) {
     return {
       ok: false,
       problems: [
@@ -715,7 +872,7 @@ export function checkReceiptForRange(range, opts = {}) {
   }
   if (structuralOnly) return { ok: true, problems: [] };
   const problems = [];
-  for (const entry of entries) {
+  for (const entry of [...entries, ...inPlace]) {
     for (const p of validateEntry(entry, entryOpts)) problems.push(`${entry.heading}\n      ${p}`);
   }
   return { ok: problems.length === 0, problems };
