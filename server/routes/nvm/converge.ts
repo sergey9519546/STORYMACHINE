@@ -255,7 +255,38 @@ router.get('/api/nvm/converge-stream', aiLimiter, withSessionCommand(async (req,
     const raced = await withDeadline(operation, CONVERGE_BUDGET.timeoutMs);
     if (raced.timedOut) {
       emitSSE({ type: 'converge_error', error: 'ai_budget_exceeded' });
-      await operation.catch(() => {});
+      // NOT `await`ed. Mirrors server/routes/nvm/revision.ts's identical fix
+      // for GET /api/nvm/revise-stream (520a3891; docs/audits/2026-09-19-
+      // revise-deadline/README.md §2, §4, which named this exact branch as a
+      // follow-up rather than fixing it there). ensureEnded() is what
+      // actually closes this SSE response; awaiting the abandoned
+      // `operation` here first would hold res.end() until the underlying
+      // provider call itself settles — for a truly hung call (the exact
+      // failure this budget exists to bound) that is "never", leaving the
+      // client's stream open long after it already received the terminal
+      // error event.
+      //
+      // COORDINATOR SAFETY (why this is safe despite this route, unlike
+      // revise-stream, being withSessionCommand-wrapped — see this file's
+      // header): convergeScene() (server/nvm/converge/loop.ts) takes a plain
+      // NarrativeState value, not Stage, and never imports Stage or the
+      // session's SQLite handle — it is pure computation over its arguments.
+      // The ONLY code on this route that writes to Stage is the
+      // appendGhost() loop below, which runs strictly AFTER
+      // `const result = raced.value;` — i.e. only on the non-timeout success
+      // path, inside this same function call. On a timeout we return before
+      // ever reaching it, and the abandoned `operation` promise has no
+      // `.then()` continuation that would read its eventually-resolved
+      // ghosts (`.catch(() => {})` only swallows a rejection, so it can never
+      // become an unhandled rejection) — so even if `operation` settles after
+      // this handler has returned, its result is discarded and no Stage
+      // write ever happens because of it. SessionCommandCoordinator's "the
+      // next queued command is never admitted before this one's Stage writes
+      // are done" guarantee therefore still holds on this path: this command
+      // makes zero Stage writes when it times out, whether `operation` is
+      // awaited here or not.
+      operation.catch(() => {});
+      ensureEnded();
       return;
     }
     const result = raced.value;
