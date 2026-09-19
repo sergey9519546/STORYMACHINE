@@ -43,7 +43,10 @@ import type { NarrativeTransitionIR } from '../ir/NarrativeTransitionIR.ts';
 import type { NarrativeState } from '../state/NarrativeState.ts';
 import type { StoryOp } from '../ops/StoryOp.ts';
 import type { SceneTarget } from '../generate/proof-spec.ts';
-import { knownCharacters, charsReferenced } from '../proof/tier1/intentional.ts';
+import {
+  knownCharacters, charsReferenced,
+  type IntentionalGroundingOptions,
+} from '../proof/tier1/intentional.ts';
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 import { logger } from '../../lib/logger.ts';
 import {
@@ -91,6 +94,16 @@ export interface CastAlignmentOutcome {
 export interface CastAlignmentContext {
   /** The scene being generated; supplies the small amount of scene context sent. */
   target?: SceneTarget;
+  /**
+   * What IntentionalProof will treat as grounded for this candidate
+   * (2026-09-19, cast-grounding lane). The caller passes the SAME object it
+   * passes to runTier1, so the options this step offers are exactly the names
+   * the proof accepts. Omitted, the set is what it always was: state's
+   * characters plus the candidate's own UPDATE_BELIEF charIds — which at scene
+   * 0 is nothing to align TO, and is why this step reported
+   * `nothing_to_align` on precisely the scenes the bench lost.
+   */
+  grounding?: IntentionalGroundingOptions;
   /** Caller deadline, forwarded to the adapter alongside its own 10 s timeout. */
   signal?: AbortSignal;
 }
@@ -211,8 +224,9 @@ export async function alignCandidateCast(
 ): Promise<CastAlignmentOutcome> {
   if (!castAlignmentEnabled()) return skip(ir, 'disabled', []);
 
-  // The SAME set IntentionalProof blocks on — imported, not re-derived.
-  const known = knownCharacters(ir, state);
+  // The SAME set IntentionalProof blocks on — imported, not re-derived, and
+  // given the same grounding options the proof will be given.
+  const known = knownCharacters(ir, state, ctx.grounding);
   const unknown: string[] = [];
   for (const op of ir.ops) {
     for (const charId of charsReferenced(op)) {

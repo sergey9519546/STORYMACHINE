@@ -130,6 +130,41 @@ describe('story-bench fixture', () => {
       });
     }
   });
+
+  // 2026-09-19 cast-grounding lane. Every target carries the premise's cast
+  // ids, because IntentionalProof now grounds against what the CALLER says
+  // exists instead of against the candidate under judgment
+  // (server/nvm/proof/tier1/intentional.ts). Without this field the bench keeps
+  // measuring the old behaviour: an invented "Char1" passes if the candidate
+  // also invents a belief for it, and a real cast member referenced at scene 0
+  // — before castGroundingOps has committed anything — is blocked.
+  it('every scene target carries the premise cast ids, and they are the ones castGroundingOps grounds', () => {
+    for (const p of FIXTURE.premises) {
+      const castIds = (p.cast as Array<{ id: string }>).map((c) => c.id);
+      const targets = bench.beatsToSceneTargets(p);
+      assert.ok(targets.length > 0, `${p.id}: no scene targets at all`);
+      for (const t of targets) {
+        assert.deepEqual(t.cast, castIds, `${p.id}: every beat's target must carry the whole cast`);
+      }
+      // The same ids the commit-time grounding ops use — one cast, not two.
+      const groundedIds = bench.castGroundingOps(p).map((o) => o.charId);
+      assert.deepEqual(groundedIds, castIds, `${p.id}: cast ids must match castGroundingOps`);
+      // And the shape SceneTargetSchema accepts (server/lib/validation.ts).
+      for (const id of castIds) {
+        assert.ok(id.length > 0 && id.length <= 64, `${p.id}: cast id "${id}" is out of the schema's bounds`);
+        assert.ok(!/[\n\t]/.test(id), `${p.id}: cast id "${id}" must be a single line`);
+      }
+      assert.ok(castIds.length <= 64, `${p.id}: ${castIds.length} cast members exceeds the schema cap`);
+    }
+  });
+
+  it('a premise with no cast sends no `cast` field at all — absent and empty are different to the proof', () => {
+    const p = JSON.parse(JSON.stringify(FIXTURE.premises[0])) as Record<string, unknown>;
+    delete p.cast;
+    for (const t of bench.beatsToSceneTargets(p)) {
+      assert.equal('cast' in t, false, 'an absent cast must stay absent, not become []');
+    }
+  });
 });
 
 describe('story-bench cast grounding', () => {

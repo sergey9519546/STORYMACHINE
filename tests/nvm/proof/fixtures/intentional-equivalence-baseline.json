@@ -1,0 +1,850 @@
+{
+  "no-character-ops|empty": [
+    {
+      "proof": "TemporalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "CausalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "IntentionalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "MechanismProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "EpistemicProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ContinuityProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ProvenanceProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "transition is not attributable",
+      "findings": [
+        {
+          "proof": "ProvenanceProof",
+          "severity": "block",
+          "message": "transition has no creation timestamp",
+          "subjectId": "eq-1"
+        }
+      ]
+    },
+    {
+      "proof": "EarnedRevealProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    }
+  ],
+  "self-grounding-invented-name|empty": [
+    {
+      "proof": "TemporalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "CausalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "IntentionalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "MechanismProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "EpistemicProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ContinuityProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ProvenanceProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "transition is not attributable",
+      "findings": [
+        {
+          "proof": "ProvenanceProof",
+          "severity": "block",
+          "message": "transition has no creation timestamp",
+          "subjectId": "eq-2"
+        }
+      ]
+    },
+    {
+      "proof": "EarnedRevealProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    }
+  ],
+  "reference-only-real-cast|empty": [
+    {
+      "proof": "TemporalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "CausalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "IntentionalProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "an op acts on a character not in the narrative",
+      "findings": [
+        {
+          "proof": "IntentionalProof",
+          "severity": "block",
+          "message": "op[0] APPRAISE_EMOTION references ungrounded character \"MAYA\"",
+          "subjectId": "MAYA",
+          "opIdx": 0
+        },
+        {
+          "proof": "IntentionalProof",
+          "severity": "block",
+          "message": "op[1] SHIFT_RELATIONSHIP references ungrounded character \"MAYA\"",
+          "subjectId": "MAYA",
+          "opIdx": 1
+        },
+        {
+          "proof": "IntentionalProof",
+          "severity": "block",
+          "message": "op[1] SHIFT_RELATIONSHIP references ungrounded character \"DEV\"",
+          "subjectId": "DEV",
+          "opIdx": 1
+        }
+      ]
+    },
+    {
+      "proof": "MechanismProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "EpistemicProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ContinuityProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ProvenanceProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "transition is not attributable",
+      "findings": [
+        {
+          "proof": "ProvenanceProof",
+          "severity": "block",
+          "message": "transition has no creation timestamp",
+          "subjectId": "eq-3"
+        }
+      ]
+    },
+    {
+      "proof": "EarnedRevealProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    }
+  ],
+  "one-grounded-one-referenced|empty": [
+    {
+      "proof": "TemporalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "CausalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "IntentionalProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "an op acts on a character not in the narrative",
+      "findings": [
+        {
+          "proof": "IntentionalProof",
+          "severity": "block",
+          "message": "op[1] APPRAISE_EMOTION references ungrounded character \"MAYA\"",
+          "subjectId": "MAYA",
+          "opIdx": 1
+        }
+      ]
+    },
+    {
+      "proof": "MechanismProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "EpistemicProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ContinuityProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ProvenanceProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "transition is not attributable",
+      "findings": [
+        {
+          "proof": "ProvenanceProof",
+          "severity": "block",
+          "message": "transition has no creation timestamp",
+          "subjectId": "eq-4"
+        }
+      ]
+    },
+    {
+      "proof": "EarnedRevealProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    }
+  ],
+  "relationship-with-unknown-half|empty": [
+    {
+      "proof": "TemporalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "CausalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "IntentionalProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "an op acts on a character not in the narrative",
+      "findings": [
+        {
+          "proof": "IntentionalProof",
+          "severity": "block",
+          "message": "op[0] SHIFT_RELATIONSHIP references ungrounded character \"MAYA\"",
+          "subjectId": "MAYA",
+          "opIdx": 0
+        },
+        {
+          "proof": "IntentionalProof",
+          "severity": "block",
+          "message": "op[0] SHIFT_RELATIONSHIP references ungrounded character \"THE STRANGER\"",
+          "subjectId": "THE STRANGER",
+          "opIdx": 0
+        }
+      ]
+    },
+    {
+      "proof": "MechanismProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "EpistemicProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ContinuityProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ProvenanceProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "transition is not attributable",
+      "findings": [
+        {
+          "proof": "ProvenanceProof",
+          "severity": "block",
+          "message": "transition has no creation timestamp",
+          "subjectId": "eq-5"
+        }
+      ]
+    },
+    {
+      "proof": "EarnedRevealProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    }
+  ],
+  "mixed-with-invented-name|empty": [
+    {
+      "proof": "TemporalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "CausalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "IntentionalProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "an op acts on a character not in the narrative",
+      "findings": [
+        {
+          "proof": "IntentionalProof",
+          "severity": "block",
+          "message": "op[1] APPRAISE_EMOTION references ungrounded character \"DEV\"",
+          "subjectId": "DEV",
+          "opIdx": 1
+        },
+        {
+          "proof": "IntentionalProof",
+          "severity": "block",
+          "message": "op[2] SHIFT_RELATIONSHIP references ungrounded character \"DEV\"",
+          "subjectId": "DEV",
+          "opIdx": 2
+        }
+      ]
+    },
+    {
+      "proof": "MechanismProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "EpistemicProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ContinuityProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ProvenanceProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "transition is not attributable",
+      "findings": [
+        {
+          "proof": "ProvenanceProof",
+          "severity": "block",
+          "message": "transition has no creation timestamp",
+          "subjectId": "eq-6"
+        }
+      ]
+    },
+    {
+      "proof": "EarnedRevealProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    }
+  ],
+  "no-character-ops|maya-dev": [
+    {
+      "proof": "TemporalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "CausalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "IntentionalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "MechanismProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "EpistemicProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ContinuityProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ProvenanceProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "transition is not attributable",
+      "findings": [
+        {
+          "proof": "ProvenanceProof",
+          "severity": "block",
+          "message": "transition has no creation timestamp",
+          "subjectId": "eq-1"
+        }
+      ]
+    },
+    {
+      "proof": "EarnedRevealProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    }
+  ],
+  "self-grounding-invented-name|maya-dev": [
+    {
+      "proof": "TemporalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "CausalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "IntentionalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "MechanismProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "EpistemicProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ContinuityProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ProvenanceProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "transition is not attributable",
+      "findings": [
+        {
+          "proof": "ProvenanceProof",
+          "severity": "block",
+          "message": "transition has no creation timestamp",
+          "subjectId": "eq-2"
+        }
+      ]
+    },
+    {
+      "proof": "EarnedRevealProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    }
+  ],
+  "reference-only-real-cast|maya-dev": [
+    {
+      "proof": "TemporalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "CausalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "IntentionalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "MechanismProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "EpistemicProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ContinuityProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ProvenanceProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "transition is not attributable",
+      "findings": [
+        {
+          "proof": "ProvenanceProof",
+          "severity": "block",
+          "message": "transition has no creation timestamp",
+          "subjectId": "eq-3"
+        }
+      ]
+    },
+    {
+      "proof": "EarnedRevealProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    }
+  ],
+  "one-grounded-one-referenced|maya-dev": [
+    {
+      "proof": "TemporalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "CausalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "IntentionalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "MechanismProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "EpistemicProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ContinuityProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ProvenanceProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "transition is not attributable",
+      "findings": [
+        {
+          "proof": "ProvenanceProof",
+          "severity": "block",
+          "message": "transition has no creation timestamp",
+          "subjectId": "eq-4"
+        }
+      ]
+    },
+    {
+      "proof": "EarnedRevealProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    }
+  ],
+  "relationship-with-unknown-half|maya-dev": [
+    {
+      "proof": "TemporalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "CausalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "IntentionalProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "an op acts on a character not in the narrative",
+      "findings": [
+        {
+          "proof": "IntentionalProof",
+          "severity": "block",
+          "message": "op[0] SHIFT_RELATIONSHIP references ungrounded character \"THE STRANGER\"",
+          "subjectId": "THE STRANGER",
+          "opIdx": 0
+        }
+      ]
+    },
+    {
+      "proof": "MechanismProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "EpistemicProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ContinuityProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ProvenanceProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "transition is not attributable",
+      "findings": [
+        {
+          "proof": "ProvenanceProof",
+          "severity": "block",
+          "message": "transition has no creation timestamp",
+          "subjectId": "eq-5"
+        }
+      ]
+    },
+    {
+      "proof": "EarnedRevealProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    }
+  ],
+  "mixed-with-invented-name|maya-dev": [
+    {
+      "proof": "TemporalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "CausalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "IntentionalProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "MechanismProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "EpistemicProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ContinuityProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    },
+    {
+      "proof": "ProvenanceProof",
+      "tier": 1,
+      "pass": false,
+      "reason": "transition is not attributable",
+      "findings": [
+        {
+          "proof": "ProvenanceProof",
+          "severity": "block",
+          "message": "transition has no creation timestamp",
+          "subjectId": "eq-6"
+        }
+      ]
+    },
+    {
+      "proof": "EarnedRevealProof",
+      "tier": 1,
+      "pass": true,
+      "reason": "ok",
+      "findings": []
+    }
+  ]
+}

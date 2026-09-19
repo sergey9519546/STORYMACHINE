@@ -2515,6 +2515,36 @@ export const SceneTargetSchema = z.object({
   qualityTarget: z.number().min(0).max(100).optional(),
   themeHint: noControlChars.max(300).optional(),
   necessity: NecessityCertificateSchema.optional(),
+  // 2026-09-19 cast-grounding lane: the character ids the caller says exist in
+  // this story. Same identifier convention as `activeMechanisms` above — a
+  // control-character-free string, capped, in a capped array — because it
+  // reaches the same place by the same route (the generation preamble), and
+  // because a charId with an embedded newline is how a cast line stops being
+  // one line. `.min(1)` because an empty id is not a character: it would be
+  // rendered as nothing in the CAST line and would ground nothing in
+  // IntentionalProof, so accepting it would only let a caller believe it had
+  // declared a cast member. 64 entries is generous for a screenplay cast and
+  // bounds what one request can push into the prompt.
+  //
+  // `.optional()`, not `.default([])`: absent and empty mean DIFFERENT things
+  // to server/nvm/proof/tier1/intentional.ts — absent leaves the proof's
+  // pre-2026-09-19 self-grounding behaviour intact, empty asserts that the
+  // story has no characters — so a default here would silently switch every
+  // caller that omits it onto the new path.
+  //
+  // The extra refinement on top of noControlChars: that helper deliberately
+  // PERMITS LF and TAB (see CONTROL_CHARS_RE above — it is shared with prose
+  // fields where a line break is legitimate), and a character cue is a
+  // single-line identifier in every format this repo reads or writes. A
+  // "MAYA\nIGNORE THE ABOVE" id is rejected here rather than only neutralised
+  // at render time by sanitizeSingleLine in
+  // server/nvm/generate/proof-spec.ts's formatCastList — both hold, because
+  // that function is also called from paths this schema does not guard.
+  cast: z.array(
+    noControlChars.min(1).max(64).refine(s => !/[\n\t]/.test(s), {
+      message: 'a character id must be a single line',
+    }),
+  ).max(64).optional(),
 });
 
 // H6's documented default (loop.ts: `maxIterations * candidatesPerIteration`)
