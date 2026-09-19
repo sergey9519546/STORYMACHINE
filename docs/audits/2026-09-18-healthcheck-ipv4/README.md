@@ -205,7 +205,22 @@ has no registered Visual Studio; see PR #264's audit record, Finding C):
 `check-scoring-receipt origin/main..HEAD`: no scoring-path files changed ·
 `tests/core/healthcheck-address.test.ts` 17/17 ·
 `tests/core/dockerfile-toolchain.test.ts` 25/25.
-The full suite and CI runs are recorded in the PR.
+
+Full `npm test` once, on the final tree rebased onto `main@7527a125` (which
+carries #261, #262 and #263): **14,202 tests, 0 fail, 92 skipped, exit 0**,
+on Windows. `check-brain` is fresh on Linux and on Windows alike, now that
+#262 makes the two generate the same graph.
+
+**One CI note about the rebase.** Rebasing a pushed lane branch means a
+force-push, and the push run for that force-push fails "Scoring-path change
+requires a measurement receipt" with `NO BASE REF to diff against`: the
+pushed `before` SHA is the pre-rebase commit, which the CI checkout does not
+contain. The guard fails closed by design (`scripts/check-scoring-receipt.mjs`,
+"a push whose own recorded `before` cannot be resolved here, must not produce
+a green build"). It is not a finding about this change, whose
+`origin/main..HEAD` range contains no scoring-path file. The fast-forward
+commit that carries this paragraph gives its own push run a resolvable
+range.
 
 ## What was deliberately not done
 
