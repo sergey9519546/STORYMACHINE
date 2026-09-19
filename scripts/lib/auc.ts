@@ -61,6 +61,28 @@
 //     floor below moved. The same statement is in CLAUDE.md's "Which floor,
 //     exactly" section and docs/brain/Gates/Gate - AUC-24 Ratchet.md.
 //
+// ── A SECOND, NARROWER RECIPE CHANGE ON 2026-09-19 (harness-honesty lane) ──
+// `reassembleFountainScenes` (scripts/lib/scene-segments.ts) used to join
+// scene slices with a bare `scenes.join('')`. When a script's final scene
+// lacked a trailing newline — legal Fountain, and true of arbitrary
+// owner-local corpus files even though not of any of the 32 committed
+// public-benchmark scripts — that un-terminated slice, once the shuffle
+// relocated it away from last position, ran straight into the next scene's
+// heading line and welded it onto the previous scene's prose, so that
+// heading stopped parsing as a heading at all. VERIFIED by probe: a 3-scene
+// script with no trailing newline, its final scene relocated to position 1,
+// came back with 2 scenes where the recipe only meant to touch order/drop.
+// Consequences: `shuffleDropDegrade` silently lost an EXTRA scene beyond the
+// intended drop (inflating measured separation via the `140/sceneCount`
+// scarcity term), and `assertFinalSceneIsFirst` THREW on the resulting
+// scene-count mismatch, hard-failing CLIMAX_RELOCATE on any such script.
+// `reassembleFountainScenes` now inserts a `\n` after a relocated slice that
+// lacks its own terminator, which is a REASSEMBLY fix — `shuffleDropDegrade`
+// below is unchanged text — but it changes the recipe's OUTPUT for that class
+// of input, so `AUC24_DEGRADATION_ID` bumps again, to `shuffle-drop/v3`; see
+// that constant's own comment. `AUC24_FLOOR` is untouched, same rule as the
+// v2 bump. No table has ever been locked, so nothing is invalidated.
+//
 // PURITY: nothing here reads the filesystem, the environment, or the clock.
 
 import { makePrng, seedFromString, shuffle } from '../../server/nvm/repro/seed.ts';
@@ -275,8 +297,27 @@ export const PUBLIC_FLOORS = [
  *  `INT.`/`EXT.`-only split to the doctor's own heading grammar
  *  (scripts/lib/scene-segments.ts) — see `shuffleDropDegrade`'s header. No
  *  table existed at v1, so nothing was invalidated; the bump is what stops a
- *  v1 table from ever being compared to a v2 measurement. */
-export const AUC24_DEGRADATION_ID = 'shuffle-drop/v2';
+ *  v1 table from ever being compared to a v2 measurement.
+ *
+ *  BUMPED TO v3 ON 2026-09-19 (harness-honesty lane): `reassembleFountainScenes`
+ *  (scripts/lib/scene-segments.ts) changed how it joins scene slices back
+ *  together — it now inserts a `\n` after any relocated slice that lacks its
+ *  own line terminator, instead of a bare `join('')`. This is a REASSEMBLY
+ *  fix, not a re-segmentation, but it changes this recipe's OUTPUT for any
+ *  input where the final scene lacks a trailing newline (VERIFIED by probe:
+ *  a 3-scene, no-trailing-newline script silently lost an extra scene under
+ *  the old join once the shuffle moved its un-terminated last scene out of
+ *  last position — `sceneCount` fell by one where the recipe only meant to
+ *  drop one, inflating the measured scarcity-term separation). Per this
+ *  file's own rule ("bump ... if the recipe ... ever changes"), the bump
+ *  applies here too: the recipe's output CAN change for real corpus files
+ *  (no committed public-benchmark script exhibits this, but the AUC-24
+ *  corpus is arbitrary owner-local files, some of which may lack a trailing
+ *  newline). No v2 table has ever been locked
+ *  (`tests/fixtures/auc24-table.json` still does not exist), so nothing is
+ *  invalidated by this bump either. `AUC24_FLOOR` is untouched, per the same
+ *  rule as the v2 bump. */
+export const AUC24_DEGRADATION_ID = 'shuffle-drop/v3';
 
 /** Human-readable description of `AUC24_DEGRADATION_ID`, embedded in the
  *  committed table so the artifact is self-describing. */
@@ -287,7 +328,10 @@ export const AUC24_DEGRADATION = {
     + '(scripts/lib/scene-segments.ts over src/lib/fountain.ts\'s parseFountain: INT./EXT./EST./'
     + 'I/E./INT./EXT. and forced .HEADING lines, boneyard excluded), NOT the INT./EXT.-only split '
     + 'used before 2026-09-12 — then drop every third scene of the shuffled order '
-    + '(index % 3 === 2); any pre-first-heading head is preserved verbatim at the top',
+    + '(index % 3 === 2); any pre-first-heading head is preserved verbatim at the top; scenes are '
+    + 'rejoined with a `\\n` inserted after any relocated slice that lacks its own line terminator '
+    + '(v3, 2026-09-19), so a script with no trailing newline cannot have its last scene welded '
+    + 'onto the next one when the shuffle moves it out of last position',
   seedTemplate: 'seedFromString("degrade:" + <manifest entry.file>)',
   prng: 'mulberry32 (makePrng) + djb2 (seedFromString), server/nvm/repro/seed.ts',
   subsetSize: AUC24_SUBSET,
@@ -380,6 +424,17 @@ export function degradationSeed(seedKey: string): number {
  * head preservation, and the fact that every surviving scene is byte-identical
  * to its source. Only the answer to "where does a scene begin" moved.
  *
+ * ── A SECOND SEGMENTATION-ADJACENT FIX, 2026-09-19 (harness-honesty lane) ──
+ * This function's own body (below) is UNCHANGED — it still calls
+ * `segmentFountainScenes` then `reassembleFountainScenes`. What changed is
+ * `reassembleFountainScenes` itself: a script whose final scene has no
+ * trailing newline used to have that scene's missing terminator silently
+ * carried into the output the moment the shuffle moved it out of last
+ * position, welding the next scene's heading onto the previous scene's prose
+ * and losing a scene from the count. `AUC24_DEGRADATION_ID` bumps to
+ * `shuffle-drop/v3` for this reason too — see that constant's comment for the
+ * full account and the probe. `AUC24_FLOOR` is untouched.
+ *
  * It stays a TOTAL function — a script with no headings comes back unchanged
  * rather than throwing, which `tests/core/auc.test.ts` pins. A no-op IS an
  * error, but it is the measurement's error to raise, not the recipe's: see
@@ -429,6 +484,15 @@ export function assertDegradationChangedText(
   );
 }
 
+/** Strip a single trailing `\n` or `\r\n`, for the ONE comparison in
+ *  `assertFinalSceneIsFirst` that must tolerate it — see that function's
+ *  comment. Never used for anything that reaches health scoring; the
+ *  degraded TEXT still carries the terminator `reassembleFountainScenes`
+ *  inserted, only this equality check looks past it. */
+function withoutTrailingLineTerminator(scene: string): string {
+  return scene.replace(/\r?\n$/, '');
+}
+
 /**
  * CLIMAX_RELOCATE's defining property, asserted rather than assumed.
  *
@@ -438,6 +502,21 @@ export function assertDegradationChangedText(
  * (finding 12). Nothing checked. This is the check: after the degradation the
  * FIRST scene must be the intact script's LAST, and the scene count must be
  * unchanged.
+ *
+ * ── Comparing scene TEXT, not scene BYTES, since 2026-09-19 (harness-honesty
+ * lane) ─────────────────────────────────────────────────────────────────
+ * `reassembleFountainScenes` inserts a `\n` after a relocated slice that
+ * lacks its own line terminator — which the intact script's LAST scene can,
+ * when the source has no trailing newline, since it is exactly the one slice
+ * `segmentFountainScenes` never terminates. Relocating that slice to the
+ * front is precisely what this function checks for, so `before`'s
+ * un-terminated last scene and `after`'s now-terminated first scene are the
+ * SAME scene with one appended `\n` — a real positive, not a mismatch. Byte
+ * equality would reject it (verified by probe: it did, before this fix, with
+ * "did not put the final scene first" — a false negative on a relocation
+ * that worked exactly as intended). Comparing with a single trailing
+ * terminator stripped from both sides fixes that without weakening the
+ * check: any other difference in scene content still fails it.
  *
  * @throws when the relocation did not land the final scene first.
  */
@@ -451,7 +530,10 @@ export function assertFinalSceneIsFirst(scriptLabel: string, text: string, degra
       + 'term; if it moves the count it measures the same artifact as SHUFFLE_DROP.',
     );
   }
-  if (before.length > 0 && after[0] !== before[before.length - 1]) {
+  if (
+    before.length > 0
+    && withoutTrailingLineTerminator(after[0]) !== withoutTrailingLineTerminator(before[before.length - 1])
+  ) {
     throw new Error(
       `CLIMAX_RELOCATE did not put the final scene first on ${scriptLabel}. Every document `
       + 'describing this degradation says "move the final scene to position 1"; a relocation that '

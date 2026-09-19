@@ -225,6 +225,69 @@ describe('scene-segments — the slices are lossless', () => {
   });
 });
 
+describe('scene-segments — reassembly does not weld scenes on a missing trailing newline', () => {
+  // 2026-09-19, harness-honesty lane. VERIFIED by probe (session report §4
+  // row 11): a script whose final scene lacks a trailing newline has an
+  // un-terminated last slice; moving that slice out of last position used to
+  // concatenate the next scene's heading onto its last prose line, so that
+  // heading stopped parsing as a heading and a scene silently vanished from
+  // the count. The fix lives in `reassembleFountainScenes`, not in
+  // segmentation, so these tests exercise reassembly directly.
+  const THREE_NO_TRAILING_NEWLINE = 'INT. A - DAY\n\none.\n\nINT. B - DAY\n\ntwo.\n\nINT. C - DAY\n\nthree.';
+
+  it('the exact probe case: relocating the un-terminated final scene first still yields 3 scenes', () => {
+    const { head, scenes } = segmentFountainScenes(THREE_NO_TRAILING_NEWLINE);
+    assert.equal(scenes.length, 3);
+    assert.ok(!scenes[2].endsWith('\n'), 'fixture must actually lack a trailing newline on its last scene');
+    const relocated = reassembleFountainScenes(head, [scenes[2], scenes[0], scenes[1]]);
+    assert.equal(
+      countFountainScenes(relocated), 3,
+      `expected 3 scenes after relocating the final scene first, got ${countFountainScenes(relocated)}. `
+      + `Reassembled text: ${JSON.stringify(relocated)}`,
+    );
+    // Starts with the moved scene...
+    assert.ok(relocated.startsWith('INT. C - DAY'), 'reassembled text should start with the relocated scene');
+    // ...and every heading is still at the start of a line (not welded onto
+    // the previous scene's prose).
+    const headingsAtLineStart = relocated.split('\n').map((line) => line.trim());
+    for (const heading of ['INT. C - DAY', 'INT. A - DAY', 'INT. B - DAY']) {
+      assert.ok(
+        headingsAtLineStart.includes(heading),
+        `${JSON.stringify(heading)} is not a standalone line in the reassembled text: ${JSON.stringify(relocated)}`,
+      );
+    }
+  });
+
+  it('the identity permutation still reproduces the text byte-for-byte, trailing newline or not', () => {
+    const withTrailingNewline = 'INT. A - DAY\n\none.\n\nINT. B - DAY\n\ntwo.\n\nINT. C - DAY\n\nthree.\n';
+    for (const text of [THREE_NO_TRAILING_NEWLINE, withTrailingNewline]) {
+      const { head, scenes } = segmentFountainScenes(text);
+      assert.equal(
+        reassembleFountainScenes(head, scenes), text,
+        `identity permutation is not byte-for-byte on ${JSON.stringify(text)}`,
+      );
+    }
+  });
+
+  it('a \\r\\n script with no trailing newline: relocation still yields the right scene count', () => {
+    const crlfNoTrailingNewline = 'INT. A - DAY\r\n\r\none.\r\n\r\nINT. B - DAY\r\n\r\ntwo.\r\n\r\nINT. C - DAY\r\n\r\nthree.';
+    const { head, scenes } = segmentFountainScenes(crlfNoTrailingNewline);
+    assert.equal(scenes.length, 3);
+    assert.ok(!scenes[2].endsWith('\n'), 'fixture must lack a trailing newline on its last scene');
+    // Identity permutation is exact, CRLF included.
+    assert.equal(reassembleFountainScenes(head, scenes), crlfNoTrailingNewline);
+    // Relocating the un-terminated final scene first still yields 3 scenes —
+    // the inserted separator is a bare `\n` (not `\r\n`), which is enough for
+    // the parser to see a new line and therefore a new heading.
+    const relocated = reassembleFountainScenes(head, [scenes[2], scenes[0], scenes[1]]);
+    assert.equal(
+      countFountainScenes(relocated), 3,
+      `expected 3 scenes, got ${countFountainScenes(relocated)}. Text: ${JSON.stringify(relocated)}`,
+    );
+    assert.ok(relocated.startsWith('INT. C - DAY'));
+  });
+});
+
 describe('scene-segments — rebuild-experiment-lib\'s heading view is built on it', () => {
   it('reports the same scenes as the slice view, with the same slugs', () => {
     // One grammar, two views. Before this lane the heading view carried its own

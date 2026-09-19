@@ -201,6 +201,13 @@ measurement's job), and `AUC24_DEGRADATION_ID` is bumped to `shuffle-drop/v2` so
 an old-recipe table can never be compared to a new measurement. On the 32
 committed public-benchmark scripts the new segmentation produces byte-identical
 output, which is why neither shuffle-drop floor below moved.
+**2026-09-19 (harness-honesty lane): `AUC24_DEGRADATION_ID` bumped again, to
+`shuffle-drop/v3` — `reassembleFountainScenes` now inserts a `\n` after a
+relocated scene slice that lacks its own line terminator, fixing a defect
+where a script with no trailing newline could have its un-terminated final
+scene welded onto the next scene's heading once the shuffle moved it out of
+last position (verified by probe); `AUC24_FLOOR` is untouched and, since no
+table has ever been locked, nothing is invalidated.**
 
 It is NOT comparable to the 761-script P1 baseline
 (`docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`), which reports

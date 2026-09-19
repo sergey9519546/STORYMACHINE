@@ -10,25 +10,61 @@
 //
 // Env-gated (like real-script-corpus): set STORY_GRAPH_CORPUS_DIR to enable.
 // Uses merged-fountain corpus from corpus-pipeline (364 screenplays).
+//
+// SKIP, NOT SILENCE (2026-09-19, harness-honesty lane). This file used to
+// `return` from inside `describe()` when the env var was unset — which
+// registers ZERO tests. `node:test` then has nothing to report: not a
+// failure, not even a skip count, just an empty suite that looks identical
+// to "the corpus was there and everything passed" at a glance and identical
+// to "this file is empty" in a `# skipped` tally. The four AUC assertions
+// below were invisible to `npm test`'s own skip count on every CI run.
+// `tests/core/real-script-corpus.test.ts` solves this correctly: it always
+// registers every test, marking each with node:test's own `{ skip: reason }`
+// so the run reports `# skipped N` with the reason named, and it fails
+// loudly (rather than skipping) when the env var is SET but points at a
+// path that doesn't exist — a typo'd path used to read as a silent, and
+// therefore invisible, skip. This file now follows the same three-state
+// shape (unset / broken / valid) and the same fail-loud-on-broken test, so
+// "match the sibling" is not just prose — the sibling's exact pattern is
+// reused, not re-derived.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 
-const CORPUS_DIR = process.env.STORY_GRAPH_CORPUS_DIR;
+const CORPUS_DIR = process.env.STORY_GRAPH_CORPUS_DIR ?? '';
+
+// Three distinct states, kept distinct on purpose (mirrors
+// tests/core/real-script-corpus.test.ts) so a misconfigured path reads as a
+// hard failure rather than a silent skip that looks like a pass:
+//   1. unset      → the copyright/local-only skip (honest, expected in CI).
+//   2. set-broken → the env var points at a path that doesn't exist or isn't
+//                   a directory — almost always a typo. Fail once, loudly,
+//                   naming the path, instead of the old silent `return`.
+//   3. set-valid  → run the assertions below.
+const CORPUS_DIR_STATE: 'unset' | 'broken' | 'valid' = !CORPUS_DIR
+  ? 'unset'
+  : (existsSync(CORPUS_DIR) && statSync(CORPUS_DIR).isDirectory() ? 'valid' : 'broken');
+const SKIP_REASON = CORPUS_DIR_STATE === 'unset'
+  ? 'STORY_GRAPH_CORPUS_DIR not set — corpus text is local-only (set to a merged-fountain corpus path, e.g. from corpus-pipeline)'
+  : false;
+// The four corpus-reading tests below also skip on a BROKEN path — the
+// dedicated integrity test above is what fails loudly for that case, so
+// these four don't pile on with a confusing readdirSync-on-a-missing-dir
+// error of their own.
+const CORPUS_TEST_SKIP = CORPUS_DIR_STATE === 'valid'
+  ? false
+  : (SKIP_REASON || `STORY_GRAPH_CORPUS_DIR is set to "${CORPUS_DIR}" but is not a valid directory — see the integrity test above`);
 
 describe('Story Graph Position-Sensitivity Regression', () => {
-  if (!CORPUS_DIR || !existsSync(CORPUS_DIR)) {
-    console.log('  ⚠ STORY_GRAPH_CORPUS_DIR not set or invalid, skipping position-sensitivity tests');
-    console.log('    Set to merged-fountain corpus path to enable (e.g., from corpus-pipeline)');
-    return;
-  }
-  // Narrowed once, here — CORPUS_DIR (string | undefined) is captured by
-  // closure in measureCorpusAUC below, and narrowing from the guard above
-  // doesn't cross that function boundary, so pass this down explicitly
-  // instead of re-reading the module-scope optional.
+  it('corpus dir integrity: set path must exist and be a directory', { skip: CORPUS_DIR_STATE !== 'broken' && 'only runs when STORY_GRAPH_CORPUS_DIR is set to a bad path' }, () => {
+    assert.fail(`STORY_GRAPH_CORPUS_DIR is set to "${CORPUS_DIR}" but that path does not exist or is not a directory — fix the path, or unset it to skip the copyright-gated corpus`);
+  });
+
+  // Read once at module-eval time regardless of state; only used inside test
+  // bodies that are themselves skipped unless CORPUS_DIR_STATE === 'valid'.
   const corpusDir: string = CORPUS_DIR;
 
   // Act-swap recipe: reorder acts 1-2-3 → 3-1-2
@@ -115,7 +151,7 @@ describe('Story Graph Position-Sensitivity Regression', () => {
     return { auc, goods, bads, meanGood, meanBad, separation, skipped, n: goods.length };
   }
   
-  it('forwardEdgeRatio: detects backward causality in act-swapped scripts (AUC ≥0.70)', async () => {
+  it('forwardEdgeRatio: detects backward causality in act-swapped scripts (AUC ≥0.70)', { skip: CORPUS_TEST_SKIP }, async () => {
     console.log('\n  Testing forwardEdgeRatio position-sensitivity (target: AUC ≥0.70)...');
     
     const result = await measureCorpusAUC(
@@ -137,7 +173,7 @@ describe('Story Graph Position-Sensitivity Regression', () => {
     );
   });
   
-  it('arcCoherence: detects tension-position disruption in act-swapped scripts (AUC ≥0.70)', async () => {
+  it('arcCoherence: detects tension-position disruption in act-swapped scripts (AUC ≥0.70)', { skip: CORPUS_TEST_SKIP }, async () => {
     console.log('\n  Testing arcCoherence position-sensitivity (target: AUC ≥0.70)...');
     
     const result = await measureCorpusAUC(
@@ -163,7 +199,7 @@ describe('Story Graph Position-Sensitivity Regression', () => {
     );
   });
   
-  it('graphHealth: composite metric detects structural disruption in act-swapped scripts (AUC ≥0.70)', async () => {
+  it('graphHealth: composite metric detects structural disruption in act-swapped scripts (AUC ≥0.70)', { skip: CORPUS_TEST_SKIP }, async () => {
     console.log('\n  Testing graphHealth composite position-sensitivity (target: AUC ≥0.70)...');
     
     const result = await measureCorpusAUC(
@@ -185,7 +221,7 @@ describe('Story Graph Position-Sensitivity Regression', () => {
     );
   });
   
-  it('escalationMonotonicity: act-to-act tension rise disrupted by act-swap (informational)', async () => {
+  it('escalationMonotonicity: act-to-act tension rise disrupted by act-swap (informational)', { skip: CORPUS_TEST_SKIP }, async () => {
     console.log('\n  Testing escalationMonotonicity position-sensitivity (informational)...');
     
     const result = await measureCorpusAUC(

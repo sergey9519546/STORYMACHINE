@@ -45,13 +45,28 @@
 //
 // ── Two views, one boundary list ──────────────────────────────────────────
 //   * `segmentFountainScenes` — VERBATIM slices. `head + scenes.join('')`
-//     reproduces the input byte for byte, so rearranging, dropping or
-//     reordering scenes changes only order and membership, never bytes within
-//     a scene. This is the view every degradation uses.
+//     reproduces the input byte for byte FOR THE IDENTITY ORDER, so
+//     rearranging, dropping or reordering scenes changes only order and
+//     membership, never bytes within a scene. This is the view every
+//     degradation uses.
 //   * `sceneHeadingLineIndices` / `splitLines` — the boundary list and the line
 //     split, exported so the legacy `{preamble, scenes: [{heading, body}]}`
 //     view in `rebuild-experiment-lib.mjs` can be built on the same grammar
 //     instead of carrying its own regexes.
+//
+// ── A missing final newline, and where the fix lives (2026-09-19,
+//    harness-honesty lane) ───────────────────────────────────────────────
+// A script with no trailing newline gives its LAST scene slice no line
+// terminator — harmless while that slice stays last, but if a degradation
+// relocates it earlier, the next slice's heading gets glued onto its final
+// prose line and stops parsing as a heading (VERIFIED by probe: a 3-scene,
+// no-trailing-newline script relocated to move its final scene first came
+// back with 2 scenes, not 3). `reassembleFountainScenes` is where this is
+// fixed, not `segmentFountainScenes`: it inserts a `\n` after any slice that
+// lacks a terminator and is not last in the OUTPUT order, so the identity
+// permutation still reproduces `text` exactly (the one terminator-less slice
+// stays last) and every other permutation stays well-formed. See that
+// function's own comment for the full account.
 //
 // ── What it deliberately does NOT do ──────────────────────────────────────
 // It does not normalise. `analyzeFountainText` runs `normalizeScreenplay`
@@ -119,10 +134,49 @@ export function segmentFountainScenes(text: string): FountainSceneSegmentation {
   return { head, scenes };
 }
 
-/** Put a segmentation back together. The inverse of `segmentFountainScenes`
- *  for any permutation or subset of its scenes. */
+/**
+ * Put a segmentation back together. The inverse of `segmentFountainScenes`
+ * for any permutation or subset of its scenes — including the identity
+ * permutation, which must reproduce `text` exactly.
+ *
+ * ── Why this isn't just `head + scenes.join('')` (2026-09-19, harness-honesty
+ * lane, VERIFIED by probe) ─────────────────────────────────────────────────
+ * A script with no trailing newline has a last scene slice that ALSO lacks a
+ * trailing newline — `segmentFountainScenes` keeps each slice byte-verbatim,
+ * so a missing terminator on the input's last line means a missing
+ * terminator on its last slice. That is harmless in the ORIGINAL order,
+ * where the un-terminated slice is still last. It stops being harmless the
+ * moment a degradation moves that slice out of last position: the next
+ * scene's heading is concatenated onto the un-terminated slice's final prose
+ * line and, since a heading only parses at the start of a LINE, stops being
+ * a heading at all. Probe (3 scenes, no trailing newline on the source,
+ * final scene relocated to position 1): the naive join produced
+ * `"INT. C - DAY\n\nthree.INT. A - DAY\n\n..."` — 2 scenes where there
+ * should be 3, because `INT. A - DAY` is now glued onto `three.` on one
+ * line. Consequences downstream: `shuffleDropDegrade` silently loses an
+ * EXTRA scene beyond the ones it meant to drop (inflating the measured
+ * separation in the harness's favour, since the scarcity term is
+ * `140/sceneCount`), and `assertFinalSceneIsFirst` THROWS on the scene-count
+ * mismatch — hard-failing the climax-relocate channel on any corpus script
+ * stored without a trailing newline.
+ *
+ * The fix is in REASSEMBLY, not segmentation: when joining, insert a single
+ * `\n` after any scene slice that (a) does not already end with a line
+ * terminator (`\n` or `\r\n`) and (b) is not the LAST slice in the new
+ * order. The identity permutation is then still exact, because the one
+ * slice that can lack a terminator — the original text's last scene — stays
+ * last, so rule (b) never fires for it. Any permutation that moves it
+ * earlier now gets a terminator inserted after it, so the invariant
+ * `head + scenes.join('') === text` (identity order only) still holds, and
+ * every other order stays a well-formed, re-parseable script.
+ */
 export function reassembleFountainScenes(head: string, scenes: readonly string[]): string {
-  return head + scenes.join('');
+  const withTerminators = scenes.map((scene, i) => {
+    const isLast = i === scenes.length - 1;
+    const hasTerminator = scene.endsWith('\n'); // covers both '\n' and '\r\n'
+    return isLast || hasTerminator ? scene : `${scene}\n`;
+  });
+  return head + withTerminators.join('');
 }
 
 /** How many scenes this segmenter sees. Equal to the doctor's `sceneCount` for

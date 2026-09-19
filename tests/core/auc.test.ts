@@ -29,7 +29,11 @@ import {
   degradationSeed,
   shuffleDropDegrade,
 } from '../../scripts/lib/auc.ts';
-import { countFountainScenes, segmentFountainScenes } from '../../scripts/lib/scene-segments.ts';
+import {
+  countFountainScenes,
+  reassembleFountainScenes,
+  segmentFountainScenes,
+} from '../../scripts/lib/scene-segments.ts';
 import { makePrng, seedFromString, shuffle } from '../../server/nvm/repro/seed.ts';
 
 /**
@@ -331,9 +335,13 @@ describe('shuffleDropDegrade — the segmentation change is real, not cosmetic',
   it('records the new segmentation in the degradation id and recipe text', () => {
     // A table locked under the old recipe must never be compared to a new
     // measurement, and the artifact is self-describing, so the id carries it.
-    assert.equal(AUC24_DEGRADATION_ID, 'shuffle-drop/v2');
+    // v3 (2026-09-19, harness-honesty lane): reassembly now inserts a `\n`
+    // after a relocated scene slice missing its own terminator — see
+    // AUC24_DEGRADATION_ID's own comment in scripts/lib/auc.ts.
+    assert.equal(AUC24_DEGRADATION_ID, 'shuffle-drop/v3');
     assert.match(AUC24_DEGRADATION.recipe, /scene-segments\.ts/);
     assert.match(AUC24_DEGRADATION.recipe, /NOT the INT\.\/EXT\.-only split/);
+    assert.match(AUC24_DEGRADATION.recipe, /lacks its own line terminator/);
   });
 });
 
@@ -381,5 +389,49 @@ describe('assertDegradationChangedText / assertFinalSceneIsFirst', () => {
       () => assertFinalSceneIsFirst('k.fountain', THREE, dropped),
       /changed the scene count on k\.fountain \(3 -> 2\)/,
     );
+  });
+
+  // ── 2026-09-19, harness-honesty lane: the no-trailing-newline defect ──────
+  // VERIFIED by probe (session report §4 row 11). Before the
+  // `reassembleFountainScenes` fix, a script whose final scene lacked a
+  // trailing newline had that scene's missing terminator carried straight
+  // into the output the moment a relocation moved it out of last position:
+  // the next scene's heading welded onto the previous scene's last prose
+  // line and stopped parsing as a heading, so the scene count silently fell.
+  // That made `assertFinalSceneIsFirst` throw a false "changed the scene
+  // count" error on CLIMAX_RELOCATE, and made `shuffleDropDegrade` drop an
+  // extra scene beyond the one the recipe meant to drop. Both are fixed by
+  // reassembly, not segmentation — these tests exercise the real recipe
+  // functions end to end, not `reassembleFountainScenes` directly (that is
+  // `tests/core/scene-segments.test.ts`'s job).
+  const NO_TRAILING_NEWLINE = 'INT. A - DAY\n\none.\n\nINT. B - DAY\n\ntwo.\n\nINT. C - DAY\n\nthree.';
+
+  it('assertFinalSceneIsFirst no longer throws when the source has no trailing newline', () => {
+    const { head, scenes } = segmentFountainScenes(NO_TRAILING_NEWLINE);
+    assert.equal(scenes.length, 3);
+    assert.ok(!scenes[scenes.length - 1].endsWith('\n'), 'fixture no longer exercises the no-trailing-newline case');
+    const relocated = reassembleFountainScenes(head, [scenes[2], scenes[0], scenes[1]]);
+    // Before the fix this threw: "CLIMAX_RELOCATE changed the scene count on
+    // k.fountain (3 -> 2)" — a false positive caused by the harness, not the
+    // manipulation.
+    assert.equal(assertFinalSceneIsFirst('k.fountain', NO_TRAILING_NEWLINE, relocated), relocated);
+    assert.equal(countFountainScenes(relocated), 3);
+  });
+
+  it('shuffleDropDegrade on a no-trailing-newline script drops exactly the intended scene, not an extra one', () => {
+    // seedKey 'probe-0' is the defect's exact trigger case, found by brute
+    // force over the real PRNG: the seeded shuffle puts the un-terminated
+    // final scene ("INT. C - DAY", no trailing `\n`) FIRST among the two
+    // survivors (order [C, A], B dropped at shuffled index 2) — i.e. C is
+    // relocated out of last position without being dropped, which is
+    // precisely the precondition the probe in this lane's session report
+    // named. Before the `reassembleFountainScenes` fix this seed produced
+    // `"INT. C - DAY\n\nthree.INT. A - DAY\n\n..."` — C's heading welded onto
+    // A's, 1 scene where the recipe (3 in, drop 1) should leave 2.
+    const out = shuffleDropDegrade(NO_TRAILING_NEWLINE, 'probe-0');
+    assert.equal(countFountainScenes(out), 2,
+      `shuffleDropDegrade kept ${countFountainScenes(out)} scenes, expected 2 — an extra scene was `
+      + `lost to welding, the exact defect this lane fixes. Output: ${JSON.stringify(out)}`);
+    assert.ok(out.startsWith('INT. C - DAY'), 'expected the un-terminated scene C to be relocated first');
   });
 });
