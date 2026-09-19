@@ -130,3 +130,100 @@ overlap test. The regression-guard case above pins this specific shape shut.
 
 Per the lane brief, `npm test` and `npm run brain` were **not** run in this
 lane.
+
+## § Regression found in review and fixed
+
+An adversarial reviewer's probe found that this lane's own fix
+(`entriesModifiedInPlace()`, above) had introduced a NEW false pass in
+`checkReceiptForRange()` (~lines 850-880 at the time), fixed here on
+`lane/receipt-gate-existence`.
+
+**The false-pass shape.** The version of `checkReceiptForRange()` this lane
+shipped folded the new `inPlace` result into the EXISTENCE test:
+`if (entries.length === 0 && inPlace.length === 0) return { ok: false, ... }`.
+But `entriesModifiedInPlace()` finds an entry by hunk line-number OVERLAP
+with the entry's span — it has no requirement about *what* changed inside
+that span. So any edit at all inside any *old* entry — a one-word typo fix
+in a `Corpus fingerprint` line, or appending one `- **Note:** …` bullet (the
+exact move this same function's own error string forbids: "Appending lines
+to an existing entry is not a receipt for a new scoring change") — made
+`inPlace.length` nonzero and satisfied "this range added a receipt entry",
+even though the range added no entry at all and the edited entry was
+already well-formed. The gate then printed, untruthfully, "gained a
+well-formed new entry in the same range. OK." It also weakened
+`structuralOnly` mode (release.yml's whole-release-window check), which
+returned `ok: true` right after that same existence test, before any
+in-place validation ran.
+
+**The probe result.** Two attacks, confirmed on the branch before the fix
+below:
+
+- **Attack A** — a scoring-path file (`server/nvm/analyze/doctor.ts`)
+  changed, plus a one-word typo fix inside a previous, valid, measured
+  entry's `Corpus fingerprint` line, with no new entry anywhere in the
+  range: PASS (exit 0) on the branch, "gained a well-formed new entry in
+  the same range. OK."; correctly FAILS (exit 1, "gained no new entry") at
+  `53f6e377` (pre-lane).
+- **Attack B** — the same scoring-path change, plus one appended
+  `- **Note:** …` bullet on a previous valid entry, no new entry: PASS
+  (exit 0) on the branch, same untruthful "gained a well-formed new entry"
+  (or, under `--structural-only`, "gained a new entry … OK
+  (content was validated by CI on the range that added it)."); correctly
+  FAILS at `53f6e377`.
+
+Both were reproduced directly against the unfixed
+`checkReceiptForRange()` via the real CLI (`node
+scripts/check-scoring-receipt.mjs`, spawned over a throwaway git repo,
+push-event shaped) before any code changed on this branch — see the
+fail-first test runs below.
+
+**The fix** (`scripts/check-scoring-receipt.mjs`, `checkReceiptForRange()`):
+`inPlace` entries now contribute VALIDATION, never EXISTENCE. Their
+validation runs FIRST — before the existence check, and unconditionally of
+`structuralOnly` — so a problem found in an in-place entry (most often
+PENDING, but any `validateEntry()` rule) fails the range by name regardless
+of whether the range also happens to add a brand-new entry elsewhere
+(C-DANGER, above, still fails this way in both modes). Existence is then
+decided by `entries.length === 0` alone — a brand-new entry, recognized
+because its OWN heading line was added — never by `inPlace.length`. A
+brand-new entry's field validation is still skipped under `structuralOnly`
+(release.yml's existing, intentional behavior, unchanged), but an in-place
+edit is validated in both modes, because the false pass this closes is
+reachable in both. The success message ("gained a well-formed new entry")
+is only ever printed when `entries.length > 0`, so it can no longer
+describe a range that added nothing.
+
+**The new tests**
+(`tests/core/receipt-gate-inplace-rewrite.test.ts`, describe block
+"REGRESSION: an in-place edit must never count as a NEW entry (existence
+test)"):
+
+- **ATTACK A** — typo-fix-only edit inside a previous valid entry plus a
+  scoring-path change: asserts exit 1 and stderr matching `/gained no new
+  entry/`. Run against the unfixed script first: failed (`0 !== 1`, actual
+  exit 0, stdout containing "gained a well-formed new entry in the same
+  range. OK."). Passes after the fix.
+- **ATTACK B** — appended Note bullet, same shape: same fail-first result
+  (`0 !== 1`) before the fix, passes after.
+- **ATTACK B, `--structural-only`** — the same append, run through the CLI's
+  `--structural-only` flag (release.yml's whole-window mode): fail-first
+  result (`0 !== 1`, stdout "gained a new entry in the same range. OK
+  (content was validated by CI on the range that added it).") before the
+  fix, passes after.
+
+All 7 pre-existing cases in the same file — (b)-(f), C-DANGER, and the
+append-after-untouched-entry regression guard — were re-run unchanged
+against both the unfixed and fixed script and passed both times (10/10
+total after the fix, 7/10 before it — see this lane's final report for the
+full TAP output). `tests/core/scoring-receipt-guard.test.ts` (26/26),
+`tests/core/check-scoring-receipt.test.ts` (8/8),
+`tests/scripts/receipt-conversion.test.ts` (43/43),
+`tests/scripts/owner-measure-e2e.test.ts` (56/56),
+`tests/scripts/owner-measure-plan.test.ts` (30/30) and
+`tests/core/ci-gates-intact.test.ts` (64/64) all still pass. `npm run lint`
+is clean. `node scripts/check-scoring-receipt.mjs 1e7779de..HEAD` and `node
+scripts/check-scoring-receipt.mjs $(git merge-base origin/main
+HEAD)..HEAD` both report "no scoring-path files changed. OK." — this fix
+lives in gate tooling (`scripts/check-scoring-receipt.mjs` and its test
+file), not on the scoring path, so no `MEASUREMENT_RECEIPTS.md` entry is
+required for it.
