@@ -1,7 +1,9 @@
 // Wave 134 — The 14-Pass Revision Pipeline
 // Runs the compiled Fountain screenplay through 14 sequential revision passes.
 // Each pass diagnoses a layer, marks weak spots, and rewrites (LLM or stub).
-// Approved spans are threaded through every pass unchanged.
+// Each pass diagnoses THE DOCUMENT IT IS HANDED: when a pass changes the draft,
+// the records/structure/annotations the next pass reads are re-derived from the
+// changed draft, and every approved span is re-pointed at its own text in it.
 //
 // Passes (in order):
 //  1. structure        — act balance, midpoint pressure, reversal density
@@ -25,6 +27,8 @@ import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
 import type { PassResult, ApprovedSpan, StoryContext, PassName, RevisionPass, PassInput } from './passes/types.ts';
 import { logger } from '../../lib/logger.ts';
 import { isDiagnoseOnly } from './rewrite.ts';
+import { relocateApprovedSpans } from './approved-spans.ts';
+import { analyzeFountainText } from '../analyze/fountain-analyzer.ts';
 
 import { structurePass }    from './passes/structure.ts';
 import { causalityPass }    from './passes/causality.ts';
@@ -116,16 +120,41 @@ async function runDiagnosePass(
 }
 
 /**
- * Run all 12 revision passes over a compiled screenplay.
+ * Run all 14 revision passes over a compiled screenplay.
  *
- * Each pass receives the fountain text as modified by all prior passes.
- * Approved spans are guaranteed-preserved (the LLM rewriter is instructed
- * to leave them unchanged; in stub mode nothing changes anyway).
+ * Each pass receives the fountain text as modified by all prior passes, AND
+ * the diagnostics of that text. `records`/`structure`/`annotations` describe
+ * the draft as it was compiled; the moment a pass changes the draft, the next
+ * pass gets a fresh set derived from the changed draft by
+ * analyzeFountainText() instead of the compiled originals. Before 2026-09-20
+ * the originals were handed to all 14 passes while the text moved underneath
+ * them, so passes 2..14 diagnosed the pre-revision document — they could flag
+ * a scene a prior pass had already deleted, and miss one it had introduced.
+ * A pass that changes nothing costs nothing: the re-derivation is skipped
+ * whenever the draft is byte-equal to the one already diagnosed, which is
+ * every pass of every diagnose-only run (see the isDiagnoseOnly() branch
+ * below, where `revisedFountain` provably never changes).
+ *
+ * `records`/`structure` as PASSED IN are still the caller's — a route builds
+ * them from the StoryCommit ledger (server/routes/nvm/revision.ts), which
+ * carries signal no text reconstruction can — and pass 1 reads exactly those.
+ * Only the re-derivation, for a draft the caller never saw, comes from the
+ * text.
+ *
+ * Approved spans follow the text: a span is a line range into ONE document, so
+ * when a pass changes the draft each span is re-located by its own excerpt
+ * (./approved-spans.ts) and its line numbers rewritten. Preservation itself is
+ * enforced at the rewrite seam (./rewrite-llm.ts's approvedSpansSurvive
+ * rejects any rewrite that drops a locked excerpt); in stub mode nothing
+ * changes anyway.
+ *
+ * The RESULT's `originalFountain` is untouched by all of this: it is the draft
+ * as submitted, and remains the baseline a caller diffs against.
  *
  * @param compiled      Output of compileScreenplay()
  * @param records       Screenplay memory records from buildScreenplayMemory()
  * @param structure     Current structural state from analyzeStructure()
- * @param approvedSpans Spans the author has locked — never changed by any pass
+ * @param approvedSpans Spans the author has locked — re-pointed, never dropped
  * @param onProgress    H8: Optional callback — called after each pass with progress info
  */
 export async function runRevisionPipeline(
@@ -195,6 +224,14 @@ export async function runRevisionPipeline(
     //    never diverges from originalFountain in this mode even in the
     //    sequential loop below, so every pass can safely receive
     //    fountain: originalFountain directly with no thread-through.
+    //    The same property is what makes this branch untouched by the
+    //    2026-09-20 per-pass re-diagnosis below: that re-derivation is gated
+    //    on `currentFountain !== diagnosedFountain`, and in this mode the
+    //    draft never changes, so there is nothing to re-derive and nothing to
+    //    re-locate. The doctor — the only caller that reaches this branch —
+    //    therefore reads exactly the same records/structure/annotations it
+    //    always did, which is why the change carries an output-identity
+    //    receipt rather than a re-measured AUC.
     //
     // 2. No pass's DIAGNOSTIC (issue-producing) code reads priorPassResults.
     //    Every pass file has exactly one read site for it — the same
@@ -231,16 +268,81 @@ export async function runRevisionPipeline(
     );
     passResults.push(...resultsByIndex);
   } else {
+    // ── Sequential rewrite path ────────────────────────────────────────────
+    // Three things travel with `currentFountain` from pass to pass, and each
+    // one is only meaningful relative to a PARTICULAR draft:
+    //
+    //   passRecords/passStructure/passAnnotations — the diagnostics a pass
+    //     reads. Anchored by `diagnosedFountain`: the draft they describe.
+    //   passSpans — the author's locked line ranges. Anchored by
+    //     `spanAnchorFountain`: the draft their line numbers index into.
+    //
+    // The two anchors are tracked separately rather than as one "last draft"
+    // variable so that a re-derivation that fails (analyzeFountainText
+    // throwing on pathological text) does not also strand the spans: the span
+    // re-location is pure string work and still runs, and the diagnostics are
+    // retried against the next draft instead of being frozen forever by one
+    // failure.
+    let passRecords = records;
+    let passStructure = structure;
+    let passAnnotations = annotations;
+    let passSpans = approvedSpans;
+    let diagnosedFountain = originalFountain;
+    let spanAnchorFountain = originalFountain;
+
     for (let i = 0; i < passes.length; i++) {
       const { name, fn } = passes[i];
+
+      // Byte-equality, not a change flag: a pass that "changed" the draft back
+      // to what it already was costs nothing here, and a pass that reports
+      // changed: false while returning different text still gets re-diagnosed.
+      if (currentFountain !== diagnosedFountain) {
+        try {
+          const rediagnosed = analyzeFountainText(currentFountain);
+          passRecords = rediagnosed.records;
+          passStructure = rediagnosed.structure;
+          passAnnotations = rediagnosed.annotations;
+          diagnosedFountain = currentFountain;
+          logger.debug('revision_pass_rediagnosed', {
+            passIndex: i, passName: name, sceneCount: rediagnosed.records.length,
+          });
+        } catch (err) {
+          // Keep the previous diagnostics rather than handing this pass none.
+          // They are stale — which is the defect this block exists to close —
+          // so it is logged as an error, not swallowed.
+          logger.error('revision_rediagnose_failed', {
+            passIndex: i, passName: name, error: (err as Error).message,
+          });
+        }
+      }
+
+      if (passSpans.length > 0 && currentFountain !== spanAnchorFountain) {
+        const relocation = relocateApprovedSpans(spanAnchorFountain, currentFountain, passSpans);
+        if (relocation.lost.length > 0) {
+          // Indices only — never the span's text or the draft's. After an
+          // accepted LLM rewrite this cannot fire (rewrite-llm.ts's
+          // approvedSpansSurvive rejects a rewrite that drops a locked
+          // excerpt); a non-LLM editor of the draft is not bound by that.
+          logger.warn('revision_locked_span_lost_between_passes', {
+            passIndex: i,
+            passName: name,
+            lostSpanIndices: relocation.lost,
+            lostSpanCount: relocation.lost.length,
+            totalApprovedSpans: passSpans.length,
+          });
+        }
+        passSpans = relocation.spans;
+        spanAnchorFountain = currentFountain;
+      }
+
       try {
         let result = await fn({
           fountain: currentFountain,
           original: originalFountain,
-          annotations,
-          structure,
-          records,
-          approvedSpans,
+          annotations: passAnnotations,
+          structure: passStructure,
+          records: passRecords,
+          approvedSpans: passSpans,
           storyContext,
           priorPassResults: passResults.length > 0 ? [...passResults] : undefined,
         });
