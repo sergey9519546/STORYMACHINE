@@ -88,6 +88,18 @@ drift recurred; see `SESSION_REPORT_2026-09-19.md` §7.1. Final head
 `0edb6df2`, `RUN_E2E=1 npm test`: 14,512 tests, 0 failures, 98 skipped
 (env-gated), 1 todo.
 
+2026-09-20 closed the remaining §4 rows under owner authorization: row 3
+(per-pass diagnostics), rows 5 and 6 (the unified scene-heading grammar),
+row 7 (the AUC-24 table gate deadline moved to 2026-11-01, Decision #11),
+row 8 (all 17 parked branches triaged), row 16 (the blind-pair number and
+the two public-benchmark intervals now lead README, NORTH_STAR, ROADMAP and
+ARCHITECTURE), and row 18 (dead-weight proposal B3 removed). See
+`SESSION_REPORT_2026-09-19.md` §8 for the commit table. Final head
+`1db74c21`, full suite: 14,561 tests, 0 failures, 98 skipped. The owner
+still needs to run `measure-real` and `lock-auc24` on the corpus and commit
+`tests/fixtures/auc24-table.json` before 2026-11-01 — no real-corpus figure
+has been claimed for the new grammar.
+
 **2026-09-13 — CI green, and the story track begins: four defects only
 the runner could show, the owner's run as one command, and generation
 measured before it is tuned.** The GitHub Actions account block lifted at

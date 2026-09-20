@@ -288,3 +288,52 @@ and `0edb6df2`.
 
 4. Final verified state after this round: `RUN_E2E=1 npm test` at head
 `0edb6df2` — 14,512 tests, 0 failures, 98 skipped (env-gated), 1 todo.
+
+## 8. 2026-09-20 — the remaining rows
+
+The owner authorized the owner-gated rows on 2026-09-20 ("tackle it all").
+Scoring-path work landed under the standing condition that no real-corpus
+figure is claimed without a run, and the receipt gate accepted both
+scoring-path entries on that basis.
+
+| §4 row | What closed it | Commit | Record |
+|---|---|---|---|
+| 3 | revision passes now diagnose the document they are handed (re-derived via `analyzeFountainText(currentFountain)` when the text changed; on the route path this replaces ledger-derived records from pass 2 on, a documented trade); approved spans are re-located between passes by whole-line verbatim match, nearest occurrence (`server/nvm/revision/approved-spans.ts`); output identity 45/45; receipt is an output-identity entry | `e3c3b53a` | `docs/audits/2026-09-20-per-pass-diagnostics/` |
+| 5 and 6 | seven drifted copies of the heading grammar replaced by one exported predicate in `src/lib/fountain.ts`; `scenesFromFountain` uses it; forced heading is `.` + alphanumeric so `..`/`...` lines are no longer headings; measured: a 16-scene mixed-heading script goes 3 → 16 scenes for the arc deduction, and one `...` line inside dialogue no longer moves health 62 → 37.8 on a 5-scene toy; output identity 45/45 because the fixture set contains no non-INT/EXT or `..` lines (counted); public benchmark unchanged, no floor moved; the receipt states no real-corpus figure is claimed and that the owner must re-lock the real-corpus manifest and run `measure-real`/`lock-auc24` on `shuffle-drop/v3`. Unicode forced headings (`.МОСКВА`) are not recognized — owner decision. Post-merge: the snapshot pin was environment-dependent on `engineCommit`, fixed separately | `77e9e0fe`; follow-up `91b55b9d` | `docs/audits/2026-09-20-scene-grammar/` |
+| 7 | AUC-24 table gate deadline moved 2026-10-01 → 2026-11-01 as Decision #11 (recipe bumped to v3 on 2026-09-19, so an earlier table would be invalid); the owner must lock the table before then or the gate blocks CI by design | `2a71a035` | (Decision Log #11) |
+| 8 | all 17 parked branches triaged with merge trials: 8 superseded or already merged (`lane/node-24`, `lane/healthcheck-ipv4` are ancestors; the four `calibrate/voice-bound-*` and the two `claude/*-pending-measurement` are patch-identical to landed or renamed work), `scoring/advice-rule-fixes` LANDS with docs-only conflicts after the owner's `measure-real`, five REBASE-THEN-LAND (`renderer-residuals` is the tip of a three-branch chain; `r5-verbosity-bias` and `feature-length-defects` compete for the same `densityPenalty`), `wip/phase-w-ui-checkpoint` ABANDON. Nothing deleted | `b1fe52b8` | `docs/audits/2026-09-20-parked-branches/` |
+| 16 | blind pairs measured at 1 of 6 on `26d930dd` (the "four of six" in `docs/PATH_TO_EXCELLENCE.md` line ~468 describes the unmerged `scoring/feature-length-defects` branch); README, NORTH_STAR, ROADMAP and ARCHITECTURE now lead with that number, the two public-benchmark intervals containing 0.5, the positive-control caveat, and the superseded-recipe status of 0.731; five claims-register rows added with resolving anchors | `d8893a03` | (README, NORTH_STAR.md, ROADMAP.md, ARCHITECTURE.md, `docs/CLAIMS_REGISTER.md`) |
+| 18 | proposal B3 acted on — `agent-scheduler/` (12 files) and `test-freeride.js` removed with a dependency map showing zero live references; Proposal A, B1, B2 (the 78-file closure) and the four never-run v5.0 test files remain proposals for the owner | `7c2d389c` | `docs/audits/2026-09-20-dead-weight-b3/` |
+
+Follow-ups outside §4: the receipt gate's in-place detector treated a `---`
+separator as part of the previous entry's span and re-validated a
+historical entry on an honest append (false FAIL) — fixed in `2942fdb7`
+(separator lines trimmed from spans; the 2026-09-19 existence rule
+untouched); `approvedSpans` on `/api/nvm/revise` is now a typed schema
+(`startLine` >= 1, `endLine` >= `startLine`, `reason` <= 500 chars, <= 200
+spans) instead of `unknown[]`, with the only sender (`RevisionPanel.tsx`)
+already within those bounds — `971c055d`, `docs/audits/2026-09-20-approved-spans-schema/`.
+
+Verification: an independent verifier at `1db74c21` ran lint, the console
+gate, the brain graph check, server reachability, the receipt gate on both
+ranges naming six scoring-path files with two accepted entries, the
+output-identity harness (45/45 against both `26d930dd` and `53f6e377`), the
+public benchmark (all six numbers unchanged), the build, `npm run gates`
+(the auc24-table gate now reads 2026-11-01), and attribution (26/26). The
+full suite ran 14,561 tests, 0 failures, 98 skipped.
+
+Open for the owner:
+
+1. `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`, re-lock the
+   real-corpus manifest, `npm run lock-auc24` on `shuffle-drop/v3`, and
+   commit `tests/fixtures/auc24-table.json` before 2026-11-01 — the first
+   real-corpus figures the unified grammar has ever produced; the AUC-24
+   ratchet (0.622) is the check.
+2. Land `scoring/advice-rule-fixes` per the triage runbook.
+3. Decide Unicode forced headings.
+4. Delete the 8 superseded branches and the stray
+   `origin/lane/per-pass-diagnostics` (pushed by a lane by mistake at
+   `e3c3b53a`; fully merged).
+5. Proposals A/B1/B2 and the v5.0 test files.
+6. `converge-stream` still has no `cast` parameter; `allowIntroduce` is
+   inert in the loop.
