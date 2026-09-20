@@ -568,6 +568,7 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkDroughtRun, checkZoneImbalance, checkCoOccurrenceDecoupled, checkAftermathVoid, checkPeakUncaused, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { isSuspenseDip } from '../../screenplay/suspense-dip.ts';
 import { GENRE_RULE_MODIFIERS, TONE_REGISTERS, composeThresholds } from '../../../lib/genre-router.ts';
 import type { GenreRuleThresholds, ToneName } from '../../../lib/genre-router.ts';
 import type { StoryGenre } from '../../../engine/types.ts';
@@ -653,8 +654,9 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
 
   // ── Missing reversal means flat structure ─────────────────────────────────
   // Honesty hedge (pilot session 2026-08-07, PILOT_SESSION_REPORT.md §6.1):
-  // `structure.reversalCount` is defined ONLY as scenes with `suspenseDelta
-  // < -1` — a magnitude dip in the danger/relief lexicon (see D3,
+  // `structure.reversalCount` is defined ONLY as scenes whose `suspenseDelta`
+  // dips to the suspense-dip threshold (screenplay/suspense-dip.ts) — a
+  // magnitude dip in the danger/relief lexicon (see D3,
   // docs/p1-benchmark/DETECTOR_DEFECTS_2026-08-03.md, and
   // reversal-detection.ts's own header for the full analysis). It cannot see
   // a reversal conveyed as a broken deal, a betrayal, or a plan backfiring in
@@ -672,7 +674,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     issues.push({
       location: 'Overall structure',
       rule: 'NO_REVERSALS',
-      description: 'No suspense-dip reversals detected — this checks only for a scene where the engine\'s danger/tension language drops sharply (suspenseDelta < -1); it does not detect a reversal conveyed as a betrayal, a broken deal, or a plan backfiring in prose that doesn\'t also read as a tension drop. Reread the draft for that kind of turn before treating this as "no opposition anywhere."',
+      description: 'No suspense-dip reversals detected — this checks only for a scene where the engine\'s danger/tension language drops (suspenseDelta ≤ -1); it does not detect a reversal conveyed as a betrayal, a broken deal, or a plan backfiring in prose that doesn\'t also read as a tension drop. Reread the draft for that kind of turn before treating this as "no opposition anywhere."',
       severity: 'major',
       suggestedFix: 'If a reread confirms the story truly never turns, add a scene where a character\'s plan backfires or a situation inverts. If a reversal is already on the page but reads flat on tension language, this is a gap in the detector\'s coverage, not necessarily a craft problem.',
     });
@@ -1004,7 +1006,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   }
 
   // MIDPOINT_REVERSAL_ABSENT: The midpoint zone (40%–60%) contains no reversal
-  // (suspenseDelta < -1) and no revelation. Great stories pivot at the midpoint —
+  // (a suspense dip) and no revelation. Great stories pivot at the midpoint —
   // the protagonist's strategy shifts from reaction to action. A midpoint with no
   // catalysing event is a story that passes through its centre without changing
   // direction. Requires 10+ scenes for a meaningful midpoint zone.
@@ -1013,7 +1015,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
     const midEnd     = Math.ceil(n * 0.6);
     const midRecords = records.slice(midStart, midEnd);
     const hasMidEvent = midRecords.some(r =>
-      r.suspenseDelta < -1 || r.revelation !== null,
+      isSuspenseDip(r.suspenseDelta) || r.revelation !== null,
     );
     if (!hasMidEvent) {
       issues.push({
@@ -1035,7 +1037,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   if (n >= 10) {
     const lateCutoff = Math.floor(n * 0.4);
     const firstEventIdx = records.findIndex(r =>
-      r.suspenseDelta < -1 || r.revelation !== null,
+      isSuspenseDip(r.suspenseDelta) || r.revelation !== null,
     );
     if (firstEventIdx > lateCutoff) {
       issues.push({
@@ -1205,7 +1207,7 @@ export async function structurePass(input: PassInput): Promise<PassResult> {
   //    structured signal rather than checking individual act-zone proportions. ──
   {
     const isDramaticEvent222 = (r: any): boolean =>
-      r.suspenseDelta < -1 ||
+      isSuspenseDip(r.suspenseDelta) ||
       r.revelation !== null ||
       r.clockRaised === true ||
       (r.relationshipShifts ?? []).some((s: any) => Math.abs(s.amount) >= 0.3);

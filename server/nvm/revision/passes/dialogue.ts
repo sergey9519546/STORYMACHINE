@@ -621,13 +621,39 @@ const ON_THE_NOSE_EMOTIONS =
   'depressed|anxious|nervous|proud|ashamed|guilty|jealous|hopeless|miserable|stressed|worried|' +
   'frustrated|exhausted|overwhelmed|upset|embarrassed|confused|lonely|insecure|panicked|' +
   'disappointed|annoyed|irritated|humiliated|betrayed|hopeful|grateful|stunned|shocked|numb|' +
-  'broken|trapped|threatened|worthless|relieved|ecstatic|heartsick';
+  'broken|trapped|threatened|worthless|relieved|glad|ecstatic|heartsick';
+
+/** Filler allowed between the first-person opener and the emotion word.
+ *
+ *  ── Why this replaced a five-adverb whitelist (2026-09-04) ────────────────
+ *  The opener used to admit only `(really |so |very |extremely |incredibly )?`
+ *  before the emotion. MEASURED consequence: on a deliberately worst-possible
+ *  on-the-nose fixture (tests/fixtures/advice-audit/bad.fountain — every line
+ *  states its speaker's feeling outright) this regex produced ZERO matches
+ *  that survived the density gate, because "Yes, I am STILL worried about the
+ *  presentation." misses on `still`, "I am GLAD it all worked out." missed on
+ *  a word absent from the lexicon, and the two lines that did match landed in
+ *  different scenes. The rule that exists to catch stated feeling could not
+ *  fire on a script made of nothing else.
+ *
+ *  Lazy `{0,2}` word filler admits the ordinary adverbial and determiner
+ *  material English puts there (`still`, `not quite`, `a little`, `kind of`,
+ *  `so damn`) without opening the template up to a whole clause. Two words is
+ *  the measured ceiling: three would start matching "I am the one who is
+ *  angry" and similar constructions where the emotion belongs to a different
+ *  subject.
+ *
+ *  NEGATION IS EXCLUDED at the opener. "I'm not angry." is the canonical
+ *  SUBTEXT line — a character denying the feeling the scene is showing — and
+ *  is the opposite of the defect this rule targets. The old narrow whitelist
+ *  excluded it by accident; the lookahead excludes it on purpose. */
+const ON_THE_NOSE_FILLER = "(?!not\\b|never\\b|no\\b)(?:\\w+ ){0,2}?";
 const ON_THE_NOSE_RE = new RegExp(
   '\\b(' +
-    `I(?:'m| am) (?:really |so |very |extremely |incredibly )?(?:${ON_THE_NOSE_EMOTIONS})` +
-    `|I feel (?:really |so |very )?(?:${ON_THE_NOSE_EMOTIONS})` +
-    `|I(?:'ve| have) been (?:really |so |very |feeling )?(?:${ON_THE_NOSE_EMOTIONS})` +
-    `|that makes me (?:really |so |very )?(?:${ON_THE_NOSE_EMOTIONS})` +
+    `I(?:'m| am) ${ON_THE_NOSE_FILLER}(?:${ON_THE_NOSE_EMOTIONS})` +
+    `|I feel ${ON_THE_NOSE_FILLER}(?:${ON_THE_NOSE_EMOTIONS})` +
+    `|I(?:'ve| have) been ${ON_THE_NOSE_FILLER}(?:${ON_THE_NOSE_EMOTIONS})` +
+    `|that makes me ${ON_THE_NOSE_FILLER}(?:${ON_THE_NOSE_EMOTIONS})` +
   ')\\b',
   'i',
 );
@@ -641,8 +667,26 @@ const ON_THE_NOSE_FIRST_PERSON_RE = /\b(I|I'm|I've|I'll|my|me)\b/i;
 /** Detect explicit character trait labeling instead of showing */
 const TRAIT_LABELING_RE = /\b(you are|he is|she is|they are|you're|he's|she's|they're)\s+(so |very |such a |a )?(brave|smart|stupid|coward|liar|hero|weak|strong|fool|genius|monster|saint|evil|kind|cruel|honest|dishonest|reckless|ruthless|manipulative|selfish|selfless)\b/i;
 
-/** Detect pure exposition delivery ("As you know, Bob...") */
-const AS_YOU_KNOW_RE = /\b(as you know|you already know|as we discussed|as I told you|you remember that|let me explain|the reason (is|why))\b/i;
+/** Detect pure exposition delivery ("As you know, Bob...").
+ *
+ *  ── `you already know` needs a following proposition (2026-09-04) ─────────
+ *  The alternation used to carry the bare substring `you already know`, and a
+ *  bare substring cannot tell the as-you-know MOVE from its exact opposite.
+ *  MEASURED on the matched advice-audit fixtures: this rule fired MAJOR on the
+ *  EXCELLENT script and not at all on the BAD one, and the line it fired on was
+ *
+ *      TESS: "You're asking me a question you already know the answer to."
+ *
+ *  — a line whose entire dramatic function is to REFUSE to deliver exposition.
+ *  The as-you-know defect is a character stating a PROPOSITION both characters
+ *  already hold, for the audience's benefit; "you already know the answer" and
+ *  "you already know what I'm going to say" state no proposition at all, they
+ *  refer to knowledge without supplying any. The alternate therefore requires
+ *  the phrase to be followed by a comma or a `that`-clause — the two shapes an
+ *  actual restated proposition takes ("You already know that the plant closes
+ *  Friday.", "You already know, the plant closes Friday.") — while the other
+ *  alternates, which are unambiguous openers, are unchanged. */
+const AS_YOU_KNOW_RE = /\b(as you know|you already know(?=,|\s+that\b)|as we discussed|as I told you|you remember that|let me explain|the reason (is|why))\b/i;
 
 /** Detect question-answer agreement (character agrees without pushback) */
 const AGREEMENT_RE = /^(yes|right|exactly|absolutely|of course|agreed|sure|correct|definitely|totally|indeed)[.,!]?$/i;
@@ -747,10 +791,22 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   const dialogue = extractDialogue(fountain);
 
   // ── On-the-nose emotion statements ───────────────────────────────────────
-  // Wave 18α: DENSITY-gated. A single isolated feeling line in a scene is normal, often
-  // dramatically justified, dialogue — the defect this rule targets is DENSITY (multiple
-  // characters, or repeated lines, narrating feelings instead of showing them). Only fires
-  // once a scene has 2+ on-the-nose matches; a lone match anywhere is left alone.
+  // Wave 18α: DENSITY-gated. A single isolated feeling line is normal, often dramatically
+  // justified, dialogue — the defect this rule targets is DENSITY (multiple characters, or
+  // repeated lines, narrating feelings instead of showing them). A lone match anywhere is
+  // still left alone.
+  //
+  // 2026-09-04 — the density gate moved from PER-SCENE >= 2 to SCRIPT-WIDE >= 3.
+  // Wave 18α's per-scene form required the on-the-nose lines to CLUSTER, which is a
+  // property of one bad scene, not of a script written on the nose throughout. MEASURED
+  // on the two matched advice-audit fixtures (tests/fixtures/advice-audit/): the bad
+  // script — where every character states their feeling outright, in ordinary bad English
+  // rather than in the calibration corpus's own flagged phrasings — spread its stated
+  // feelings one per scene and therefore produced ZERO findings under the per-scene gate.
+  // Script-wide >= 3 keeps Wave 18α's actual intent (one feeling line is not a defect;
+  // a habit is) while measuring the habit at the scale it exists at. The excellent
+  // fixture stays at 0 matches under both gates, so the widening is not paid for in
+  // false positives on the negative fixture.
   {
     const lineToSceneNose = buildLineToSceneMap(fountain);
     const noseMatches: Array<{ speaker: string; line: string; lineNum: number; sceneIdx: number }> = [];
@@ -760,12 +816,9 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
         noseMatches.push({ ...d, sceneIdx: lineToSceneNose[d.lineNum - 1] ?? 0 });
       }
     }
-    const noseCountByScene = new Map<number, number>();
+    const ON_THE_NOSE_SCRIPT_MIN = 3;
     for (const m of noseMatches) {
-      noseCountByScene.set(m.sceneIdx, (noseCountByScene.get(m.sceneIdx) ?? 0) + 1);
-    }
-    for (const m of noseMatches) {
-      if ((noseCountByScene.get(m.sceneIdx) ?? 0) >= 2) {
+      if (noseMatches.length >= ON_THE_NOSE_SCRIPT_MIN) {
         issues.push({
           location: `Line ${m.lineNum} (${m.speaker})`,
           rule: 'ON_THE_NOSE',
@@ -791,16 +844,44 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   }
 
   // ── Consecutive agreements (sycophantic echo) ────────────────────────────
+  // 2026-09-04 — gated on the agreement being the scene's LAST dialogue beat.
+  //
+  // The rule's own claim is "no conflict or subtext", which is a claim about
+  // the EXCHANGE, not about the line. A bare monosyllabic agreement is either
+  // sycophancy or the most loaded line in the script, and the engine has no
+  // channel that can tell those apart from the line alone. MEASURED on the
+  // matched advice-audit fixtures, the ungated rule fired on the EXCELLENT
+  // script and not at all on the BAD one, and the line it fired on was
+  //
+  //     NOOR: "Yes."
+  //
+  // — an admission that ends her career, reported to the writer as "NOOR
+  // simply agrees with GIL — no conflict or subtext".
+  //
+  // Scene-terminal is the minimal condition under which the rule's own text is
+  // TRUE rather than merely emitted: an agreement that is immediately answered,
+  // pressed, or contradicted by a later line in the same scene demonstrably DID
+  // produce more exchange, so "no conflict" is falsified on the page. Only an
+  // agreement that ENDS the exchange can support the claim. This deliberately
+  // keeps the rule narrow rather than removing it — capitulation as a scene's
+  // last word is a real and diagnosable habit, and DIALOGUE_AGREEMENT_CHAIN
+  // (3+ consecutive agreements) still covers the in-scene run case.
+  const lineToSceneAgree = buildLineToSceneMap(fountain);
+  const sceneOfDialogue = (lineNum: number) => lineToSceneAgree[lineNum - 1] ?? 0;
   for (let i = 1; i < dialogue.length; i++) {
-    if (AGREEMENT_RE.test(dialogue[i].line) && dialogue[i].speaker !== dialogue[i - 1].speaker) {
-      issues.push({
-        location: `Line ${dialogue[i].lineNum} (${dialogue[i].speaker})`,
-        rule: 'SYCOPHANTIC_AGREEMENT',
-        description: `${dialogue[i].speaker} simply agrees with ${dialogue[i - 1].speaker} — no conflict or subtext`,
-        severity: 'minor',
-        suggestedFix: 'Give the agreeing character a qualification, hesitation, or counter-desire',
-      });
-    }
+    if (!AGREEMENT_RE.test(dialogue[i].line)) continue;
+    if (dialogue[i].speaker === dialogue[i - 1].speaker) continue;
+    const scene = sceneOfDialogue(dialogue[i].lineNum);
+    const isSceneTerminal =
+      i === dialogue.length - 1 || sceneOfDialogue(dialogue[i + 1].lineNum) !== scene;
+    if (!isSceneTerminal) continue;
+    issues.push({
+      location: `Line ${dialogue[i].lineNum} (${dialogue[i].speaker})`,
+      rule: 'SYCOPHANTIC_AGREEMENT',
+      description: `${dialogue[i].speaker} closes the scene by simply agreeing with ${dialogue[i - 1].speaker} — the exchange ends on capitulation, with nothing qualified, resisted, or left open`,
+      severity: 'minor',
+      suggestedFix: 'Give the agreeing character a qualification, hesitation, or counter-desire — or let the scene end one beat earlier, on the line that still had friction in it',
+    });
   }
 
   // ── Long monologue (>6 lines without interruption) ───────────────────────
@@ -2424,7 +2505,15 @@ export async function dialoguePass(input: PassInput): Promise<PassResult> {
   // Distinct from ON_THE_NOSE (broad literalness), EMOTIONAL_SUPPRESSION (the opposite —
   // feeling withheld entirely), and TRAIT_LABELING (naming a character's traits).
   if (dialogue.length >= 8) {
-    const emotionNamingRe392 = /\b(i'?m|i am|i feel|i'?m feeling|feeling)\s+(so\s+|really\s+|very\s+)?(angry|sad|scared|afraid|frightened|happy|hurt|upset|furious|terrified|nervous|anxious|lonely|jealous|miserable|devastated|heartbroken|ashamed|guilty|excited|thrilled|depressed|frustrated|worried|enraged|grief|heartbroken|overjoyed|crushed)\b/i;
+    // 2026-09-04: the intensifier slot was `(so|really|very)?`, the same
+    // three-adverb whitelist that made ON_THE_NOSE unable to fire on a script
+    // written entirely on the nose (see ON_THE_NOSE_FILLER above for the
+    // measurement). It is widened here for the same reason and with the same
+    // guard: at most two filler words, and never across a negation, since
+    // "I'm not scared" is subtext rather than emotion-naming. `relieved` and
+    // `glad` join the list — both are feelings stated outright, and both were
+    // missing while their opposites (`devastated`, `crushed`) were present.
+    const emotionNamingRe392 = /\b(i'?m|i am|i feel|i'?m feeling|feeling)\s+(?!not\b|never\b|no\b)(?:\w+\s+){0,2}?(angry|sad|scared|afraid|frightened|happy|hurt|upset|furious|terrified|nervous|anxious|lonely|jealous|miserable|devastated|heartbroken|ashamed|guilty|excited|thrilled|depressed|frustrated|worried|relieved|glad|enraged|grief|overjoyed|crushed)\b/i;
     const emotionNamingCount392 = dialogue.filter(d => emotionNamingRe392.test(d.line)).length;
     if (emotionNamingCount392 >= 3) {
       issues.push({

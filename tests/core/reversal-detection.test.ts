@@ -52,9 +52,23 @@ describe('detectReversals — positive fixture: the canonical D3 betrayal-revela
   const text = fs.readFileSync(path.join(fixtureDir, 'the-second-key.fountain'), 'utf8');
   const { records } = analyzeFountainText(text);
 
-  it('legacy suspense-dip definition reports ZERO reversals on this script (reproduces D3 exactly)', () => {
-    const delta = computeReversalDelta(records);
-    assert.equal(delta.legacyCount, 0, 'D3 states structure.reversalCount === 0 on this exact script');
+  // 2026-09-04 — this used to assert `legacyCount === 0`. The suspense-dip
+  // threshold was corrected that day (screenplay/suspense-dip.ts: `< -1` is
+  // `<= -2` on an integer channel, reached by 0 of the 42 scripts this repo
+  // ships), and the legacy channel now counts ONE dip on this fixture — at
+  // sceneIdx 2, the GATE scene. D3's actual claim is not about a cardinality:
+  // it is that the legacy suspense channel CANNOT SEE the allegiance reveal at
+  // sceneIdx 12. That claim is unchanged and is now demonstrable in a stronger
+  // form — legacy flags a scene that is not the reveal, and still misses the
+  // one that is — so the assertion moved from the count to the scene set,
+  // which is what the ledger actually says and what no future threshold change
+  // can quietly satisfy by accident.
+  it('the legacy suspense-dip channel does not flag the VAULT reveal scene (reproduces D3\'s blind spot)', () => {
+    const legacyScenes = records
+      .map((r, i) => ({ i, d: r.suspenseDelta }))
+      .filter(x => x.d <= -1)
+      .map(x => x.i);
+    assert.ok(!legacyScenes.includes(12), `legacy must not see the reveal at sceneIdx 12; flagged ${JSON.stringify(legacyScenes)}`);
   });
 
   it('detectReversals finds the allegiance reveal the legacy channel misses', () => {
@@ -72,21 +86,43 @@ describe('detectReversals — positive fixture: the canonical D3 betrayal-revela
     assert.match(hit!.evidence, /signed my transfer papers/i);
   });
 
-  it('computeReversalDelta reports a positive delta on this script (detected finds what legacy misses)', () => {
+  // computeReversalDelta compares CARDINALITIES, not scene sets. On this
+  // fixture the two channels now each report one reversal — at two DIFFERENT
+  // scenes (legacy at 2, detected at 12) — so the delta stat reads 0 while the
+  // channels disagree completely. That is a real blind spot in the stat, not in
+  // the detector, and it is asserted here rather than papered over: a future
+  // wiring decision must not read `delta === 0` as "the channels agree".
+  it('computeReversalDelta is internally consistent, and its delta cannot show a same-count disagreement', () => {
     const delta = computeReversalDelta(records);
-    assert.equal(delta.legacyCount, 0);
     assert.ok(delta.detectedCount >= 1);
     assert.equal(delta.delta, delta.detectedCount - delta.legacyCount);
-    assert.ok(delta.delta >= 1);
+    const legacyScenes = records.map((r, i) => ({ i, d: r.suspenseDelta })).filter(x => x.d <= -1).map(x => x.i);
+    const detectedScenes = detectReversals(records).reversals.map(r => r.sceneIdx);
+    assert.notDeepEqual(legacyScenes, detectedScenes, 'the two channels flag different scenes on this fixture');
+    assert.equal(delta.delta, 0, 'and the cardinality-only delta stat cannot see that disagreement');
   });
 });
 
 // ── Negative fixture: linear, no-twist script (both channels agree on 0) ──
 
+// 2026-09-04: this fixture said "a QUIET gallery". `quiet` is in RELIEF_WORDS
+// (fountain-analyzer.ts), so scene 2 scored suspenseDelta -1 on one incidental
+// adjective describing a LOCATION rather than any de-escalation. Under the old
+// `< -1` threshold nothing noticed, because that threshold was unreachable; the
+// corrected `<= -1` threshold surfaced it. The word is changed to `shuttered`
+// so the fixture matches its own stated intent (a script with no tension
+// movement at all) rather than the intent being quietly false.
+//
+// FINDING, recorded rather than fixed here: RELIEF_WORDS has the same
+// word-sense defect this batch fixed in DANGER_TENSION_WORDS ('dark', 'runs',
+// 'shot'), and the corrected threshold makes the relief side's noise reachable
+// where it previously was not. That is a real cost of the correction and is
+// documented in docs/scoring/ADVICE_RULE_FIXES_2026-09-04.md; auditing the
+// relief lexicon is separate scoring work with its own measurement.
 describe('detectReversals — negative fixture: linear no-twist heist, both channels agree on 0', () => {
   const text = fountain(
     ['INT. PAWNSHOP BACK ROOM - NIGHT', '', 'June counts a stack of bills at a folding table, patient, unhurried.', '', 'JUNE', 'Ten thousand even, same as always.'],
-    ['INT. MARCUS\'S APARTMENT - NIGHT', '', 'Marcus spreads photographs of a quiet gallery across a cluttered table. June leans in the doorway, arms crossed, smiling.', '', 'MARCUS', 'Small job. In and out before midnight.', '', 'JUNE', 'You always say that.'],
+    ['INT. MARCUS\'S APARTMENT - NIGHT', '', 'Marcus spreads photographs of a shuttered gallery across a cluttered table. June leans in the doorway, arms crossed, smiling.', '', 'MARCUS', 'Small job. In and out before midnight.', '', 'JUNE', 'You always say that.'],
     ['EXT. GALLERY - BACK ALLEY - NIGHT', '', 'June photographs the delivery door while Marcus times the guard\'s rounds against a stopwatch.', '', 'MARCUS', 'Same guard, same route, every forty minutes.', '', 'JUNE', 'Forty minutes is plenty.'],
     ['INT. GALLERY - STORAGE ROOM - NIGHT', '', 'June works the old lock while Marcus watches the hallway.', '', 'MARCUS', 'Almost there.', '', 'JUNE', 'Nearly done.'],
     ['INT. GALLERY - VAULT - CONTINUOUS', '', 'June lifts the small case free and the door swings open without resistance.', '', 'JUNE', 'That\'s the one.'],
@@ -116,7 +152,7 @@ describe('detectReversals — negative fixture: linear no-twist heist, both chan
 describe('detectReversals — negative fixture: a plain suspense dip (legacy fires, detector correctly does not)', () => {
   const text = fountain(
     ['INT. PAWNSHOP BACK ROOM - NIGHT', '', 'June counts a stack of bills at a folding table, patient, unhurried.', '', 'JUNE', 'Ten thousand even, same as always.'],
-    ['INT. MARCUS\'S APARTMENT - NIGHT', '', 'Marcus spreads photographs of a quiet gallery across a cluttered table. June leans in the doorway, arms crossed, smiling.', '', 'MARCUS', 'Small job. In and out before midnight.', '', 'JUNE', 'You always say that.'],
+    ['INT. MARCUS\'S APARTMENT - NIGHT', '', 'Marcus spreads photographs of a shuttered gallery across a cluttered table. June leans in the doorway, arms crossed, smiling.', '', 'MARCUS', 'Small job. In and out before midnight.', '', 'JUNE', 'You always say that.'],
     // The dip scene: heavy on RELIEF_WORDS, no DANGER_TENSION_WORDS, no
     // revelation-pattern text, no dialogue (so no relationshipShifts either)
     // — a pure magnitude de-escalation with no other signal at all.

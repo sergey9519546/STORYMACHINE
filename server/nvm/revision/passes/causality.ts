@@ -620,6 +620,7 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { checkCoOccurrenceDecoupled, checkAftermathVoid, checkZoneImbalance, checkPeakUncaused, checkDroughtRun, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
+import { isSuspenseDip } from '../../screenplay/suspense-dip.ts';
 
 export async function causalityPass(input: PassInput): Promise<PassResult> {
   const { fountain, records, annotations, approvedSpans } = input;
@@ -925,7 +926,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     if (hasGoal) {
       const hasOpposition = records.some(r => {
         const hasNegShift = (r.relationshipShifts ?? []).some(s => s.amount < -0.5);
-        const hasReversal = r.suspenseDelta <= -1;
+        const hasReversal = isSuspenseDip(r.suspenseDelta);
         return hasNegShift || hasReversal;
       });
       if (!hasOpposition) {
@@ -2407,8 +2408,8 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
 
   // POSITIVE_REACTION_WITHOUT_CAUSE (minor): A scene carries a positive emotional shift but
   // neither it nor the two scenes before it contain any on-page cause for relief or joy — no
-  // positive relationship shift, no revelation, no payoff, no suspense release (suspenseDelta
-  // < -1), no clock relief (clockDelta < 0). The character brightens with no visible reason,
+  // positive relationship shift, no revelation, no payoff, no suspense release (a suspense
+  // dip, screenplay/suspense-dip.ts), no clock relief (clockDelta < 0). The character brightens with no visible reason,
   // so the upswing reads as unearned. This is the positive sibling of REACTION_WITHOUT_CAUSE,
   // which keys exclusively on negative emotion (`emotionalShift !== 'negative'` → continue);
   // an uncaused positive turn is just as much a causal gap as an uncaused negative one, and is
@@ -2420,7 +2421,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
     if (curr.emotionalShift !== 'positive') continue;
     const selfCause405 =
       curr.revelation !== null ||
-      (curr.suspenseDelta ?? 0) < -1 ||
+      isSuspenseDip(curr.suspenseDelta) ||
       (curr.clockDelta ?? 0) < 0 ||
       ((curr.payoffSetupIds ?? []) as any[]).length > 0 ||
       ((curr.relationshipShifts ?? []) as any[]).some((s: any) => s.amount > 0);
@@ -2431,7 +2432,7 @@ export async function causalityPass(input: PassInput): Promise<PassResult> {
       if (
         p.emotionalShift === 'positive' ||
         p.revelation !== null ||
-        (p.suspenseDelta ?? 0) < -1 ||
+        isSuspenseDip(p.suspenseDelta) ||
         (p.clockDelta ?? 0) < 0 ||
         ((p.payoffSetupIds ?? []) as any[]).length > 0 ||
         ((p.relationshipShifts ?? []) as any[]).some((s: any) => s.amount > 0)

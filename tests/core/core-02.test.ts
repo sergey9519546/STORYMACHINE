@@ -358,6 +358,9 @@ ALICE
 As you know, Bob, we discussed the plan.
 
 BOB
+I am still ashamed about the Henderson file.
+
+BOB
 Absolutely.
 `;
 
@@ -4210,6 +4213,14 @@ describe('NVM — 12-Pass Revision Pipeline (Wave 39)', () => {
     assert.ok(Array.isArray(result.issues));
   });
 
+  // 2026-09-04: ON_THE_NOSE's density gate moved from >=2 PER SCENE to >=3
+  // SCRIPT-WIDE (dialogue.ts carries the measurement — the per-scene form could
+  // not fire on a script written on the nose throughout, because such a script
+  // spreads its stated feelings one per scene). SAMPLE_FOUNTAIN carried exactly
+  // two, so a third was added: BOB's "I am still ashamed about the Henderson
+  // file." It also exercises the widened filler slot (`still`, which the old
+  // five-adverb whitelist rejected) and the cross-scene counting the new gate
+  // does. AS_YOU_KNOW_BOB's own line in this fixture is untouched.
   it('dialoguePass: detects ON_THE_NOSE and AS_YOU_KNOW_BOB in sample', async () => {
     const result = await dialoguePass(makePassInput());
     assert.equal(result.pass, 'dialogue');

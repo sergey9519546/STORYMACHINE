@@ -4932,7 +4932,16 @@ He said <that> & she said it's over.`;
     const emitted = new Set(parseFountain(SAMPLE_FOUNTAIN_P2).map(b => b.type));
     // `empty`, `boneyard`, `synopsis` and `page_break` are structural blocks the
     // print path drops rather than styles, so they need no class.
-    const notStyled = new Set(['empty', 'boneyard', 'synopsis', 'page_break']);
+    //
+    // `title_page` joined them 2026-09-04, when parseFountain learned to type
+    // the leading `Title:`/`Author:` block instead of calling it `action`. It
+    // belongs on this list rather than in the map: a title page is not body
+    // prose, and every exporter ALREADY skipped these lines when building the
+    // body and rendered them separately (src/lib/export-title-page.ts, used by
+    // docx.ts and fdx.ts). Before the parser change the print path printed
+    // "Title: X" as an action line at the top of page 1; it is now dropped from
+    // the body, which is what the other two exporters already did.
+    const notStyled = new Set(['empty', 'boneyard', 'synopsis', 'page_break', 'title_page']);
     const unmapped = [...emitted].filter(t => !(t in cssMap) && !notStyled.has(t));
     assert.deepEqual(unmapped, [],
       `the parser emits block types with no print CSS class: ${unmapped.join(', ')}`);

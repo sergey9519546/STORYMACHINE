@@ -92,6 +92,8 @@ const CORE_ALLOWLIST: Record<string, string> = {
     'expectedTensionAt and the structure/arc preset tables analyze/metrics.ts scores the emotional arc against; pure data + pure functions.',
   'server/nvm/ops/StoryOp.ts':
     'StoryOp / AtomicFact / ClueCarrier type vocabulary the screenplay memory records are shaped by; one STORY_OP_KINDS table, no runtime dependencies.',
+  'server/nvm/screenplay/suspense-dip.ts':
+    'isSuspenseDip / countSuspenseDips — the one definition of the suspense-dip reversal predicate behind structure.reversalCount and reversalDensity, which NO_REVERSALS and NO_REVERSALS_LONG_STORY (4x weight) turn into ScriptDoctorReport.health; a constant plus two pure predicates, no imports.',
   'server/nvm/proof/surfacing.ts':
     'SupportState and the surfacing thresholds the disclosure/epistemics analysis grades evidence with; pure.',
   'server/nvm/quality/arc-tracker.ts':

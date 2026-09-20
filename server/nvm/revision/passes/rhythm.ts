@@ -544,24 +544,74 @@
 import type { PassInput, PassResult, RevisionIssue } from './types.ts';
 import { rewritePass } from '../rewrite.ts';
 import { fastWordCount } from '../../../lib/string-utils.ts';
+import { titlePageLineCount } from '../../../../src/lib/fountain.ts';
 import { checkZoneImbalance, checkDroughtRun, checkPeakUncaused, checkAftermathVoid, checkCoOccurrenceDecoupled, checkZoneCluster, FOUR_ZONE_NAMES } from './lib/checks.ts';
 
-/** Extract action lines (non-dialogue, non-slug, non-transition) from fountain */
+/** Extract action lines (non-dialogue, non-slug, non-transition) from fountain.
+ *
+ *  ── Two parse defects fixed 2026-09-04 ────────────────────────────────────
+ *  Both let DIALOGUE reach this list, where every rhythm rule then measured it
+ *  as prose and reported it to the writer as an action line.
+ *
+ *  (1) A dialogue BLOCK is every non-blank line after a cue up to the next
+ *      blank line, not one line. The old `skipNext` boolean consumed exactly
+ *      one, so a cue followed by a parenthetical spilled the actual speech into
+ *      the action list. MEASURED on the matched advice-audit fixture:
+ *
+ *          NOOR
+ *          (to herself)
+ *          No.
+ *
+ *      produced `ACTION_SHORTEST_OUTLIER @ action line 108: "No."` — the
+ *      script's shortest "action line" was a line of dialogue.
+ *
+ *  (2) A cue carrying an extension — `DAN (CONT'D)`, `MARIA (V.O.)`,
+ *      `SAM (O.S.)` — never matched the cue test at all, because the character
+ *      class has no parentheses in it. So the CUE ITSELF entered the action
+ *      list, and so did the speech beneath it. MEASURED on the same pair of
+ *      fixtures: `ACTION_SHORTEST_OUTLIER @ action line 108: "DAN (CONT'D)"`.
+ *      The extension is stripped before the cue test, matching what
+ *      character-arc.ts already does with the identical pattern.
+ *
+ *  Fountain's own title page (`Title:`, `Author:`, `Draft date:` ...) is also
+ *  skipped here: those lines are not screenplay prose, and src/lib/fountain.ts
+ *  now types them `title_page` rather than `action` for the same reason. */
 function extractActionLines(fountain: string): Array<{ text: string; lineNum: number }> {
   const lines = fountain.split('\n');
   const action: Array<{ text: string; lineNum: number }> = [];
-  let skipNext = false;
+  let inDialogueBlock = false;
+  let inBoneyard = false;
+  const titlePageEnd = titlePageLineCount(fountain);
 
   for (let i = 0; i < lines.length; i++) {
+    if (i < titlePageEnd) continue;
     const line = lines[i].trim();
-    if (!line) { skipNext = false; continue; }
+
+    // Boneyard (`/* ... */`) is Fountain's COMMENT, and a comment is not
+    // prose. The old check tested only `line.startsWith('/*')`, which skipped
+    // the OPENING line of a multi-line comment and then measured every line of
+    // its body as action. That is how a fixture's own provenance header
+    // produced `ACTION_SHORTEST_OUTLIER @ action line 25: "device."` — the
+    // script's "shortest action line" was a word inside a licence note. The
+    // state machine mirrors parseFountain's (src/lib/fountain.ts).
+    if (!inBoneyard && line.startsWith('/*')) {
+      inBoneyard = !(line.includes('*/') && line.length > 2);
+      continue;
+    }
+    if (inBoneyard) {
+      if (line.includes('*/')) inBoneyard = false;
+      continue;
+    }
+
+    if (!line) { inDialogueBlock = false; continue; }
 
     // Sluglines, transitions, character cues, parentheticals
     if (/^(INT\.|EXT\.|INT\/EXT\.|I\/E\.|CUT TO|FADE|SMASH|THE END)/i.test(line)) continue;
-    if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(line)) { skipNext = true; continue; }
-    if (skipNext) { skipNext = false; continue; } // dialogue line after character cue
+    const cueBody = line.replace(/\s*\(.*?\)\s*$/, '').trimEnd();
+    if (/^[\p{Lu}\p{Lt}][\p{Lu}\p{Lt}\p{M}0-9\s\-'\.]{2,}$/u.test(cueBody)) { inDialogueBlock = true; continue; }
+    if (inDialogueBlock) continue; // dialogue/parenthetical inside the cue's block
     if (line.startsWith('(') && line.endsWith(')')) continue; // parenthetical
-    if (line.startsWith('>') || line.startsWith('/*') || line.startsWith('//')) continue;
+    if (line.startsWith('>') || line.startsWith('//')) continue;
 
     action.push({ text: line, lineNum: i + 1 });
   }
@@ -1627,8 +1677,19 @@ export async function rhythmPass(input: PassInput): Promise<PassResult> {
   // writer is stage-managing the reader's eye rather than trusting the image to land.
   // Distinct from SEMICOLON_IN_ACTION (`;` not `:`), DASH_CHAIN (trailing em-dash),
   // ELLIPSIS_CHAIN (trailing `...`), and ACTION_PARENTHESIS_ASIDE.
+  // 2026-09-04 -- a digit guard. The test was `l.text.includes(':')`, which
+  // cannot tell a dramatic-reveal colon from a clock, a ratio, or a scene-time
+  // stamp. MEASURED on the matched advice-audit fixture, this rule told the
+  // writer that "Checks the time: 8:52." and "GIL ABARA, 9:40 PM" were "a colon
+  // used as a dramatic-reveal device". The reveal colon is always followed by
+  // PROSE -- a clause the colon is holding back -- so requiring a non-digit
+  // after it (or end of line, for "She reads the note:") keeps every genuine
+  // case and drops every numeric one. A reveal whose payload happens to open
+  // with a number is the deliberate false negative here; being silent about one
+  // is cheaper than telling a writer their timestamp is a craft decision.
+  const DRAMATIC_COLON_358 = /[^\d\s]\s*:(?:\s+(?!\d)|$)/;
   if (actionLines.length >= 8) {
-    const colonCount358 = actionLines.filter(l => l.text.includes(':')).length;
+    const colonCount358 = actionLines.filter(l => DRAMATIC_COLON_358.test(l.text)).length;
     if (colonCount358 >= 3) {
       issues.push({
         location: 'Action lines throughout',
