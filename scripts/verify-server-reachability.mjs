@@ -7,10 +7,11 @@
 // an unlisted unreachable component fails). server/ had no counterpart — which
 // is exactly why 78 non-test files / 24,722 LOC accumulated there without
 // anyone noticing. This script is that counterpart: BFS from server.ts, fail on
-// any NEW unreachable file.
+// any NEW unreachable file. (42 of those 78 — the v5.0 closure — were removed
+// on 2026-09-20 under Proposal B2; 36 files / 8,517 lines remain allowlisted.)
 //
 // WHAT IT DOES NOT DO. It does not delete, quarantine, or recommend deleting
-// anything. The 78 files that are unreachable today are listed below with the
+// anything. The 36 files that are unreachable today are listed below with the
 // reason each one is there, and this script PASSES with all of them present.
 // Its whole job is to stop the pile growing while the owner decides. See
 // docs/proposals/DEAD_WEIGHT_REMOVAL_2026-08-24.md for the standing proposal.
@@ -80,75 +81,32 @@ const TEST_DIR_SEGMENT = '__tests__';
 // silently.
 
 const KNOWN_UNREACHABLE = new Set([
-  // ── 1. tsconfig-quarantined v5.0 "narrative OS" subsystem (28 files) ─────
-  // These four directories are excluded from tsconfig.json's compile (they
-  // never type-checked: 241 tsc errors pre-quarantine) and dir-excluded from
-  // CI's console.* grep. They are the merged-but-unfinished experimental
-  // surface CLAUDE.md's standing task explicitly deprioritizes behind
-  // demand-first validation. Preserved in the tree per the keep-as-reference
-  // moratorium; not wired to anything.
+  // ── 1-3. REMOVED 2026-09-20: the v5.0 "narrative OS" closure ────────────
+  // Groups 1-3 of this list (the tsconfig-quarantined quantum / research /
+  // planning / infinity-gate subsystem, the 13 dead server/nvm/kernel files,
+  // and server/nvm/live/v5-loop.ts — 42 files, 16,153 lines by this script's
+  // own line count) no longer exist. They were deleted under the owner's
+  // decision on Proposal B2 of
+  // docs/proposals/DEAD_WEIGHT_REMOVAL_2026-08-24.md; the dependency map,
+  // classification and gate counts are in
+  // docs/audits/2026-09-20-dead-weight-b1-b2/README.md, and every file is
+  // recoverable from git history at bf4f3bff.
   //
-  // Known placeholder-value sites inside this group, recorded here so nobody
-  // has to rediscover them: quantum/adaptive-pruning.ts returns a literal
-  // 0.5 for genre novelty, 0.5 for thematic distance and 5 for genre count
-  // (each marked "Placeholder"); infinity-gate/audience-simulation.ts's
-  // calculateCulturalMatch returns a literal 0.7; planning/index.ts re-exports
-  // OASISEmotionalValidator, whose three methods all throw "OASIS integration
-  // not yet implemented".
-  'server/nvm/quantum/adaptive-pruning.ts',
-  'server/nvm/quantum/distributed-workers.ts',
-  'server/nvm/quantum/entanglement.ts',
-  'server/nvm/quantum/example.ts',
-  'server/nvm/quantum/hierarchical-clustering.ts',
-  'server/nvm/quantum/index.ts',
-  'server/nvm/quantum/story-field.ts',
-  'server/nvm/quantum/types.ts',
-  'server/nvm/research/api.ts',
-  'server/nvm/research/dashboard.ts',
-  'server/nvm/research/examples.ts',
-  'server/nvm/research/experiments/quantum-branching.ts',
-  'server/nvm/research/experiments/setup-payoff-distance.ts',
-  'server/nvm/research/experiments/trinity-gate-precision.ts',
-  'server/nvm/research/index.ts',
-  'server/nvm/research/theories/campbell-hero-journey.ts',
-  'server/nvm/research/theories/freytag-pyramid.ts',
-  'server/nvm/research/types.ts',
-  'server/nvm/infinity-gate/audience-simulation.ts',
-  'server/planning/apdl-planner.ts',
-  'server/planning/apdl-validator.ts',
-  'server/planning/apdl.ts',
-  'server/planning/effect-targets.ts',
-  'server/planning/emotional-effects-library.ts',
-  'server/planning/examples.ts',
-  'server/planning/index.ts',
-  'server/planning/oasis-integration.ts',
-  'server/planning/pddl-types.ts',
-
-  // ── 2. Dead kernel files (13) ────────────────────────────────────────────
-  // The v5.0 kernel experiment. Listed individually BECAUSE the directory is
-  // mixed: event-store.ts and adapters/commit-to-events.ts are LIVE (imported
-  // by server/engine/Stage.ts) and are deliberately absent from this list, so
-  // they stay covered by the tripwire like any other shipped file. Each entry
-  // below matches tsconfig.json's per-file quarantine of the same paths.
-  'server/nvm/kernel/adapters.ts',
-  'server/nvm/kernel/adapters/index.ts',
-  'server/nvm/kernel/adapters/nlp-helpers.ts',
-  'server/nvm/kernel/adapters/type-enrichment.ts',
-  'server/nvm/kernel/index.ts',
-  'server/nvm/kernel/integration.ts',
-  'server/nvm/kernel/trinity-gate-demo.ts',
-  'server/nvm/kernel/trinity-gate-example.ts',
-  'server/nvm/kernel/trinity-gate.ts',
-  'server/nvm/kernel/v5-examples.ts',
-  'server/nvm/kernel/verifiers/owne-verifier.ts',
-  'server/nvm/kernel/verifiers/preflight-auditor.ts',
-  'server/nvm/kernel/verifiers/story-graph-verifier.ts',
-
-  // ── 3. The v5 live loop (1) ──────────────────────────────────────────────
-  // Also tsconfig-excluded by name. Writes the literal string 'To be analyzed'
-  // as every branch's dramatic impact, which is the clearest single marker
-  // that this loop was never finished.
-  'server/nvm/live/v5-loop.ts',
+  // Their entries had to go with them: this script FAILS on an allowlist entry
+  // naming a file that no longer exists (the ALLOWLIST STALE branch below).
+  // The placeholder-value sites those entries used to record — quantum/
+  // adaptive-pruning.ts's literal 0.5 / 0.5 / 5, infinity-gate/
+  // audience-simulation.ts's literal 0.7 cultural match, planning/index.ts's
+  // OASISEmotionalValidator whose three methods all threw "not yet
+  // implemented", and v5-loop.ts's literal 'To be analyzed' — are gone with
+  // the code, and were verified to have no live importer before deletion.
+  //
+  // THE LIVE KERNEL CLOSURE IS UNCHANGED AND STILL COVERED. server/nvm/kernel/
+  // event-store.ts, types.ts and adapters/commit-to-events.ts were never on
+  // this list, because server/engine/Stage.ts imports them; they are reachable
+  // and this tripwire guards them like any other shipped file. That is the
+  // trap described in this file's header, and removing the dead siblings did
+  // not touch it.
 
   // ── 4. Unwired analyze/** candidate modules (27) ─────────────────────────
   // Analyzer modules that exist, mostly type-check, and in many cases have
