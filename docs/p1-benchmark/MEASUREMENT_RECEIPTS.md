@@ -3439,3 +3439,176 @@ with the ledger's own marker for a receipt that is not yet one *(REDACTION 3 of
 4, same reason)*. The conversion recipe — all three
 of `pendingReason`'s scans, not just the heading — is in
 `docs/brain/Owner/Owner - R5 Measurement and Merge.md`.
+
+#### SECOND PASS, 2026-09-20 — the same candidate with the session head `6ca3fcd0` merged in, the six public floors re-locked, and three of four standing failures closed
+
+This subsection extends the entry above IN PLACE rather than opening a new one:
+it is the same branch, the same change, measured again after
+`git merge --no-ff 6ca3fcd0` brought the session head onto it. Nothing above is
+edited; everything below is a fresh run.
+
+- **Date:** 2026-09-20
+- **Git SHA:** merge commit `4229a22a` on `lane/land-feature-length-defects`, merging the session head `6ca3fcd0` onto the candidate at `4029b245`; measured at `7d12b32d`, the tip after the three commits this pass added. The baseline every before/after below is measured against is a `git archive 6ca3fcd0` checkout, scored with `GIT_SHA=dev` on both sides so the build stamp cannot enter the diff.
+- **Command:** `node scripts/check-doctor-output-identity.mjs --tree <6ca3fcd0 archive> --out <dir>`, `--tree . --out <dir>`, `--compare <before> <after>` · `npm run benchmark:public -- --lock` · `node --experimental-strip-types --test` on each suite in the gate table of `docs/audits/2026-09-20-feature-length-defects-prep/README.md` · `npm run measure-voice-bound -- --uniform-min=150 --max-admitted=80,100 --probe-cast=40 --repeats=2 --conditions=loaded` (twice: at the shipped bound and at a candidate of 1,900,000) · `npm run lint` · `npm run check-no-console` · `npm run check-server-reachability` · `npm run check-docs` · `npm run gates` · `npm run build` · `npm run test:metamorphic` · `node scripts/check-scoring-receipt.mjs 6ca3fcd0..HEAD`. Every one was run in the foreground in this worktree and its output read.
+- **Corpus fingerprint:** unchanged from the entry above, and re-verified by the run — `npm run benchmark:public -- --lock` rewrote `tests/fixtures/public-corpus-manifest.json` and `tests/fixtures/public-benchmark-split.json` and **neither changed a byte**, so the 32 committed distributable screenplays (20 CC0 in `data/screenplays/` + the 12 blind-pair fixtures) hash to exactly what the first pass locked. The private AUC-24 corpus is absent from this environment; no real-corpus figure appears in this subsection.
+- **Measured AUC-24:** none claimed, for the same reason as the entry above. `REAL_SCRIPT_CORPUS_DIR` is unset here and the private 761-script corpus is absent from this environment, so this subsection carries no real-corpus figure and is not a receipt for the AUC-24 ratchet. `AUC24_FLOOR` stays 0.622 and `AUC24_DEGRADATION_ID` stays `shuffle-drop/v4`; no `lock-auc24` run happened and `tests/fixtures/auc24-table.json` still does not exist.
+
+**What the merge brought in, and what it cost the score: nothing.** The session
+head carries the `burrowsDelta` corpus-statistics hoist (`04fb13cc`, its own
+output-identity receipt earlier in this file), the revision pipeline's
+ledger-structure fix, approved-span bounds, the receipt gate's per-line field
+rule, `scenesFromFountain` line-ending normalization, `AUC24_DEGRADATION_ID`
+`shuffle-drop/v4`, Unicode forced headings and an event-store type-check. Only
+one merge conflict touched the scoring path — `server/nvm/analyze/voice-delta.ts`,
+where both sides had hoisted the same redundancy at different levels. Both are
+kept and they compose: the session's `combinedCorpusStats` (one pass over the
+function-word set per PAIR, replacing 130 re-tokenizations, bit-identity
+contract intact) now runs at the top of the branch's `deltaFromFrequencies`
+(each eligible character's frequency table built once and reused across every
+pair it appears in). The branch's `corpusStats` / `statsOf` are gone;
+`statsOf([fA, fB])` and the unrolled accumulation are the same arithmetic in the
+same order, seed included, so no double moves.
+
+**Output identity vs `git archive 6ca3fcd0`, both sides `GIT_SHA=dev`:** 45
+fixtures compared, health moves on **25**, RMS **9.839**, mean **+2.292**,
+largest **+32.2** on `transfer-window`, **6 verdicts flip**, 5 grades flip,
+`sceneCount` moves on **0 of 45**. That is the first pass's blast radius
+reproduced to the last digit against a different baseline, which is the
+statement that the merge changed no score: the 20 calibration samples are all
+unmoved in health and in finding count, and the 25 that move are the same 25,
+by the same amounts. All 45 reports differ in SOME field, as expected for this
+branch — the report-honesty fixes rewrite `plainSummary`, the exposed-and-unwired
+`meanAbsDialogueShareDeltaNormalised` and `excludedCharacters` are new fields,
+and the dimension percentiles shift with the reference set.
+
+**Public benchmark, re-locked this pass.** `npm run benchmark:public -- --lock`,
+N=32, 2000-resample bootstrap at seed 42. Measured: shuffle-drop **0.8750**
+matched-pair [0.7500, 0.9688] / **0.8291** all-pairs [0.7222, 0.9268], 28/4/0,
+mean gap +1.8937; climax-relocate **0.5938** [0.4219, 0.7500] / **0.5269**
+[0.4639, 0.5986], 18/12/2, mean gap +0.0875; control **1.0000** / **1.0000**,
+32/0/0. Every one is byte-for-byte the first pass's. The floors:
+
+| constant | before | after | measured |
+|---|---|---|---|
+| `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` | 0.855 | 0.855 | 0.8750 |
+| `PUBLIC_SHUFFLE_DROP_FLOOR` | 0.8091 | 0.8091 | 0.8291 |
+| `PUBLIC_ORDER_PAIRED_FLOOR` | 0.5269 | **0.5738** | 0.5938 |
+| `PUBLIC_ORDER_FLOOR` | 0.4951 | **0.5069** | 0.5269 |
+| `PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR` | 0.98 | 0.98 | 1.0000 |
+| `PUBLIC_DIALOGUE_FLATTEN_FLOOR` | 0.98 | 0.98 | 1.0000 |
+
+**No floor fell.** Two rose, to the values the first pass predicted
+arithmetically; the four that stayed were already at
+`round4(measured − 0.02)`, the control pair capped there by a measurement of
+exactly 1.0000. The split is still pre-registered and REPORTED rather than used:
+all six were locked from all 32 scripts, the five holdout files included, so no
+held-out evaluation happened on this pass either.
+
+**Blind pairs:** `ordered 4 of 6, mean gap 0.3833` — `night-shift` 78.1/76.2,
+`low-tide` 78.1/78.0, `the-deposit` 76.6/77.0 inverted, `the-ledger` 77.6/76.5,
+`signal-drift` 75.6/76.6 inverted, `fence-line` 77.6/77.0. Unchanged from the
+first pass, exit 0, 4/4, and the registered known-failing result is untouched.
+Six pairs is inside what chance produces either way.
+
+**`tests/core/calibration.test.ts` 21/21**, band monotonicity untouched.
+**`npm run test:metamorphic` exit 0**, 7 hard passes with `stapled_shorts`
+holding over all 14 seeded orderings and `empty_verbosity` the one registered
+known-failing witness.
+
+**Three of the four standing failures are closed, and the fourth is reported
+rather than answered.**
+
+1. `tests/core/public-benchmark.test.ts` 33/33 — the idempotence subtest is
+   green because the re-lock above actually happened, and `npm run gates` now
+   exits 0 including its mutation self-check
+   (`PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` raised to 0.925 made the suite FAIL on
+   that floor by name).
+2. `tests/core/scene-grammar.test.ts` 16/16 — the ellipsis guard is re-anchored
+   from exact health equality to `sceneCount` equality (5 on both documents)
+   plus `|Δhealth| < 2.0`. Measured on this tree with the test's own fixture
+   pair: WITHOUT 63.0 / 57 words / 11 findings, WITH 64.2 / 60 words / 10
+   findings, Δ +1.2. The equality was an artefact of the saturated sub-1
+   density term absorbing three words and one finding; the defect it guards
+   against is Δ 24.2 (62.0 → 37.8, verdict CONSIDER → PASS, on a phantom sixth
+   scene).
+3. `tests/core/coverage-letter.test.ts` 55/55 — all 21 committed screenplays
+   re-measured the way the route renders them: shipped min **3.37** (`mise`),
+   median **3.64**, max **4.02** (`counter-offer` and `runoff`, tied); bare
+   report 3.12 / 3.44 / 3.72; the 231-scene feature fixture 3.79. The renderer
+   itself is unchanged across `e79c64b4..HEAD`, so what moved is which findings
+   reach the ranked body. Two of 21 sit 0.02 pp past 4.00 — ten words at 500
+   words to the page — so the nine descriptions keep "three-to-four-page" (a
+   3.37-to-4.02-page document is a three-to-four-page document, and
+   "three-to-five-page" would be less accurate) and the gate's upper bound moves
+   from 4.0 to 4.1, the measurement plus a stated 0.08 pp.
+4. `tests/security/fountain-shape-guard-cue-parity.test.ts` is still **676 pass,
+   2 fail**, on `assembled-feature.fountain`'s 1.52x headroom against
+   `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` = 675,000. See the next paragraph.
+
+**The voice-eligible-weight bound: measured, and deliberately left where it is.**
+The hoist removed the cost reason the bound sits at 675,000, and this pass
+measured by how much, with `npm run measure-voice-bound` on this sandbox
+(Intel Xeon @ 2.10GHz x4, 16 GiB, node v22.22.2, linux/x64), `loaded`
+condition, 2 repeats, the same script the runner workflow drives:
+
+| shape | bound in tree | weight | CPU ms (worst) | % of the 15,000 ms half-budget |
+|---|---|---|---|---|
+| max-admitted N=80 | 675,000 | 652,800 | 275 | 2% |
+| max-admitted N=100 | 675,000 | 660,000 | 250 | 2% |
+| uniform-min N=150 | 675,000 | 675,000 | 257 | 2% |
+| probe-cast N=40 | 675,000 | 609,600 | 409 | 3% |
+| max-admitted N=70 | 1,900,000 | 1,881,600 | 635 | 4% |
+| max-admitted N=80 | 1,900,000 | 1,881,600 | 590 | 4% |
+| max-admitted N=85 | 1,900,000 | 1,864,050 | 580 | 4% |
+| max-admitted N=90 | 1,900,000 | 1,895,400 | 566 | 4% |
+
+The locked table for the same `max-admitted` N=80 row reads **11,810 ms** on the
+GitHub runner, measured before the hoist. Exactly one committed fixture sits
+under the suite's 3x demand — `assembled-feature.fountain` at 1.52x (weight
+443,990); the second-worst is `data/screenplays/runoff.fountain` at 170.0x, so a
+bound anywhere between 1,331,970 (3x the fixture) and 1,919,999 (below the
+lightest pinned DoS payload, 1,920,000) clears the whole corpus.
+
+**And the bound is still 675,000, because the method that sets it cannot be
+completed in this environment.** `tests/core/voice-bound-derivation.test.ts`
+asserts three things that bind together: `fixture.machine.ci === 'github-actions'`
+(a table locked from a developer box fails by name), `guardEvaluatedAgainst`
+deep-equal to this tree's two bound values, and — the binding one — every
+`max-admitted` row's `pooledWords` equal to
+`row.n * maxAdmittedWordsPerSpeaker(row.n, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT)`.
+Raising the weight bound changes the shape the table's rows describe, so a fresh
+runner sweep is required, and a runner sweep requires either a pushed
+`calibrate/**` branch or a `workflow_dispatch` against a ref that already
+carries the candidate bound. This lane pushes nothing. So the number above is
+reported as evidence for the owner's sweep and the constant is untouched:
+raising it from a sandbox measurement is exactly the 2026-09-13 failure the
+fixture's own header records ("the box that enforces a bound is the one it has
+to hold on"), and it would trade two red assertions for a differently red one.
+The owner's step is one `calibrate/**` push away and is in the runbook.
+
+**Gate table, this pass:** `npm run lint` 0 · `npm run check-no-console` 0 (312
+files, all proven unreachable) · `npm run check-server-reachability` 0 ·
+`npm run check-docs` 0 · `npm run build` 0 · `npm run gates` 0 ·
+`npm run test:metamorphic` 0 · `node scripts/check-scoring-receipt.mjs
+6ca3fcd0..HEAD` 0 (5 scoring-path files) · `script-doctor` 90 · `calibration` 21
+· `auc` 31 · `public-benchmark` 33 · `public-benchmark-limits` 7 ·
+`honesty-audit-claims` 15 · `fixture-provenance-comment-guard` 143 ·
+`documentation-truth` 8 · `blind-pairs-discrimination` 4 · `summary-honesty` 9 ·
+`clue-proper-noun-guard` 12 · `voice-delta` 18 · `voice-delta-hoist-identity` 3
+· `voice-bound-derivation` 8 · `agency-signal` 52 · `discrimination` 12 ·
+`feature-scale-discrimination` 7 · `rebuild-experiment` 41 ·
+`structural-signal-precision-consistency` 39 · `coverage-html` 54 ·
+`coverage-letter` 55 · `voice-separation-abstention` 15 ·
+`revision-per-pass-diagnostics` 18 · `scene-grammar` 16 ·
+`scene-split-line-endings` 4 · `auc24-table` 3 pass / 6 skipped (no locked
+table) · `structural-signals` 22 · `run-metamorphic-classify` 10 ·
+`fountain-shape-guard-cue-parity` **676 pass / 2 fail**, the one item above.
+
+**Runner attestation:** I ran every command listed in this subsection myself, in
+this worktree, in the foreground, and read each one's output; every number here
+came out of one of those runs and none is transcribed from another document or
+from a prior measurement. I did **not** run `npm run measure-real`, and I could
+not: the private 761-script corpus is absent from this environment and
+`REAL_SCRIPT_CORPUS_DIR` is unset here. No AUC-24 value is claimed anywhere in
+this subsection. I also did not run `npm test` in full or `npm run brain`, both
+excluded by this lane's brief, and I pushed nothing.

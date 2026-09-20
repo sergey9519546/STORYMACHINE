@@ -90,12 +90,40 @@ itself. The branch's PENDING ledger entry was rewritten in place into a measured
 PUBLIC-CORPUS receipt with the original kept verbatim under `#### As filed on
 2026-09-07` and four redactions marked inline — see [[Gate - Receipt Gate]].
 
+## Second pass (2026-09-20, on the session head `6ca3fcd0`)
+
+`## Second pass (on 6ca3fcd0)` in the README is the continuation of this lane
+after `git merge --no-ff 6ca3fcd0` (merge commit `4229a22a`, measured at
+`7d12b32d`). **Three of the four failures above are closed and `npm run gates`
+exits 0.** The public floors were RE-LOCKED and none fell —
+`PUBLIC_ORDER_PAIRED_FLOOR` 0.5269 -> **0.5738** and `PUBLIC_ORDER_FLOOR`
+0.4951 -> **0.5069**, the other four already at `round4(measured - 0.02)` — with
+the six measured values and both committed fixtures byte-for-byte unchanged,
+which is the second independent proof that
+[[Audit - 2026-09-20 Burrows Delta Hoist]] moves no number. The scene-grammar guard is re-anchored to `sceneCount`
+equality plus `|delta health| < 2.0` (the pre-fix defect was 24.2). The coverage
+letter was re-measured over all 21 screenplays (3.37 / 3.64 / 4.02 pages
+shipped) and the promise restated from that measurement. Output identity against
+`6ca3fcd0` reproduces the first pass exactly: 25 of 45 health moves, RMS 9.839,
+6 verdicts, 0 `sceneCount`.
+
+**The shape-guard item is still open, and it is now a METHOD blocker rather than
+a cost one.** Post-hoist, the worst shape a 1,900,000 bound would admit costs
+590 ms against a 15,000 ms half-budget target (the committed runner table reads
+11,810 ms for the same shape pre-hoist), and exactly one tracked fixture is
+under 3x while the next-worst is 170x — so any bound in [1,331,970 … 1,919,999]
+clears the corpus. But the derivation fixture
+[[Gate - Fountain Shape Guard]] reads (`tests/fixtures/voice-bound-derivation
+.json`) must be re-measured ON A GITHUB RUNNER for any bound change, and this
+lane pushes nothing. One `calibrate/**` push closes it.
+
 ## What the owner still owes
 
 `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` against
-[[Gate - AUC-24 Ratchet]], the 72-row manifest re-lock, `npm run lock-auc24`,
-and the §6.1 decision above, which stands whatever the AUC says. The full
-runbook is §9 of the README. No AUC-24 figure is claimed anywhere in this lane's
+[[Gate - AUC-24 Ratchet]], the 72-row manifest re-lock, `npm run lock-auc24` on
+the `shuffle-drop/v4` recipe, and the §6.1 / §S2(a) bound decision, which stands
+whatever the AUC says. The reduced runbook is §S5 of the README; §9 is the
+first pass's longer form. No AUC-24 figure is claimed anywhere in this lane's
 record: the private corpus is not present in the environment it ran in.
 
 **Related:** [[Branch - Feature-Length Defects]],
@@ -109,7 +137,7 @@ record: the private corpus is not present in the environment it ran in.
 - `docs/audits/2026-09-20-feature-length-defects-prep/README.md`
 - `docs/audits/2026-09-20-parked-branches/README.md`
 - `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` — the 2026-09-20 entry
-- `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §13
+- `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §13 and §14
 - `docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md`
 - `scripts/lib/auc.ts`
 - `server/nvm/analyze/doctor.ts`
