@@ -175,6 +175,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Approved Spans Schema.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Approved Spans Schema",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Approved Spans Schema.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B3.md",
       "type": "audit",
       "title": "Audit — 2026-09-20 Dead Weight B3",
@@ -1502,6 +1508,18 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Approved Spans Schema.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Approved Spans Schema.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Approved Spans Schema.md",
       "to": "docs/brain/Patterns.md"
     },
     {
