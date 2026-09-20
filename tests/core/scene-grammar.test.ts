@@ -158,12 +158,47 @@ describe('scene grammar — (b) `..` and `...` lines are not scene headings', ()
   });
 
   test('health no longer moves when a writer types an ellipsis', async () => {
-    // PRE-change this pair differed (the phantom scene lifts the 140/sceneCount
-    // scarcity term). It is the health figure that made row 6 a scoring bug
-    // rather than a cosmetic one.
+    // WHAT THIS GUARDS, AND WHY IT IS NOT AN EQUALITY ANY MORE.
+    //
+    // PRE-change (tree `26d930dd`), the `...and then nothing.` line opened a
+    // PHANTOM SIXTH SCENE and took the rest of BEN's block with it: scenes went
+    // 5 -> 6 and health went 62.0 -> 37.8, a delta of 24.2 that flipped the
+    // verdict CONSIDER -> PASS. That is the defect — a writer typing an
+    // ellipsis inside a dialogue block lost 24 points of health — and it is
+    // what this test exists to keep closed. See
+    // docs/audits/2026-09-20-scene-grammar/README.md.
+    //
+    // This assertion was written as `a.health === b.health` because on that
+    // tree the two documents scored EXACTLY 62.0 once the phantom scene was
+    // gone. That exact equality was an ARTEFACT OF SATURATION, not a property
+    // of the grammar: WITH is not the same document as WITHOUT — it carries
+    // three more words (57 -> 60) and one fewer major finding (11 -> 10) — and
+    // the near-step sub-1 density curve (SUB_DENSITY_STEEPNESS = 50) absorbed
+    // that difference whole. At steepness 2 the curve is near-linear and
+    // passes it through, so this tree measures 63.0 against 64.2: a +1.2 move
+    // that is the density term reading a real textual difference, not the
+    // scene grammar mis-reading a heading.
+    //
+    // So the guard is anchored to what it is actually about: the SCENE COUNT
+    // must be identical (the grammar property), and health must not move
+    // MATERIALLY (the scoring consequence). The 2.0-point band is 12x smaller
+    // than the 24.2-point defect and larger than the 1.2 that three words and
+    // one finding legitimately buy. Tightening it back to exact equality would
+    // re-couple this test to whatever the density curve's shape happens to be;
+    // widening it past 2.0 would start admitting the defect back.
     const [a, b] = await Promise.all([runScriptDoctor(WITHOUT), runScriptDoctor(WITH)]);
+    assert.equal(a.sceneCount, 5);
+    assert.equal(b.sceneCount, 5);
     assert.equal(a.sceneCount, b.sceneCount);
-    assert.equal(a.health, b.health);
+    const deltaHealth = Math.abs(b.health - a.health);
+    assert.ok(
+      deltaHealth < 2.0,
+      `typing an ellipsis inside a dialogue block moved health by ${deltaHealth.toFixed(1)} `
+      + `(${a.health} -> ${b.health}), at or past the 2.0-point band. The pre-fix defect was 24.2 `
+      + '(62.0 -> 37.8 on a phantom sixth scene); anything approaching that is the scene grammar '
+      + 'reading a continuation line as a heading again. A delta of ~1.2 is the density term '
+      + 'reading the three extra words and one fewer finding, which is legitimate.',
+    );
   });
 });
 
