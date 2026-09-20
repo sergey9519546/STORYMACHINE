@@ -584,6 +584,14 @@ AUC-24 = 0.731, was measured on a scene-segmentation recipe superseded
 current recipe. See `docs/CLAIMS_REGISTER.md` row 124 and CLAUDE.md's
 Standing task section for the full accounting.
 
+**Re-measured 2026-09-20** on the session branch that lands
+`scoring/advice-rule-fixes` (six detector fixes — NOT `main`, and not a
+real-corpus figure): shuffle-drop **0.4375** matched-pair, climax-relocate
+**0.4375**, positive control 0.9844. All four measurement intervals still
+contain 0.5, and all six public-benchmark floors were re-locked — four of
+them DOWNWARD. Per-pair table in
+`docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §12.
+
 ---
 
 ## 10. Change policy

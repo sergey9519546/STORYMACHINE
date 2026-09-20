@@ -35,6 +35,14 @@ discrimination; it was measured on a scene-segmentation recipe superseded
 (`npm run benchmark:public`, `node --experimental-strip-types --test
 tests/core/blind-pairs-discrimination.test.ts`).
 
+**Re-measured 2026-09-20** on the session branch that lands
+`scoring/advice-rule-fixes` (six detector fixes — NOT `main`, and not a
+real-corpus figure): shuffle-drop **0.4375** matched-pair, climax-relocate
+**0.4375**, positive control 0.9844. All four measurement intervals still
+contain 0.5, and all six public-benchmark floors were re-locked — four of
+them DOWNWARD. Per-pair table in
+`docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §12.
+
 ## Licensing
 
 `LICENSE` currently grants no license, right, or permission to any person or

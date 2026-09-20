@@ -10,6 +10,14 @@ unmerged `scoring/feature-length-defects` branch's own measurement, not
 `main`'s current state — see `docs/CLAIMS_REGISTER.md` row 121 and
 CLAUDE.md's Standing task section.
 
+**Re-measured 2026-09-20** on the session branch that lands
+`scoring/advice-rule-fixes` (six detector fixes — NOT `main`, and not a
+real-corpus figure): shuffle-drop **0.4375** matched-pair, climax-relocate
+**0.4375**, positive control 0.9844. All four measurement intervals still
+contain 0.5, and all six public-benchmark floors were re-locked — four of
+them DOWNWARD. Per-pair table in
+`docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §12.
+
 **State as of 2026-09-19, main @ 28754489 (eleven session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one

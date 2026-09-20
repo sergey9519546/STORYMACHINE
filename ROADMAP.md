@@ -293,6 +293,14 @@ blind-pair harness
 mean health gap -0.0167. That is the only always-on CI test against
 independent real writing and is the number to lead with over any AUC here.
 
+**Re-measured 2026-09-20** on the session branch that lands
+`scoring/advice-rule-fixes` (six detector fixes — NOT `main`, and not a
+real-corpus figure): shuffle-drop **0.4375** matched-pair, climax-relocate
+**0.4375**, positive control 0.9844. All four measurement intervals still
+contain 0.5, and all six public-benchmark floors were re-locked — four of
+them DOWNWARD. Per-pair table in
+`docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §12.
+
 **Decision: proceed to P2 while structural work continues.** The dialogue
 channel is solved — that's real discrimination on real writing. The
 structural gap is an analyzer-layer problem that doesn't block shipping a

@@ -839,3 +839,106 @@ segmenter changes what `npm run lock-auc24` will measure on the owner's corpus.
 
 The same four statements are in `scripts/lib/auc.ts`'s header, `CLAUDE.md`'s
 "Which floor, exactly" section, and `docs/brain/Gates/Gate - AUC-24 Ratchet.md`.
+
+## 12. Re-lock, 2026-09-20 — a SCORING change, and four of the six floors fell
+
+This is the opposite case to §11, and the contrast is the point. §11 re-locked
+two floors after an INSTRUMENT fix with the score provably frozen (45/45
+byte-identical, manifest unchanged). This re-lock follows a change to the score
+itself: landing `scoring/advice-rule-fixes` (six measured detector defects —
+`server/nvm/analyze/fountain-analyzer.ts`, `reversal-detection.ts`, ten
+`server/nvm/revision/passes/*`, `server/nvm/screenplay/structure.ts`, the new
+`screenplay/suspense-dip.ts`, and title-page/boneyard masking in
+`src/lib/fountain.ts`). The doctor's output moved on **38 of 45** identity
+fixtures and **29 of them moved health**, so every number below moved with it.
+
+### 12.1 Every number that moved
+
+Measured with `npm run benchmark:public` on both trees, N=32, 2000-resample
+bootstrap at seed 42 both times; "before" is a `git archive bf4f3bff` checkout.
+
+| | statistic | 2026-09-12 | 2026-09-20 | floor before | floor after | |
+|---|---|---|---|---|---|---|
+| `SHUFFLE_DROP` | matched-pair (PRIMARY) | 0.5313 | **0.4375** | 0.5113 | **0.4175** | **FELL** |
+| `SHUFFLE_DROP` | all-pairs | 0.5586 | **0.5298** | 0.5386 | **0.5098** | **FELL** |
+| `CLIMAX_RELOCATE` | matched-pair (PRIMARY) | 0.4063 | **0.4375** | 0.3863 | **0.4175** | rose |
+| `CLIMAX_RELOCATE` | all-pairs | 0.4443 | **0.4897** | 0.4243 | **0.4697** | rose |
+| `DIALOGUE_FLATTEN` (control) | matched-pair | 1.0000 | **0.9844** | 0.98 | **0.9644** | **FELL** |
+| `DIALOGUE_FLATTEN` (control) | all-pairs | 0.9473 | **0.9458** | 0.9273 | **0.9258** | **FELL** |
+
+| other statistics | 2026-09-12 | 2026-09-20 |
+|---|---|---|
+| `SHUFFLE_DROP` 95% CI, matched-pair | [0.3750, 0.6875] | [0.2813, 0.6250] |
+| `SHUFFLE_DROP` 95% CI, all-pairs | [0.4219, 0.6973] | [0.4033, 0.6548] |
+| `SHUFFLE_DROP` ordered / inverted / tied | 17 / 15 / 0 | **14 / 18 / 0** |
+| `SHUFFLE_DROP` mean health gap | −1.93 | **−3.60** |
+| `CLIMAX_RELOCATE` 95% CI, matched-pair | [0.2656, 0.5469] | [0.3125, 0.5781] |
+| `CLIMAX_RELOCATE` 95% CI, all-pairs | [0.3662, 0.5112] | [0.4175, 0.5576] |
+| `CLIMAX_RELOCATE` ordered / inverted / tied | 8 / 14 / 10 | **8 / 12 / 12** |
+| `CLIMAX_RELOCATE` mean health gap | −1.23 | −1.25 |
+| `DIALOGUE_FLATTEN` ordered / inverted / tied | 32 / 0 / 0 | **31 / 0 / 1** |
+| `DIALOGUE_FLATTEN` mean health gap | +29.30 | **+34.65** |
+| scripts pinned at health 76.0 | 10 | 10 (unchanged) |
+| `CLIMAX_RELOCATE` ties that are pinned scripts | 9 of 10 | 9 of 12 |
+
+Every one of the four measurement-channel intervals still contains 0.5. Both
+2026-09-12 point estimates sit inside their 2026-09-20 intervals and both
+2026-09-20 point estimates sit inside their 2026-09-12 intervals, so **nothing
+here resolves as a real change in discrimination on this corpus** — which is
+exactly why the ratchet, not the point estimate, is what the repository asserts.
+
+### 12.2 Which pairs flipped, on the channel whose floor fell furthest
+
+`SHUFFLE_DROP` matched-pair went 17 ordered → 14. Five pairs changed class:
+
+| script | gap before | gap after | |
+|---|---|---|---|
+| `dead-frequency.fountain` | +1.5 | **−2.2** | ordered → inverted |
+| `quiet-season.fountain` | +2.5 | **−0.7** | ordered → inverted |
+| `the-detour.fountain` | +1.5 | **−0.6** | ordered → inverted |
+| `the-key-under-the-mat.fountain` | +1.7 | **−0.6** | ordered → inverted |
+| `signal-drift-bad.fountain` (blind fixture) | −3.5 | **+1.0** | inverted → ordered |
+
+Three of the four losses are sub-point gaps on either side of zero. None is a
+pair the engine ever separated with any margin.
+
+### 12.3 The control's single tie is a floor clamp, and it is named
+
+The positive control lost its 32-of-32: `data/screenplays/room-12.fountain`
+scored **health 33.5 intact before this change and 0.0 after**, while its
+dialogue-flattened copy was already 0.0. Health is clamped at 0, so the two
+sides cannot be separated by a scale with no room left underneath them. Zero
+inversions remain, and the control's mean gap **rose** from +29.30 to +34.65
+points, so the instrument reads more strongly than before, not less.
+
+`tests/core/public-benchmark.test.ts` was narrowed rather than loosened: it now
+requires zero inversions AND that every tied pair be clamped at health 0 on both
+sides. A tie anywhere above the floor still fails by name. `tied <= 1` was
+deliberately not written — it would have bought the suite's green with the
+control's only job.
+
+Two intact scripts account for most of the movement at the bottom of the range:
+`room-12.fountain` 33.5 → 0.0 and `transfer-window.fountain` 31.9 → 15.4. Both
+were already the corpus's two lowest-scoring scripts and both are graded
+`troubled` before and after. Their issue counts barely moved (`room-12` is
+197 → 197 issues, identical by severity); what moved is their position against
+the calibration reference distribution, which this change also raised — the
+reference corpus is re-scored from `calibration/corpus.ts` at runtime, so a
+detector fix that removes false positives across the reference set lowers the
+percentile of a script whose own findings did not improve.
+
+### 12.4 What this re-lock does NOT claim
+
+* **No real-corpus figure.** `REAL_SCRIPT_CORPUS_DIR` was unset and the private
+  corpus is not present in the environment this was measured in. `AUC24_FLOOR`
+  is untouched at 0.622, `AUC24_DEGRADATION_ID` is untouched at
+  `shuffle-drop/v3`, and `tests/fixtures/real-corpus-manifest.json` was not
+  re-locked. The owner's `npm run measure-real` and `npm run lock-auc24` are
+  the first real-corpus readings of this tree, and they are owed.
+* **No held-out evaluation.** All six floors were locked from all 32 scripts,
+  holdout included, exactly as in §8. `tests/fixtures/public-benchmark-split.json`
+  re-locked to its previous bytes.
+* **Not a verdict on the branch.** Four floors fell; two rose; every movement is
+  inside every interval. This section exists so a reader sees the fall without
+  having to reconstruct it from a diff, which is the one failure mode
+  `--lock` makes easy.

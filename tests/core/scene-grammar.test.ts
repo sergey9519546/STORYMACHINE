@@ -202,6 +202,21 @@ describe('scene grammar — (d) a plain INT./EXT. script is byte-identical', () 
     // scripts/check-doctor-output-identity.mjs, treats it the same way via
     // `--ignore-keys` rather than requiring it to match across checkouts).
     // The snapshot was generated with `GIT_SHA=dev`; nothing else is stripped.
+    //
+    // RE-LOCKED 2026-09-20, landing `scoring/advice-rule-fixes`
+    // (docs/audits/2026-09-20-advice-rule-fixes-landing/README.md). That branch
+    // fixes six detector defects and legitimately moves this fixture's report:
+    // totalIssues 233 -> 206, bySeverity {2,51,180} -> {1,47,158}, health
+    // 0 -> 22.5, healthPercentile 0 -> 5, sceneCount unchanged at 16. The
+    // original `git archive 26d930dd` bytes are what the 2026-09-20 scene-
+    // grammar receipt in docs/p1-benchmark/MEASUREMENT_RECEIPTS.md proved the
+    // grammar change against, and they remain readable at this file's parent
+    // commit; from here the snapshot is a REGRESSION lock on the current tree,
+    // not a pre-grammar-change identity proof. Regenerate it the same way it
+    // was regenerated here — run `runScriptDoctor` on the fixture with
+    // `GIT_SHA=dev`, strip `analyzedAt` and `provenance.engineCommit`, and
+    // write `canonical()`'s two-space JSON plus a trailing newline — and say in
+    // the receipt what moved and why.
     const text = read('plain-int-ext.fountain');
     const report = await runScriptDoctor(text);
     const { analyzedAt: _ignored, ...stable } = report as unknown as Record<string, unknown>;

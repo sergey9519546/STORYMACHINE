@@ -44,8 +44,10 @@
 //
 //   * With only null readings, nothing here separated "the score is blind to
 //     mechanical damage" from "this harness never worked". DIALOGUE_FLATTEN
-//     is the manipulation the score demonstrably DOES catch — 32 of 32, zero
-//     ties — so the other two readings are the score's, not the instrument's.
+//     is the manipulation the score demonstrably DOES catch — 31 of 32 since
+//     2026-09-20, zero inversions, and the single tie is a pair clamped at
+//     health 0 on both sides (see the positive-control suite below) — so the
+//     other two readings are the score's, not the instrument's.
 //   * Round 1 floored only the all-pairs statistic, which is the HIGHER of
 //     the two computed in 7 of the 8 cells measured across main and the three
 //     scoring branches. A paired design's honest estimator is the matched-pair
@@ -397,7 +399,7 @@ describe('public benchmark — the positive control', () => {
   // worked" — and every null reading in the artifact depends on that
   // distinction. DIALOGUE_FLATTEN is the manipulation the score must catch;
   // if it stops catching it, the harness is what broke.
-  it('the harness is demonstrably able to separate intact from damaged — 32 of 32, zero ties', () => {
+  it('the harness is demonstrably able to separate intact from damaged — zero inversions, and every tie clamped at health 0', () => {
     assert.equal(dialogueFlatten.role, 'control', 'DIALOGUE_FLATTEN is a control, and must be labelled one');
     assert.equal(dialogueFlatten.n, PUBLIC_CORPUS_SIZE);
     assert.deepEqual(dialogueFlatten.skipped, []);
@@ -408,10 +410,33 @@ describe('public benchmark — the positive control', () => {
       + '"Hello." The positive control is the one manipulation this engine is built to catch; an inversion '
       + 'here means the harness, not the score, is the thing to look at first.',
     );
+    // TIES: 2026-09-06 through 2026-09-12 this read `tied === 0` — 32 of 32,
+    // unambiguous. Landing `scoring/advice-rule-fixes` on 2026-09-20 dropped
+    // `data/screenplays/room-12.fountain`'s INTACT health from 33.5 to 0.0,
+    // and its flattened copy was already 0.0, so that pair became a tie. The
+    // assertion was NOT loosened to `tied <= 1`, which would have bought the
+    // suite's green with the control's only job. It is narrowed instead: a tie
+    // is admissible ONLY where health has run out of room underneath both
+    // sides — both at the 0 floor, where no manipulation of any size can
+    // separate them. A tie anywhere above the floor still fails by name, and
+    // is still evidence about the HARNESS before it is evidence about the
+    // score. Strictly stronger than `tied <= 1`, and strictly weaker than
+    // `tied === 0` only in the one place the scale itself is exhausted.
+    const unexplainedTies = dialogueFlatten.pairs.filter(
+      (p) => p.real === p.degraded && !(p.real === 0 && p.degraded === 0),
+    );
+    assert.deepEqual(
+      unexplainedTies.map((p) => `${p.file} at health ${p.real}`),
+      [],
+      'the control must be unambiguous — a tie here weakens the only evidence that the instrument reads '
+      + 'anything. A tie is tolerated ONLY when both sides are clamped at the health floor of 0, where the '
+      + 'scale cannot express a difference; these ties are not.',
+    );
     assert.equal(
       dialogueFlatten.tied,
-      0,
-      'the control must be unambiguous — a tie here weakens the only evidence that the instrument reads anything',
+      dialogueFlatten.pairs.filter((p) => p.real === 0 && p.degraded === 0).length,
+      'every tied control pair must be a health-floor clamp on BOTH sides — if the counts disagree, a tie '
+      + 'exists that the floor does not explain',
     );
     assert.ok(
       dialogueFlatten.meanGap > 20,

@@ -42,9 +42,9 @@
     "strength": 0
   },
   "bySeverity": {
-    "critical": 2,
-    "major": 51,
-    "minor": 180
+    "critical": 1,
+    "major": 47,
+    "minor": 158
   },
   "characterFunctions": [
     {
@@ -87,7 +87,7 @@
   "contentHash": "fc85411fd4389bdc2dba918ba614125b7cb1aff426c6b971aef6d87064b5306e",
   "dimensions": [
     {
-      "issueCount": 72,
+      "issueCount": 61,
       "key": "structure-pacing",
       "label": "Structure & Pacing",
       "passes": [
@@ -95,13 +95,13 @@
         "pacing",
         "rhythm"
       ],
-      "percentile": 85,
-      "percentileDescriptor": "Structure & Pacing is stronger than 85% of the reference set.",
-      "score": 31.4,
-      "summary": "Structure & Pacing needs real work — 56 minor problem(s), centered on revelation drought."
+      "percentile": 75,
+      "percentileDescriptor": "Structure & Pacing is stronger than 75% of the reference set.",
+      "score": 45,
+      "summary": "47 minor problem(s) here, mostly around revelation drought — worth a focused revision pass."
     },
     {
-      "issueCount": 62,
+      "issueCount": 57,
       "key": "character",
       "label": "Character",
       "passes": [
@@ -111,11 +111,11 @@
       ],
       "percentile": 55,
       "percentileDescriptor": "Character is stronger than 55% of the reference set.",
-      "score": 26.4,
-      "summary": "Character needs real work — 41 minor problem(s), centered on zero entropy scene."
+      "score": 32.5,
+      "summary": "Character needs real work — 37 minor problem(s), centered on zero entropy scene."
     },
     {
-      "issueCount": 22,
+      "issueCount": 21,
       "key": "dialogue-voice",
       "label": "Dialogue & Voice",
       "passes": [
@@ -124,11 +124,11 @@
       ],
       "percentile": 100,
       "percentileDescriptor": "Dialogue & Voice is in the top 10% of the reference set.",
-      "score": 93.3,
+      "score": 93.7,
       "summary": "Dialogue & Voice is in good shape — a handful of minor notes, mostly around interruption void."
     },
     {
-      "issueCount": 69,
+      "issueCount": 59,
       "key": "plot-logic",
       "label": "Plot Logic & Payoff",
       "passes": [
@@ -137,10 +137,10 @@
         "payoff",
         "conflict"
       ],
-      "percentile": 25,
-      "percentileDescriptor": "Plot Logic & Payoff is stronger than 25% of the reference set.",
-      "score": 31.4,
-      "summary": "Plot Logic & Payoff needs real work — 54 minor problem(s), centered on exposition dump."
+      "percentile": 20,
+      "percentileDescriptor": "Plot Logic & Payoff is in the bottom quartile of the reference set.",
+      "score": 48.7,
+      "summary": "46 minor problem(s) here, mostly around exposition dump — worth a focused revision pass."
     },
     {
       "issueCount": 8,
@@ -152,7 +152,7 @@
       ],
       "percentile": 100,
       "percentileDescriptor": "Theme & Originality is in the top 10% of the reference set.",
-      "score": 98,
+      "score": 97.9,
       "summary": "Theme & Originality is in good shape — a handful of minor notes, mostly around scene shape templating."
     }
   ],
@@ -302,7 +302,7 @@
     "graphDeduction": 12,
     "graphHealthScore": 18,
     "metrics": {
-      "arcCoherence": -0.6279988996105245,
+      "arcCoherence": -0.5221022298583189,
       "causalDensity": 0.9444444444444444,
       "escalationMonotonicity": 0,
       "forwardEdgeRatio": 0.5,
@@ -310,8 +310,8 @@
       "promisePaymentRatio": 0
     }
   },
-  "health": 0,
-  "healthPercentile": 0,
+  "health": 22.5,
+  "healthPercentile": 5,
   "interiority": {
     "charactersOpaque": 0,
     "charactersWithWant": 2,
@@ -339,7 +339,7 @@
   "metrics": {
     "perScene": [
       {
-        "cliffhangerStrength": 33,
+        "cliffhangerStrength": 21,
         "informationAsymmetryStrength": 11,
         "pacingFit": null,
         "pivotStrength": 0,
@@ -349,7 +349,7 @@
         "twistImpact": 0
       },
       {
-        "cliffhangerStrength": 21,
+        "cliffhangerStrength": 8,
         "informationAsymmetryStrength": 11,
         "pacingFit": null,
         "pivotStrength": 0,
@@ -501,18 +501,18 @@
     ],
     "script": {
       "emotionalImpactRange": {
-        "peak": 67,
-        "spread": 50
+        "peak": 33,
+        "spread": 25
       },
       "finalCliffhangerStrength": 0,
-      "momentumConsistency": 56,
+      "momentumConsistency": 50,
       "narrativeCohesion": 88,
       "pacingFit": null,
       "sceneCount": 16,
-      "suspenseEntropy": 56,
+      "suspenseEntropy": 84,
       "tensionMeasures": {
         "asymmetric": 6,
-        "lexical": 0.06,
+        "lexical": -0.06,
         "rhythmic": 50,
         "structural": 0
       }
@@ -548,14 +548,6 @@
           "rule": "CLIMAX_TOO_EARLY",
           "severity": "major",
           "suggestedFix": "Move the peak intensity scene closer to the third act"
-        },
-        {
-          "description": "No suspense-dip reversals detected — this checks only for a scene where the engine's danger/tension language drops sharply (suspenseDelta < -1); it does not detect a reversal conveyed as a betrayal, a broken deal, or a plan backfiring in prose that doesn't also read as a tension drop. Reread the draft for that kind of turn before treating this as \"no opposition anywhere.\"",
-          "id": "f627c1f23dab58a3",
-          "location": "Overall structure",
-          "rule": "NO_REVERSALS",
-          "severity": "major",
-          "suggestedFix": "If a reread confirms the story truly never turns, add a scene where a character's plan backfires or a situation inverts. If a reversal is already on the page but reads flat on tension language, this is a gap in the detector's coverage, not necessarily a craft problem."
         },
         {
           "description": "Scene 5 (Act 1 ending) has low suspense delta (0.0) — Act 1 should end with a turning point that forces entry into Act 2",
@@ -598,17 +590,9 @@
           "suggestedFix": "Insert an \"all is lost\" beat in this zone: a failure, a betrayal, or a moment where all hope seems gone. The climax lands harder after the protagonist has been broken."
         },
         {
-          "description": "The midpoint zone (Scenes 7–10) has no reversal and no revelation — the story passes through its structural centre without the pivot that shifts protagonist strategy from reaction to action.",
-          "id": "c58963f82e6b4889",
-          "location": "Midpoint zone (Scenes 7–10)",
-          "rule": "MIDPOINT_REVERSAL_ABSENT",
-          "severity": "major",
-          "suggestedFix": "Place a major reversal or revelatory beat near the midpoint: a discovery that recontextualises the threat, or a setback that forces the protagonist to abandon their first strategy and commit to a new one."
-        },
-        {
-          "description": "The first reversal or revelation occurs at Scene 13 — 75% through the story. The central conflict doesn't launch until after 40% has elapsed; the audience has no dramatic anchor for the opening.",
-          "id": "c97f54c17c9149f1",
-          "location": "First dramatic event at Scene 13",
+          "description": "The first reversal or revelation occurs at Scene 10 — 56% through the story. The central conflict doesn't launch until after 40% has elapsed; the audience has no dramatic anchor for the opening.",
+          "id": "4a3335e7530762ae",
+          "location": "First dramatic event at Scene 10",
           "rule": "INCITING_INCIDENT_TOO_LATE",
           "severity": "major",
           "suggestedFix": "Move the inciting event before the 40% mark. The audience needs a dramatic anchor — a reversal, revelation, or shock — early enough to understand what the story is about before the midpoint arrives."
@@ -622,15 +606,15 @@
           "suggestedFix": "Build the pre-climax approach: raise the stakes in the two scenes before the climax zone through a complication, a failed attempt, or a tightening deadline. The climax lands hardest when it arrives as the peak of already-rising pressure, not as an abrupt acceleration from flat."
         },
         {
-          "description": "Scenes 1–12 form a run of 12 consecutive scenes with no dramatic event — no reversal, revelation, clock, or major relationship shift across 75% of the story. This vacuum straddles the act structure and leaves the audience without a catalytic beat for a sustained stretch.",
+          "description": "Scenes 1–9 form a run of 9 consecutive scenes with no dramatic event — no reversal, revelation, clock, or major relationship shift across 56% of the story. This vacuum straddles the act structure and leaves the audience without a catalytic beat for a sustained stretch.",
           "id": "5b39b1e0a465c7cc",
-          "location": "Scenes 1–12",
+          "location": "Scenes 1–9",
           "rule": "DRAMATIC_VACUUM_STRETCH",
           "severity": "major",
           "suggestedFix": "Inject a dramatic event into the middle of this run: a reversal, a revelation, or a relationship rupture that re-orients the story. No quarter of the runtime should pass without at least one beat that changes the protagonist's situation."
         },
         {
-          "description": "The centre of mass of the story's suspense sits at 2% of the runtime — well into the front half. The dramatic energy is structurally front-loaded: tension peaks early and thins toward the climax, so the back half coasts downhill from a high it already spent.",
+          "description": "The centre of mass of the story's suspense sits at 0% of the runtime — well into the front half. The dramatic energy is structurally front-loaded: tension peaks early and thins toward the climax, so the back half coasts downhill from a high it already spent.",
           "id": "b0d64da9debdb84c",
           "location": "Suspense distribution",
           "rule": "TENSION_FRONTLOADED_COM",
@@ -758,14 +742,6 @@
           "suggestedFix": "Seed Act 1 with open questions: an anomaly the story withholds the answer to, an unexplained behavior, a hint of stakes the audience can sense but not yet see. The first act should make the audience lean forward wanting more — an Act 1 that averages negative curiosity means the audience has been given less to wonder about than they started with."
         },
         {
-          "description": "The midpoint zone (Scenes 7–9) contains no scene reaching a suspenseDelta above 1, while the story spikes tension elsewhere — the structural pivot passes without pressure. The midpoint is where a strong story raises the stakes and tightens its grip; a tension void at the exact center means the engine of suspense stalls precisely where the second half should be accelerating out of the turn.",
-          "id": "db6c6ab59fc6769f",
-          "location": "Midpoint (Scenes 7–9) — suspense void",
-          "rule": "MIDPOINT_SUSPENSE_VOID",
-          "severity": "minor",
-          "suggestedFix": "Raise the tension at the midpoint: let the pivot that reframes the story also escalate the danger — a deadline imposed, a threat revealed, an escape route closed. The middle of the story is the most dangerous place to let suspense flatten, because it is where the audience decides whether the back half is worth the wait."
-        },
-        {
           "description": "All 4 Act 2b scenes (9–12) are emotionally neutral — the run-up to the climax generates no emotional movement. Act 2b is where the cost of the conflict should be landing hardest as the protagonist approaches their lowest point; a flatline here means the story climbs toward its peak with the emotional arc stalled, so the climax inherits no accumulated feeling.",
           "id": "52fe3c5c9b0475a6",
           "location": "Act 2b (Scenes 9–12) — emotional flatline",
@@ -782,12 +758,12 @@
           "suggestedFix": "Plant a new question in Act 2b: a discovery that recasts the central problem, a character whose motives become suddenly unclear, or a clue that implies more is at stake than the audience realized. The escalation zone should not just raise the tension but renew the mystery."
         },
         {
-          "description": "No scene in Act 3 (Scenes 13–16) reaches a suspenseDelta above 1, even though the story builds meaningful tension elsewhere. The finale resolves without the audience being under pressure — the action happens and the resolution arrives, but no scene in the final act generates the sense of threat and uncertainty that makes an ending feel earned rather than merely arrived at.",
-          "id": "ec6cfa3a6ff67202",
-          "location": "Act 3 (Scenes 13–16) — suspense void",
-          "rule": "ACT3_SUSPENSE_VOID",
+          "description": "The story's first dramatic catalyst (Scene 1) is followed by two scenes that raise neither suspense nor curiosity — both flat on both channels. The inciting spark fires and the story immediately stalls: the event that should launch the protagonist into the central problem generates no momentum in its wake, so the audience feels the engine catch and die before the journey begins.",
+          "id": "fbfbf5a3a8ea3692",
+          "location": "Scenes 2–3 (after first catalyst at Scene 1)",
+          "rule": "INCITING_AFTERMATH_STALL",
           "severity": "minor",
-          "suggestedFix": "Build genuine tension in Act 3: a complication that threatens the resolution, a last-moment reversal, or a confrontation that could go either way. The audience should not be confident of the outcome until it arrives — Act 3 tension is what converts a satisfying plot conclusion into a felt experience."
+          "suggestedFix": "Let the catalyst propel the next two scenes: a consequence the protagonist must react to, a question the event opens, a new pressure it introduces. An inciting incident is defined by what it sets in motion — the scenes immediately after it should accelerate, not idle."
         },
         {
           "description": "7 consecutive scenes (Scenes 2–8) all carry the purpose \"complicate\" — a localized structural plateau where the story stops rotating through narrative functions. Even though the script uses other purposes elsewhere, this run serves the same structural job scene after scene with no change of gear, so the audience loses the sense of forward structural motion across the stretch.",
@@ -798,6 +774,14 @@
           "suggestedFix": "Break the run by varying scene purpose: between the \"complicate\" scenes, insert a reversal, a character-moment that reframes the stakes, or a setup that plants a later payoff. A run of one structural function reads as the story marking time; rotating purposes keeps each scene advancing the architecture, not just the page count."
         },
         {
+          "description": "All 16 scenes with dramatic turns (dramaticTurn ≠ 'nothing') are preceded in the prior three scenes by no revelation, no high-suspense moment (suspenseDelta > 1), and no clock raise — the story's pivots erupt without structural build-up. Dramatic turns are the moments when the story changes direction: they work when they feel inevitable-in-retrospect, as if everything leading to that point made this reversal necessary. When every turn arrives without a preceding escalation — no truth surfacing, no pressure building, no deadline closing in — the pivot feels arbitrary and the story changes direction for structural convenience rather than narrative necessity.",
+          "id": "b42cba4604679ced",
+          "location": "All 16 dramatic turn scene(s) — causeless",
+          "rule": "DRAMATIC_TURN_CAUSELESS",
+          "severity": "minor",
+          "suggestedFix": "Before at least one dramatic turn, build structural runway in the prior two or three scenes: let a revelation surface that makes the reversal feel like its consequence, raise suspense so the turn arrives as release rather than interruption, or introduce a clock that makes the pivot feel necessary. A dramatic turn that follows from something the audience has been shown to be building feels earned; one that arrives from narrative dead air feels like a plot reset."
+        },
+        {
           "description": "The story has 2 scenes that pivot the narrative (dramatic turns) and 3 scenes that raise curiosity (curiosityDelta>0), but no scene carries both simultaneously. A dramatic turn should reframe what the audience does not yet know — a reversal that opens new questions, a recognition that exposes incomplete understanding. The most generative pivots raise curiosity in the very scene they turn, so the audience registers the change of direction AND wonders where it leads. When turns and curiosity spikes always occupy separate scenes, pivots deliver structural reorientation without epistemic opening: the story turns, but the turn itself raises no new question, and the reversal reads as a closed event rather than a door into the unknown.",
           "id": "7d6c139261051d23",
           "location": "2 turn scene(s), 3 curiosity scene(s) — no overlap",
@@ -806,17 +790,9 @@
           "suggestedFix": "Let at least one dramatic turn also raise curiosity in the same scene — stage the pivot so it opens a question rather than merely closing one. A reversal that reveals a new mystery, a recognition that makes the audience re-examine what they thought they understood, or a twist that implies more is hidden all fuse the structural turn with epistemic pull. A pivot that turns the story and opens a question in the same beat is far more propulsive than one that only redirects."
         },
         {
-          "description": "The story has 2 scenes that pivot the narrative (dramatic turns) and 2 scenes that raise suspense (suspenseDelta>0), but no scene carries both. A dramatic pivot is naturally a moment of heightened tension — the reversal lands while the audience is electrified, combining direction change with felt urgency. The most charged pivots co-occur with a suspense spike in the same scene so the audience registers the change as a genuinely dangerous shift. When turns and suspense always occupy separate scenes, pivots are emotionally cool at the moment they happen: the story changes direction in scenes without tension, and builds tension in scenes without direction change, so the two engines never combine into the explosive beat that makes a reversal feel threatening.",
-          "id": "5315b9d64e4f497a",
-          "location": "2 turn scene(s), 2 suspense scene(s) — no overlap",
-          "rule": "TURN_SUSPENSE_DECOUPLED",
-          "severity": "minor",
-          "suggestedFix": "Stage at least one dramatic turn so it also spikes suspense in the same scene — let the pivot arrive at a high-tension moment, or let the reversal itself be the source of a new threat. A chase that turns when the route is blocked, a revelation that pivots and simultaneously ratchets the danger, or a confrontation that reverses and leaves the protagonist more exposed all fuse structural direction change with felt urgency."
-        },
-        {
-          "description": "The story's highest-tension scene (Scene 1, suspenseDelta 2) generates no curiosity (curiosityDelta ≤ 0), while 3 other scenes raise questions. The tensest scene is a closed pocket of high stakes — the audience's adrenaline spikes without their wondering intensifying. Peak suspense and peak curiosity coinciding makes for a thriller's best moments: not only does the danger spike, but a question opens that pulls the audience forward through it. When the tensest scene raises no question, the peak is climactic without being propulsive: the audience is locked into the moment of danger without the wondering that drives them to find out what comes next.",
+          "description": "The story's highest-tension scene (Scene 1, suspenseDelta 1) generates no curiosity (curiosityDelta ≤ 0), while 3 other scenes raise questions. The tensest scene is a closed pocket of high stakes — the audience's adrenaline spikes without their wondering intensifying. Peak suspense and peak curiosity coinciding makes for a thriller's best moments: not only does the danger spike, but a question opens that pulls the audience forward through it. When the tensest scene raises no question, the peak is climactic without being propulsive: the audience is locked into the moment of danger without the wondering that drives them to find out what comes next.",
           "id": "a562fb5d37d9641b",
-          "location": "Scene 1 (peak suspenseDelta 2) — curiosityDelta ≤ 0",
+          "location": "Scene 1 (peak suspenseDelta 1) — curiosityDelta ≤ 0",
           "rule": "PEAK_SUSPENSE_CURIOSITY_VOID",
           "severity": "minor",
           "suggestedFix": "Stage the peak suspense scene so it also opens a question — an unknown that the high-tension moment forces but does not yet answer. A confrontation peaking in danger while leaving the outcome uncertain, a chase that explodes in tension and reveals new information the audience wants to decipher, or a threat at its worst that implies a secret not yet understood all make the peak both gripping and propulsive."
@@ -846,22 +822,6 @@
           "suggestedFix": "Raise curiosity somewhere within the 12-scene stretch so the structure keeps a live question driving it throughout that stretch."
         },
         {
-          "description": "Every revelation in the story (2 discoveries) is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A truth that lands without re-tightening tension right after it leaves the structure's revelations feeling inert rather than consequential to what follows.",
-          "id": "b52af415df06d470",
-          "location": "2 revelation aftermath(s) — no suspense rise within 2 scenes",
-          "rule": "STRUCTURE_REVELATION_SUSPENSE_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one revelation, let a new tension rise from the discovery, so the structure's revelations keep the story pressing forward instead of settling into calm."
-        },
-        {
-          "description": "Every one of the story's 2 suspense-spike scenes is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the structure's tension registering as isolated pressure rather than a source of the next thing worth wondering about.",
-          "id": "7bb601a7752604b5",
-          "location": "2 suspense-spike scene(s) — no curiosity rise within 2 scenes of any",
-          "rule": "STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread."
-        },
-        {
           "description": "Every one of the story's 2 scenes that plant a clue is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A planted clue that never provokes a fresh question in its immediate aftermath leaves the seed structurally present but inert — the story sets something up without letting the audience feel the pull of wondering what it means.",
           "id": "3e7ce9d09f2ef6e4",
           "location": "2 seed scene(s) — no curiosity rise within 2 scenes of any",
@@ -870,8 +830,8 @@
           "suggestedFix": "In the two scenes following at least one seed, let a new question surface from what was just planted, so the clue generates curiosity rather than passing unnoticed until its eventual payoff."
         }
       ],
-      "major": 15,
-      "minor": 27,
+      "major": 13,
+      "minor": 24,
       "pass": "structure"
     },
     {
@@ -910,14 +870,6 @@
           "suggestedFix": "Let the revelation change something immediately: a character recalibrates, a relationship shifts, or the stakes rise. Information that alters nothing wasn't worth revealing."
         },
         {
-          "description": "Scene 1 spikes to suspense 2.0 but the next two scenes are completely flat — no emotional aftershock, no clock, no relationship movement. The action peak dissolves without causal consequence.",
-          "id": "2251b9f7fa95324c",
-          "location": "Scene 1 (action peak)",
-          "rule": "CONSEQUENCE_CHAIN_BREAK",
-          "severity": "minor",
-          "suggestedFix": "Let high-action peaks echo forward: show the emotional aftershock, the strained relationship, or the accelerated deadline in the scenes that immediately follow. Action without consequence is noise, not drama."
-        },
-        {
           "description": "Act 2 (Scenes 5–12, 8 scenes) contains no revelation, payoff, planted clue, raised clock, or significant relationship shift — the story's longest structural section is causally inert. Nothing is planted, escalated, or discovered across the entire middle act.",
           "id": "a2cf6177ab940a3c",
           "location": "Act 2 (Scenes 5–12)",
@@ -926,17 +878,17 @@
           "suggestedFix": "Act 2 must be the engine of complication. Plant clues, raise clocks, shift relationships, or deliver a mid-story revelation in each act-2 sequence. The protagonist should be discovering, failing, and adapting across the middle — not waiting for Act 3."
         },
         {
-          "description": "Scenes 3–6 hold suspense essentially flat (|delta| ≤ 0.5 for 4 consecutive scenes) — tension neither rises nor falls across the stretch. The story flatlines; the audience's sense of forward pressure goes slack.",
+          "description": "Scenes 2–5 hold suspense essentially flat (|delta| ≤ 0.5 for 4 consecutive scenes) — tension neither rises nor falls across the stretch. The story flatlines; the audience's sense of forward pressure goes slack.",
           "id": "d4e45fed9daa01ab",
-          "location": "Scenes 3–6",
+          "location": "Scenes 2–5",
           "rule": "SUSPENSE_PLATEAU_FLATLINE",
           "severity": "minor",
           "suggestedFix": "Break the plateau with a deliberate move on the suspense curve: raise a clock, deliver a setback, or release built tension at a turning point. A flat tension line over four-plus scenes reads as the story idling."
         },
         {
-          "description": "Scene 2 delivers a dramatic turn (\"\") but the next two scenes are causally inert — neutral emotion, no suspense rise, no relationship movement. A turn that changes nothing downstream is a turn in name only; the story declares a pivot and then proceeds as if it never happened.",
-          "id": "1362bcd2bb24ba10",
-          "location": "Scene 2 (dramatic turn: )",
+          "description": "Scene 1 delivers a dramatic turn (\"\") but the next two scenes are causally inert — neutral emotion, no suspense rise, no relationship movement. A turn that changes nothing downstream is a turn in name only; the story declares a pivot and then proceeds as if it never happened.",
+          "id": "0fb86cc3477e3767",
+          "location": "Scene 1 (dramatic turn: )",
           "rule": "DRAMATIC_TURN_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "Let the turn ripple: the scenes immediately after a reversal or revelation should show characters adjusting — an emotional shift, a relationship strained or realigned, suspense climbing as the new situation sinks in. The size of a turn is measured by its wake, not its announcement."
@@ -956,6 +908,14 @@
           "rule": "EMOTIONAL_NEUTRAL_RUN",
           "severity": "minor",
           "suggestedFix": "Inject emotional movement into the flat stretch: a small loss, an unexpected kindness, a flare of fear or hope. Plot events should leave emotional residue on the characters; if a run of scenes moves the plot but stirs no feeling, the audience is watching machinery, not people."
+        },
+        {
+          "description": "The 16 dramatic-turn scenes (reversals, recognitions, twists) have an average suspenseDelta of -0.06 — the story's pivots generate no tension. A turn is where the situation flips, and that flip should be the most uncertain moment in its stretch: the audience should not know what happens next. When turns land tension-flat, they read as administrative plot changes rather than dangerous pivots that threaten the protagonist.",
+          "id": "ff77c9de83f3e798",
+          "location": "16 dramatic-turn scene(s) — avg suspenseDelta -0.06",
+          "rule": "DRAMATIC_TURN_NO_SUSPENSE",
+          "severity": "minor",
+          "suggestedFix": "Make each turn dangerous: the reversal should raise the stakes and the uncertainty at once — a new threat exposed, an advantage lost, a deadline tightened by the twist. A pivot that does not raise suspense is a change the audience is informed of rather than gripped by."
         },
         {
           "description": "All 16 dramatic-turn scenes (reversals, recognitions, twists) are emotionally neutral — the story's pivots move no one. A turn is where the situation flips, and the flip should land as a felt event: shock, grief, hope, dread. When every pivot is affectless, the plot changes direction while the protagonist registers nothing, so the audience processes each turn as information rather than experiencing it as drama.",
@@ -988,14 +948,6 @@
           "rule": "CURIOSITY_TEMPORAL_CLUSTER",
           "severity": "minor",
           "suggestedFix": "Redistribute curiosity spikes so that each structural third contains at least one scene where a new question is opened or an existing question deepens (positive curiosityDelta). Move some of the closing-third mystery beats to the underweight thirds, or add new question-generating moments in the zones that currently carry little to no mystery engagement. Sustained curiosity across all three acts keeps the audience engaged throughout."
-        },
-        {
-          "description": "The script has 2 qualifying dramatic-turn scenes and 2 scenes with a suspense rise, but no dramatic turn is immediately followed by a scene with rising tension. A narrative pivot signals that the story's direction has changed — and the scene right after is the most natural place for suspense to build as the new situation's danger becomes apparent. When no turn is ever followed by a suspense rise in its immediate wake, the pivots never translate into felt pressure: the story changes course, but the audience never experiences the danger of the new direction settling in.",
-          "id": "808816403516e98f",
-          "location": "2 dramatic-turn scene(s) — none immediately followed by a suspense rise",
-          "rule": "DRAMATIC_TURN_SUSPENSE_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "After at least one dramatic turn, let the immediately following scene carry a positive suspenseDelta — rising tension as the consequences of the pivot become clear. The suspense rise need not be caused by the turn itself; its proximity is enough to let the reversal feel like it raised the stakes and tightened the screw."
         },
         {
           "description": "The story contains a run of 6 consecutive scenes with no visual staging beats at all, even though 5 scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the causal chain of events without any staged action to anchor it.",
@@ -1044,26 +996,10 @@
           "rule": "CAUSALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "In the two scenes following an open-thread scene, let a new question sharpen the audience's curiosity so the causal chain's loose ends keep pulling the story forward rather than sitting inert."
-        },
-        {
-          "description": "Every one of the story's 2 suspense-spike scenes is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the causal chain's tension registering as isolated pressure rather than a source of the next thing worth wondering about.",
-          "id": "48296243ec8c0e6b",
-          "location": "2 suspense-spike scene(s) — no curiosity rise within 2 scenes of any",
-          "rule": "CAUSALITY_SUSPENSE_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread."
-        },
-        {
-          "description": "Every one of the story's 2 revelation scenes is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A truth that surfaces without ever sharpening danger or uncertainty in its wake leaves the causal chain's disclosures reading as settled facts rather than information that raises the stakes of what follows.",
-          "id": "c7a56816776d75a5",
-          "location": "2 revelation scene(s) — no suspense rise within 2 scenes of any",
-          "rule": "CAUSALITY_REVELATION_SUSPENSE_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one revelation, let the new information tighten the tension around what comes next, so disclosure keeps building pressure instead of only resolving questions."
         }
       ],
       "major": 4,
-      "minor": 19,
+      "minor": 16,
       "pass": "causality"
     },
     {
@@ -1214,14 +1150,6 @@
           "suggestedFix": "Give the protagonist at least one decisive proactive beat in Act 3: they set the final trap, force the confrontation, or make the irreversible move that triggers the climax. The ending must be something they cause, not something they merely survive"
         },
         {
-          "description": "The story's highest-momentum scene (Scene 1, entropy 3.0) lands in Act 1 rather than near the climax — the most informationally dense moment is in the setup, so the story front-loads its peak and has nowhere left to build",
-          "id": "ce3f5aa965598c36",
-          "location": "Scene 1 (INT. FIELD STATION - DAY)",
-          "rule": "ENTROPY_SPIKE_MISPLACED",
-          "severity": "major",
-          "suggestedFix": "Redistribute momentum so the entropy peak lands in the back half: dial down the Act 1 spike, or escalate the climax so the densest concentration of suspense, relationship turns, and revelations arrives when the stakes are highest"
-        },
-        {
           "description": "The protagonist initiates 2 proactive beats in the first half but none in the second half — their agency burns out at the midpoint, exactly when the story should be accelerating toward the climax.",
           "id": "5cab93e282499552",
           "location": "Second half (Scenes 9–16)",
@@ -1348,18 +1276,10 @@
           "rule": "INTENTION_SEED_CURIOSITY_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question about what the character's pursuit will uncover next."
-        },
-        {
-          "description": "Every one of the story's 2 scenes that reveal something is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere in the script. A revelation that never sharpens danger or urgency about what the character now wants leaves the intention layer's disclosures reading as settled facts rather than information that raises the stakes of the pursuit.",
-          "id": "697e3b03257d9545",
-          "location": "2 revelation scene(s) — no suspense rise within 2 scenes",
-          "rule": "INTENTION_REVELATION_SUSPENSE_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one revelation, let the new information tighten the tension around what the character is after, so disclosure keeps building pressure instead of only resolving it."
         }
       ],
-      "major": 16,
-      "minor": 19,
+      "major": 15,
+      "minor": 18,
       "pass": "intention"
     },
     {
@@ -1548,30 +1468,14 @@
           "rule": "BELIEF_SEED_CURIOSITY_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "In the two scenes following at least one clue-seeding moment, let curiosity visibly sharpen so the seed's groundwork registers as a live question, not just planted information."
-        },
-        {
-          "description": "Every one of the story's 2 revelation scenes is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A discovery that never re-tightens tension right after it lands leaves the belief layer's revelations feeling inert rather than consequential.",
-          "id": "29f1cf6b9da6b22c",
-          "location": "2 revelation scene(s) — no suspense rise within 2 scenes of any",
-          "rule": "BELIEF_REVELATION_SUSPENSE_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one revelation, let a new tension rise so the discovery carries forward pressure instead of resolving into calm."
-        },
-        {
-          "description": "Every one of the story's 2 suspense-spike scenes is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the belief layer's tension registering as isolated pressure rather than a source of the next thing worth wondering about.",
-          "id": "31bc9942fb04e8a6",
-          "location": "2 suspense-spike scene(s) — no curiosity rise within 2 scenes of any",
-          "rule": "BELIEF_SUSPENSE_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread."
         }
       ],
       "major": 7,
-      "minor": 18,
+      "minor": 16,
       "pass": "belief"
     },
     {
-      "critical": 1,
+      "critical": 0,
       "issues": [
         {
           "description": "Average suspense in the second half (0) does not exceed the first half — conflict fails to escalate",
@@ -1582,14 +1486,6 @@
           "suggestedFix": "Increase the stakes in the second half by having a character lose something they cannot recover easily"
         },
         {
-          "description": "An 8+ scene story with zero suspense-dip reversals detected — this reads only for a sharp scene-level drop in the engine's danger/tension language (suspenseDelta < -1), not for a betrayal, broken deal, or backfire conveyed without that tension-language signature. Reread before treating this as \"no conflict texture.\"",
-          "id": "9bed77ed917160b0",
-          "location": "Conflict layer",
-          "rule": "NO_REVERSALS_LONG_STORY",
-          "severity": "critical",
-          "suggestedFix": "If a reread confirms no plan ever fails or backfires anywhere in the story, add one. If a reversal already exists on the page but isn't registering here, that's a gap in this detector's tension-language coverage, not necessarily a craft problem."
-        },
-        {
           "description": "Act 1 (4 scenes) contains no conflict signal: no clock raised, no reversal, no negative relationship shift. The story opens without tension — the audience has nothing at stake from the start.",
           "id": "081c8f645bb79b33",
           "location": "Act 1 (Scenes 1–4)",
@@ -1598,20 +1494,20 @@
           "suggestedFix": "Introduce a conflict signal in the first 25%: raise a clock, create a minor relational rupture, or plant a threat. The opening must establish what the protagonist stands to lose before the audience will care about saving it."
         },
         {
-          "description": "The midpoint and adjacent scenes (Scenes 8–10) carry no conflict signal — no clock, no reversal, no negative relationship shift. The structural pivot has no dramatic tension.",
-          "id": "2750f1656a7ca566",
-          "location": "Scenes 8–10 (midpoint ±1)",
-          "rule": "CONFLICT_MIDPOINT_ABSENT",
-          "severity": "major",
-          "suggestedFix": "Add a conflict beat to the midpoint zone: raise a clock, introduce a reversal, or create a relational rupture. The midpoint is where the story shifts gear — it should feel dramatic, not inert."
+          "description": "2 reversals occur but no scene carries a negative relationship shift — all conflict is external plot force with zero interpersonal damage. Characters never wound each other; they only absorb external obstacles.",
+          "id": "41f0800d261703ef",
+          "location": "Conflict architecture",
+          "rule": "ANTAGONIST_FORCE_ONLY",
+          "severity": "minor",
+          "suggestedFix": "Add at least one scene where the conflict damages a relationship: a betrayal, a broken trust, or an accusation that shifts how two characters stand in relation to each other. External opposition without interpersonal cost produces plot without drama."
         },
         {
-          "description": "The final third of the story (scenes 11–16) contains no scene with rising suspense (positive suspenseDelta), even though 2 suspense-escalating scene(s) exist in the opening and middle. The climax approach carries no new tension build — the home stretch generates no visceral urgency. Suspense is an audience-facing signal of mounting threat; when it vanishes in the final third while the earlier acts used it freely, the story's closing movement risks feeling like a release from tension rather than its peak. The final third should carry the story's highest sustained suspense, not its lowest.",
-          "id": "f262733c9341a585",
-          "location": "Closing third (scenes 11–16) — no positive suspenseDelta",
-          "rule": "CONFLICT_CLOSING_SUSPENSE_VOID",
+          "description": "Act 1 (the first 4 scenes) contains no conflict signal — no tension drop, no negative relationship shift — yet the story develops conflict later. The opening is frictionless and the inciting opposition arrives late, giving the audience nothing to lean into from the start.",
+          "id": "cf6c8ae344b18b7d",
+          "location": "Act 1 (Scenes 1–4) — conflict layer",
+          "rule": "CONFLICT_OPENING_VOID",
           "severity": "minor",
-          "suggestedFix": "Introduce at least one scene in the final third that escalates suspense — a threat that tightens, a revelation that raises the stakes, a confrontation that forces the protagonist into a position with no easy exit. The closing act should feel like pressure accumulating toward an inevitable breaking point, not like a wind-down from the tensions the earlier acts established."
+          "suggestedFix": "Pose the dramatic question early and let something resist it in Act 1: a friction between characters, an obstacle that bites, a threat that announces itself. An opening with no opposition reads as preamble; the conflict should be felt before the first act ends."
         },
         {
           "description": "100% of the conflict arc's 3 curiosity-spike scenes are concentrated in the closing structural third, leaving the other two-thirds wonder-flat. The conflict's mystery dimension — the questions the escalating situation generates — is ghettoized into one zone rather than sustained across the full arc. When curiosity clusters in one stretch, the audience experiences a burst of wondering followed by a long question-quiet stretch rather than continuous deepening uncertainty. Effective conflict sustains wonder across all three structural zones: early questions establish what is at stake and unknown, middle questions deepen the mystery under pressure, and late questions hold the tension through the resolution.",
@@ -1620,14 +1516,6 @@
           "rule": "CONFLICT_CURIOSITY_ZONE_CLUSTER",
           "severity": "minor",
           "suggestedFix": "Redistribute curiosity spikes so that each structural third carries at least one moment where the conflict opens a new question. Move some of the closing third's wonder beats into the underweight zones, or add new curiosity-generating moments in the question-quiet sections. The conflict is most gripping when it keeps generating new questions across its full arc — when the audience never knows whether they understand enough to predict the outcome."
-        },
-        {
-          "description": "None of the conflict's 2 dramatic-turn scenes is followed by a positive suspenseDelta within the next two scenes, even though 2 suspense-rise scenes exist elsewhere in the script. A dramatic turn is a moment of structural reorientation — the conflict flips direction, the protagonist's position changes, the meaning of prior events is restructured — and the natural aftermath is heightened urgency: the new situation demands a recalibration the protagonist has not yet completed, and that gap is where felt pressure should rise. When every pivot's aftermath is suspense-flat, turns function as pure plot mechanics: the situation changes but the protagonist's danger does not register in the two scenes immediately following the reversal. The conflict pivots without escalating.",
-          "id": "b6debe92c410fde0",
-          "location": "2 dramatic-turn scene(s) — none followed by a suspense rise within 2 scenes",
-          "rule": "CONFLICT_TURN_AFTERMATH_SUSPENSE_VOID",
-          "severity": "minor",
-          "suggestedFix": "After at least one dramatic turn, let the next one or two scenes carry a positive suspenseDelta that the new configuration generates — the heightened danger of a restructured situation, the pressure of the protagonist's revised position, or the urgency of having to respond to a conflict that has just changed shape. A turn that raises tension in its aftermath does more than restructure: it escalates. The audience, having just seen the conflict's direction change, experiences that change as increased pressure rather than as a neutral repositioning."
         },
         {
           "description": "The conflict arc contains a run of 12 consecutive scenes with no revelation — an extended disclosure drought — even though 2 revelation scenes exist elsewhere. Revelations are the mechanism by which hidden truths emerge under pressure: they reframe the conflict, expose hidden motivations, and generate the irrevocable knowledge that forces characters into new positions. An unbroken stretch of 12 revelation-free scenes means the conflict advances through action and reaction for an extended run without any new hidden truth coming to light — the audience watches the situation escalate without their understanding of it deepening. The conflict's epistemic dimension flatlines: no cause surfaces, no motivation is exposed, no misunderstood fact becomes clear during the drought.",
@@ -1660,26 +1548,10 @@
           "rule": "CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "In the two scenes following at least one clue-seeding moment, let a new question arise from the plant so the conflict's foreshadowing keeps generating curiosity, not just sitting as inert setup."
-        },
-        {
-          "description": "Every one of the story's 2 revelation scenes is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A discovery that never sharpens danger or uncertainty right after it lands leaves the conflict's reckoning with new information feeling settled rather than newly charged.",
-          "id": "d14aed0b1f55c54d",
-          "location": "2 revelation scene(s) — no suspense rise within 2 scenes of any",
-          "rule": "CONFLICT_REVELATION_SUSPENSE_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one revelation, let the new information raise what's at risk, so the discovery compounds tension instead of resolving into calm."
-        },
-        {
-          "description": "Every one of the story's 2 suspense-spike scenes is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the conflict layer's tension registering as isolated pressure rather than a source of the next thing worth wondering about.",
-          "id": "0f25e2980e56d090",
-          "location": "2 suspense-spike scene(s) — no curiosity rise within 2 scenes of any",
-          "rule": "CONFLICT_SUSPENSE_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread."
         }
       ],
-      "major": 3,
-      "minor": 9,
+      "major": 2,
+      "minor": 7,
       "pass": "conflict"
     },
     {
@@ -1798,14 +1670,6 @@
           "suggestedFix": "Redistribute some of the closing third's curiosity spikes into the other two zones so that new questions open across the full arc. Each structural third can carry its own intrigue beat: an early question that establishes what the protagonist doesn't know, a middle question that complicates their understanding, and a late question that holds the tension through the resolution. Spreading wonder across the thirds turns an episodic burst of mystery into a continuous thread of deepening intrigue."
         },
         {
-          "description": "None of the story's 2 suspense-spike scenes is followed by a scene with raised curiosity within the next two scenes, even though 3 curiosity-positive scenes exist elsewhere. When stakes increase, the natural corollary is deeper mystery: who's responsible for the threat, what comes next, whether survival is possible in this new configuration. Suspense without curiosity aftermath is pressure without wonder — the protagonist feels the stakes rise but generates no new questions from the heightened situation. When every tension spike passes into a two-scene curiosity void, danger and mystery operate as completely parallel systems that never cross: the story escalates stakes through one channel and deepens questions through another, but the two never speak to each other in the immediate aftermath of the story's most charged moments.",
-          "id": "77a0f1e51ef3cd14",
-          "location": "2 suspense-spike scene(s) — none followed by a curiosity rise within 2 scenes",
-          "rule": "ARC_SUSPENSE_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "After at least one suspense-spike scene, let the next one or two scenes carry a raised curiosityDelta — a new question that the escalated danger generates. The curiosity doesn't need to be explicit exposition: a revelation that the threat has a hidden dimension, a development that makes the protagonist wonder about an element they thought they understood, or an encounter that raises a new question under pressure all qualify. Tension that generates wonder makes the stakes feel more complex and the protagonist's situation more unknowable — and an unknowable situation is harder to look away from."
-        },
-        {
           "description": "The 2 scenes carrying outstanding clue-debt never coincide with the 3 scenes where curiosity is actively rising — the arc's open mysteries and its moments of climbing intrigue run on separate tracks. A scene that already holds an unresolved question is a natural place for wonder to spike further, but that pairing never occurs here.",
           "id": "3ec7a65e7c3989ec",
           "location": "2 open-thread scene(s), 3 rising-curiosity scene(s) — zero overlap",
@@ -1828,18 +1692,10 @@
           "rule": "ARC_SEED_CURIOSITY_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question tied to the character's arc."
-        },
-        {
-          "description": "Every revelation in the story (2 discoveries) is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A discovery that never tightens the felt sense of danger right after it leaves the arc's revelations landing as flat information rather than a beat that raises the pressure on the protagonist.",
-          "id": "12b6bf65d0da7a88",
-          "location": "2 revelation aftermath(s) — no suspense rise within 2 scenes",
-          "rule": "ARC_REVELATION_SUSPENSE_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one revelation, let the tension climb so the arc's discoveries keep building pressure rather than settling once the truth is out."
         }
       ],
       "major": 4,
-      "minor": 15,
+      "minor": 13,
       "pass": "character-arc"
     },
     {
@@ -1932,25 +1788,17 @@
           "rule": "DIALOGUE_SEED_CURIOSITY_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "In the two scenes following at least one clue-seeding moment, let a character's line raise a new question about it so the seed's curiosity is voiced, not just planted."
-        },
-        {
-          "description": "Every one of the story's 2 scenes that raise suspense is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere in the script. A spike in danger that never opens a fresh question right after it leaves the dialogue layer's tension registering as isolated pressure rather than a source of the next thing worth wondering about.",
-          "id": "86d2008039249ad5",
-          "location": "2 suspense-rise scene(s) -- no curiosity rise within 2 scenes",
-          "rule": "DIALOGUE_SUSPENSE_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one suspense rise, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread."
         }
       ],
       "major": 0,
-      "minor": 12,
+      "minor": 11,
       "pass": "dialogue"
     },
     {
       "critical": 0,
       "issues": [
         {
-          "description": "16 of 18 action lines (89%) are flat declaratives with no internal punctuation and no subordinating clause. Pure declarative sequences (\"She enters. He looks. She leaves.\") have no temporal layering, no causality signal, and no simultaneity — the action reads as a beat list rather than cinematic prose.",
+          "description": "14 of 16 action lines (88%) are flat declaratives with no internal punctuation and no subordinating clause. Pure declarative sequences (\"She enters. He looks. She leaves.\") have no temporal layering, no causality signal, and no simultaneity — the action reads as a beat list rather than cinematic prose.",
           "id": "40a7b8d1576548fe",
           "location": "Action lines throughout",
           "rule": "DECLARATIVE_PILE",
@@ -1958,7 +1806,7 @@
           "suggestedFix": "Introduce structural variety: \"As she opens the door, he rises.\" layers two actions. \"Before he can speak, she's gone.\" uses cause and sequence. \"He watches, unable to move.\" uses a comma and hanging modifier. Even one varied structure per page breaks the declarative monotone."
         },
         {
-          "description": "18 action lines contain no simultaneous-action language (\"while\", \"even as\", \"at the same time\") — every action is strictly sequential. Film captures two things happening at once in the frame; a scene with no simultaneity misses the visual layering that distinguishes screenplay from a prose sequence of events.",
+          "description": "16 action lines contain no simultaneous-action language (\"while\", \"even as\", \"at the same time\") — every action is strictly sequential. Film captures two things happening at once in the frame; a scene with no simultaneity misses the visual layering that distinguishes screenplay from a prose sequence of events.",
           "id": "67095157f3dcf59e",
           "location": "Action lines throughout",
           "rule": "SIMULTANEOUS_ACTION_ABSENT",
@@ -1966,7 +1814,15 @@
           "suggestedFix": "Add at least one simultaneous layer: \"While he talks, she reads the room.\" or \"Even as he smiles, his hands are shaking.\" Simultaneous action creates visual depth and reveals character through contradiction."
         },
         {
-          "description": "18 action lines contain no texture or material descriptor — the screenplay world has no tactile surface. Nothing is rough, worn, cracked, gleaming, or stained. Texture words are what make described objects feel real; their absence gives the visual world a blank, set-photograph quality.",
+          "description": "16 action lines contain no line of 3 words or fewer — the prose has no punchy impact beats. The very-short line is one of screenwriting's most powerful tools: \"She stops.\" \"He's gone.\" \"Silence.\" When everything runs at similar length, nothing can land with maximum impact.",
+          "id": "395744693a235e74",
+          "location": "Action lines throughout",
+          "rule": "SHORT_LINE_POVERTY",
+          "severity": "minor",
+          "suggestedFix": "Introduce at least 2-3 impact lines of 1-3 words at your key dramatic beats. Not every action needs a full sentence. \"She fires.\" — done. \"Empty.\" — done. Short lines create a beat the reader cannot rush past."
+        },
+        {
+          "description": "16 action lines contain no texture or material descriptor — the screenplay world has no tactile surface. Nothing is rough, worn, cracked, gleaming, or stained. Texture words are what make described objects feel real; their absence gives the visual world a blank, set-photograph quality.",
           "id": "9f8f1fc9767262e1",
           "location": "Action lines throughout",
           "rule": "VISUAL_TEXTURE_ABSENT",
@@ -1974,7 +1830,7 @@
           "suggestedFix": "Add at least 2-3 texture descriptors to the action: the worn armrest, the cracked plastic casing, the polished floor that reflects the overhead light. Texture is how the world tells the audience how old it is, how it has been used, and what it costs to be in it."
         },
         {
-          "description": "18 action lines contain no spatial anchor phrase — characters move through featureless space. Without \"across the room\", \"by the window\", \"against the wall\", the audience cannot build a mental map of the scene's geography. Every action floats in an unlocated void.",
+          "description": "16 action lines contain no spatial anchor phrase — characters move through featureless space. Without \"across the room\", \"by the window\", \"against the wall\", the audience cannot build a mental map of the scene's geography. Every action floats in an unlocated void.",
           "id": "d21ba0c64a607f7f",
           "location": "Action lines throughout",
           "rule": "SPATIAL_ANCHOR_ABSENT",
@@ -1990,44 +1846,20 @@
           "suggestedFix": "After each cluster of long action lines, insert a short sharp beat — a 2–5 word line that captures the essential consequence (\"He freezes.\", \"A long silence.\", \"The door is open.\"). This punctuation tells the reader where one image ends and the next begins."
         },
         {
-          "description": "The final 25% of action lines (the climactic staging) contains no short line of 4 words or fewer, while 2 such lines appear earlier in the script. The staccato register used to create impact in earlier sections disappears precisely when the story needs it most: at the climax, a one-line beat at the moment of decision, a three-word line at the turning point, forces the reader to pause inside the beat rather than pass through it at prose velocity. When the finale is written entirely in longer, fuller lines, the climactic staging feels uniform rather than punctuated — every beat takes the same amount of time to read, regardless of its dramatic weight.",
-          "id": "a55f582742ce707a",
-          "location": "Action lines 14–18 (final 25%) — no short ≤4-word line",
-          "rule": "ACTION_FINALE_SHORT_ABSENT",
+          "description": "All 16 action lines have nearly identical word counts: standard deviation is 2.35 around an average of 9.0 words per line. This metronomic uniformity signals that no conscious rhythmic shaping is occurring — the writer produces the same-length line regardless of whether a beat calls for a short punch or an expansive image. Screenplay rhythm requires diversity: 2-word staccato beats, 5-word staging notes, 12-word descriptive paragraphs — interleaved to move the reader's eye at varying speeds.",
+          "id": "f2295949784a118f",
+          "location": "Action lines — word-count flatline (stdDev = 2.35, avg = 9.0 words)",
+          "rule": "ACTION_WORDCOUNT_FLATLINE",
           "severity": "minor",
-          "suggestedFix": "Add at least one short action line (≤4 words) in the finale zone: the single word at the decision point, the two-word beat before the final action, the minimal line that holds the moment. \"She pulls the trigger.\" becomes \"She fires.\" if the preceding two lines have built the moment fully. Short beats in the climax are not shortcuts — they are the most intensive form of staging because they ask the reader to stop and feel rather than read."
+          "suggestedFix": "Deliberately vary action line length to match the dramatic function: short lines (1–4 words) for sharp beats and transitions; medium lines (5–9 words) for staging and reaction; long lines (10–15 words) for setting and atmosphere. Read the script aloud — if every pause feels the same length, the rhythm is wrong."
         },
         {
-          "description": "The middle 50% of action lines (lines 5–13) contains no short line of 4 words or fewer, while 2 short lines exist in the outer zones — the script's longest sustained section is written without any compressed beat. Short lines serve a pacing function in the middle of prose: they signal a gear-change, register a reaction in isolation, or land a beat without commentary. When the middle zone is uniformly dense, it risks feeling metronomically even — each line demands similar reading time, and the absence of the staccato beat removes the contrast that makes the surrounding longer lines feel deliberate rather than routine.",
-          "id": "ee627c7a47175366",
-          "location": "Middle action lines (5–13) — no short line ≤4 words",
-          "rule": "ACTION_MIDDLE_SHORT_ABSENT",
-          "severity": "minor",
-          "suggestedFix": "Add at least one short action line (≤4 words) in the middle section (action lines 5–13) — a one-word reaction, a two-word observation, a three-word beat that interrupts the density. The short line doesn't need to be climactic; it needs to change the reader's rhythm and signal that something just happened in a single beat."
-        },
-        {
-          "description": "11 consecutive action lines each fall between 5 and 11 words — the script maintains a comfortable mid-range cadence for a sustained stretch without sampling either the staccato register (≤4 words) or the dense descriptive register (≥12 words), even though both extremes appear elsewhere in the script. Rhythm depends on contrast: a short line lands with percussive impact because it interrupts a longer sentence, and a long line carries elaborative weight because it stretches past the surrounding brevity. In a 11-line medium run, every beat arrives with the same pace — steady but undifferentiated — and the cumulative effect is a plateau of prose that reads as moderate rather than dramatic.",
-          "id": "e72133f84634cd9e",
-          "location": "11 consecutive action line(s) in the 5–11 word range",
-          "rule": "ACTION_CONSECUTIVE_MEDIUM_RUN",
-          "severity": "minor",
-          "suggestedFix": "Break the medium run by introducing at least one short (≤4 words) or long (≥12 words) action line within the 11-line sequence. A single staccato beat mid-run resets the reader's expectation and makes the surrounding medium lines feel deliberate rather than habitual; a single long line anchors the run with a fully-realized image that the brevity around it makes more vivid."
-        },
-        {
-          "description": "Fewer than 15% of action lines contain a comma (2 of 18) — the script's action prose is almost entirely comma-free. Commas are the primary tool for syntactic complexity within a single action sentence: they introduce dependent clauses (\"She hesitates, then moves\"), list actions in sequence (\"She opens the door, scans the room, steps inside\"), and insert parenthetical qualifications that give an action its emotional subtext (\"He smiles, just barely\"). When virtually no action lines use commas, every sentence must be simple and unmodified — subject, verb, object, full stop. The cumulative reading experience is syntactically monotone: each beat arrives as a single unadorned statement, and the prose is rhythmically restricted even when word count and sentence count are varied.",
+          "description": "Fewer than 15% of action lines contain a comma (2 of 16) — the script's action prose is almost entirely comma-free. Commas are the primary tool for syntactic complexity within a single action sentence: they introduce dependent clauses (\"She hesitates, then moves\"), list actions in sequence (\"She opens the door, scans the room, steps inside\"), and insert parenthetical qualifications that give an action its emotional subtext (\"He smiles, just barely\"). When virtually no action lines use commas, every sentence must be simple and unmodified — subject, verb, object, full stop. The cumulative reading experience is syntactically monotone: each beat arrives as a single unadorned statement, and the prose is rhythmically restricted even when word count and sentence count are varied.",
           "id": "4d27282e5df0383e",
-          "location": "2 of 18 action line(s) contain a comma",
+          "location": "2 of 16 action line(s) contain a comma",
           "rule": "ACTION_PUNCTUATION_DESERT",
           "severity": "minor",
           "suggestedFix": "Introduce commas into at least 15% of action lines by adding syntactic complexity where the action allows it: join a main action to a qualifying detail (\"She opens the door, her hand shaking\"), enumerate two simultaneous observations (\"The room is empty, the window open\"), or add a mid-sentence pause that gives an action its physical texture (\"He stops, listens, then takes the stairs two at a time\"). Each well-placed comma adds a rhythmic beat inside the sentence that the surrounding simple lines cannot provide."
-        },
-        {
-          "description": "The script's shortest action line has only 2 words — less than 24% of the script's 8-word average. In a prose context where the average action line runs 8 words, a line collapsing to 2 creates a radical discontinuity: a point-of-shock outlier that can land as a powerful, deliberate impact beat or as an under-written placeholder. The contrast ratio flags it as anomalously short relative to the script's own register. An extreme floor outlier draws attention proportional to the gap; it should be there because it earns that weight.",
-          "id": "e1bfe4a66d602fe7",
-          "location": "action line 2: \"Author: Fixture\"",
-          "rule": "ACTION_SHORTEST_OUTLIER",
-          "severity": "minor",
-          "suggestedFix": "Read the 2-word line in context. If it is a deliberate staccato impact beat — a single action that ends a sequence, a response to a blow — the brevity may be intentional. If it reads as a placeholder or an incomplete beat, expand it to carry the scene's weight. If the gap from the rest of the prose feels unearned, adding a clause or detail brings it into the script's register."
         },
         {
           "description": "The story contains a run of 6 consecutive scenes with no visual staging beats at all, even though 5 scenes elsewhere do carry physical staging. A long unbroken stretch with nothing physically shown leaves the story's rhythm running on pure dialogue and interiority for an extended stretch.",
@@ -2062,14 +1894,6 @@
           "suggestedFix": "Raise curiosity in at least one scene outside the closing third so the rhythm keeps generating fresh questions more evenly across the story."
         },
         {
-          "description": "Every revelation in the story (2 discoveries) is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A discovery that never tightens the felt sense of danger right after it leaves the rhythm's revelations landing as flat information rather than a beat that raises the temperature.",
-          "id": "bc903afc4d50cdaa",
-          "location": "2 revelation aftermath(s) — no suspense rise within 2 scenes",
-          "rule": "RHYTHM_REVELATION_SUSPENSE_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one revelation, let the tension climb so the rhythm's discoveries carry forward momentum rather than settling once the truth is out."
-        },
-        {
           "description": "Every one of the story's 2 clue-planting scenes is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A planted clue that never opens a fresh question right after it lands leaves the rhythm's foreshadowing registering as a closed event rather than a development that generates the next thing to wonder about.",
           "id": "c10290b2381c1a98",
           "location": "2 seed scene(s) — no curiosity rise within 2 scenes of any",
@@ -2084,18 +1908,10 @@
           "rule": "RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "In the two scenes following at least one open-thread moment, let a new question surface so the rhythm's lingering questions keep generating curiosity, not just accumulating as backlog."
-        },
-        {
-          "description": "Every one of the story's 2 suspense-spike scenes is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the rhythm's tension registering as isolated pressure rather than a source of the next thing worth wondering about.",
-          "id": "a2a722a169dd1c1b",
-          "location": "2 suspense-spike scene(s) — no curiosity rise within 2 scenes of any",
-          "rule": "RHYTHM_SUSPENSE_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread."
         }
       ],
       "major": 0,
-      "minor": 18,
+      "minor": 14,
       "pass": "rhythm"
     },
     {
@@ -2118,17 +1934,9 @@
           "suggestedFix": "Break the plateau: hard-cut one of these scenes to a single beat, or expand another into a full set-piece. A run of same-length scenes reads as a monotone even when the rest of the script breathes."
         },
         {
-          "description": "The story's peak suspense scene (Scene 1, suspenseDelta 2.0) is 2 lines — in the bottom 30% of all scene lengths. The most intense moment is among the shortest. The climax deserves the most space; an undersized peak scene spends the story's central dramatic charge in a flash.",
-          "id": "edccc66baa988af6",
-          "location": "Scene 1 (peak suspense, 2 lines)",
-          "rule": "CLIMAX_SCENE_UNDERSIZED",
-          "severity": "minor",
-          "suggestedFix": "Expand the climax scene: more character reaction, more physical consequence, more time inside the highest-stakes moment. The scene that carries the story's maximum tension should feel weightier than the setup scenes surrounding it — let the audience live in the peak longer."
-        },
-        {
-          "description": "Act 1's average suspenseDelta (0.75) exceeds Act 3's (-0.25), and the climax zone is flat or declining. Suspense peaks in the setup and dissipates before the resolution — the story front-loads tension and coasts. The audience loses urgency exactly when the story needs them most engaged.",
+          "description": "Act 1's average suspenseDelta (0.25) exceeds Act 3's (-0.25), and the climax zone is flat or declining. Suspense peaks in the setup and dissipates before the resolution — the story front-loads tension and coasts. The audience loses urgency exactly when the story needs them most engaged.",
           "id": "f6c5dd328c08df7b",
-          "location": "Act 1 avg suspense (0.8) vs Act 3 avg (-0.3)",
+          "location": "Act 1 avg suspense (0.3) vs Act 3 avg (-0.3)",
           "rule": "PACING_SUSPENSE_EARLY_PEAK",
           "severity": "minor",
           "suggestedFix": "Redistribute suspense: let Act 1 establish stakes (moderate suspense), Act 2 escalate (rising suspense), and Act 3 peak and resolve (highest then cathartic release). An escalating suspense curve means each act is more urgent than the last."
@@ -2140,6 +1948,14 @@
           "rule": "PACING_CURIOSITY_OPENING_FLATLINE",
           "severity": "minor",
           "suggestedFix": "Plant a question in the first scene: an unexplained action, a mysterious object, a character whose goal is unclear. Every opening scene should make the audience wonder \"why?\" before it makes them wonder \"what next?\". Curiosity is the engine of story; start it early."
+        },
+        {
+          "description": "The cumulative suspenseDelta across all 16 scenes is -1.0 — the story discharges more tension than it ever builds. A net-negative suspense ledger reads as a long deflation: each release outweighs the builds around it, and by the finale the story is running on charge it never banked.",
+          "id": "ab12582934e4c15d",
+          "location": "Suspense ledger (whole story)",
+          "rule": "NET_TENSION_DEFICIT",
+          "severity": "minor",
+          "suggestedFix": "Rebalance the ledger: deepen the builds (raise stakes more sharply in escalation scenes) or shrink the releases (partial resolutions that discharge some tension while leaving the core threat intact). Across the whole story, tension built should exceed tension spent until the climax settles the account."
         },
         {
           "description": "Scenes 1–12 (12 consecutive scenes) all have curiosityDelta ≤ 0 — the question-engine goes dark for a sustained stretch while 3 positive-curiosity scenes appear elsewhere. During these 12 scenes the audience carries the same unresolved questions without any renewal or deepening: no new question is raised, no existing question is made more urgent. A curiosity dead zone of this length teaches the audience that this stretch of story does not generate forward pull — they are watching events unfold rather than being drawn into unknowns.",
@@ -2180,33 +1996,17 @@
           "rule": "PACING_CURIOSITY_DROUGHT_RUN",
           "severity": "minor",
           "suggestedFix": "Raise curiosity somewhere within the 12-scene stretch so pacing keeps a live question driving momentum throughout that stretch."
-        },
-        {
-          "description": "Every one of the story's 2 scenes where suspense rises is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. Tension that never opens a fresh question right after it spikes leaves the pacing's danger and mystery engines decoupled — the story tightens without also deepening what the reader wants to know.",
-          "id": "e49528724b7ca775",
-          "location": "2 suspense-rise scene(s) — no curiosity rise within 2 scenes of any",
-          "rule": "PACING_SUSPENSE_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one suspense rise, let a new question surface so the pacing's tension and curiosity build together instead of on separate tracks."
-        },
-        {
-          "description": "Every one of the story's 2 curiosity-spike scenes is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A fresh question that never sharpens into danger or urgency right after it opens leaves the pacing's curiosity registering as idle wondering rather than a hook that tightens the tension of what comes next.",
-          "id": "58dc21544003b923",
-          "location": "2 curiosity-spike scene(s) — no suspense rise within 2 scenes of any",
-          "rule": "PACING_CURIOSITY_SUSPENSE_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one curiosity spike, let the new question raise the stakes, so the pacing's curiosity feeds tension rather than dissipating as loose intrigue."
         }
       ],
       "major": 1,
-      "minor": 11,
+      "minor": 9,
       "pass": "pacing"
     },
     {
       "critical": 0,
       "issues": [
         {
-          "description": "16 of 16 scenes (100%) share an identical structural shape (neutral|D|-|-: emotion·dialogue·reversal·relationship) — the scenes are stamped from one template. Even where purpose labels vary, the underlying beat machine repeats, and the story acquires a mechanical sameness.",
+          "description": "14 of 16 scenes (88%) share an identical structural shape (neutral|D|-|-: emotion·dialogue·reversal·relationship) — the scenes are stamped from one template. Even where purpose labels vary, the underlying beat machine repeats, and the story acquires a mechanical sameness.",
           "id": "a453960d20fc187c",
           "location": "Scene construction",
           "rule": "SCENE_SHAPE_TEMPLATING",
@@ -2278,6 +2078,14 @@
       "critical": 0,
       "issues": [
         {
+          "description": "None of the story's 2 clue-seeding scenes is followed by a suspense rise (suspenseDelta > 0) in the next two scenes — planted threads never escalate the danger downstream. A new unknown introduced to the audience should make the situation more dangerous: the scenes after the planting should reflect the threat that the new thread implies. When every seed is followed by two scenes of flat or falling suspense, evidence is planted without consequence — the thread enters the story without raising the temperature it should.",
+          "id": "c014d775be7e2b5c",
+          "location": "All 2 seed scene(s) — no suspense rise in the next two scenes",
+          "rule": "SEED_SUSPENSE_AFTERMATH_ABSENT",
+          "severity": "minor",
+          "suggestedFix": "After at least one clue-seeding scene, let the next scene escalate tension: the planted thread has implications that make the situation more dangerous, or a character who receives the clue is put under immediate pressure by it. A seed that raises suspense in the following scene teaches the audience that new information carries risk — they should be nervous when a new clue appears, not relaxed."
+        },
+        {
           "description": "None of the story's 2 clue-seeding scenes is followed by an emotional shift (emotionalShift ≠ 'neutral') in the next two scenes — planted threads produce no felt reaction from any character. A new unknown should register emotionally: the character who encounters it should show dread, curiosity, relief, or alarm in the scenes that follow. When every seed is followed by two emotionally neutral scenes, the clue exists purely as information — the audience is asked to hold a thread that no character appears to feel the weight of. Threads the characters visibly react to are threads the audience remembers.",
           "id": "bc5f76778af3e920",
           "location": "All 2 seed scene(s) — no emotional shift in the next two scenes",
@@ -2324,26 +2132,10 @@
           "rule": "PAYOFF_SEED_CURIOSITY_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "In the two scenes following at least one clue-seeding moment, let curiosity visibly sharpen so the plant's groundwork registers as a live question, not just an inert deposit awaiting its eventual payoff."
-        },
-        {
-          "description": "Every revelation in the story (2 discoveries) is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A truth that lands without re-tightening tension in the immediate aftermath leaves the payoff machinery's revelations registering as closure alone, with nothing new pressing on the reader.",
-          "id": "73f59660f89ba799",
-          "location": "2 revelation aftermath(s) — no suspense rise within 2 scenes",
-          "rule": "PAYOFF_REVELATION_SUSPENSE_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "After at least one revelation, let one of the following two scenes carry a rise in suspense so the discovery keeps generating tension, not just settling into a resolved fact."
-        },
-        {
-          "description": "Every one of the story's 2 suspense-spike scenes is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the payoff machinery's tension registering as isolated pressure rather than a source of the next thing worth wondering about.",
-          "id": "b51e3b62765df2b9",
-          "location": "2 suspense-spike scene(s) — no curiosity rise within 2 scenes of any",
-          "rule": "PAYOFF_SUSPENSE_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread."
         }
       ],
       "major": 0,
-      "minor": 8,
+      "minor": 7,
       "pass": "payoff"
     },
     {
@@ -2358,12 +2150,28 @@
           "suggestedFix": "Give Act 2 tonal shape: a moment of false hope or dark comedy in Act 2a, a turn toward crisis in Act 2b. The midpoint should feel like a register shift, not just a midpoint."
         },
         {
+          "description": "Only 0 of 16 action lines (0%) are short declarative fragments (≤ 4 words) — the prose has no staccato rhythm. Every sentence is a full clause; the urgency of fragment shots (\"The door. Open. Silence.\") is entirely absent.",
+          "id": "6128177888036937",
+          "location": "Action line rhythm",
+          "rule": "SENTENCE_FRAGMENT_STARVATION",
+          "severity": "minor",
+          "suggestedFix": "Introduce short declarative fragments at moments of tension, revelation, or visual punctuation. A two-word action line can carry more weight than a sentence: \"Nothing moves.\" reads louder than \"Nobody in the room is moving at all.\""
+        },
+        {
           "description": "16 of 16 dialogue lines (100%) end with a period, with only 0 questions and 0 exclamations — the dialogue is punctuationally flat. Uniformly period-terminated dialogue reads as scripted and bloodless; real conversation has tonal pitch variation.",
           "id": "26b66f334a7b2c76",
           "location": "Dialogue punctuation texture",
           "rule": "DIALOGUE_FLAT_PUNCTUATION",
           "severity": "minor",
           "suggestedFix": "Introduce punctuation variety: convert some declarative responses to genuine questions, add exclamatory beats at moments of shock or urgency. Punctuation is the cadence of breath — uniform periods strip dialogue of its pulse. Even two or three questions per page change the register dramatically."
+        },
+        {
+          "description": "Across 16 action lines, the word counts cluster tightly around a mean of 9.0 words (coefficient of variation 0.26, below the 0.30 rhythm threshold) — every action line is nearly the same length. Screen action lives on rhythmic contrast: a long descriptive build resolved by a curt punch. When all lines are equal length, the prose reads as a flat list of equally weighted facts and the eye finds no emphasis or pace.",
+          "id": "270155c5690d70cb",
+          "location": "Action line prose",
+          "rule": "ACTION_LINE_LENGTH_UNIFORMITY",
+          "severity": "minor",
+          "suggestedFix": "Vary action-line length deliberately. Let a long, detailed line set up a moment and a two- or three-word fragment land the beat: \"She crosses the dark hall, one hand trailing the wall, breath held against the silence. Then — a sound.\" Contrast in length creates the staccato-and-legato rhythm that makes action prose cinematic rather than uniform."
         },
         {
           "description": "16 consecutive dialogue lines each end declaratively — no question, no exclamation — creating a sustained assertion avalanche where nobody probes, nobody challenges, and nobody expresses intensity. While declarative dialogue is the backbone of conversation, a run of 16 statements without any interrogation or charged speech signals that the exchange has collapsed into a single emotional register: all assertion, no inquiry. Real conversation — even in conflict — involves the occasional question (however rhetorical) that breaks the monotony of uninterrupted statement and invites the audience to shift their reading from \"listening to claims\" to \"wondering what comes next.\"",
@@ -2412,22 +2220,6 @@
           "rule": "VOICE_SEED_CURIOSITY_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "In the two scenes following at least one clue-seeding moment, let curiosity visibly sharpen so the seed's groundwork registers as something the voice keeps returning to."
-        },
-        {
-          "description": "Every one of the story's 2 revelation scenes is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A truth that surfaces without sharpening danger or uncertainty right after it lands leaves the voice's reckoning with new information feeling settled rather than newly charged.",
-          "id": "d474c9685c12ce5c",
-          "location": "2 revelation scene(s) — no suspense rise within 2 scenes of any",
-          "rule": "VOICE_REVELATION_SUSPENSE_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one revelation, let the new information raise what's at risk, so the discovery compounds tension instead of resolving into calm."
-        },
-        {
-          "description": "Every one of the story's 2 suspense-spike scenes is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the voice's tension registering as isolated pressure rather than a source of the next thing worth wondering about.",
-          "id": "ab7ab0b59760c856",
-          "location": "2 suspense-spike scene(s) — no curiosity rise within 2 scenes of any",
-          "rule": "VOICE_SUSPENSE_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread."
         }
       ],
       "major": 0,
@@ -2491,18 +2283,10 @@
           "rule": "RELATIONAL_SEED_CURIOSITY_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question about what it means for the relationship."
-        },
-        {
-          "description": "Every one of the story's 2 revelation scenes is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A discovery that never re-tightens tension right after it lands leaves the relational arc's reckoning with new information feeling inert rather than consequential to the bonds it should complicate.",
-          "id": "0d383ccf728cfae4",
-          "location": "2 revelation scene(s) — no suspense rise within 2 scenes of any",
-          "rule": "RELATIONSHIP_REVELATION_SUSPENSE_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one revelation, let a new tension rise in how characters relate to each other, so the discovery's relational fallout keeps pressing on the story instead of resolving into calm."
         }
       ],
       "major": 0,
-      "minor": 7,
+      "minor": 6,
       "pass": "relationship-arc"
     }
   ],
@@ -2538,7 +2322,7 @@
     "scored": true,
     "strength": 0.40421882334059744
   },
-  "plainSummary": "PASS — scored in the bottom band, below the decline line; overall score 0/100. This is the engine's deterministic, threshold-based verdict, not a human read. Theme & Originality is the highest-scoring diagnostic dimension, at 98/100. Character is the lowest-scoring diagnostic dimension, at 26/100 — most of the trouble is around zero entropy scene. Start with the highest-priority fix: Across all 4 Act 3 scenes the protagonist initiates no action — no clock raised, no clue planted. They are carried to the ending rather than choosing it; the climax happens to them instead of being driven by them.",
+  "plainSummary": "PASS — scored in the bottom band, below the decline line; overall score 23/100. This is the engine's deterministic, threshold-based verdict, not a human read. Theme & Originality is the highest-scoring diagnostic dimension, at 98/100. Character is the lowest-scoring diagnostic dimension, at 33/100 — most of the trouble is around zero entropy scene. Start with the highest-priority fix: Across all 4 Act 3 scenes the protagonist initiates no action — no clock raised, no clue planted. They are carried to the ending rather than choosing it; the climax happens to them instead of being driven by them.",
   "provenance": {
     "groundTruthSource": "mechanical-degradation",
     "percentileBasis": "internal-calibration-corpus-20-samples",
@@ -2566,17 +2350,17 @@
   "sceneHeatmap": [
     {
       "critical": 0,
-      "issueCount": 6,
-      "major": 2,
+      "issueCount": 5,
+      "major": 1,
       "minor": 4,
       "sceneIdx": 0,
       "slug": "INT. FIELD STATION - DAY"
     },
     {
       "critical": 0,
-      "issueCount": 2,
+      "issueCount": 1,
       "major": 1,
-      "minor": 1,
+      "minor": 0,
       "sceneIdx": 1,
       "slug": "EXT. RIDGE - CONTINUOUS"
     },
@@ -2638,8 +2422,8 @@
     },
     {
       "critical": 0,
-      "issueCount": 1,
-      "major": 1,
+      "issueCount": 2,
+      "major": 2,
       "minor": 0,
       "sceneIdx": 9,
       "slug": "INT. SNOW CAVE - LATER"
@@ -2662,8 +2446,8 @@
     },
     {
       "critical": 0,
-      "issueCount": 5,
-      "major": 3,
+      "issueCount": 4,
+      "major": 2,
       "minor": 2,
       "sceneIdx": 12,
       "slug": "EXT. VALLEY FLOOR - DUSK"
@@ -2986,7 +2770,7 @@
       "strengths": []
     },
     "graph": {
-      "arcCoherence": -0.6279988996105245,
+      "arcCoherence": -0.5221022298583189,
       "causalDensity": 0.9444444444444444,
       "edges": [
         {
@@ -3300,7 +3084,7 @@
         "dell"
       ]
     },
-    "graphHealth": 15,
+    "graphHealth": 16,
     "summary": {
       "criticalCount": 7,
       "overallAssessment": "weak",
@@ -3310,42 +3094,42 @@
   },
   "strengths": [],
   "structuralSignals": {
-    "actionSentenceCvOverall": 0.4688,
-    "dialogueShareRange": 0.3219,
+    "actionSentenceCvOverall": 0.44,
+    "dialogueShareRange": 0.2917,
     "lastNewPairPosition": 0,
     "leadShareSlope": 0.1544,
-    "meanAbsDialogueShareDelta": 0.0946,
+    "meanAbsDialogueShareDelta": 0.0898,
     "meanLeadShare": 0.5625,
-    "meanOpenCloseShift": 0.3413,
+    "meanOpenCloseShift": 0.3018,
     "meanSpeakersPerScene": 1,
     "meanTurnWords": 10.25,
     "newPairSceneRate": 0,
     "openCloseModeFlipRate": 1,
     "sceneCount": 16,
-    "sceneLengthCv": 0.1685,
+    "sceneLengthCv": 0.1318,
     "scenes": [
       {
-        "actionSentenceCv": 0.5644,
-        "dialogueShare": 0.3448,
+        "actionSentenceCv": 0.2857,
+        "dialogueShare": 0.4167,
         "dialogueShareDelta": 0,
         "leadShare": 1,
-        "lengthZ": 2.8623,
+        "lengthZ": 1.8721,
         "meanTurnWords": 10,
         "newPairs": 0,
         "openCloseModeFlip": true,
-        "openCloseShift": 0.9655,
+        "openCloseShift": 0.3333,
         "sceneIdx": 0,
         "slug": "INT. FIELD STATION - DAY",
         "speakerTurns": 1,
         "speakers": 1,
-        "words": 29
+        "words": 24
       },
       {
         "actionSentenceCv": 0.2,
         "dialogueShare": 0.5238,
-        "dialogueShareDelta": 0.179,
+        "dialogueShareDelta": 0.1071,
         "leadShare": 0,
-        "lengthZ": 0.436,
+        "lengthZ": 0.6897,
         "meanTurnWords": 11,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3361,7 +3145,7 @@
         "dialogueShare": 0.5217,
         "dialogueShareDelta": -0.0021,
         "leadShare": 1,
-        "lengthZ": 1.0426,
+        "lengthZ": 1.478,
         "meanTurnWords": 12,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3377,7 +3161,7 @@
         "dialogueShare": 0.625,
         "dialogueShareDelta": 0.1033,
         "leadShare": 0,
-        "lengthZ": -1.0805,
+        "lengthZ": -1.2809,
         "meanTurnWords": 10,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3393,7 +3177,7 @@
         "dialogueShare": 0.3913,
         "dialogueShareDelta": -0.2337,
         "leadShare": 1,
-        "lengthZ": 1.0426,
+        "lengthZ": 1.478,
         "meanTurnWords": 9,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3409,7 +3193,7 @@
         "dialogueShare": 0.375,
         "dialogueShareDelta": -0.0163,
         "leadShare": 0,
-        "lengthZ": -1.0805,
+        "lengthZ": -1.2809,
         "meanTurnWords": 6,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3425,7 +3209,7 @@
         "dialogueShare": 0.5,
         "dialogueShareDelta": 0.125,
         "leadShare": 1,
-        "lengthZ": -1.0805,
+        "lengthZ": -1.2809,
         "meanTurnWords": 8,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3441,7 +3225,7 @@
         "dialogueShare": 0.5789,
         "dialogueShareDelta": 0.0789,
         "leadShare": 0,
-        "lengthZ": -0.1706,
+        "lengthZ": -0.0985,
         "meanTurnWords": 11,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3457,7 +3241,7 @@
         "dialogueShare": 0.5625,
         "dialogueShareDelta": -0.0164,
         "leadShare": 1,
-        "lengthZ": -1.0805,
+        "lengthZ": -1.2809,
         "meanTurnWords": 9,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3473,7 +3257,7 @@
         "dialogueShare": 0.6316,
         "dialogueShareDelta": 0.0691,
         "leadShare": 0,
-        "lengthZ": -0.1706,
+        "lengthZ": -0.0985,
         "meanTurnWords": 12,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3489,7 +3273,7 @@
         "dialogueShare": 0.5,
         "dialogueShareDelta": -0.1316,
         "leadShare": 1,
-        "lengthZ": 0.1327,
+        "lengthZ": 0.2956,
         "meanTurnWords": 10,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3505,7 +3289,7 @@
         "dialogueShare": 0.619,
         "dialogueShareDelta": 0.119,
         "leadShare": 0,
-        "lengthZ": 0.436,
+        "lengthZ": 0.6897,
         "meanTurnWords": 13,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3521,7 +3305,7 @@
         "dialogueShare": 0.5263,
         "dialogueShareDelta": -0.0927,
         "leadShare": 1,
-        "lengthZ": -0.1706,
+        "lengthZ": -0.0985,
         "meanTurnWords": 10,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3537,7 +3321,7 @@
         "dialogueShare": 0.6667,
         "dialogueShareDelta": 0.1404,
         "leadShare": 0,
-        "lengthZ": -0.4739,
+        "lengthZ": -0.4927,
         "meanTurnWords": 12,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3553,7 +3337,7 @@
         "dialogueShare": 0.5789,
         "dialogueShareDelta": -0.0878,
         "leadShare": 1,
-        "lengthZ": -0.1706,
+        "lengthZ": -0.0985,
         "meanTurnWords": 11,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3569,7 +3353,7 @@
         "dialogueShare": 0.5556,
         "dialogueShareDelta": -0.0233,
         "leadShare": 1,
-        "lengthZ": -0.4739,
+        "lengthZ": -0.4927,
         "meanTurnWords": 10,
         "newPairs": 0,
         "openCloseModeFlip": true,
@@ -3585,16 +3369,16 @@
     "speakerEntropy": 0.9947
   },
   "structure": {
-    "actPosition": "act2a",
+    "actPosition": "midpoint",
     "approachingClimax": false,
     "avgSuspensePerScene": 0,
-    "completionPercent": 20,
+    "completionPercent": 35,
     "escalating": false,
     "midpointPressure": 0,
     "openClues": 2,
     "revelationCount": 2,
-    "reversalCount": 0,
-    "reversalDensity": 0,
+    "reversalCount": 2,
+    "reversalDensity": 1,
     "tightestScene": 0
   },
   "subplots": {
@@ -3657,7 +3441,7 @@
     "totalSubplots": 2,
     "unresolvedSubplots": 2
   },
-  "subtextRatio": 0.48,
+  "subtextRatio": 0.47,
   "temporalConsistency": {
     "consistent": true,
     "contradictions": [],
@@ -3831,15 +3615,6 @@
       "suggestedFix": "Give the protagonist at least one decisive proactive beat in Act 3: they set the final trap, force the confrontation, or make the irreversible move that triggers the climax. The ending must be something they cause, not something they merely survive"
     },
     {
-      "description": "An 8+ scene story with zero suspense-dip reversals detected — this reads only for a sharp scene-level drop in the engine's danger/tension language (suspenseDelta < -1), not for a betrayal, broken deal, or backfire conveyed without that tension-language signature. Reread before treating this as \"no conflict texture.\"",
-      "id": "9bed77ed917160b0",
-      "location": "Conflict layer",
-      "pass": "conflict",
-      "rule": "NO_REVERSALS_LONG_STORY",
-      "severity": "critical",
-      "suggestedFix": "If a reread confirms no plan ever fails or backfires anywhere in the story, add one. If a reversal already exists on the page but isn't registering here, that's a gap in this detector's tension-language coverage, not necessarily a craft problem."
-    },
-    {
       "description": "Midpoint suspense pressure is flat — the story lacks a dramatic pivot",
       "id": "348d16695890767d",
       "location": "Scene 9 (midpoint)",
@@ -3856,15 +3631,6 @@
       "rule": "CLIMAX_TOO_EARLY",
       "severity": "major",
       "suggestedFix": "Move the peak intensity scene closer to the third act"
-    },
-    {
-      "description": "No suspense-dip reversals detected — this checks only for a scene where the engine's danger/tension language drops sharply (suspenseDelta < -1); it does not detect a reversal conveyed as a betrayal, a broken deal, or a plan backfiring in prose that doesn't also read as a tension drop. Reread the draft for that kind of turn before treating this as \"no opposition anywhere.\"",
-      "id": "f627c1f23dab58a3",
-      "location": "Overall structure",
-      "pass": "structure",
-      "rule": "NO_REVERSALS",
-      "severity": "major",
-      "suggestedFix": "If a reread confirms the story truly never turns, add a scene where a character's plan backfires or a situation inverts. If a reversal is already on the page but reads flat on tension language, this is a gap in the detector's coverage, not necessarily a craft problem."
     },
     {
       "description": "Scene 5 (Act 1 ending) has low suspense delta (0.0) — Act 1 should end with a turning point that forces entry into Act 2",
@@ -3910,9 +3676,27 @@
       "rule": "DARK_NIGHT_ABSENT",
       "severity": "major",
       "suggestedFix": "Insert an \"all is lost\" beat in this zone: a failure, a betrayal, or a moment where all hope seems gone. The climax lands harder after the protagonist has been broken."
+    },
+    {
+      "description": "The first reversal or revelation occurs at Scene 10 — 56% through the story. The central conflict doesn't launch until after 40% has elapsed; the audience has no dramatic anchor for the opening.",
+      "id": "4a3335e7530762ae",
+      "location": "First dramatic event at Scene 10",
+      "pass": "structure",
+      "rule": "INCITING_INCIDENT_TOO_LATE",
+      "severity": "major",
+      "suggestedFix": "Move the inciting event before the 40% mark. The audience needs a dramatic anchor — a reversal, revelation, or shock — early enough to understand what the story is about before the midpoint arrives."
+    },
+    {
+      "description": "The two scenes before the climax zone (Scenes 10 and 11) both have low suspense (-1.0 and 0.0) — the story enters its final act from a valley rather than a rising wave.",
+      "id": "237b9c7fce9d8a5f",
+      "location": "Scenes 10–11 (pre-climax approach)",
+      "pass": "structure",
+      "rule": "PRE_CLIMAX_LULL",
+      "severity": "major",
+      "suggestedFix": "Build the pre-climax approach: raise the stakes in the two scenes before the climax zone through a complication, a failed attempt, or a tightening deadline. The climax lands hardest when it arrives as the peak of already-rising pressure, not as an abrupt acceleration from flat."
     }
   ],
-  "totalIssues": 233,
+  "totalIssues": 206,
   "verdict": "PASS",
   "voiceAnalysis": {
     "pairs": [
@@ -3925,5 +3709,5 @@
     ],
     "scored": true
   },
-  "wordCount": 405
+  "wordCount": 400
 }

@@ -172,39 +172,75 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  *  - DIALOGUE_FLATTEN is a POSITIVE CONTROL, not a finding. Both measurement
  *    channels read chance; without a manipulation the score demonstrably DOES
  *    detect, a reader cannot tell "the score is blind to mechanical damage"
- *    from "the harness never worked". The score catches this one on 32 of 32
- *    scripts with zero ties, through a scoring channel neither other
- *    degradation touches (~17-18 of its 29.30-point gap comes from outside
- *    the density/scarcity craft formula). The engine ships a deduction built
+ *    from "the harness never worked". The score catches this one on 31 of the
+ *    32 scripts with ZERO inversions and one tie, through a scoring channel
+ *    neither other degradation touches. The engine ships a deduction built
  *    for exactly this manipulation, which is what makes it a liveness check
  *    on the instrument rather than evidence about the score.
  *
- * THE TWO MEASUREMENT CHANNELS ARE NEAR CHANCE, AND THAT IS THE CURRENT
- * TRUTH, NOT A TARGET. Measured on this tree, 2026-09-12 (the instrument-fix
- * re-lock; the 2026-09-06 figures it replaced are in parentheses) — shuffle-drop
- * 0.5586 all-pairs / 0.5313 matched-pair, UNCHANGED, because the segmenter
- * change produces byte-identical output on all 32 of these scripts;
- * climax-relocate 0.4443 (was 0.4673) / 0.4063 (was 0.4219), because the
- * relocation now actually moves the final scene to position one. Every one of
- * those four intervals contains 0.5. On this corpus the doctor does not
- * reliably prefer an intact script to a mechanically damaged copy of itself
- * under either recipe — and under the CORRECTED, stronger order manipulation it
- * prefers the damaged copy slightly more often than before (inverted pairs
- * 13 -> 14 of 32). A floor at a near-chance measurement is a ratchet against
- * getting WORSE at something the engine is already bad at, which is the only
- * honest thing to assert. Raising any of them is a measurement's job, never an
- * edit's. (The control's floors are high because the control works: 0.9473
- * all-pairs / 1.0000 matched-pair, unchanged.)
+ *    THE ONE TIE (2026-09-20, landing `scoring/advice-rule-fixes`; it was
+ *    32 of 32 with zero ties from 2026-09-06 until then) is
+ *    `data/screenplays/room-12.fountain`, and it is a FLOOR CLAMP, not a
+ *    harness failure: that script's INTACT health fell from 33.5 to 0.0 on
+ *    that landing, its flattened copy was already 0.0, and health is clamped
+ *    at 0, so the two sides cannot be separated by a scale that has run out
+ *    of room underneath them. Everything else about the control got STRONGER
+ *    in the same run — mean gap 29.30 -> 34.65 points, inversions still zero.
+ *    tests/core/public-benchmark.test.ts asserts exactly that shape: zero
+ *    inversions, and every tied pair clamped at health 0 on both sides. A tie
+ *    anywhere above the floor still fails, and is still evidence about the
+ *    harness before it is evidence about the score.
  *
- * THE SCORE DID NOT MOVE WHEN THESE TWO FLOORS DID. Nothing on the scoring path
- * was touched by the 2026-09-12 change — `node scripts/check-scoring-receipt.mjs`
- * reports "no scoring-path files changed", the doctor output-identity harness is
- * 45/45 byte-identical, and `tests/fixtures/public-corpus-manifest.json` (32 rows
- * of intact sceneCount/words/health/verdict) re-locked to exactly its previous
- * bytes. The two ORDER floors moved because the INSTRUMENT changed, not the
- * engine: a degradation that leaves the opening in place is a weaker
- * manipulation than one that replaces it. Full before/after in
- * docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md §11.
+ * THE TWO MEASUREMENT CHANNELS ARE NEAR CHANCE, AND THAT IS THE CURRENT
+ * TRUTH, NOT A TARGET. Measured on this tree, 2026-09-20 (the
+ * `scoring/advice-rule-fixes` landing; the 2026-09-12 figures it replaced are
+ * in parentheses) — shuffle-drop 0.5298 all-pairs (was 0.5586) / 0.4375
+ * matched-pair (was 0.5313); climax-relocate 0.4897 all-pairs (was 0.4443) /
+ * 0.4375 matched-pair (was 0.4063). Control: 0.9458 all-pairs (was 0.9473) /
+ * 0.9844 matched-pair (was 1.0000). Every one of those four measurement
+ * intervals contains 0.5. On this corpus the doctor does not reliably prefer
+ * an intact script to a mechanically damaged copy of itself under either
+ * recipe. A floor at a near-chance measurement is a ratchet against getting
+ * WORSE at something the engine is already bad at, which is the only honest
+ * thing to assert. Raising any of them is a measurement's job, never an
+ * edit's.
+ *
+ * THE SCORE DID MOVE ON 2026-09-20, AND FOUR OF THE SIX FLOORS FELL. Read that
+ * before reading anything else here. Landing `scoring/advice-rule-fixes` (six
+ * measured detector defects; the branch changes `fountain-analyzer.ts`, ten
+ * revision passes, `reversal-detection.ts`, `screenplay/structure.ts` and
+ * `src/lib/fountain.ts`) moved 38 of the doctor's 45 identity fixtures and 29
+ * of their health values, so this benchmark was re-measured and re-locked with
+ * the fall stated rather than absorbed:
+ *
+ *     PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR   0.5113 -> 0.4175   FELL  (PRIMARY)
+ *     PUBLIC_SHUFFLE_DROP_FLOOR          0.5386 -> 0.5098   FELL
+ *     PUBLIC_ORDER_PAIRED_FLOOR          0.3863 -> 0.4175   rose  (PRIMARY)
+ *     PUBLIC_ORDER_FLOOR                 0.4243 -> 0.4697   rose
+ *     PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR 0.98 -> 0.9644   FELL  (control)
+ *     PUBLIC_DIALOGUE_FLATTEN_FLOOR      0.9273 -> 0.9258   FELL  (control)
+ *
+ * The primary shuffle-drop reading fell from 0.5313 to 0.4375 matched-pair:
+ * four pairs flipped ordered -> inverted (dead-frequency, quiet-season,
+ * the-detour, the-key-under-the-mat) and one flipped inverted -> ordered
+ * (the signal-drift-bad blind fixture), 17 ordered -> 14. The order channel
+ * moved the other way (inverted 14 -> 12, ties 10 -> 12). Both changes sit
+ * well inside every interval either statistic reports, so this is a ratchet
+ * re-lock, NOT a finding that the engine got worse at order-sensitivity in any
+ * way this corpus can resolve — but the ratchet is now lower on the primary
+ * measurement channel than it was, and that is the thing a reader must not
+ * have to reconstruct from a diff. The private-corpus AUC-24 ratchet was NOT
+ * re-measured (no corpus in that environment) and `AUC24_FLOOR` is untouched;
+ * the owner's `npm run measure-real` is what says whether this transfers.
+ * Full before/after, per-pair, in
+ * docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md §12 and in the 2026-09-20
+ * PUBLIC-CORPUS entry of docs/p1-benchmark/MEASUREMENT_RECEIPTS.md.
+ *
+ * (The 2026-09-12 re-lock before it was the opposite case and is kept here
+ * because the contrast is the useful part: nothing on the scoring path was
+ * touched then — the output-identity harness was 45/45 byte-identical and the
+ * manifest re-locked to its previous bytes — and only the two ORDER floors
+ * moved, because the INSTRUMENT changed. Full account in §11 of the same doc.)
  *
  * THE PREDICTION THIS REFUTED, kept because it is the useful part. The
  * scene-count-artifact argument (doctor.ts:2092-2093 — scarcity AUC 0.938,
@@ -217,9 +253,11 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * mean of 7.625 points at the same time, because dropping a third of the
  * scenes removes a larger share of the weighted issues than of the words and
  * `density = weightedIssues / wordCount^0.7` is convex. Net mean health
- * MOVES UP 1.93 points under degradation. The prediction was right about the
- * scarcity term and wrong about the total, which is exactly why every floor
- * below is set from a measurement instead of from the arithmetic.
+ * MOVES UP under degradation — by 1.93 points when that decomposition was
+ * measured on 2026-09-12, and by 3.60 points on the 2026-09-20 tree. The
+ * prediction was right about the scarcity term and wrong about the total,
+ * which is exactly why every floor below is set from a measurement instead of
+ * from the arithmetic.
  *
  * HOW THEY ARE SET AND RE-SET. floor = round4(measured - PUBLIC_FLOOR_MARGIN).
  * `npm run benchmark:public -- --lock` rewrites all six constant lines below
@@ -236,12 +274,12 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * matches exactly that shape, and tests/core/public-benchmark.test.ts asserts
  * every one of them is still reachable by it.
  */
-export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.5113;
-export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.5386;
-export const PUBLIC_ORDER_PAIRED_FLOOR = 0.3863;
-export const PUBLIC_ORDER_FLOOR = 0.4243;
-export const PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR = 0.98;
-export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.9273;
+export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.4175;
+export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.5098;
+export const PUBLIC_ORDER_PAIRED_FLOOR = 0.4175;
+export const PUBLIC_ORDER_FLOOR = 0.4697;
+export const PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR = 0.9644;
+export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.9258;
 
 /**
  * The margin between a fresh public-benchmark measurement and the floor

@@ -70,6 +70,13 @@ substituted):
   superseded 2026-09-12/19 (`shuffle-drop/v3`); no AUC-24 figure exists yet
   on the current recipe. See CLAUDE.md's Standing task section and
   `docs/CLAIMS_REGISTER.md` row 121 for the full accounting.
+  **Re-measured 2026-09-20** on the session branch that lands
+  `scoring/advice-rule-fixes` (six detector fixes — NOT `main`, and not a
+  real-corpus figure): shuffle-drop **0.4375** matched-pair,
+  climax-relocate **0.4375**, positive control 0.9844. All four
+  measurement intervals still contain 0.5, and all six public-benchmark
+  floors were re-locked — four of them DOWNWARD
+  (`docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §12).
 - **Discrimination is thin and synthetic.** 6 hand-authored paired
   good/bad scenarios; **all 6 are now hard CI assertions** (0 `todo` in the
   file) but two pass by only +1.4. No runnable discrimination test on *real*
