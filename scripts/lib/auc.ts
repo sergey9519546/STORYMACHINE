@@ -267,6 +267,32 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * inside what chance produces). A floor is a ratchet against getting worse;
  * raising one is a measurement's job, never an edit's.
  *
+ * WHAT THIS TREE MEASURES, 2026-09-20 (lane/land-feature-length-defects: the
+ * branch above merged onto `main` @ e79c64b4). This is the reading a CI run of
+ * tests/core/public-benchmark.test.ts recomputes, and it is not either block
+ * above: shuffle-drop 0.8750 matched-pair [0.7500, 0.9688] / 0.8291 all-pairs
+ * [0.7222, 0.9268], sign counts 28/4/0, mean health gap +1.8937;
+ * climax-relocate 0.5938 matched-pair [0.4219, 0.7500] / 0.5269 all-pairs
+ * [0.4639, 0.5986], 18/12/2 with 2 exact ties and 0 scripts pinned at health
+ * 76.0; control 1.0000 / 1.0000, 32/0/0, mean gap +26.40.
+ *
+ * The shuffle-drop pair reproduces the branch's own figures exactly. The
+ * climax-relocate pair does NOT — the branch measured 0.5469 / 0.5151 against a
+ * tree whose relocation spliced at position TWO. `main` corrected that on
+ * 2026-09-12 to position ONE (adversarial finding 12), so this tree reads a
+ * STRONGER manipulation and reads it better; the two figures are not a
+ * disagreement, they are two different degradations.
+ *
+ * SO PUBLIC_ORDER_PAIRED_FLOOR IS STALE ON PURPOSE. round4(0.5938 - 0.02) is
+ * 0.5738 and the constant below is 0.5269, which is the branch's own lock. It
+ * is left exactly as the branch wrote it: this lane prepares the branch for the
+ * owner's real-corpus measurement and does not re-lock a floor it did not
+ * measure the scoring change for. `tests/core/public-benchmark.test.ts`'s
+ * idempotence check ("a re-lock on an up-to-date tree must be a no-op") is
+ * therefore RED on this tree, by choice, and the choice is recorded in
+ * docs/audits/2026-09-20-feature-length-defects-prep/README.md. No floor is
+ * BREACHED — every one of the six measured values above is above its floor.
+ *
  * THE PREDICTION THIS REFUTED, kept because it is the useful part. The
  * scene-count-artifact argument (doctor.ts:2092-2093 — scarcity AUC 0.938,
  * rule channel 0.076) predicts that dropping every third scene of a 10-scene

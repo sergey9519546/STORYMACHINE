@@ -210,6 +210,15 @@ describe('scene grammar — (d) a plain INT./EXT. script is byte-identical', () 
     // scripts/check-doctor-output-identity.mjs, treats it the same way via
     // `--ignore-keys` rather than requiring it to match across checkouts).
     // The snapshot was generated with `GIT_SHA=dev`; nothing else is stripped.
+    //
+    // RE-LOCKED 2026-09-20 on `lane/land-feature-length-defects`, and it is now
+    // a REGRESSION LOCK ON THAT TREE, not a pre-grammar-change identity proof.
+    // Merging `scoring/feature-length-defects` legitimately moves this report:
+    // `totalIssues` 233 -> 206 and severity {2,51,180} -> {5,52,149} (the
+    // ORPHAN_CLUE proper-noun guard and the per-character voice channel), with
+    // `sceneCount` unchanged at 16 and `health` unchanged at 0. The bytes that
+    // are the evidence for the 2026-09-20 scene-grammar receipt are this
+    // file's parent commit's, and they stay readable there.
     const text = read('plain-int-ext.fountain');
     const report = await runScriptDoctor(text);
     const { analyzedAt: _ignored, ...stable } = report as unknown as Record<string, unknown>;

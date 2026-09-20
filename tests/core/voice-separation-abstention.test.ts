@@ -84,7 +84,17 @@ describe('voice-separation-copy: two states, two sentences', () => {
 
 describe('the engine really does abstain at feature length', () => {
   const CASES: Array<{ path: string; scored: boolean }> = [
-    { path: 'tests/fixtures/feature-length/assembled-feature.fountain', scored: false },
+    // RE-ANCHORED 2026-09-20 (lane/land-feature-length-defects), from
+    // `scored: false`. This fixture is the one that made the 2026-09-12 finding
+    // legible: a 2,927-line feature where ONE walk-on under the 30-word floor
+    // abstained the WHOLE channel, so the tile read N/A on every real feature.
+    // `scoring/feature-length-defects` makes eligibility per character, so it
+    // SCORES now — that is the defect being fixed, not a regression, and the
+    // expectation is inverted rather than deleted so a change that brings the
+    // all-or-nothing abstention back fails here. The abstaining case the copy
+    // is about is ABSTAINING_DRAFT below, which abstains by construction at any
+    // length.
+    { path: 'tests/fixtures/feature-length/assembled-feature.fountain', scored: true },
     { path: 'data/screenplays/runoff.fountain', scored: true },
     { path: 'data/screenplays/dead-frequency.fountain', scored: true },
     { path: 'data/screenplays/chain-of-custody.fountain', scored: true },
@@ -200,10 +210,26 @@ describe('the abstention has one wording, and it lives in the copy module', () =
     });
   }
 
+  /** A draft that abstains BY CONSTRUCTION, at any length and under either
+   *  eligibility model: exactly one character clears the 30-word floor, so
+   *  there is no pair to compute. Written here rather than pointed at a
+   *  committed screenplay because every committed screenplay is a document
+   *  whose abstention a scoring change can (and on 2026-09-20 did) remove. */
+  const ABSTAINING_DRAFT = [
+    'INT. KITCHEN - DAY', '', 'ANA sets the cup down and does not pick it up again.', '',
+    'ANA',
+    'I have been thinking about the house and about the money and about what you '
+    + 'said on the stairs, and I have decided that none of it matters as much as '
+    + 'the part you left out, which is the part I want you to say now, out loud, '
+    + 'in this kitchen, before either of us goes anywhere at all.', '',
+    'EXT. PORCH - DAY', '', 'BEN waits in the doorway.', '',
+    'BEN', 'No.', '',
+    'INT. HALL - NIGHT', '', 'The door stays shut.', '',
+  ].join('\n');
+
   it('the rendered export prints the module\'s word, on a report that really abstains', async () => {
-    const src = readFileSync(join(REPO, 'tests/fixtures/feature-length/assembled-feature.fountain'), 'utf8');
-    const report = await runScriptDoctor(src);
-    assert.equal(report.voiceAnalysis?.scored, false, 'this fixture must still abstain, or the case proves nothing');
+    const report = await runScriptDoctor(ABSTAINING_DRAFT);
+    assert.equal(report.voiceAnalysis?.scored, false, 'this draft must still abstain, or the case proves nothing');
     const html = renderCoverageHtml(report, 'abstention');
     assert.ok(html.includes('>not measured<'), 'the export must print the module\'s abstention value');
     assert.ok(!html.includes('>N/A<'), 'the badge-width value has no business in a row with room for words');

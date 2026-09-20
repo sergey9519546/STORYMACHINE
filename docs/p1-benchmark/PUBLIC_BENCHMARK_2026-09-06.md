@@ -915,3 +915,60 @@ matched pairs go from 1 of 6 ordered (mean gap −0.02) to **4 of 6 (mean gap
 +0.3833)**, with no script left pinned at a shared health value. On six pairs
 that is inside what chance produces, and it is recorded as a number to
 re-measure on more pairs, not as a result.
+
+---
+
+## 13. This tree, 2026-09-20 — `scoring/feature-length-defects` merged onto `main` @ `e79c64b4`
+
+Neither §11 nor §12 is a measurement of the tree that now exists.
+§11 measured `main` before this branch; §12 measured the branch before `main`'s
+2026-09-12 instrument fix. This section is the merged tree, produced by
+`npm run benchmark:public` on `lane/land-feature-length-defects` at merge commit
+`058f48c0`, N=32, 2000-resample bootstrap at seed 42, `GIT_SHA=dev`.
+
+| channel | statistic | `main` @ `e79c64b4` | this tree | floor | |
+|---|---|---|---|---|---|
+| SHUFFLE_DROP | matched-pair (PRIMARY) | 0.5313 | **0.8750** [0.7500, 0.9688] | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` 0.855 | above |
+| SHUFFLE_DROP | all-pairs | 0.5586 | **0.8291** [0.7222, 0.9268] | `PUBLIC_SHUFFLE_DROP_FLOOR` 0.8091 | above |
+| CLIMAX_RELOCATE | matched-pair (PRIMARY) | 0.4063 | **0.5938** [0.4219, 0.7500] | `PUBLIC_ORDER_PAIRED_FLOOR` 0.5269 | above |
+| CLIMAX_RELOCATE | all-pairs | 0.4443 | **0.5269** [0.4639, 0.5986] | `PUBLIC_ORDER_FLOOR` 0.4951 | above |
+| DIALOGUE_FLATTEN (control) | matched-pair | 1.0000 | **1.0000** [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR` 0.98 | above |
+| DIALOGUE_FLATTEN (control) | all-pairs | 0.9473 | **1.0000** [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_FLOOR` 0.98 | above |
+
+| other statistics | `main` @ `e79c64b4` | this tree |
+|---|---|---|
+| SHUFFLE_DROP ordered / inverted / tied | 17 / 15 / 0 | **28 / 4 / 0** |
+| SHUFFLE_DROP mean health gap | −1.9313 (damaged copy higher) | **+1.8937** |
+| CLIMAX_RELOCATE ordered / inverted / tied | 8 / 14 / 10 | **18 / 12 / 2** |
+| CLIMAX_RELOCATE mean health gap | −1.2344 | **+0.0875** |
+| DIALOGUE_FLATTEN ordered / inverted / tied | 32 / 0 / 0 | 32 / 0 / 0 |
+| DIALOGUE_FLATTEN mean health gap | +29.30 | **+26.40** |
+| scripts pinned at health 76.0 | 10 | **0** |
+| blind pairs ordered, mean gap | 1 of 6, −0.0167 | **4 of 6, +0.3833** |
+
+**The SHUFFLE_DROP row reproduces §12 exactly** (0.8750 / 0.8291, 28/4/0, mean
+gap +1.89), which is the claim this branch is measured on.
+
+**The CLIMAX_RELOCATE row does not, and that is the instrument, not the score.**
+§12 read 0.5469 / 0.5151 against a tree whose relocation spliced the final scene
+at position TWO. `main` corrected that to position ONE on 2026-09-12 (§11,
+adversarial finding 12), so this tree measures a strictly stronger manipulation
+— and reads it better than `main` does: 0.4063 → 0.5938, with the exact ties
+falling 10 → 2 because the density saturation that pinned ten scripts at health
+76.0 is gone. The matched-pair interval [0.4219, 0.7500] still contains 0.5.
+
+**No floor was re-locked here, and one is deliberately left stale.**
+`round4(0.5938 − 0.02)` is 0.5738 and `PUBLIC_ORDER_PAIRED_FLOOR` is 0.5269, the
+branch's own lock, so `tests/core/public-benchmark.test.ts`'s idempotence check
+("a re-lock on an up-to-date tree must be a no-op") is RED on this tree. That is
+a preparation lane declining to re-lock a ratchet it did not measure the scoring
+change for, not a breach: every one of the six values above is ABOVE its floor.
+The decision, and the run behind it, are in
+`docs/audits/2026-09-20-feature-length-defects-prep/README.md`.
+
+**What this section does not say.** Every limitation in §8 applies unchanged:
+N=32 at 9-14 scenes, `ARC_DED_MIN_SCENES` = 15 so the one feature-scale
+deduction wired into health never fires here, twenty of the scripts are
+agent-authored, and mechanical damage is not bad writing. Nothing here is
+comparable to AUC-24; no real-corpus figure was produced, because the private
+corpus is not present in the environment this ran in.

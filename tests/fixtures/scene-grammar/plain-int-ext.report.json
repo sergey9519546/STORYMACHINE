@@ -42,9 +42,9 @@
     "strength": 0
   },
   "bySeverity": {
-    "critical": 2,
-    "major": 51,
-    "minor": 180
+    "critical": 5,
+    "major": 52,
+    "minor": 149
   },
   "characterFunctions": [
     {
@@ -87,7 +87,7 @@
   "contentHash": "fc85411fd4389bdc2dba918ba614125b7cb1aff426c6b971aef6d87064b5306e",
   "dimensions": [
     {
-      "issueCount": 72,
+      "issueCount": 70,
       "key": "structure-pacing",
       "label": "Structure & Pacing",
       "passes": [
@@ -95,13 +95,13 @@
         "pacing",
         "rhythm"
       ],
-      "percentile": 85,
-      "percentileDescriptor": "Structure & Pacing is stronger than 85% of the reference set.",
-      "score": 31.4,
-      "summary": "Structure & Pacing needs real work — 56 minor problem(s), centered on revelation drought."
+      "percentile": 75,
+      "percentileDescriptor": "Structure & Pacing is stronger than 75% of the reference set.",
+      "score": 24.4,
+      "summary": "Structure & Pacing needs real work — 52 minor problem(s), centered on revelation drought."
     },
     {
-      "issueCount": 62,
+      "issueCount": 48,
       "key": "character",
       "label": "Character",
       "passes": [
@@ -109,13 +109,13 @@
         "intention",
         "relationship-arc"
       ],
-      "percentile": 55,
-      "percentileDescriptor": "Character is stronger than 55% of the reference set.",
-      "score": 26.4,
-      "summary": "Character needs real work — 41 minor problem(s), centered on zero entropy scene."
+      "percentile": 65,
+      "percentileDescriptor": "Character is stronger than 65% of the reference set.",
+      "score": 40.1,
+      "summary": "27 minor problem(s) here, mostly around zero entropy scene — worth a focused revision pass."
     },
     {
-      "issueCount": 22,
+      "issueCount": 20,
       "key": "dialogue-voice",
       "label": "Dialogue & Voice",
       "passes": [
@@ -124,11 +124,11 @@
       ],
       "percentile": 100,
       "percentileDescriptor": "Dialogue & Voice is in the top 10% of the reference set.",
-      "score": 93.3,
+      "score": 94.2,
       "summary": "Dialogue & Voice is in good shape — a handful of minor notes, mostly around interruption void."
     },
     {
-      "issueCount": 69,
+      "issueCount": 60,
       "key": "plot-logic",
       "label": "Plot Logic & Payoff",
       "passes": [
@@ -137,10 +137,10 @@
         "payoff",
         "conflict"
       ],
-      "percentile": 25,
-      "percentileDescriptor": "Plot Logic & Payoff is stronger than 25% of the reference set.",
-      "score": 31.4,
-      "summary": "Plot Logic & Payoff needs real work — 54 minor problem(s), centered on exposition dump."
+      "percentile": 5,
+      "percentileDescriptor": "Plot Logic & Payoff is in the bottom 10% of the reference set.",
+      "score": 26.4,
+      "summary": "Plot Logic & Payoff needs real work — 43 minor problem(s), centered on exposition dump."
     },
     {
       "issueCount": 8,
@@ -158,26 +158,13 @@
   ],
   "disclosureAnalysis": {
     "epistemicGaps": [],
-    "events": [
-      {
-        "discourseIndex": 0,
-        "factId": "mara",
-        "kind": "setup",
-        "storyTimeIndex": 0
-      },
-      {
-        "discourseIndex": 1,
-        "factId": "dell",
-        "kind": "setup",
-        "storyTimeIndex": 1
-      }
-    ],
+    "events": [],
     "fairReveal": {
       "fair": true,
       "support": "UNKNOWN",
       "violations": []
     },
-    "scored": true,
+    "scored": false,
     "violationCount": 0
   },
   "emotionalArc": {
@@ -293,21 +280,20 @@
   "grade": "troubled",
   "graphHealth": {
     "findings": [
-      "Promise-payment ratio is 0.00 — 2 unpaid setup(s) may feel like plot holes.",
       "Forward-edge ratio is 0.50 — causal links may flow backward, suggesting structural confusion.",
       "Escalation monotonicity is 0.00 — tension does not consistently rise across acts.",
       "Arc coherence is low — tension progression may not track with story position.",
       "16 isolated scene(s) with no causal connections to the story."
     ],
-    "graphDeduction": 12,
-    "graphHealthScore": 18,
+    "graphDeduction": 7,
+    "graphHealthScore": 53,
     "metrics": {
       "arcCoherence": -0.6279988996105245,
-      "causalDensity": 0.9444444444444444,
+      "causalDensity": 0.9375,
       "escalationMonotonicity": 0,
       "forwardEdgeRatio": 0.5,
       "isolatedSceneCount": 16,
-      "promisePaymentRatio": 0
+      "promisePaymentRatio": 1
     }
   },
   "health": 0,
@@ -339,8 +325,8 @@
   "metrics": {
     "perScene": [
       {
-        "cliffhangerStrength": 33,
-        "informationAsymmetryStrength": 11,
+        "cliffhangerStrength": 25,
+        "informationAsymmetryStrength": 0,
         "pacingFit": null,
         "pivotStrength": 0,
         "sceneIdx": 0,
@@ -349,8 +335,8 @@
         "twistImpact": 0
       },
       {
-        "cliffhangerStrength": 21,
-        "informationAsymmetryStrength": 11,
+        "cliffhangerStrength": 13,
+        "informationAsymmetryStrength": 0,
         "pacingFit": null,
         "pivotStrength": 0,
         "sceneIdx": 1,
@@ -511,7 +497,7 @@
       "sceneCount": 16,
       "suspenseEntropy": 56,
       "tensionMeasures": {
-        "asymmetric": 6,
+        "asymmetric": 4,
         "lexical": 0.06,
         "rhythmic": 50,
         "structural": 0
@@ -531,7 +517,7 @@
   },
   "passes": [
     {
-      "critical": 0,
+      "critical": 1,
       "issues": [
         {
           "description": "Midpoint suspense pressure is flat — the story lacks a dramatic pivot",
@@ -558,6 +544,14 @@
           "suggestedFix": "If a reread confirms the story truly never turns, add a scene where a character's plan backfires or a situation inverts. If a reversal is already on the page but reads flat on tension language, this is a gap in the detector's coverage, not necessarily a craft problem."
         },
         {
+          "description": "Act 1 lacks a major inciting event — no clues planted, relationship shifts, or clock pressure. The protagonist isn't forced into the central conflict.",
+          "id": "4c22d472753ae418",
+          "location": "Act 1 (Scenes 1–4)",
+          "rule": "MISSING_INCITING_INCIDENT",
+          "severity": "critical",
+          "suggestedFix": "Add a scene in Act 1 where something happens that throws the protagonist into action: a revelation, a betrayal, or an external deadline."
+        },
+        {
           "description": "Scene 5 (Act 1 ending) has low suspense delta (0.0) — Act 1 should end with a turning point that forces entry into Act 2",
           "id": "b170ac837cd3969d",
           "location": "End of Act 1 (Scene ~5)",
@@ -574,17 +568,25 @@
           "suggestedFix": "The final Act 2 scene should be the highest-stakes moment before the climax: a major reversal, false climax, or all-is-lost moment"
         },
         {
-          "description": "Scenes 3–6: 4 consecutive scenes with no revelation, planted clue, or relationship shift — the narrative goes dark; nothing is being learned or changed",
+          "description": "Scenes 1–4: 4 consecutive scenes with no revelation, planted clue, or relationship shift — the narrative goes dark; nothing is being learned or changed",
           "id": "da84bb5cd1dff6e4",
-          "location": "Scenes 3–6",
+          "location": "Scenes 1–4",
           "rule": "REVELATION_DROUGHT",
           "severity": "major",
           "suggestedFix": "At least one of these scenes must deliver narrative payload: a clue, a revelation, or a shift in a key relationship. The audience should never go 4 scenes without learning something new."
         },
         {
-          "description": "Scenes 7–10: 4 consecutive scenes with no revelation, planted clue, or relationship shift — the narrative goes dark; nothing is being learned or changed",
+          "description": "Scenes 5–8: 4 consecutive scenes with no revelation, planted clue, or relationship shift — the narrative goes dark; nothing is being learned or changed",
           "id": "da84bb5cd1dff6e4",
-          "location": "Scenes 7–10",
+          "location": "Scenes 5–8",
+          "rule": "REVELATION_DROUGHT",
+          "severity": "major",
+          "suggestedFix": "At least one of these scenes must deliver narrative payload: a clue, a revelation, or a shift in a key relationship. The audience should never go 4 scenes without learning something new."
+        },
+        {
+          "description": "Scenes 9–12: 4 consecutive scenes with no revelation, planted clue, or relationship shift — the narrative goes dark; nothing is being learned or changed",
+          "id": "da84bb5cd1dff6e4",
+          "location": "Scenes 9–12",
           "rule": "REVELATION_DROUGHT",
           "severity": "major",
           "suggestedFix": "At least one of these scenes must deliver narrative payload: a clue, a revelation, or a shift in a key relationship. The audience should never go 4 scenes without learning something new."
@@ -860,23 +862,31 @@
           "rule": "STRUCTURE_SUSPENSE_CURIOSITY_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread."
-        },
-        {
-          "description": "Every one of the story's 2 scenes that plant a clue is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A planted clue that never provokes a fresh question in its immediate aftermath leaves the seed structurally present but inert — the story sets something up without letting the audience feel the pull of wondering what it means.",
-          "id": "3e7ce9d09f2ef6e4",
-          "location": "2 seed scene(s) — no curiosity rise within 2 scenes of any",
-          "rule": "STRUCTURE_SEED_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one seed, let a new question surface from what was just planted, so the clue generates curiosity rather than passing unnoticed until its eventual payoff."
         }
       ],
-      "major": 15,
-      "minor": 27,
+      "major": 16,
+      "minor": 26,
       "pass": "structure"
     },
     {
-      "critical": 0,
+      "critical": 2,
       "issues": [
+        {
+          "description": "Scene 13 delivers a revelation but no clues were planted in any prior scene",
+          "id": "8044437ac0102a2d",
+          "location": "Scene 13 (EXT. VALLEY FLOOR - DUSK)",
+          "rule": "REVELATION_WITHOUT_SETUP",
+          "severity": "critical",
+          "suggestedFix": "Add a clue-seeding moment in an earlier scene that anticipates this revelation"
+        },
+        {
+          "description": "Scene 14 delivers a revelation but no clues were planted in any prior scene",
+          "id": "526f0c3aa814376c",
+          "location": "Scene 14 (EXT. VALLEY FLOOR - CONTINUOUS)",
+          "rule": "REVELATION_WITHOUT_SETUP",
+          "severity": "critical",
+          "suggestedFix": "Add a clue-seeding moment in an earlier scene that anticipates this revelation"
+        },
         {
           "description": "Scene 13 shows a major decision (high suspense, relationship shift, or revelation) with no setup in the 2 preceding scenes — the decision feels arbitrary",
           "id": "fc7e375dec6fe1ae",
@@ -884,22 +894,6 @@
           "rule": "UNMOTIVATED_DECISION",
           "severity": "major",
           "suggestedFix": "Add a setup scene 1-2 scenes before where a character learns information, faces pressure, or confronts tension that motivates this decision"
-        },
-        {
-          "description": "Scene 2 plants clues or raises stakes but neither this scene, its 2-scene wake, nor any later payoff shows a consequence (no relationship shift, suspense escalation, emotional reaction, revelation, clock movement, or chained follow-up) — other characters are unaffected",
-          "id": "c00b09818f789619",
-          "location": "Scene 2 (EXT. RIDGE - CONTINUOUS)",
-          "rule": "ACTION_WITHOUT_CONSEQUENCE",
-          "severity": "major",
-          "suggestedFix": "Add a reaction scene where a character responds to or is affected by the action in this scene"
-        },
-        {
-          "description": "2 clue(s) seeded in the first half (mara, dell) have no matching payoff anywhere in the story — Chekhov's gun shown but never fired",
-          "id": "cc9c8511c6dd5852",
-          "location": "Scenes 1–8 (setup zone)",
-          "rule": "CHEKHOV_GUN_UNFIRED",
-          "severity": "major",
-          "suggestedFix": "Either fire the gun: add a payoff scene that calls back each planted clue. Or remove the clue from Act 1 if you don't intend to resolve it."
         },
         {
           "description": "Scene 13 delivers a revelation but the next scene shows no causal ripple — neutral emotion, no relationship shift, no change in suspense. The truth lands and the story carries on as if nothing was learned.",
@@ -916,6 +910,14 @@
           "rule": "CONSEQUENCE_CHAIN_BREAK",
           "severity": "minor",
           "suggestedFix": "Let high-action peaks echo forward: show the emotional aftershock, the strained relationship, or the accelerated deadline in the scenes that immediately follow. Action without consequence is noise, not drama."
+        },
+        {
+          "description": "Act 1 (4 scenes) plants no clues, raises no clock, and creates no significant relationship shift — the story opens without establishing any causal threads for Acts 2 and 3 to develop",
+          "id": "d51dcee121246e60",
+          "location": "Act 1 (Scenes 1–4)",
+          "rule": "CAUSAL_ACT1_VOID",
+          "severity": "major",
+          "suggestedFix": "Act 1 must launch at least one causal thread: plant a clue that foreshadows the climax, raise a clock that creates urgency, or create a relationship shift that the protagonist must resolve. Without a thread to pull, the rest of the story has no tension to escalate."
         },
         {
           "description": "Act 2 (Scenes 5–12, 8 scenes) contains no revelation, payoff, planted clue, raised clock, or significant relationship shift — the story's longest structural section is causally inert. Nothing is planted, escalated, or discovered across the entire middle act.",
@@ -1006,14 +1008,6 @@
           "suggestedFix": "Add a physical staging beat somewhere within the 6-scene stretch — a gesture, an object, a piece of blocking — so the causal thread stays visually grounded throughout."
         },
         {
-          "description": "The 2 scenes carrying outstanding clue-debt never coincide with the 3 scenes where curiosity is actively rising — the story's open mysteries and its moments of climbing intrigue run on separate tracks. A scene that already holds an unresolved question is a natural place for wonder to spike further, but that pairing never occurs here.",
-          "id": "1d71ca359f81932f",
-          "location": "2 open-thread scene(s), 3 rising-curiosity scene(s) — zero overlap",
-          "rule": "CAUSALITY_OPEN_THREAD_CURIOSITY_DECOUPLED",
-          "severity": "minor",
-          "suggestedFix": "Let at least one scene carrying outstanding clue-debt also raise curiosity — a new question surfacing while an old one is still open, giving the story's open threads a causal tie to its rising intrigue."
-        },
-        {
           "description": "The story contains a run of 12 consecutive scenes with no rise in curiosity at all, even though 3 scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves the causal chain without a driving question for an extended run.",
           "id": "3f8684417c6fb076",
           "location": "longest stretch with no rising curiosity: 12 consecutive scenes",
@@ -1028,22 +1022,6 @@
           "rule": "CAUSALITY_CURIOSITY_ZONE_CLUSTER",
           "severity": "minor",
           "suggestedFix": "Introduce a curiosity-raising beat outside the closing third so the causal chain keeps generating open questions more evenly across the story."
-        },
-        {
-          "description": "Every clue-seeding scene (2 plants) is followed by two scenes that raise no new curiosity, even though 3 scenes elsewhere do open fresh questions. A planted clue should usually compound — its implications should provoke further wondering as the causal chain propagates outward. When every seed's aftermath opens no curiosity, the groundwork sits inert rather than rippling forward.",
-          "id": "709e066a5a52d6b8",
-          "location": "2 seed aftermath(s) — no curiosity raised within 2 scenes",
-          "rule": "CAUSALITY_SEED_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question — what else does this mean, who else is involved, what happens if it's true. A seed whose aftermath opens curiosity keeps the causal chain propagating."
-        },
-        {
-          "description": "Every scene carrying an open thread (2 of them) is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. An unresolved question that never sharpens into fresh intrigue right after it leaves the causal chain's loose ends stalling rather than pulling the audience toward what comes next.",
-          "id": "ec01feeda3a81739",
-          "location": "2 open-thread aftermath(s) — no curiosity rise within 2 scenes",
-          "rule": "CAUSALITY_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following an open-thread scene, let a new question sharpen the audience's curiosity so the causal chain's loose ends keep pulling the story forward rather than sitting inert."
         },
         {
           "description": "Every one of the story's 2 suspense-spike scenes is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the causal chain's tension registering as isolated pressure rather than a source of the next thing worth wondering about.",
@@ -1062,8 +1040,8 @@
           "suggestedFix": "In the two scenes following at least one revelation, let the new information tighten the tension around what comes next, so disclosure keeps building pressure instead of only resolving questions."
         }
       ],
-      "major": 4,
-      "minor": 19,
+      "major": 3,
+      "minor": 16,
       "pass": "causality"
     },
     {
@@ -1084,6 +1062,14 @@
           "rule": "INTENTION_INVISIBLE",
           "severity": "minor",
           "suggestedFix": "Give DELL a clear want in their first scene (verbal or physical action)"
+        },
+        {
+          "description": "Scene 2 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
+          "id": "871e3a460e40ffdd",
+          "location": "Scene 2 (EXT. RIDGE - CONTINUOUS)",
+          "rule": "ZERO_ENTROPY_SCENE",
+          "severity": "major",
+          "suggestedFix": "Either add a moment where someone learns something, feels something, or commits to something; or cut the scene entirely"
         },
         {
           "description": "Scene 3 has no emotional shift, relationship change, planted clues, or clock pressure — the scene advances neither plot nor character",
@@ -1198,14 +1184,6 @@
           "suggestedFix": "Add a turning point, revelation, or relationship shift to one of these scenes; or consolidate them into a single tighter scene"
         },
         {
-          "description": "The protagonist has 2 proactive scenes but none of them — or their immediate aftermath — backfire: pursuing the goal never produces a negative emotional shift, a relationship loss, or a suspense drop. The pursuit is frictionless, with no dramatic irony built into the wanting itself",
-          "id": "950e88a14015091a",
-          "location": "Character intention layer",
-          "rule": "GOAL_INVERSION_ABSENT",
-          "severity": "major",
-          "suggestedFix": "Add a scene where the protagonist actively pursues their goal and the pursuit itself makes things worse — they win the battle but lose an ally, or get what they asked for and regret it. The goal should bite back"
-        },
-        {
           "description": "Across all 4 Act 3 scenes the protagonist initiates no action — no clock raised, no clue planted. They are carried to the ending rather than choosing it; the climax happens to them instead of being driven by them",
           "id": "800d961611368708",
           "location": "Act 3 (Scenes 13–16)",
@@ -1214,20 +1192,12 @@
           "suggestedFix": "Give the protagonist at least one decisive proactive beat in Act 3: they set the final trap, force the confrontation, or make the irreversible move that triggers the climax. The ending must be something they cause, not something they merely survive"
         },
         {
-          "description": "The story's highest-momentum scene (Scene 1, entropy 3.0) lands in Act 1 rather than near the climax — the most informationally dense moment is in the setup, so the story front-loads its peak and has nowhere left to build",
-          "id": "ce3f5aa965598c36",
-          "location": "Scene 1 (INT. FIELD STATION - DAY)",
-          "rule": "ENTROPY_SPIKE_MISPLACED",
+          "description": "Across all 4 Act 1 scenes the protagonist initiates no action — no clock raised, no clue planted. The story opens with a passive protagonist; the inciting situation happens to them rather than being set in motion by their own choice.",
+          "id": "4976b3206f3969cf",
+          "location": "Act 1 (Scenes 1–4)",
+          "rule": "PROACTIVE_OPENING_ABSENT",
           "severity": "major",
-          "suggestedFix": "Redistribute momentum so the entropy peak lands in the back half: dial down the Act 1 spike, or escalate the climax so the densest concentration of suspense, relationship turns, and revelations arrives when the stakes are highest"
-        },
-        {
-          "description": "The protagonist initiates 2 proactive beats in the first half but none in the second half — their agency burns out at the midpoint, exactly when the story should be accelerating toward the climax.",
-          "id": "5cab93e282499552",
-          "location": "Second half (Scenes 9–16)",
-          "rule": "AGENCY_FRONTLOADED",
-          "severity": "minor",
-          "suggestedFix": "Redistribute the protagonist's initiative: hold back at least one proactive beat for the back half. The drive toward the goal should intensify after the midpoint, not evaporate."
+          "suggestedFix": "Give the protagonist at least one proactive beat in Act 1: a decision, a plan begun, a question they choose to chase. The audience must see the protagonist want something and move toward it before the world complicates that want."
         },
         {
           "description": "Act 3 (scenes 13–16, 4 scenes) contains no proactive acts — no clocks raised, no clues planted. The protagonist stops initiating in the final act, reacting to a climax rather than engineering one.",
@@ -1238,22 +1208,6 @@
           "suggestedFix": "Give the protagonist at least one proactive move in Act 3: a decisive action, a gambit, or a piece of evidence planted. The climax should feel like the culmination of the protagonist's agency — a choice they made, not a situation they endured."
         },
         {
-          "description": "The midpoint zone (Scenes 7–9) contains no proactive act — no clock raised, no clue planted — though the protagonist initiates elsewhere. Initiative collapses at the structural pivot, exactly where the protagonist's goal should transform and their drive intensify.",
-          "id": "0464e11829786a52",
-          "location": "Midpoint zone (Scenes 7–9)",
-          "rule": "PROACTIVE_MIDPOINT_VOID",
-          "severity": "minor",
-          "suggestedFix": "Give the protagonist a decisive proactive beat at the midpoint: a plan launched, a deadline set, a piece of evidence pursued. The midpoint is the gear-change — the protagonist should seize the wheel there, not drift through it."
-        },
-        {
-          "description": "Scenes 3–6 form a run of 4 consecutive scenes in which the protagonist initiates nothing — no clock raised, no clue planted — inside an otherwise active story. An extended passive stretch reads as the protagonist surrendering the wheel: events happen around them while they wait.",
-          "id": "6930f77561c8d137",
-          "location": "Scenes 3–6",
-          "rule": "PROACTIVE_DESERT_RUN",
-          "severity": "minor",
-          "suggestedFix": "Break the passive run with at least one proactive beat: a choice that commits the protagonist to a course, a deadline they impose, a lead they decide to chase. A protagonist who goes four scenes without initiating becomes a spectator in their own story."
-        },
-        {
           "description": "None of the story's 2 revelations is preceded by a proactive act within the two scenes before it — every discovery arrives without the protagonist's initiative driving it. The truths fall into their lap; they learn passively rather than uncovering anything through their own effort.",
           "id": "f44387d49ced0c50",
           "location": "Discovery / initiative coupling",
@@ -1262,60 +1216,12 @@
           "suggestedFix": "Make at least one major discovery the consequence of the protagonist's action: a clue they chose to chase, a deadline that forced a confrontation, an investigation they launched. A revelation that the protagonist earned lands harder than one the plot simply hands them."
         },
         {
-          "description": "The protagonist is proactive 2 time(s) before the climax but takes no initiative in the final scenes (scene 15+). The climax — where stakes peak — plays out as pure reaction. A passive climax undermines all the agency built through the arc: the protagonist is acted upon rather than acting.",
-          "id": "c60015df8bbe6bdb",
-          "location": "Climax zone (scene 15+) — no protagonist initiative",
-          "rule": "INTENTION_REACTIVE_CLIMAX",
-          "severity": "minor",
-          "suggestedFix": "Give the protagonist at least one decisive action in the climax: a final gambit, a clock they raise, a choice that changes everything. The climax should be the story's most compressed expression of what the protagonist wants and fears — it demands initiative, not passivity."
-        },
-        {
-          "description": "Only 2 of 16 scenes (13%) are proactive — the protagonist raises a clock or plants a clue in fewer than one scene in six. Across the whole story the protagonist almost never drives events; they spend the film reacting to a plot that happens around them rather than because of them.",
-          "id": "40b58991db72cc33",
-          "location": "Whole-story agency density",
-          "rule": "PROACTIVE_GLOBAL_SCARCITY",
-          "severity": "minor",
-          "suggestedFix": "Raise the agency floor: give the protagonist initiative in each act — a goal they pursue, a deadline they set, a lead they chase. A story is the record of a character trying to get something; if they rarely try, there is no story, only events."
-        },
-        {
-          "description": "The protagonist's 2 proactive scenes have an average curiosityDelta of 0.00 — initiative never opens a question. When the protagonist acts but the action raises no new uncertainty, agency reads as task-completion: the audience watches them execute rather than investigate, and the forward pull of \"what will this turn up?\" never attaches to what the protagonist does.",
-          "id": "0d6544ba0a1a1a9c",
-          "location": "2 proactive scene(s) — curiosity register",
-          "rule": "PROACTIVE_CURIOSITY_DECOUPLED",
-          "severity": "minor",
-          "suggestedFix": "Let initiative generate questions: when the protagonist plants a clue or makes a move, have it expose something unexpected — a complication, a half-answer, a new unknown. Agency that deepens the mystery binds the audience to the protagonist; agency that only ticks boxes leaves them watching a checklist."
-        },
-        {
-          "description": "The single scene planting the most clues (scene 1, 1 seed(s)) has no revelation, dramatic turn, suspense rise, or raised deadline in either of the two preceding scenes. The story's peak foreshadowing moment arrives in a causal vacuum — the audience has not just been given any event of sufficient weight to make the planting feel earned. Clue-planting lands hardest when it follows a moment that heightens attention: a revelation that triggers the protagonist to place a contingency, a dramatic turn that forces them to prepare for what's coming, or a suspense rise that motivates covering a vulnerability. When the densest planting has no such anchor in the scene fabric, it reads as authorial distribution rather than character action.",
-          "id": "14064dadbb99093f",
-          "location": "scene 1: densest foreshadowing (1 seed(s)) — no cause in preceding 2 scenes",
-          "rule": "SEED_PEAK_UNCAUSED",
-          "severity": "minor",
-          "suggestedFix": "In the 1–2 scenes preceding scene 1, introduce at least one narrative event that motivates the clue-planting to follow: a revelation that raises stakes, a dramatic turn that pivots the protagonist's agenda, a suspense peak that makes them act preemptively, or a clock that starts counting down. This causal anchor transforms foreshadowing from distribution into consequence."
-        },
-        {
           "description": "The story contains a run of 12 consecutive scenes with no revelation — an extended disclosure drought — even though 2 revelation scene(s) exist across the script. Unlike a front-to-back distribution skew, this is a local dead zone: a sixth of the runtime or more passes in an unbroken stretch where the audience learns nothing new. The epistemic engine stalls — the audience spends a long uninterrupted span with no forward progress in their understanding, and the momentum that earlier disclosures built dissipates before the next revelation can recover it. New information that is technically present in the script but absent for a long consecutive run leaves an extended stretch where the audience's sense of forward discovery goes slack.",
           "id": "fc6654eab4be574a",
           "location": "longest revelation drought: 12 consecutive scenes with no disclosure",
           "rule": "REVELATION_DROUGHT_RUN",
           "severity": "minor",
           "suggestedFix": "Break up the 12-scene revelation drought by seeding at least one disclosure into the middle of the run: a partial truth surfaced, a detail reframed, a secret half-exposed, or a new piece of the puzzle revealed. The drought doesn't need a major plot reversal — it needs enough new information to keep the audience's sense of forward discovery alive across an extended stretch. A story sustains intellectual engagement by feeding new understanding at a steady cadence, not by withholding all disclosure for a long span between its larger reveals."
-        },
-        {
-          "description": "Every one of the story's 2 seed scenes has a curiosityDelta ≤ 0, while the story raises curiosity in 3 scene(s) where no clue is being planted. Seeds and wonder operate as completely separate channels: foreshadowing is embedded without the scene generating any felt mystery, and the questions the audience experiences are never rooted in a planted clue. A seed that also raises curiosity is the ideal combination — the planted detail generates its own wonder in the moment, and that curiosity sustains the audience's investment in the eventual payoff. When clue-planting and curiosity are fully decoupled, seeds are procedurally embedded without generating felt mystery in the same scene, and wonder comes from non-seed sources that don't have a planted thread behind them.",
-          "id": "d3e399cb1b861786",
-          "location": "2 seed scene(s) — none with a positive curiosityDelta",
-          "rule": "SEED_CURIOSITY_DECOUPLED",
-          "severity": "minor",
-          "suggestedFix": "In at least one seed scene, let the planted clue also raise a question (positive curiosityDelta) — the detail is embedded in a way that makes the audience feel something strange or significant without understanding why. A clue-plant that generates its own mystery is most effective: the audience notices something and wonders about it, which primes them to be interested in the eventual payoff even before they know what's coming. A seed that feels mysterious in the moment creates the double value of a planted thread AND an active question."
-        },
-        {
-          "description": "The 2 scenes carrying outstanding, unpaid clue-debt never coincide with the 2 scenes where a hidden truth is revealed — the story's open questions and its moments of disclosure run on entirely separate tracks. A revelation lands most powerfully when it intersects with what the audience is actively still wondering about; when the two channels never touch, disclosures arrive into scenes where nothing is currently hanging open, and the accumulated debt is never the occasion for an answer.",
-          "id": "b552820a8287439a",
-          "location": "2 open-thread scene(s), 2 revelation scene(s) — zero overlap",
-          "rule": "OPEN_THREAD_REVELATION_DECOUPLED",
-          "severity": "minor",
-          "suggestedFix": "Let at least one revelation land in a scene that is also carrying open clue-debt — a truth surfacing precisely because a thread the audience has been tracking finally connects to it. Tying disclosure to active unresolved tension gives the revelation a question to answer instead of arriving into a quiet moment."
         },
         {
           "description": "The story contains a run of 6 consecutive scenes with no visual staging beats at all, even though 5 scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the protagonist's initiative without any staged action to anchor it.",
@@ -1342,14 +1248,6 @@
           "suggestedFix": "Raise curiosity in at least one scene outside the closing third so the character's intention keeps a driving question more evenly across the story."
         },
         {
-          "description": "Every clue-seeding scene (2 plants) is followed by two scenes that raise no new curiosity, even though 3 scenes elsewhere do open fresh questions. A planted clue should usually compound into a further question about the character's pursuit; when every seed's aftermath opens no curiosity, the groundwork sits inert rather than deepening the audience's investment.",
-          "id": "d3c95a8e1fbac110",
-          "location": "2 seed aftermath(s) — no curiosity raised within 2 scenes",
-          "rule": "INTENTION_SEED_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question about what the character's pursuit will uncover next."
-        },
-        {
           "description": "Every one of the story's 2 scenes that reveal something is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere in the script. A revelation that never sharpens danger or urgency about what the character now wants leaves the intention layer's disclosures reading as settled facts rather than information that raises the stakes of the pursuit.",
           "id": "697e3b03257d9545",
           "location": "2 revelation scene(s) — no suspense rise within 2 scenes",
@@ -1359,7 +1257,7 @@
         }
       ],
       "major": 16,
-      "minor": 19,
+      "minor": 9,
       "pass": "intention"
     },
     {
@@ -1486,36 +1384,12 @@
           "suggestedFix": "Seed a small revelation — not necessarily a major plot twist, but any moment where a character learns something true — somewhere within the 12-scene silent stretch. An overheard fragment, a confirmed suspicion, or a background fact admitted in passing is enough to keep the audience tracking the truth; it does not need to resolve a central mystery."
         },
         {
-          "description": "The script has 2 revelation scenes and 2 clue-seeding scenes, but no scene does both. Revelations and seeds are fully decoupled: the two mystery-layer channels never reinforce one another. Revelations feel unmotivated (the audience has not been primed in that moment), and seeds are planted in vacuums that never carry the charge of discovered truth. The most structurally dense mystery beats are scenes that simultaneously plant a new question and resolve a prior one — the reveal of one truth primes the audience to notice the next seed.",
-          "id": "22b4eb940db72158",
-          "location": "2 revelation scenes and 2 seed scenes — zero overlap",
-          "rule": "REVELATION_SEED_DECOUPLED",
-          "severity": "minor",
-          "suggestedFix": "Write at least one scene that contains both a revelation and a seeded clue — for example, a scene in which a truth is unveiled that also introduces a fresh piece of evidence or a new mystery for the audience to track. This overlap creates a causal chain that gives the mystery layer momentum."
-        },
-        {
-          "description": "The script has 2 revelation scenes and 2 clue-seeding scenes, but no revelation is followed immediately by a scene that plants a new clue. The most effective mystery engines operate as a chain: a disclosure resolves one unknown while the next scene plants the seed of the next question. When no revelation is followed by a fresh seed, the disclosure event closes a loop without reopening a new one — the audience receives an answer without being primed toward the next unknown. Each resolution that is not paired with a new seed drains the script's forward momentum.",
-          "id": "7d94b2925396f32b",
-          "location": "2 revelation scene(s) — none followed by a seeded clue",
-          "rule": "REVELATION_SEED_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "After at least one revelation, let the next scene plant a new seed — a detail, object, or moment of behavior that the audience will want to understand. The scene immediately after a disclosure is the most receptive to a new mystery seed: the audience's curiosity has just been satisfied and is now hungry again. A revelation without a following seed treats closure as the end of the mystery rather than the beginning of the next layer."
-        },
-        {
           "description": "The script has 2 qualifying revelation scenes and 2 scenes containing a dramatic turn, but no revelation is followed by a dramatic turn within the next two scenes. A disclosure charges the beats immediately after it: the two scenes following a revelation are the natural home for a dramatic turn catalysed by the new information — a direction-change, a reversal, a hinge the story pivots on. When no revelation is ever followed by a dramatic turn within that window, the disclosure layer and the narrative-turn layer are temporally decoupled: the story keeps revealing facts, but those facts never crystallise into the pivots that shift direction, so revelations feel absorbed without consequence.",
           "id": "54c36a3612cbf1f7",
           "location": "2 revelation scene(s) — none followed by a dramatic turn within 2 scenes",
           "rule": "REVELATION_DRAMATIC_TURN_AFTERMATH_VOID",
           "severity": "minor",
           "suggestedFix": "After at least one revelation scene, let one of the next two scenes contain a dramatic turn — a reversal, escalation, or direction-change catalysed by the disclosure. The turn need not be caused by the revelation, but their proximity lets the disclosure feel like it tilted the course of events: the audience senses that what was revealed actually mattered because the story changed direction in its wake."
-        },
-        {
-          "description": "The 2 scenes where a clue is planted never coincide with the 3 scenes where curiosity spikes — the seed and wonder-engine channels run on separate tracks. Planting a clue is a natural occasion for the audience's curiosity to visibly rise, but that pairing never happens here.",
-          "id": "4d500366b8b2180a",
-          "location": "2 seed scene(s), 3 curiosity-spike scene(s) — zero overlap",
-          "rule": "BELIEF_SEED_CURIOSITY_DECOUPLED",
-          "severity": "minor",
-          "suggestedFix": "Let at least one seed scene also spike curiosity — a planted detail that immediately makes the audience wonder what it means, tying the clue-planting and wonder-generation channels together."
         },
         {
           "description": "The story contains a run of 12 consecutive scenes with no new curiosity spike at all, even though 3 scenes elsewhere raise a fresh question. A long unbroken stretch with nothing new to wonder about leaves the belief-tracking layer's sense of active questioning dormant for an extended run.",
@@ -1542,14 +1416,6 @@
           "suggestedFix": "Raise curiosity in at least one scene outside the closing third so the belief-tracking layer keeps a fresh question testing convictions more evenly across the story."
         },
         {
-          "description": "Every clue-seeding scene in the story (2 plants) is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A planted clue that never sharpens into a fresh question right after it leaves the belief-tracking layer's groundwork buried rather than voiced as something the audience now wonders about.",
-          "id": "e1f67cbe781c4e2e",
-          "location": "2 clue-seed aftermath(s) — no curiosity rise within 2 scenes",
-          "rule": "BELIEF_SEED_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one clue-seeding moment, let curiosity visibly sharpen so the seed's groundwork registers as a live question, not just planted information."
-        },
-        {
           "description": "Every one of the story's 2 revelation scenes is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A discovery that never re-tightens tension right after it lands leaves the belief layer's revelations feeling inert rather than consequential.",
           "id": "29f1cf6b9da6b22c",
           "location": "2 revelation scene(s) — no suspense rise within 2 scenes of any",
@@ -1567,7 +1433,7 @@
         }
       ],
       "major": 7,
-      "minor": 18,
+      "minor": 14,
       "pass": "belief"
     },
     {
@@ -1654,14 +1520,6 @@
           "suggestedFix": "Raise curiosity somewhere within the 12-scene stretch so the conflict keeps a mystery engine driving audience investment throughout that stretch."
         },
         {
-          "description": "Every one of the story's 2 clue-planting scenes is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A planted clue that never opens a fresh question right after it lands leaves the conflict's foreshadowing registering as a closed event rather than a development that generates the next thing to wonder about.",
-          "id": "4ab1b0509d2db94a",
-          "location": "2 seed scene(s) — no curiosity rise within 2 scenes of any",
-          "rule": "CONFLICT_SEED_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one clue-seeding moment, let a new question arise from the plant so the conflict's foreshadowing keeps generating curiosity, not just sitting as inert setup."
-        },
-        {
           "description": "Every one of the story's 2 revelation scenes is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A discovery that never sharpens danger or uncertainty right after it lands leaves the conflict's reckoning with new information feeling settled rather than newly charged.",
           "id": "d14aed0b1f55c54d",
           "location": "2 revelation scene(s) — no suspense rise within 2 scenes of any",
@@ -1679,7 +1537,7 @@
         }
       ],
       "major": 3,
-      "minor": 9,
+      "minor": 8,
       "pass": "conflict"
     },
     {
@@ -1774,14 +1632,6 @@
           "suggestedFix": "Let at least one revelation move a bond in its aftermath: in the scene or two after a discovery, have the truth redraw a relationship — trust withdrawn from someone exposed, an alliance forged with someone vindicated, distance opened or closed by what was learned. A revelation whose aftermath shifts a relationship has consequence beyond information; it changes the human world the protagonist moves through."
         },
         {
-          "description": "Every one of the 2 clue-planting scene(s) is immediately followed by a scene with a neutral emotional register. When the protagonist plants foreshadowing, the next scene should carry emotional consequence — unease, anticipation, or a reaction that confirms the planted material has registered in their inner life. When seeds consistently precede emotional vacuums, the foreshadowing is mechanically woven but affectively inert: the character plants clues without any felt sense that the planting matters.",
-          "id": "05c8bfe68873e465",
-          "location": "2 seed scene(s) — all followed by emotionally neutral scenes",
-          "rule": "ARC_SEED_EMOTIONAL_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "After at least one seed scene, give the immediately following scene a non-neutral emotional register — the protagonist who planted the clue should feel something in the next beat: unease about what they've set in motion, anticipation about whether it will pay off, or discomfort at the implications of what they've foreshadowed. Foreshadowing lands hardest when its aftermath carries emotional weight."
-        },
-        {
           "description": "The script's curiosity engine fires in 3 scenes but then stalls for a run of 12 consecutive scenes where curiosityDelta never rises above zero. A drought of 12 scenes means the audience's open questions go unrefreshed for a substantial stretch. Unlike a deliberate pause, a curiosity drought of this length risks the audience abandoning or prematurely resolving the story's open threads, draining forward momentum.",
           "id": "6f34e076317cfe43",
           "location": "longest curiosity-flat run: 12 scenes",
@@ -1806,28 +1656,12 @@
           "suggestedFix": "After at least one suspense-spike scene, let the next one or two scenes carry a raised curiosityDelta — a new question that the escalated danger generates. The curiosity doesn't need to be explicit exposition: a revelation that the threat has a hidden dimension, a development that makes the protagonist wonder about an element they thought they understood, or an encounter that raises a new question under pressure all qualify. Tension that generates wonder makes the stakes feel more complex and the protagonist's situation more unknowable — and an unknowable situation is harder to look away from."
         },
         {
-          "description": "The 2 scenes carrying outstanding clue-debt never coincide with the 3 scenes where curiosity is actively rising — the arc's open mysteries and its moments of climbing intrigue run on separate tracks. A scene that already holds an unresolved question is a natural place for wonder to spike further, but that pairing never occurs here.",
-          "id": "3ec7a65e7c3989ec",
-          "location": "2 open-thread scene(s), 3 rising-curiosity scene(s) — zero overlap",
-          "rule": "ARC_OPEN_THREAD_CURIOSITY_DECOUPLED",
-          "severity": "minor",
-          "suggestedFix": "Let at least one scene carrying outstanding clue-debt also raise curiosity — a new question surfacing while an old one is still open, giving the arc's open threads a causal tie to its rising intrigue."
-        },
-        {
           "description": "The arc contains a run of 6 consecutive scenes with no visual staging beats at all, even though 5 scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the character's arc without any staged action to anchor it.",
           "id": "ad225fa2bd3bd173",
           "location": "longest stretch with no visual staging: 6 consecutive scenes",
           "rule": "ARC_STAGING_DROUGHT_RUN",
           "severity": "minor",
           "suggestedFix": "Add a physical staging beat somewhere within the 6-scene stretch — a gesture, an object, a piece of blocking — so the arc stays visually grounded throughout."
-        },
-        {
-          "description": "Every clue-seeding scene (2 plants) is followed by two scenes that raise no new curiosity, even though 3 scenes elsewhere do open fresh questions. A planted clue that never compounds into a further question about the character's arc leaves the groundwork inert rather than deepening the audience's investment in what it will mean.",
-          "id": "b28dd58b8b4735e4",
-          "location": "2 seed aftermath(s) — no curiosity raised within 2 scenes",
-          "rule": "ARC_SEED_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question tied to the character's arc."
         },
         {
           "description": "Every revelation in the story (2 discoveries) is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A discovery that never tightens the felt sense of danger right after it leaves the arc's revelations landing as flat information rather than a beat that raises the pressure on the protagonist.",
@@ -1839,7 +1673,7 @@
         }
       ],
       "major": 4,
-      "minor": 15,
+      "minor": 12,
       "pass": "character-arc"
     },
     {
@@ -1926,14 +1760,6 @@
           "suggestedFix": "Add a physical staging beat somewhere within the 6-scene stretch so staging shares the load with dialogue throughout that stretch."
         },
         {
-          "description": "Every clue-seeding scene (2 plants) is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. Planting a clue without characters' dialogue visibly wondering about it right after leaves the seed buried rather than voiced as a live question.",
-          "id": "b3f6eb5e0791ef01",
-          "location": "2 seed aftermath(s) -- no curiosity rise within 2 scenes",
-          "rule": "DIALOGUE_SEED_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one clue-seeding moment, let a character's line raise a new question about it so the seed's curiosity is voiced, not just planted."
-        },
-        {
           "description": "Every one of the story's 2 scenes that raise suspense is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere in the script. A spike in danger that never opens a fresh question right after it leaves the dialogue layer's tension registering as isolated pressure rather than a source of the next thing worth wondering about.",
           "id": "86d2008039249ad5",
           "location": "2 suspense-rise scene(s) -- no curiosity rise within 2 scenes",
@@ -1943,7 +1769,7 @@
         }
       ],
       "major": 0,
-      "minor": 12,
+      "minor": 11,
       "pass": "dialogue"
     },
     {
@@ -2038,14 +1864,6 @@
           "suggestedFix": "Add a physical staging beat somewhere within the 6-scene stretch — a gesture, an object, a piece of blocking — so the story's rhythm stays visually grounded throughout."
         },
         {
-          "description": "The 2 scenes carrying outstanding clue-debt never coincide with the 3 scenes where curiosity is actively rising — the story's open mysteries and its moments of climbing intrigue run on separate rhythmic tracks. A scene that already holds an unresolved question is a natural place for wonder to spike further, but that pairing never occurs here.",
-          "id": "5fc298c2977acd22",
-          "location": "2 open-thread scene(s), 3 rising-curiosity scene(s) — zero overlap",
-          "rule": "OPEN_THREAD_CURIOSITY_SIGNAL_DECOUPLED",
-          "severity": "minor",
-          "suggestedFix": "Let at least one scene carrying outstanding clue-debt also raise curiosity — a new question surfacing while an old one is still open, so the story's open threads and its rising intrigue occasionally converge."
-        },
-        {
           "description": "The story contains a run of 12 consecutive scenes with no rise in curiosity at all, even though 3 scenes elsewhere do spark wonder. A long unbroken stretch with nothing new to wonder about leaves the story's rhythm flat with no question driving it for an extended run.",
           "id": "7d61c4978a21d827",
           "location": "longest stretch with no rising curiosity: 12 consecutive scenes",
@@ -2070,22 +1888,6 @@
           "suggestedFix": "In the two scenes following at least one revelation, let the tension climb so the rhythm's discoveries carry forward momentum rather than settling once the truth is out."
         },
         {
-          "description": "Every one of the story's 2 clue-planting scenes is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A planted clue that never opens a fresh question right after it lands leaves the rhythm's foreshadowing registering as a closed event rather than a development that generates the next thing to wonder about.",
-          "id": "c10290b2381c1a98",
-          "location": "2 seed scene(s) — no curiosity rise within 2 scenes of any",
-          "rule": "RHYTHM_SEED_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one clue-seeding moment, let a new question arise from the plant so the rhythm's foreshadowing keeps generating curiosity, not just sitting as inert setup."
-        },
-        {
-          "description": "Every scene carrying an unresolved thread (2 instances) is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere in the script. An open question that never generates a fresh question right after it lingers registers as inert plot backlog rather than a thread the rhythm keeps actively developing.",
-          "id": "87d0ad77bfd29176",
-          "location": "2 open-thread scene(s) — no curiosity rise within 2 scenes of any",
-          "rule": "RHYTHM_OPEN_THREAD_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one open-thread moment, let a new question surface so the rhythm's lingering questions keep generating curiosity, not just accumulating as backlog."
-        },
-        {
           "description": "Every one of the story's 2 suspense-spike scenes is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A spike in danger that never opens a fresh question right after it leaves the rhythm's tension registering as isolated pressure rather than a source of the next thing worth wondering about.",
           "id": "a2a722a169dd1c1b",
           "location": "2 suspense-spike scene(s) — no curiosity rise within 2 scenes of any",
@@ -2095,7 +1897,7 @@
         }
       ],
       "major": 0,
-      "minor": 18,
+      "minor": 15,
       "pass": "rhythm"
     },
     {
@@ -2238,14 +2040,6 @@
           "suggestedFix": "Break up the run by inserting a scene with a different functional purpose somewhere in the middle of the streak — a confrontation, a revelation, or a decision point that performs a different structural job than the surrounding scenes. Varying the FUNCTION of consecutive scenes, not just their content, keeps the story's rhythm from flattening."
         },
         {
-          "description": "The 2 scenes carrying outstanding, unpaid clue-debt never coincide with the 3 scenes where curiosity spikes — the mystery engine and the debt it should be drawing on run on entirely separate tracks. Curiosity spikes that never intersect with what's actually left unresolved read as manufactured rather than earned, since the audience's wondering isn't visibly tied to the specific questions the story is holding open.",
-          "id": "4996106ff188cf7d",
-          "location": "2 open-thread scene(s), 3 curiosity-spike scene(s) — zero overlap",
-          "rule": "OPEN_THREAD_CURIOSITY_DECOUPLED",
-          "severity": "minor",
-          "suggestedFix": "Let at least one curiosity spike land in a scene that is also carrying open clue-debt — the audience's heightened wondering should visibly connect to a specific unresolved thread rather than arriving on its own unconnected schedule."
-        },
-        {
           "description": "The story contains a run of 6 consecutive scenes with no visual staging beats at all, even though 5 scenes elsewhere do carry physical staging. A long unbroken stretch with nothing physically shown is itself a learnable pattern — the audience can predict that no staged image will arrive for an extended stretch.",
           "id": "67b08c2fa7ba5d34",
           "location": "longest stretch with no visual staging: 6 consecutive scenes",
@@ -2268,6 +2062,14 @@
           "rule": "ORIGINALITY_CURIOSITY_DROUGHT_RUN",
           "severity": "minor",
           "suggestedFix": "Raise curiosity somewhere within the 12-scene stretch so wonder stays unpredictable rather than settling into a learnable lull."
+        },
+        {
+          "description": "Every one of the story's 2 revelation scenes is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. Once the audience notices the pattern, they learn that a discovery never sharpens danger or uncertainty in its wake — a predictable, avoidable absence that leaves each reveal reading as settled information rather than a newly charged development.",
+          "id": "16d05c1d9a98f5ec",
+          "location": "2 revelation scene(s) — no suspense rise within 2 scenes of any",
+          "rule": "ORIGINALITY_REVELATION_SUSPENSE_AFTERMATH_VOID",
+          "severity": "minor",
+          "suggestedFix": "In the two scenes following at least one revelation, let the new information raise what's at risk, so the discovery compounds tension instead of resolving into calm and training the audience to expect nothing to follow from what they just learned."
         }
       ],
       "major": 1,
@@ -2278,20 +2080,12 @@
       "critical": 0,
       "issues": [
         {
-          "description": "None of the story's 2 clue-seeding scenes is followed by an emotional shift (emotionalShift ≠ 'neutral') in the next two scenes — planted threads produce no felt reaction from any character. A new unknown should register emotionally: the character who encounters it should show dread, curiosity, relief, or alarm in the scenes that follow. When every seed is followed by two emotionally neutral scenes, the clue exists purely as information — the audience is asked to hold a thread that no character appears to feel the weight of. Threads the characters visibly react to are threads the audience remembers.",
-          "id": "bc5f76778af3e920",
-          "location": "All 2 seed scene(s) — no emotional shift in the next two scenes",
-          "rule": "SEED_EMOTIONAL_AFTERMATH_ABSENT",
-          "severity": "minor",
-          "suggestedFix": "After at least one clue-seeding scene, let a character react emotionally in the next scene or the one after: the evidence they encounter leaves them shaken, hopeful, afraid, or resolute. The emotional response does not need to be dramatic — even quiet unease or grim recognition tells the audience that what was just planted matters. A thread the characters respond to emotionally is far more memorable than one they catalogue without reaction."
-        },
-        {
-          "description": "None of the story's 2 clue-seeding scenes is followed by a curiosity rise (curiosityDelta > 0) in the next two scenes — planted threads open no forward questions in the audience. A new clue should activate the \"what does this mean?\" reflex: the scenes that follow the plant should register the new unknown as a pull forward. When every seed is followed by two scenes of flat or falling curiosity, the evidence is archived rather than ignited — the audience stores the information without being made to wonder about its implications. A thread that doesn't raise curiosity in its wake is a thread the audience will forget.",
-          "id": "439a88b1d0482be4",
-          "location": "All 2 seed scene(s) — no curiosity rise in the next two scenes",
-          "rule": "SEED_CURIOSITY_AFTERMATH_ABSENT",
-          "severity": "minor",
-          "suggestedFix": "After at least one seed scene, let the next scene or the one after raise a direct question the audience is now burning to answer: a character discovers a partial connection, a detail the clue introduced reappears unexpectedly, or a new scene reveals that the planted evidence has implications beyond what was first apparent. The curiosity rise signals to the audience that the thread they just received is alive and pulling — not merely filed."
+          "description": "No clues or setups are planted in the story — the screenplay has no setup/payoff architecture",
+          "id": "68be8b6f24ab0e45",
+          "location": "Setup/payoff layer",
+          "rule": "NO_SETUPS",
+          "severity": "major",
+          "suggestedFix": "Plant at least one object, phrase, or secret in Act 1 that pays off in Act 3"
         },
         {
           "description": "The story contains a run of 6 consecutive scenes with no visual staging beats at all, even though 5 scenes elsewhere do carry physical staging. A long unbroken stretch of pure dialogue or exposition with nothing physically shown leaves the payoff engine without any embodied resolution to anchor it.",
@@ -2318,14 +2112,6 @@
           "suggestedFix": "Raise curiosity in at least one scene outside the closing third so the payoff engine keeps planting fresh questions more evenly across the story."
         },
         {
-          "description": "Every clue-seeding scene in the story (2 plants) is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A planted clue that never sharpens into a fresh question right after it leaves the payoff machinery's groundwork buried rather than voiced as something the audience is now wondering about.",
-          "id": "84d684ab93798303",
-          "location": "2 seed aftermath(s) — no curiosity rise within 2 scenes",
-          "rule": "PAYOFF_SEED_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one clue-seeding moment, let curiosity visibly sharpen so the plant's groundwork registers as a live question, not just an inert deposit awaiting its eventual payoff."
-        },
-        {
           "description": "Every revelation in the story (2 discoveries) is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A truth that lands without re-tightening tension in the immediate aftermath leaves the payoff machinery's revelations registering as closure alone, with nothing new pressing on the reader.",
           "id": "73f59660f89ba799",
           "location": "2 revelation aftermath(s) — no suspense rise within 2 scenes",
@@ -2342,8 +2128,8 @@
           "suggestedFix": "In the two scenes following at least one suspense spike, let a new question surface from the danger, so the tension keeps generating curiosity, not just dread."
         }
       ],
-      "major": 0,
-      "minor": 8,
+      "major": 1,
+      "minor": 5,
       "pass": "payoff"
     },
     {
@@ -2406,14 +2192,6 @@
           "suggestedFix": "Raise curiosity in at least one scene outside the closing third so the story's voice keeps generating fresh questions more evenly across the story."
         },
         {
-          "description": "Every clue-seeding scene in the story (2 plants) is followed by two scenes with no rise in curiosity, even though 3 such rises occur elsewhere. A planted clue that never sharpens into a fresh question right after it leaves the voice's groundwork buried rather than voiced as a live question the audience carries forward.",
-          "id": "6aec42fdcc6c24b5",
-          "location": "2 seed aftermath(s) — no curiosity rise within 2 scenes",
-          "rule": "VOICE_SEED_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "In the two scenes following at least one clue-seeding moment, let curiosity visibly sharpen so the seed's groundwork registers as something the voice keeps returning to."
-        },
-        {
           "description": "Every one of the story's 2 revelation scenes is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A truth that surfaces without sharpening danger or uncertainty right after it lands leaves the voice's reckoning with new information feeling settled rather than newly charged.",
           "id": "d474c9685c12ce5c",
           "location": "2 revelation scene(s) — no suspense rise within 2 scenes of any",
@@ -2431,7 +2209,7 @@
         }
       ],
       "major": 0,
-      "minor": 10,
+      "minor": 9,
       "pass": "voice"
     },
     {
@@ -2485,14 +2263,6 @@
           "suggestedFix": "Raise curiosity in at least one scene outside the closing third so the relationship keeps generating fresh questions more evenly across the story."
         },
         {
-          "description": "Every clue-seeding scene (2 plants) is followed by two scenes that raise no new curiosity, even though 3 scenes elsewhere do open fresh questions. A planted clue that never compounds into a further question about the relationship leaves the arc's groundwork inert rather than deepening the audience's investment in how the bond will change.",
-          "id": "ded7c2efbf9a2fe4",
-          "location": "2 seed aftermath(s) — no curiosity raised within 2 scenes",
-          "rule": "RELATIONAL_SEED_CURIOSITY_AFTERMATH_VOID",
-          "severity": "minor",
-          "suggestedFix": "Let at least one seed compound in its aftermath: in the scene or two after a clue is planted, let its implications provoke a new question about what it means for the relationship."
-        },
-        {
           "description": "Every one of the story's 2 revelation scenes is followed by two scenes with no rise in suspense, even though 2 such rises occur elsewhere. A discovery that never re-tightens tension right after it lands leaves the relational arc's reckoning with new information feeling inert rather than consequential to the bonds it should complicate.",
           "id": "0d383ccf728cfae4",
           "location": "2 revelation scene(s) — no suspense rise within 2 scenes of any",
@@ -2502,7 +2272,7 @@
         }
       ],
       "major": 0,
-      "minor": 7,
+      "minor": 6,
       "pass": "relationship-arc"
     }
   ],
@@ -2538,7 +2308,7 @@
     "scored": true,
     "strength": 0.40421882334059744
   },
-  "plainSummary": "PASS — scored in the bottom band, below the decline line; overall score 0/100. This is the engine's deterministic, threshold-based verdict, not a human read. Theme & Originality is the highest-scoring diagnostic dimension, at 98/100. Character is the lowest-scoring diagnostic dimension, at 26/100 — most of the trouble is around zero entropy scene. Start with the highest-priority fix: Across all 4 Act 3 scenes the protagonist initiates no action — no clock raised, no clue planted. They are carried to the ending rather than choosing it; the climax happens to them instead of being driven by them.",
+  "plainSummary": "PASS — scored in the bottom band, below the decline line; overall score 0/100. This is the engine's deterministic, threshold-based verdict, not a human read. Theme & Originality is the highest-scoring diagnostic dimension, at 98/100. Every diagnostic dimension scores at or above the overall (lowest: Structure & Pacing at 24/100, 24 point(s) above it). They are different statistics, not two views of one: a dimension reads issue density inside a single craft family, on its own curve, while the overall reads density across all of them, adds the scene-count term — 12 point(s) at 16 scene(s) — and subtracts any document-scale structural deductions. So the dimension scores rank the craft families against each other; they do not add up to the overall, and the gap is not a number to fix inside any one of them. Start with the highest-priority fix: Act 1 lacks a major inciting event — no clues planted, relationship shifts, or clock pressure. The protagonist isn't forced into the central conflict.",
   "provenance": {
     "groundTruthSource": "mechanical-degradation",
     "percentileBasis": "internal-calibration-corpus-20-samples",
@@ -2566,9 +2336,9 @@
   "sceneHeatmap": [
     {
       "critical": 0,
-      "issueCount": 6,
-      "major": 2,
-      "minor": 4,
+      "issueCount": 4,
+      "major": 1,
+      "minor": 3,
       "sceneIdx": 0,
       "slug": "INT. FIELD STATION - DAY"
     },
@@ -2661,16 +2431,16 @@
       "slug": "INT. TRUCK - DAY"
     },
     {
-      "critical": 0,
-      "issueCount": 5,
+      "critical": 1,
+      "issueCount": 6,
       "major": 3,
       "minor": 2,
       "sceneIdx": 12,
       "slug": "EXT. VALLEY FLOOR - DUSK"
     },
     {
-      "critical": 0,
-      "issueCount": 2,
+      "critical": 1,
+      "issueCount": 3,
       "major": 1,
       "minor": 1,
       "sceneIdx": 13,
@@ -2678,9 +2448,9 @@
     },
     {
       "critical": 0,
-      "issueCount": 2,
+      "issueCount": 1,
       "major": 1,
-      "minor": 1,
+      "minor": 0,
       "sceneIdx": 14,
       "slug": "INT. TRUCK - NIGHT"
     },
@@ -2703,32 +2473,6 @@
   "storyGraph": {
     "diagnostics": {
       "critical": [
-        {
-          "confidence": 0.85,
-          "impact": "Audiences remember setups and expect payoffs. Unresolved promises can feel like plot holes or wasted screen time.",
-          "message": "Setup \"mara\" planted but never resolved",
-          "sceneIdx": 0,
-          "severity": "critical",
-          "suggestions": [
-            "Add a payoff scene in Act 2 or 3 to resolve this setup",
-            "If this setup is no longer relevant to the main plot, consider removing it",
-            "Connect this promise to an existing climax or resolution scene"
-          ],
-          "type": "unpaid-promise"
-        },
-        {
-          "confidence": 0.85,
-          "impact": "Audiences remember setups and expect payoffs. Unresolved promises can feel like plot holes or wasted screen time.",
-          "message": "Setup \"dell\" planted but never resolved",
-          "sceneIdx": 1,
-          "severity": "critical",
-          "suggestions": [
-            "Add a payoff scene in Act 2 or 3 to resolve this setup",
-            "If this setup is no longer relevant to the main plot, consider removing it",
-            "Connect this promise to an existing climax or resolution scene"
-          ],
-          "type": "unpaid-promise"
-        },
         {
           "confidence": 0.8,
           "impact": "This scene doesn't affect or get affected by the main plot. It may feel disconnected or unnecessary.",
@@ -2987,20 +2731,8 @@
     },
     "graph": {
       "arcCoherence": -0.6279988996105245,
-      "causalDensity": 0.9444444444444444,
+      "causalDensity": 0.9375,
       "edges": [
-        {
-          "source": "scene-0",
-          "target": "promise-setup-mara",
-          "type": "promise-link",
-          "weight": 1
-        },
-        {
-          "source": "scene-1",
-          "target": "promise-setup-dell",
-          "type": "promise-link",
-          "weight": 1
-        },
         {
           "source": "scene-0",
           "target": "scene-1",
@@ -3272,40 +3004,19 @@
           },
           "sceneIdx": 15,
           "type": "scene"
-        },
-        {
-          "id": "promise-setup-mara",
-          "label": "Setup: mara",
-          "metadata": {
-            "clueId": "mara",
-            "promiseType": "setup"
-          },
-          "type": "promise"
-        },
-        {
-          "id": "promise-setup-dell",
-          "label": "Setup: dell",
-          "metadata": {
-            "clueId": "dell",
-            "promiseType": "setup"
-          },
-          "type": "promise"
         }
       ],
-      "promisePaymentRatio": 0,
+      "promisePaymentRatio": 1,
       "scored": true,
       "setupPayoffDistance": 0,
-      "unpaidPromises": [
-        "mara",
-        "dell"
-      ]
+      "unpaidPromises": []
     },
-    "graphHealth": 15,
+    "graphHealth": 55,
     "summary": {
-      "criticalCount": 7,
+      "criticalCount": 5,
       "overallAssessment": "weak",
       "strengthCount": 0,
-      "totalIssues": 20
+      "totalIssues": 18
     }
   },
   "strengths": [],
@@ -3315,6 +3026,7 @@
     "lastNewPairPosition": 0,
     "leadShareSlope": 0.1544,
     "meanAbsDialogueShareDelta": 0.0946,
+    "meanAbsDialogueShareDeltaNormalised": 1.0416,
     "meanLeadShare": 0.5625,
     "meanOpenCloseShift": 0.3413,
     "meanSpeakersPerScene": 1,
@@ -3591,71 +3303,18 @@
     "completionPercent": 20,
     "escalating": false,
     "midpointPressure": 0,
-    "openClues": 2,
+    "openClues": 0,
     "revelationCount": 2,
     "reversalCount": 0,
     "reversalDensity": 0,
     "tightestScene": 0
   },
   "subplots": {
-    "intersectionCount": 15,
+    "intersectionCount": 0,
     "scored": true,
-    "subplots": [
-      {
-        "description": "Mystery thread \"mara\" unresolved (seeded scene 0)",
-        "intersectionScenes": [
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15
-        ],
-        "openedAtScene": 0,
-        "opsCount": 1,
-        "participants": [],
-        "resolvedAtScene": null,
-        "subplotId": "mystery:mara",
-        "type": "mystery_thread"
-      },
-      {
-        "description": "Mystery thread \"dell\" unresolved (seeded scene 1)",
-        "intersectionScenes": [
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15
-        ],
-        "openedAtScene": 1,
-        "opsCount": 1,
-        "participants": [],
-        "resolvedAtScene": null,
-        "subplotId": "mystery:dell",
-        "type": "mystery_thread"
-      }
-    ],
-    "totalSubplots": 2,
-    "unresolvedSubplots": 2
+    "subplots": [],
+    "totalSubplots": 0,
+    "unresolvedSubplots": 0
   },
   "subtextRatio": 0.48,
   "temporalConsistency": {
@@ -3822,6 +3481,33 @@
   },
   "topPriorities": [
     {
+      "description": "Act 1 lacks a major inciting event — no clues planted, relationship shifts, or clock pressure. The protagonist isn't forced into the central conflict.",
+      "id": "4c22d472753ae418",
+      "location": "Act 1 (Scenes 1–4)",
+      "pass": "structure",
+      "rule": "MISSING_INCITING_INCIDENT",
+      "severity": "critical",
+      "suggestedFix": "Add a scene in Act 1 where something happens that throws the protagonist into action: a revelation, a betrayal, or an external deadline."
+    },
+    {
+      "description": "Scene 13 delivers a revelation but no clues were planted in any prior scene",
+      "id": "8044437ac0102a2d",
+      "location": "Scene 13 (EXT. VALLEY FLOOR - DUSK)",
+      "pass": "causality",
+      "rule": "REVELATION_WITHOUT_SETUP",
+      "severity": "critical",
+      "suggestedFix": "Add a clue-seeding moment in an earlier scene that anticipates this revelation"
+    },
+    {
+      "description": "Scene 14 delivers a revelation but no clues were planted in any prior scene",
+      "id": "526f0c3aa814376c",
+      "location": "Scene 14 (EXT. VALLEY FLOOR - CONTINUOUS)",
+      "pass": "causality",
+      "rule": "REVELATION_WITHOUT_SETUP",
+      "severity": "critical",
+      "suggestedFix": "Add a clue-seeding moment in an earlier scene that anticipates this revelation"
+    },
+    {
       "description": "Across all 4 Act 3 scenes the protagonist initiates no action — no clock raised, no clue planted. They are carried to the ending rather than choosing it; the climax happens to them instead of being driven by them",
       "id": "800d961611368708",
       "location": "Act 3 (Scenes 13–16)",
@@ -3883,38 +3569,12 @@
       "rule": "ACT2_BOUNDARY_WEAK",
       "severity": "major",
       "suggestedFix": "The final Act 2 scene should be the highest-stakes moment before the climax: a major reversal, false climax, or all-is-lost moment"
-    },
-    {
-      "description": "Scenes 3–6: 4 consecutive scenes with no revelation, planted clue, or relationship shift — the narrative goes dark; nothing is being learned or changed",
-      "id": "da84bb5cd1dff6e4",
-      "location": "Scenes 3–6",
-      "pass": "structure",
-      "rule": "REVELATION_DROUGHT",
-      "severity": "major",
-      "suggestedFix": "At least one of these scenes must deliver narrative payload: a clue, a revelation, or a shift in a key relationship. The audience should never go 4 scenes without learning something new."
-    },
-    {
-      "description": "Scenes 7–10: 4 consecutive scenes with no revelation, planted clue, or relationship shift — the narrative goes dark; nothing is being learned or changed",
-      "id": "da84bb5cd1dff6e4",
-      "location": "Scenes 7–10",
-      "pass": "structure",
-      "rule": "REVELATION_DROUGHT",
-      "severity": "major",
-      "suggestedFix": "At least one of these scenes must deliver narrative payload: a clue, a revelation, or a shift in a key relationship. The audience should never go 4 scenes without learning something new."
-    },
-    {
-      "description": "No scene in the pre-climax zone (63%–81%) carries a negative emotional shift with meaningful suspense — the protagonist never hits their lowest point before the final push",
-      "id": "cc3df25551c3b5b2",
-      "location": "Scenes 11–14 (pre-climax zone)",
-      "pass": "structure",
-      "rule": "DARK_NIGHT_ABSENT",
-      "severity": "major",
-      "suggestedFix": "Insert an \"all is lost\" beat in this zone: a failure, a betrayal, or a moment where all hope seems gone. The climax lands harder after the protagonist has been broken."
     }
   ],
-  "totalIssues": 233,
+  "totalIssues": 206,
   "verdict": "PASS",
   "voiceAnalysis": {
+    "excludedCharacters": [],
     "pairs": [
       {
         "a": "MARA",
