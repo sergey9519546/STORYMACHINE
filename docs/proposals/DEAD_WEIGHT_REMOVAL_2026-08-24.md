@@ -250,6 +250,23 @@ for and does not collect.
 
 ### Two items outside `server/**`
 
+> **Acted on 2026-09-20.** The owner authorized B3 specifically — and nothing
+> wider — and it was executed: `agent-scheduler/` (12 tracked files) and
+> `test-freeride.js` were deleted in commit
+> `chore: remove agent-scheduler/ and test-freeride.js (dead-weight proposal
+> B3)`. Both of this section's claims were re-verified immediately before
+> deletion: `node test-freeride.js` still exited 1 with the module-not-found
+> error quoted below, and `agent-scheduler/` was still imported by nothing
+> (`grep -rn "from '.*agent-scheduler\|require(.*agent-scheduler" .` found no
+> hits). No reference to either path existed in `package.json`, any CI
+> workflow, `tsconfig.json`'s exclude list, `scripts/run-tests.mjs`,
+> `scripts/check-no-console.mjs`, `scripts/verify-server-reachability.mjs`, or
+> `.dockerignore`, so no config file needed a follow-up edit. Full dependency
+> map and gate results in
+> `docs/audits/2026-09-20-dead-weight-b3/README.md`. **Proposal A, B1, B2, and
+> the four never-run v5.0 test files remain proposals awaiting the owner** —
+> this lane touched only the two items below.
+
 **`agent-scheduler/`** — 12 tracked files (`git ls-files agent-scheduler | wc -l`
 = 12): four markdown reports, `cron-config.json`, `crontab-schedule.txt`,
 `package.json`, `progress-tracker.json`, and three `.js` files. It is the

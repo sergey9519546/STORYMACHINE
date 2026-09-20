@@ -186,6 +186,12 @@ is not itself dishonest if it is done in a diff a reviewer can see, as
 opposed to quietly, which is why this doc records the expiry rather than
 either asserting it will be met or assuming it has been extended.
 
+**2026-09-20:** Dead-weight proposal B3 acted on — `agent-scheduler/` (12
+tracked files) and `test-freeride.js` deleted on `lane/dead-weight-b3`; see
+`docs/proposals/DEAD_WEIGHT_REMOVAL_2026-08-24.md`'s B3 note and
+`docs/audits/2026-09-20-dead-weight-b3/README.md`. Proposal A, B1, B2, and the
+v5.0 test files are still awaiting the owner.
+
 ### Pull requests (15 reviewed, all states)
 
 Zero open. Merged and present in main: **#257** (INVERSE_CHEKHOV_GUN, the
