@@ -199,6 +199,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B3.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Feature Length Defects Prep",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
       "type": "audit",
       "title": "Audit — 2026-09-20 Parked Branches",
@@ -511,6 +517,12 @@
       "path": "docs/brain/Measurements/Measurement - EMOTIONAL_ARC_ANTISLOP_EXPERIMENT_2026-07-11.md"
     },
     {
+      "id": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md",
+      "type": "measurement",
+      "title": "Measurement — FEATURE_LENGTH_DEFECTS_2026-09-07",
+      "path": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md"
+    },
+    {
       "id": "docs/brain/Measurements/Measurement - HEALTH_REARCH_INCREMENT1_LANDED_2026-07-11.md",
       "type": "measurement",
       "title": "Measurement — HEALTH_REARCH_INCREMENT1_LANDED_2026-07-11",
@@ -705,7 +717,7 @@
     {
       "id": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "type": "owner",
-      "title": "Owner Item — Measure and Merge the Stacked Scoring Branch",
+      "title": "Owner Item — Measure and Merge the Parked Scoring Branches",
       "path": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
     {
@@ -1555,6 +1567,74 @@
       "to": "docs/brain/Patterns.md"
     },
     {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Burrows Delta Hoist.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
       "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
       "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
@@ -1788,6 +1868,42 @@
     },
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Defects.md",
       "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
     {
@@ -1800,11 +1916,7 @@
     },
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
-      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
-    },
-    {
-      "from": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
-      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
     },
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
@@ -1813,6 +1925,14 @@
     {
       "from": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
     },
     {
       "from": "docs/brain/Branches/Branch - Forced Cue.md",
@@ -2323,6 +2443,22 @@
       "to": "docs/brain/Measurements/Measurement - ARC_RECALIBRATION_WAVE_2026-07-11.md"
     },
     {
+      "from": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
       "from": "docs/brain/Measurements/Measurement - IMPORT_COMPREHENSION_2026-07-11.md",
       "to": "docs/brain/Sessions/Session - 2026-09-05 Review Batch.md"
     },
@@ -2761,6 +2897,10 @@
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
       "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
+      "to": "docs/brain/Measurements/Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07.md"
     },
     {
       "from": "docs/brain/Owner/Owner - R5 Measurement and Merge.md",
