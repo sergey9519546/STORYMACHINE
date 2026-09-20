@@ -1426,6 +1426,15 @@ describe('ROUND 5 (finding 1, BLOCKER): scene-segmentation predicate parity with
     ['..', 'two periods are not a forced heading', false],
     ['...and then nothing.', 'an ellipsis opening a dialogue continuation is prose, not a heading', false],
     ['.2 HOURS LATER', 'a forced heading may start with a digit', true],
+    // 2026-09-20 (Unicode forced-heading decision): FORCED_SCENE_HEADING_RE
+    // widened from `[A-Za-z0-9]` to `\p{L}\p{N}` (any Unicode letter or
+    // number) — a forced heading in Cyrillic, Armenian or CJK now counts, and
+    // the ellipsis exclusion above is unaffected (none of those bytes is
+    // `\p{L}`/`\p{N}` either).
+    ['.МОСКВА - ДЕНЬ', 'a forced heading in Cyrillic', true],
+    ['.ԵՐԵՎԱՆ', 'a forced heading in Armenian', true],
+    ['.東京', 'a forced heading in CJK', true],
+    ['. МОСКВА', 'a space after the dot is still not a forced heading', false],
     ['!This is forced action, not a heading.', 'forced action (!) must NOT be a heading', false],
     ['INTERPOL AGENTS STORM THE ROOM', 'a prefix-shaped word with no [. ] boundary must NOT match', false],
     ['INT.LOCATION - DAY', 'no space after the period — the period alone satisfies [. ]', true],

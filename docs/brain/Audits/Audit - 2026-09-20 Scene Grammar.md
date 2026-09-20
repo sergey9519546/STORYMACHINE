@@ -103,6 +103,14 @@ measurement showed no effect (2427/2619/2339 ms before, 2514/2313/2417 with,
 2466/2334/2329 without). `npm test` in full and `npm run brain` were out of
 this lane's scope.
 
+**2026-09-20 addendum (Unicode forced headings):** `FORCED_SCENE_HEADING_RE`
+widened from `[A-Za-z0-9]` to `\p{L}\p{N}` (any Unicode letter or number) on
+`lane/unicode-forced-heading` off this lane's `bf4f3bff` merge — the decision
+this audit's §2 deferred, now made; see
+`docs/audits/2026-09-20-scene-grammar/README.md`'s "§ Unicode forced
+headings (decision 2026-09-20)" and the "FORCED HEADINGS IN ANY SCRIPT" entry
+in `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`.
+
 **Related:** [[Audit - 2026-09-19 Harness Honesty]],
 [[Audit - 2026-09-12 Adversarial Review]], [[Gate - AUC-24 Ratchet]],
 [[Gate - Public Benchmark]], [[Gate - Output-Identity Harness]],
