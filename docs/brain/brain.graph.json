@@ -193,6 +193,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Scene Grammar",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
       "type": "branch",
       "title": "Branch — Adversarial 2026-09-12",
@@ -1608,6 +1614,70 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Output-Identity Harness.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Output-Identity Harness.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Glossary.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
       "to": "docs/brain/Patterns.md"
     },
     {
