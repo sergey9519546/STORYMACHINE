@@ -556,3 +556,66 @@ Independent verifier at `0b7dd404` (range `1db74c21..0b7dd404`): lint, console g
 ### 10.1 Final verification
 
 Independent verifier at `9f0ea060` (range `0b7dd404..9f0ea060`, 14 commits): lint, console gate (4 quarantine entries), brain (147 notes), server reachability (36 unreachable, all allowlisted), receipt gate on both ranges naming six scoring-path files with accepted entries, doctor output identity 45 of 45 byte-identical against `53f6e377`, public benchmark unchanged (0.5313/0.5586, 0.4063/0.4443, 1.0000/0.9473; `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` 0.5113; `AUC24_DEGRADATION_ID` `shuffle-drop/v4`), build, gates, attribution on all fourteen commits. Full suite: 14,598 tests, 0 failures, 98 skipped (env-gated). Verdict: safe to push.
+
+## 11. 2026-09-20, fourth pass — the hoist and the candidate's second pass
+
+1. **`burrowsDelta` hoist landed on the session branch** (`04fb13cc`; audit
+   `docs/audits/2026-09-20-burrows-delta-hoist/`): the corpus statistics are
+   computed once per pair instead of 130 times. Bit-identical over 3,706
+   pairs (`Object.is`, `maxDeltaDiff = 0`, checked against a frozen copy of
+   the pre-change code; falsified on purpose by an associativity change, to
+   confirm the comparison can fail). 43x to 51x faster on the worst admitted
+   shapes. The cue-parity guard's worst-case cost line went from 6,510 ms
+   (43% of the 15,000 ms half-budget) to about 300 ms (2%). Output identity
+   45 of 45. No constant moved. Verified at `6ca3fcd0`: full suite 14,601
+   tests, 0 failures, 98 skipped, identity 45 of 45 against `53f6e377`, six
+   benchmark numbers unchanged, `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` still
+   675,000.
+
+2. **Feature-length candidate, second pass** on
+   `origin/lane/land-feature-length-defects` (tip `ca5f2e85`; merge of
+   `6ca3fcd0` at `4229a22a`, floors re-locked `e7b8f8a1`, scene-grammar
+   guard `40994342`, coverage-letter `7d12b32d`, audit `e2e912ab`; the two
+   hoists composed in `voice-delta.ts`). Three of the four failing tests
+   from §10, item 3 are closed:
+   - The six public floors re-locked with none falling
+     (`PUBLIC_ORDER_PAIRED_FLOOR` 0.5269 → 0.5738, `PUBLIC_ORDER_FLOOR`
+     0.4951 → 0.5069, the other four unchanged); manifest and split
+     byte-identical; `npm run gates` exit 0 with its own mutation
+     self-check.
+   - The ellipsis guard re-anchored to scene count plus a 2.0-point health
+     band (the pre-fix delta was 24.2).
+   - The coverage-letter promise restated from a re-measurement of all 21
+     screenplays (3.37 to 4.02 pages, median 3.64; gate upper bound 4.0 →
+     4.1).
+
+   Blind pairs 4 of 6, calibration 21 of 21, and the identity delta
+   reproduces the first pass to the digit (25 of 45 health moves, 0
+   sceneCount moves).
+
+   The ONE remaining failure is the cue-parity headroom: the feature
+   fixture weighs 443,990 against the 675,000 bound (1.52x, and the guard
+   demands 3x). A re-derivation was attempted (`npm run
+   measure-voice-bound`: every shape now at or below 4% of the half-budget
+   even at a 1,900,000 bound; admissible window 1,331,970 to 1,919,999),
+   but `tests/core/voice-bound-derivation.test.ts` binds the constant to a
+   fixture that must carry a `github-actions` machine fingerprint, so the
+   lock can only come from a run of `.github/workflows/calibrate-voice-bound.yml`
+   on a ref carrying the candidate bound. The lane did not fabricate the
+   fingerprint and did not accept the 1.52x reading in its place.
+
+3. **Owner runbook, reduced to five steps** (from the audit's §S5):
+   (i) `git fetch origin lane/land-feature-length-defects`;
+   (ii) `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` on it — AUC-24
+   against 0.622 is the decision;
+   (iii) re-lock the 72-row real-corpus manifest;
+   (iv) `npm run lock-auc24` on recipe `shuffle-drop/v4`;
+   (v) push a `calibrate/**` ref (or `workflow_dispatch`) with
+   `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` set inside the admissible window so
+   the runner locks the derivation fixture; then merge. The earlier items
+   stand alongside this: the `advice-rule-fixes` decision, the nine-branch
+   deletion, and the AUC-24 table commitment before 2026-11-01.
+
+### 11.1 Final verification
+
+Independent verifier at `6ca3fcd0`: full suite 14,601 tests, 0 failures, 98 skipped; identity 45 of 45; six benchmark numbers unchanged; verdict safe to push.

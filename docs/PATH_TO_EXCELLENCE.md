@@ -86,7 +86,13 @@ path, two locked-span edge cases, and two doctor-pool low-severity issues —
 plus re-anchored the claims register a second time after the same anchor
 drift recurred; see `SESSION_REPORT_2026-09-19.md` §7.1. Final head
 `0edb6df2`, `RUN_E2E=1 npm test`: 14,512 tests, 0 failures, 98 skipped
-(env-gated), 1 todo.
+(env-gated), 1 todo. A fourth pass on 2026-09-20 landed the `burrowsDelta`
+corpus-statistics hoist (`04fb13cc`) bit-identically, 43x to 51x faster on
+the worst admitted shapes. The feature-length candidate on
+`lane/land-feature-length-defects` (tip `ca5f2e85`) closed three of its four
+failing tests in a second pass and is now one method blocker — a
+GitHub Actions runner re-derivation of the voice-weight bound, which the
+lane could not fabricate — away from green.
 
 2026-09-20 closed the remaining §4 rows under owner authorization: row 3
 (per-pass diagnostics), rows 5 and 6 (the unified scene-heading grammar),
