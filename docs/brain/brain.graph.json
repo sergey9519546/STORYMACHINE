@@ -181,6 +181,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B3.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Parked Branches",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
       "type": "branch",
       "title": "Branch — Adversarial 2026-09-12",
@@ -1489,6 +1495,94 @@
     {
       "from": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B3.md",
       "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Forced Cue.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Renderer Residuals.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Forced Cue.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Renderer Residuals.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md"
     },
     {
       "from": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
