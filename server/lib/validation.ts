@@ -804,6 +804,40 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 675_000;
 // computeReachableSet), so it is scoring-path and needs a measurement receipt.
 // But it is the fix to point at — free and bit-identical — rather than a pair
 // cap, which would move scores.
+//
+// LANDED 2026-09-20 — AND NEITHER BOUND MOVED, DELIBERATELY. The hoist above
+// shipped on `lane/burrows-delta-hoist` with its output-identity receipt
+// (docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, 2026-09-20; lane record at
+// docs/audits/2026-09-20-burrows-delta-hoist/README.md): bit-identical over
+// 3,706 pairs at `maxDeltaDiff = 0`, all 45 doctor reports byte-identical, all
+// six public-benchmark floors unmoved. Measured on that lane's sandbox, three
+// runs each, OLD module vs NEW module in one process:
+//
+//   * `analyzeVoices` on `max-admitted` at cast 80 (3,160 pairs, the shape
+//     MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is DERIVED against):
+//     5,974 / 5,966 / 6,047 ms -> 121 / 118 / 118 ms — 50.6x.
+//   * `analyzeVoices` on `uniform-min` at cast 150 (11,175 pairs, the shape
+//     MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT is derived against):
+//     10,343 / 10,566 / 10,187 ms -> 236 / 236 / 237 ms — 43.8x.
+//   * `analyzeFountainText` END TO END on the max-admitted document:
+//     5,666 / 6,163 / 6,166 ms -> 151 / 133 / 131 ms — 43.1x, which is the
+//     "~99% of the derivation shape's cost" claim above, measured from the
+//     outside.
+//
+// NOTHING HERE WAS RE-DERIVED ON THOSE TIMINGS, and that is the point. Both
+// bounds, and the committed table at tests/fixtures/voice-bound-derivation.json
+// that MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is re-derived from, were measured
+// BEFORE the hoist, on the runner, under `npm test`. They are therefore now
+// CONSERVATIVE by roughly the ratios above rather than wrong — the admitted
+// worst shape costs far less than the derivation charged it — and a bound that
+// is too strict rejects documents it could serve, which is a narrowing to
+// re-open on purpose with a fresh `npm run measure-voice-bound` on the runner,
+// not a silent side effect of a perf lane. Raising either number here without
+// re-locking that table fails tests/core/voice-bound-derivation.test.ts, which
+// is the guard working. Any per-ms-per-unit rate quoted in the round-1/round-2
+// derivations ABOVE (0.0173-0.0187, and the 0.022 conservative upper bound) is
+// likewise a PRE-HOIST rate and must not be reused as if it still described
+// this code.
 export const MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 80;
 // 2026-09-06 review round 7 follow-up, non-blocking — RESIDUAL accepted
 // worst case, recorded here rather than left unstated: a document sitting

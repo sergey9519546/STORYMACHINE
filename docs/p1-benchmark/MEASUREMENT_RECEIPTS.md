@@ -2902,3 +2902,74 @@ that nobody mistakes one for the other.
   CR-only, and it shows two measured deltas on synthetic inputs the committed
   corpus does not contain. It says nothing about whether the score
   discriminates, and it is not comparable to AUC-24 or to the P1 baseline.
+
+### 2026-09-20 — burrowsDelta HOISTS THE CORPUS STATISTICS OUT OF ITS WORD LOOP — output-identity receipt (bit-identical, no score moved; the private corpus is not present in this environment and no real-corpus figure is claimed)
+
+- **What changed on the scoring path:** one file,
+  `server/nvm/analyze/voice-delta.ts`. It is scoring-path for one reason —
+  `server/nvm/analyze/fountain-analyzer.ts` imports `analyzeVoices` from it, so
+  it sits on `doctor.ts`'s import graph. `burrowsDelta(a, b, functionWords)`
+  computed `freqA` and `freqB` once and then called `corpusStats({ a, b }, word,
+  words)` from INSIDE its loop over the 65 function words; `corpusStats` re-ran
+  `relativeFrequencies` over BOTH sides on every iteration — 2 x 65 = 130 full
+  re-tokenizations per character pair, of two maps the caller already held. The
+  statistics do not depend on the word beyond indexing it, so they are now
+  computed in one pass, by `combinedCorpusStats(freqA, freqB, words)`, before
+  the loop. `corpusStats` is gone; it had no other caller and was not exported.
+- **Why no number can move, and how the arithmetic was kept:** the new helper is
+  the old `corpusStats` body with its two `Array.prototype.reduce` calls
+  unrolled over the exactly two samples it was ever handed. `Object.values({ a,
+  b })` is always length 2 and always in that order, so the old function's
+  `freqs.length === 0` and `freqs.length < 2` early returns were unreachable
+  from `burrowsDelta`; everything else is preserved literally, including the `0`
+  seed each reduce started from, so the per-word accumulation SEQUENCE (seed,
+  then a, then b) is byte-for-byte the old one. Floating-point addition is not
+  associative, which is why this was not rewritten as `(fA + fB) / 2`: that
+  shape would pass a tolerance check and could fail an identity check. The
+  exported signature, the `a.length === 0 || b.length === 0` degenerate guard,
+  the `count > 0 ? sumAbsDelta / count : 0` return and `analyzeVoices`'s
+  abstention rules are untouched.
+- **Date:** 2026-09-20
+- **Git SHA:** the first commit on `lane/burrows-delta-hoist`, branched from `925164dc`. Its own object id is not quoted here because this entry is written inside that commit; `docs/audits/2026-09-20-burrows-delta-hoist/README.md` §1 records the id once it exists, and `git log 925164dc..lane/burrows-delta-hoist` resolves it.
+- **Baseline used:** `925164dc` — the commit this lane branched from and the tree the change is measured against. Two forms of it were used, both real: a `git archive 925164dc` export unpacked to a scratch directory with `node_modules` symlinked in from the real checkout (for the output-identity harness and the before-timings), and a `git worktree add --detach 925164dc` checkout (for the security suite, whose fixture enumeration needs a `.git`). Both sides of the identity comparison ran with `GIT_SHA=dev`, because the archive export has no `.git` and `provenance.engineCommit` would otherwise differ for a reason that has nothing to do with this change.
+- **Command:** every command below was run in this lane's worktree (or, where stated, in the `925164dc` baseline tree), and each one's exit code and output was read directly from its own log —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types tests/core/voice-delta.test.ts
+  node --experimental-strip-types tests/core/voice-delta-hoist-identity.test.ts
+  node --experimental-strip-types tests/core/voice-separation-abstention.test.ts
+  node --experimental-strip-types tests/core/voice-bound-derivation.test.ts
+  node --experimental-strip-types tests/security/fountain-shape-guard-cue-parity.test.ts   # in BOTH trees
+  node --experimental-strip-types tests/core/script-doctor.test.ts
+  node --experimental-strip-types tests/core/calibration.test.ts
+  node --experimental-strip-types tests/core/public-benchmark.test.ts
+  node --experimental-strip-types tests/core/public-benchmark-limits.test.ts
+  node --experimental-strip-types tests/core/coverage-html.test.ts
+  node --experimental-strip-types tests/core/honesty-audit-claims.test.ts
+  node --experimental-strip-types tests/core/auc24-table.test.ts
+  node --experimental-strip-types tests/core/brain-coverage.test.ts
+  git archive 925164dc | tar -x -C <scratch>/base-tree
+  ln -s <checkout>/node_modules <scratch>/base-tree/node_modules
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/base-tree --out <scratch>/before
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/wt-h      --out <scratch>/after
+  node scripts/check-doctor-output-identity.mjs --compare <scratch>/before <scratch>/after
+  npm run benchmark:public -- --json
+  npm run gates
+  node scripts/check-scoring-receipt.mjs 925164dc..HEAD
+  ```
+  Every one exited 0 except `tests/core/brain-coverage.test.ts`, which reports 7 of 8: its check (e), the generated graph's freshness, holds only once `npm run brain` regenerates `docs/brain/brain.graph.json` and `GRAPH.md`, and regenerating the graph is outside this lane's scope. Its other seven checks pass, including (b), the one that requires this range's new `docs/audits/` directory to have a brain note citing it. This is not `npm run measure-real`: the private real-script corpus is not present in this environment, no AUC-24 value is claimed anywhere in this entry, and no real-corpus figure is claimed for this range.
+- **Output identity:** the compare run's own line, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+  **0 of 45 fixtures differ.**
+- **Bit-identity, pair by pair:** `tests/core/voice-delta-hoist-identity.test.ts` holds a frozen verbatim copy of `git show 925164dc:server/nvm/analyze/voice-delta.ts`'s implementation (only the top-level identifiers renamed, so it can sit beside the live module) and compares it against the shipped function with `Object.is`, not a tolerance. **3,706 pairs compared, maxDeltaDiff = 0** — 385 from the seeded generated corpus (a 25-voice cast at varied lengths and registers, plus 78 degenerate and boundary shapes: empty, one empty string, whitespace-only, punctuation-only, a single function word, a single content word, no function words at all, one function word repeated, digits and symbols, apostrophes, all-uppercase; plus four 2,000-line sets; plus three custom function-word sets including an empty one) and 3,321 from every character pair in `tests/fixtures/feature-length/assembled-feature.fountain` (82 speaking characters). The pooled delta over those 3,321 feature pairs is `2674.920634920615` on both implementations, identical to the last bit.
+- **Speed, three runs each, OLD module vs NEW module on the same machine and the same inputs:** the isolated Burrows's-Delta pair loop over the feature fixture's own dialogue (3,321 pairs) went **7586.1 / 7531.3 / 7165.3 ms -> 157.3 / 150.8 / 151.0 ms (47.5x best-to-best, 49.9x median-to-median)**. `analyzeVoices` on the `max-admitted` shape at cast 80 (3,160 pairs — the shape `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` is derived against) went **5974.4 / 5966.2 / 6046.6 ms -> 120.8 / 118.1 / 117.7 ms (50.7x)**; on `uniform-min` at cast 150 (11,175 pairs — the shape `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` is derived against) it went **10342.5 / 10566.0 / 10187.1 ms -> 235.8 / 236.3 / 236.8 ms (43.2x)**. End to end through `analyzeFountainText`, the max-admitted document (58,260 chars) went **5666.0 / 6163.1 / 6165.9 ms -> 151.2 / 133.1 / 131.4 ms (43.1x)** and the uniform-min 150 document (33,710 chars) went **10139.4 / 10197.7 / 8833.9 ms -> 239.5 / 242.3 / 244.1 ms (36.9x best-to-best, 41.8x median-to-median)**.
+- **What the speed numbers do NOT say:** end to end on `assembled-feature.fountain` itself the analyzer reads **38.8 / 29.3 / 31.8 ms before and 44.8 / 32.1 / 31.8 ms after — no change, and none was available** — because at `925164dc` `analyzeVoices` ABSTAINS on that fixture (its all-or-nothing `MIN_WORDS = 30` rule: one character under the floor abstains the whole document), so the hoisted code never runs on it. The fixture's 3,321 pairs are what the channel WOULD cost if it scored, which is what the isolated pair-loop row above measures and what the feature-length branch's per-character eligibility would make real.
+- **Cost margin on the guard's own assertion, before and after.** `tests/security/fountain-shape-guard-cue-parity.test.ts` is **677 pass / 0 fail on BOTH trees**, and prints two figures. The weight headroom is unchanged, as it must be — this lane touches cost, not weight: `voice-eligible-weight headroom: worst tracked fixture is "data/screenplays/runoff.fountain" at 170.0x` on both. The cost line moves: `voice-bound worst-case cost: max-admitted N=80 (102 words/speaker) cpu 6510ms (43% of the 15000ms half-budget target), wall 6415ms` at `925164dc`, and `cpu 300ms (2% of the 15000ms half-budget target), wall 246ms` here — **21.7x more CPU margin under the same 15,000 ms target, on the same machine.**
+- **No bound was re-derived and no constant moved.** `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` stays at 675,000 and `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` at 80; `tests/fixtures/voice-bound-derivation.json`, the ubuntu-latest table the second constant is re-derived from, is untouched and `tests/core/voice-bound-derivation.test.ts` is 8/8. Both were measured BEFORE this hoist, so they are now conservative rather than wrong, and re-deriving them is a separate lane needing a fresh `npm run measure-voice-bound` on the runner. The only edit to `server/lib/validation.ts` in this range is comment text recording that, and recording that the pre-hoist per-unit rates quoted in its round-1/round-2 derivations (0.0173-0.0187 ms/unit, and the 0.022 conservative upper bound) no longer describe this code.
+- **Corpus fingerprint:** committed input sets only, no private text read. (1) The 45 in-repo identity fixtures the harness scores — 20 `data/screenplays/*.fountain` live-action fixtures, 20 calibration `REFERENCE_CORPUS` samples, the P0 sample script, and 4 synthetic concatenations at 60/120/240/300 scenes. (2) The public benchmark's 32-script manifest, `tests/fixtures/public-corpus-manifest.json`, unchanged by this range, sha256 `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e` (`tests/fixtures/public-benchmark-split.json`, also unchanged: `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`). (3) `tests/fixtures/feature-length/assembled-feature.fountain`, read but not modified, sha256 `b438618901f55db0b65143281d87b97357811072873533cc11854686785f903b`. Every one of the 32 manifest rows — `sceneCount`, `words`, `health`, `verdict` — came back byte-identical, so no manifest re-lock was needed and none was run. **The PRIVATE AUC-24 corpus was not available in this environment** (`REAL_SCRIPT_CORPUS_DIR` is unset here and the corpus is local-only by copyright), so no real-corpus figure is claimed for this range. `AUC24_FLOOR` is untouched at 0.622 and `AUC24_DEGRADATION_ID` remains `shuffle-drop/v4`.
+- **Public benchmark before/after:** all six floors' measured values reproduce unchanged from the committed 32 distributable screenplays, matching both `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first (PRIMARY), all-pairs second: shuffle-drop **0.5313 / 0.5586**; climax-relocate **0.4063 / 0.4443**; DIALOGUE_FLATTEN (the positive control) **1.0000 / 0.9473**, 32 of 32 ordered, zero ties. Ordered/inverted/tied counts are also unchanged — shuffle-drop 17/15/0, climax-relocate 8/14/10. **No floor constant in `scripts/lib/auc.ts` was touched, no floor rose, no floor fell, and no re-lock was performed;** that file is not in this lane's diff.
+- **Runner attestation:** run in the session worktree (`lane/burrows-delta-hoist`, branched from `925164dc`) on 2026-09-20 by the lane agent, on an Intel(R) Xeon(R) Processor @ 2.10GHz x4 sandbox (parallelism 4, 16 GiB) under node v22.22.2, linux/x64; no API key was present and no private corpus was read. I extracted the `925164dc` baseline myself with `git archive` and with `git worktree add --detach`, symlinked `node_modules` in from the real checkout, ran every command in the block above here, and read each one's exit code and output directly. The before-timings and after-timings come from the same script run once per tree, back to back, on that machine. A fail-first run is not meaningful for an identity pin the ordinary way round — copied into the `925164dc` checkout the new test passes 3/3, because there the frozen copy and the shipped function are literally the same code — so the test was falsified the other way instead, by breaking the hoist on purpose in this tree. Replacing the unrolled variance sum with the mathematically equal `E[x^2] - mean^2` makes it fail immediately and by name: `GEN_0 x GEN_1: old 1.2380952380952381 !== new 1.2380952380954005 (bit-identity required, not tolerance)`, and again on the feature fixture, `NELL x DELGADO: old 0.7936507936507936 !== new 0.7936507936510317`. The file was restored from a byte copy taken before that probe and re-run 3/3. That is the evidence that the 3,706 passing comparisons are a real constraint and not a formality. This is an output-identity receipt, not a discrimination-statistic measurement: the private real-script corpus is not present in this environment, `REAL_SCRIPT_CORPUS_DIR` is unset here, and no real-corpus figure is claimed for this range.
+- **What a reader should NOT take from this entry.** It is a pure-performance output-identity receipt. It shows the score did not move — by byte identity on all 45 doctor reports, by `Object.is` on 3,706 Burrows's-Delta pairs, and by six unchanged public-benchmark statistics. It says nothing about whether the score discriminates, none of its numbers is comparable to AUC-24 or to the P1 baseline, and it does NOT raise either voice-eligibility bound: it only makes the cost those bounds are derived against far smaller than the derivation charged it.
