@@ -186,6 +186,21 @@ is not itself dishonest if it is done in a diff a reviewer can see, as
 opposed to quietly, which is why this doc records the expiry rather than
 either asserting it will be met or assuming it has been extended.
 
+**2026-09-20:** full per-branch triage of all seventeen non-`main` branches
+(the nine above plus `scoring/advice-rule-fixes`, `scoring/r5-verbosity-bias`,
+`scoring/stacked-r5-plus-advice`, `scoring/feature-length-defects`,
+`scoring/feature-length-saturation-only`, `claude/advice-rule-fixes-pending-
+measurement`, `claude/r5-verbosity-bias-pending-measurement`, and
+`wip/phase-w-ui-checkpoint`), each with a merge-onto-`26d930dd` trial,
+docs-vs-code conflict classification, a superseded check against what has
+landed since its merge-base, and a LAND / REBASE-THEN-LAND / SUPERSEDED /
+ABANDON / KEEP-AS-REFERENCE call: `docs/audits/2026-09-20-parked-branches/
+README.md`. Corroborates this addendum's calibrate-stack, three-branch-chain,
+and already-merged findings at the patch/ancestor level; adds that
+`scoring/advice-rule-fixes` merges onto `26d930dd` with docs-only conflicts
+(LAND, pending `npm run owner:measure`) and that
+`wip/phase-w-ui-checkpoint` is ABANDON, not merely stale.
+
 ### Pull requests (15 reviewed, all states)
 
 Zero open. Merged and present in main: **#257** (INVERSE_CHEKHOV_GUN, the
