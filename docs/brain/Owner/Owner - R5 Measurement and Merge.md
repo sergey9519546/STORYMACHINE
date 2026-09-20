@@ -246,7 +246,18 @@ Read that section before answering the accept/reject prompt.
 **One stated caveat travels with the stack**, and `owner:measure` prints it at
 the point it applies: it carries the first branch's 1,500,000 voice-eligible
 bound, which must not land before main's 675,000 re-derivation is applied on
-the merged tree with the analyzer cap in place. The thing that would let BOTH bounds rise is not the analyzer pair cap this row used to name: `burrowsDelta` re-derives both characters' relative frequencies 130 times per pair, and hoisting that is bit-identical (`maxDeltaDiff = 0`) and 43.8-56x faster. It is scoring-path and needs a receipt, but it costs the score nothing — point a scoring lane at that first.
+the merged tree with the analyzer cap in place. **SETTLED 2026-09-20 on
+`lane/land-feature-length-defects`, so this caveat is history rather than an
+open item there:** the `burrowsDelta` hoist named below landed, GitHub Actions
+run **35542413222** re-measured the whole family on the runner at 8% or less of
+the half-budget under load (worst 1,210 ms, against 11,810 ms pre-hoist), and
+1,500,000 was locked with `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` re-derived from
+that run's committed table at **100**. The calibrate step of that lane's runbook
+is DONE; see `docs/audits/2026-09-20-feature-length-defects-prep/README.md`
+`## Runner lock (run 35542413222)`, and its brain note
+`docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md`. What is still owed on that
+branch is only the private-corpus half — `measure-real`, the 72-row manifest
+re-lock and `lock-auc24` on `shuffle-drop/v4`. The thing that would let BOTH bounds rise is not the analyzer pair cap this row used to name: `burrowsDelta` re-derives both characters' relative frequencies 130 times per pair, and hoisting that is bit-identical (`maxDeltaDiff = 0`) and 43.8-56x faster. It is scoring-path and needs a receipt, but it costs the score nothing — point a scoring lane at that first.
 
 The stack CONTAINS both R5 singles as unsquashed ancestors, so merging it
 subsumes them and the other two need not be merged separately. Whichever lands

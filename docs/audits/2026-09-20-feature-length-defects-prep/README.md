@@ -947,3 +947,225 @@ the 2026-09-13 table did. Same commit (or a follow-up in the same push) should
 also rewrite the three cue-parity tests named in item 1 above, whose whole
 premise is the 675,000 boundary story, to match whatever
 `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` the runner derives.
+
+## Runner lock (run 35542413222)
+
+**Status: §S2(a) is CLOSED. The calibrate step in §S5 is DONE and does not need
+to be run again.** The branch now has no failing test among every suite this
+lane ran, including the security suite that carried the last three known
+failures.
+
+**The machine.** `.github/workflows/calibrate-voice-bound.yml`,
+`workflow_dispatch`, ref `lane/land-feature-length-defects` @ `cfe56403`,
+ubuntu-latest — AMD EPYC 7763 64-Core Processor x4 (parallelism 4, 16 GiB),
+node v24.20.0, linux/x64, runner image `Linux/X64/ubuntu24/20260907.300.1`.
+Default inputs (`uniform_min=150`,
+`max_admitted=50,60,65,70,75,80,85,90,100`, `probe_cast=20,30,40,44`,
+`repeats=2`, `conditions=idle,loaded`). Completed 2026-09-20T22:43:06Z. Its
+printed LOCK-FILE line was copied VERBATIM from the job log into
+`tests/fixtures/voice-bound-derivation.json` and re-indented by
+`npm run measure-voice-bound -- --lock-from=tests/fixtures/voice-bound-derivation.json`,
+which is the only thing that touched the file: the tool recomputed the
+`derivation` block, `marginFraction`, the per-row `guard` column and
+`guardEvaluatedAgainst` against this tree and left every timing alone. Not one
+measured number was edited. `machine.ci` reads `github-actions` and
+`machine.runId` reads `35542413222`, so
+`voice-bound-derivation.test.ts`'s first assertion — the 2026-09-13 finding made
+executable — is satisfied by the table rather than around it.
+
+**Headline numbers.** Every swept shape costs **8% or less** of the 15,000 ms
+half-budget target under load; worst is max-admitted N=50 at **1,210 ms**. Idle
+worst is 754 ms. The derivation block reads `derivedCast: 100,
+derivedCpuMsMax: 746`.
+
+| shape | weight | cpu ms (idle) | cpu ms (loaded) | % of half-budget (loaded) |
+|---|---|---|---|---|
+| max-admitted N=50 | 1,500,000 | 754 | **1,210** | 8% |
+| max-admitted N=60 | 1,490,400 | 662 | 1,057 | 7% |
+| max-admitted N=65 | 1,495,650 | 650 | 1,001 | 7% |
+| max-admitted N=70 | 1,499,400 | 629 | 978 | 7% |
+| max-admitted N=75 | 1,485,000 | 628 | 908 | 6% |
+| max-admitted N=80 | 1,497,600 | 590 | 897 | 6% |
+| max-admitted N=85 | 1,473,900 | 538 | 788 | 5% |
+| max-admitted N=90 | 1,458,000 | 542 | 821 | 5% |
+| **max-admitted N=100** | 1,500,000 | 539 | **746** | **5%** |
+| uniform-min N=150 | 675,000 | 307 | 463 | 3% |
+| probe-cast N=20 | 303,840 | 417 | 616 | 4% |
+| probe-cast N=30 | 457,200 | 445 | 674 | 4% |
+| probe-cast N=40 | 609,600 | 592 | 841 | 6% |
+| probe-cast N=44 | 672,408 | 631 | 869 | 6% |
+
+For scale: the 2026-09-13 table's max-admitted N=80 row — the row the old
+constant was derived from — read **11,810 ms** on the runner, pre-hoist. The
+guard column the run PRINTED shows REJECT for max-admitted N >= 85 and for
+uniform-min N=150, because the tree that ran still carried `DISTINCT = 80`;
+`--lock-from` re-evaluated that column against this tree, which is exactly the
+2026-09-13 finding-6 mechanism and is asserted by the fixture test.
+
+**The two bounds now.**
+
+| constant | value | how it is picked |
+|---|---|---|
+| `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` | **1,500,000** | HEADROOM, inside the window [1,331,970 .. 1,919,999] that §S2(a) derived from both ends. Merely CHECKED against cost. |
+| `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` | **100** (was 80) | re-derived by `tests/core/voice-bound-derivation.test.ts` from run 35542413222's table: `deriveCast` returns 100 at 746 ms against a 12,000 ms ceiling. The constant was set from the test's own failure message. |
+
+**And the derivation is now bounded by the SWEEP, not by cost — said here
+rather than left to be noticed.** 100 is also the largest cast the run swept,
+and no sweep could bracket it. On the max-admitted shape the weight bound fixes
+the DOCUMENT rather than the cast: a cast of N carries
+`N x floor(W / N²) ~= W / N` pooled words, so the document gets LIGHTER as the
+cast grows, and since the 2026-09-07/09-20 Burrows's-Delta hoists left document
+size rather than pair count dominating, cost FALLS with cast. The runner's own
+loaded column is monotone the wrong way (1,210 ms at N=50 down to 746 ms at
+N=100), and a local probe over every cast the weight bound can admit at all
+(N=50…223 — `30 x 223² = 1,491,870` is the last one under the bound) reads
+810 / 650 / 485 / 451 / 476 / 510 ms. Nothing within an order of magnitude of
+the 12,000 ms ceiling. So `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 100` is a
+CONSERVATIVE choice equal to the top of a measured grid, not the point where
+cost runs out — the weight bound would admit a cast of 223 on its own, and the
+cue-parity suite asserts this one stays strictly below that so it is not
+decorative.
+
+`tests/core/voice-bound-derivation.test.ts`'s bracketing assertion was therefore
+re-anchored rather than deleted, and it is strictly more informative than
+before: it still demands a BRACKETING sweep whenever one is possible, and in the
+grid-limited case it demands the table PROVE the shape cannot reach the ceiling
+— cost not trending upward across the grid, and every swept row at or under 25%
+of it. The pre-hoist table (11,848 ms at N=80, 13,836 ms at N=100, run
+34740951649) fails that branch by a wide margin, which is the property the
+original assertion existed for. **8/8.**
+
+**Headroom, at the locked bounds.**
+
+| fixture | voice-eligible weight | headroom |
+|---|---|---|
+| `tests/fixtures/feature-length/assembled-feature.fountain` | 443,990 | **3.4x** (1,500,000 / 443,990 = 3.3785…) |
+| round-3 bypass B (lightest pinned DoS payload) | 1,920,000 | bound is 1.28x BELOW it — still REJECTED |
+
+Quoted from the suite's own diagnostics:
+
+```
+voice-eligible-weight headroom: worst tracked fixture is
+"tests/fixtures/feature-length/assembled-feature.fountain" at 3.4x
+
+voice-bound worst-case cost: max-admitted N=100 (150 words/speaker) cpu 475ms
+(3% of the 15000ms half-budget target), wall 389ms — local: Intel(R) Xeon(R)
+Processor @ 2.80GHz x4 (parallelism 4, 16 GiB), node v22.22.2, linux/x64
+```
+
+**What the re-anchored cue-parity tests now assert.** Five, not three — the
+"81-150 band" loop was stale for the same reason and could not be left.
+
+1. *The realistic few-big shape's accept/reject boundary is cast 97/98, and the
+   WEIGHT bound is what fires there.* Replaces "a 60-cast fully-eligible feature
+   is now REJECTED (weight 909,000 > 675,000)", whose PREMISE was stale rather
+   than its literal. Sweeping casts 90-105 through the guard: the verdict is
+   monotone, the largest admitted cast is **97** (eligible weight 1,491,084) and
+   the smallest refused is **98** (1,507,632), refused by
+   `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` — two casts BELOW the cast bound, so on
+   a realistic ensemble the cast bound never fires first, which is now a
+   property that fails if it changes. The same test states the consequence of
+   the re-derivation in the place the old narrowing was disclosed: the 60-cast
+   ensemble (916,200) is ACCEPTED now.
+2. *The document that sits EXACTLY on the weight bound is the max-admitted shape
+   at the cast bound, it is ACCEPTED, and one paragraph more per speaker is
+   REJECTED by the WEIGHT bound.* Replaces the `assert.equal(uniformMinWeight(150),
+   MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT)` sanity check, which is unsatisfiable at
+   1,500,000 (`30N² = 1,500,000` has no integer root). What sits on the bound now
+   is `maxAdmittedWordsPerSpeaker(100, 1_500_000) = 150` words x 100 speakers =
+   1,500,000 exactly — simultaneously ON both bounds. The equality is ±1
+   sensitive in the weight bound by construction. The narrowing itself survives
+   as its own test: uniform-min N=150 is still REJECTED, now unambiguously by
+   the CAST bound, with its weight asserted to be under the weight bound so no
+   reader has to guess which fired.
+3. *The uniform-min N=151 shape is still REJECTED — by the CAST bound now.* Its
+   weight, 684,030, is admitted by the raised weight bound, so the assertion
+   follows the guard. The ORDERING property that test's title was really about —
+   weight is evaluated FIRST, so no pinned DoS rejection ever changed its
+   message — is not dropped: it is asserted directly, on uniform-min N=250,
+   which violates both bounds and must still report
+   `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`.
+4. *The band the cast bound rejects is 101-223*, not 81-150. Both ends are
+   arithmetic: it opens one past the cast bound and closes at
+   `floor(sqrt(1,500,000 / 30)) = 223`.
+5. *The band ENDS at 223*: uniform-min N=224 weighs 1,505,280, crosses the
+   weight bound, and is taken by it — so the band can never silently run off the
+   end of the weight bound.
+
+`tests/security/fountain-shape-guard-cue-parity.test.ts` **681/681** (from 678
+tests with 5 failing). Every pinned DoS/bypass payload is still REJECTED,
+including bypass B, confirmed by the suite's own whole-file check.
+
+**One thing left OPEN, and it is recorded rather than quietly fixed.**
+`VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT = 0.173` is a 2026-09-05
+developer-box rate for the n-uniform-32-word-floor shape, taken BEFORE the
+hoists, and its "the small end is the conservative one" claim no longer holds:
+the runner measured the heaviest shape this bound admits (max-admitted N=50,
+weight exactly 1,500,000) at 1,210 ms loaded / 754 ms idle — **0.807 and 0.503
+us/unit, 4.7x and 2.9x ABOVE the constant**. The model is therefore OPTIMISTIC
+by about 5x on the runner. The value is deliberately left alone, because
+re-fitting it from a DIFFERENT shape's measurement is precisely the drift the
+pair of constants exists to prevent, and because the margin-proof assertion
+clears on either number with room (1,500,000 x 0.173 us = 260 ms; x 0.807 us =
+1,211 ms; target 10,000 ms — 38x and 8.3x under). Closing it honestly means one
+more runner sweep of THAT shape. The constant's comment now says all of this at
+the site.
+
+### Gate table, runner lock
+
+| gate | result |
+|---|---|
+| `tests/core/voice-bound-derivation.test.ts` | 0 (8/8) |
+| `tests/security/fountain-shape-guard-cue-parity.test.ts` | **0 (681/681)** |
+| `tests/core/voice-delta.test.ts` | 0 (18) |
+| `tests/core/voice-delta-hoist-identity.test.ts` | 0 (3) |
+| `tests/core/voice-separation-abstention.test.ts` | 0 (15) |
+| `tests/core/api-schemas.test.ts` | 0 (6) |
+| `tests/routes/scriptide-doctor.test.ts` | 0 (18) |
+| `tests/routes/scriptide-doctor-deep.test.ts` | 0 (9) |
+| `tests/routes/scriptide-doctor-pdf.test.ts` | 0 (9) |
+| `tests/routes/scriptide-doctor-pdf-offthread.test.ts` | 0 (3) |
+| `tests/routes/scriptide-doctor-stream.test.ts` | 0 (7) |
+| `tests/core/script-doctor.test.ts` | 0 (90) |
+| `tests/core/calibration.test.ts` | 0 (21) |
+| `tests/core/public-benchmark.test.ts` | 0 (33) |
+| `tests/core/scene-grammar.test.ts` | 0 (16) |
+| `tests/core/coverage-letter.test.ts` | 0 (55) |
+| `tests/core/blind-pairs-discrimination.test.ts` | 0 (4) — ordered 4 of 6, mean gap 0.3833 |
+| `tests/core/honesty-audit-claims.test.ts` | 0 (15) — after rows 69 and 116 |
+| `tests/core/claims-row-citations.test.ts` | 0 (5) |
+| `tests/core/brain-coverage.test.ts` | 0 (8) |
+| `npm run lint` | 0 |
+| `npm run check-no-console` | 0 — 312 files, 3 quarantine entries, all proven unreachable |
+| `npm run gates` | 0 (including the public-benchmark mutation self-check) |
+| `npm run build` | 0 |
+| `node scripts/check-scoring-receipt.mjs cfe56403..HEAD` | 0 — `no scoring-path files changed` |
+
+Output identity is not expected to hold on this branch and was not run: this is
+the scoring candidate. Nothing in this lane touches the scoring path —
+`server/lib/validation.ts` sits outside `doctor.ts`'s import graph, which the
+receipt gate confirms by name.
+
+### Owner runbook, reduced again
+
+The calibrate step is **DONE**. What is left is the private-corpus half, which
+nothing in this repository can substitute for.
+
+```
+git fetch origin lane/land-feature-length-defects
+git worktree add ../trial-fld --detach origin/lane/land-feature-length-defects
+cd ../trial-fld
+npm ci --ignore-scripts        # Windows: then npm run setup-hooks under Git Bash
+REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real
+```
+
+1. **Read the AUC-24 against `AUC24_FLOOR` = 0.622.** A fall is a real finding
+   about this change; do not answer it by moving the floor. What the run can and
+   cannot settle is unchanged from §S5 step 1.
+2. **Re-lock `tests/fixtures/real-corpus-manifest.json`** — all 72 rows move on
+   the level shift alone.
+3. **`npm run lock-auc24`** on the **`shuffle-drop/v4`** recipe. It writes
+   `tests/fixtures/auc24-table.json` for the first time; its number is not
+   comparable to 0.731.
+4. **Merge decision.** Unchanged from §S5 step 5, with one item removed from the
+   "not in" column: the shape guard no longer blocks.

@@ -117,13 +117,39 @@ clears the corpus. But the derivation fixture
 .json`) must be re-measured ON A GITHUB RUNNER for any bound change, and this
 lane pushes nothing. One `calibrate/**` push closes it.
 
+## Runner lock, 2026-09-20 — §S2(a) CLOSED
+
+The README's `## Runner lock (run 35542413222)` section is the record. GitHub
+Actions run **35542413222** (`calibrate-voice-bound.yml`, `workflow_dispatch`,
+ref `lane/land-feature-length-defects` @ `cfe56403`, ubuntu-latest / AMD EPYC
+7763 x4 / node v24.20.0, repeats 2, idle+loaded) measured every swept shape at
+**8% or less** of the 15,000 ms half-budget under load — worst 1,210 ms, at
+max-admitted N=50 — against the 11,810 ms the same family read pre-hoist. Its
+LOCK-FILE line is committed verbatim at
+`tests/fixtures/voice-bound-derivation.json` and re-indented by the tool, never
+by hand. `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` = **1,500,000** (headroom-picked
+inside [1,331,970 … 1,919,999], 3.4x on the assembled feature);
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` = **100**, re-derived from the table by the
+shape guard's own fixture test, `tests/core/voice-bound-derivation.test.ts`
+(746 ms against a 12,000 ms ceiling).
+
+**The honest caveat that travels with it:** 100 is also the top of the swept
+grid, and no sweep could bracket it — post-hoist the max-admitted shape gets
+CHEAPER as the cast grows, and every cast the weight bound admits at all
+(N=50…223) costs an order of magnitude under the ceiling. So the constant is a
+conservative top-of-grid choice, not a cost boundary, and the fixture test's
+bracketing assertion was re-anchored to demand a bracketing sweep again the
+moment cost starts trending upward. Five cue-parity tests that pinned the old
+675,000 boundary's STORY were rewritten to the derived bounds, and that suite is
+**681/681**: the branch now has no failing test.
+
 ## What the owner still owes
 
 `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` against
 [[Gate - AUC-24 Ratchet]], the 72-row manifest re-lock, `npm run lock-auc24` on
-the `shuffle-drop/v4` recipe, and the §6.1 / §S2(a) bound decision, which stands
-whatever the AUC says. The reduced runbook is §S5 of the README; §9 is the
-first pass's longer form. No AUC-24 figure is claimed anywhere in this lane's
+the `shuffle-drop/v4` recipe, and the merge decision. **The calibrate step is
+done** — the README's reduced runbook under `## Runner lock (run 35542413222)`
+supersedes §S5's step 4. No AUC-24 figure is claimed anywhere in this lane's
 record: the private corpus is not present in the environment it ran in.
 
 **Related:** [[Branch - Feature-Length Defects]],
