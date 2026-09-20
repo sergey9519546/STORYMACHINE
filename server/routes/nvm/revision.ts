@@ -159,7 +159,12 @@ router.post('/api/nvm/compile', gameLimiter, validate(CompileBodySchema), asyncH
 // aiLimiter: one revise call runs the 14-pass pipeline — up to 14 sequential LLM rewrites.
 router.post('/api/nvm/revise', aiLimiter, validate(ReviseBodySchema), asyncHandler(async (req, res) => {
   const { stage } = getOrCreateSession(sessionId(req));
-  const { approvedSpans = [] } = req.body as { approvedSpans?: unknown[] };
+  // validate(ReviseBodySchema) above already rejected a malformed approvedSpans
+  // with 400 before this handler runs — it validates but does not replace
+  // req.body (see validate()'s own comment in server/lib/validation.ts), so
+  // this is still a manual read of the raw body, but the cast is now backed
+  // by ApprovedSpanSchema rather than being the caller's word for it.
+  const { approvedSpans = [] } = req.body as { approvedSpans?: import('../../nvm/revision/passes/types.ts').ApprovedSpan[] };
   const title = compiledTitle((req.body as { title?: unknown }).title);
 
   const { buildScreenplayMemory } = await import('../../nvm/screenplay/memory.ts');
@@ -182,8 +187,11 @@ router.post('/api/nvm/revise', aiLimiter, validate(ReviseBodySchema), asyncHandl
   const structure = analyzeStructure(records, allCommits);
   const compiled = compileScreenplay(allCommits, state, records, structure, title);
 
-  // approvedSpans validated loosely — we trust the pipeline to ignore malformed spans
-  const safeSpans = Array.isArray(approvedSpans) ? approvedSpans as import('../../nvm/revision/passes/types.ts').ApprovedSpan[] : [];
+  // ApprovedSpanSchema (server/lib/validation.ts) already shaped every entry
+  // by the time this line runs — this is no longer "trust the pipeline to
+  // ignore malformed spans", just a defensive fallback for the case where
+  // approvedSpans was omitted entirely (defaulted to [] above).
+  const safeSpans = Array.isArray(approvedSpans) ? approvedSpans : [];
 
   const illusionCtx = stage.getIllusionState();
   const characterSummary = stage.getAllAgents().slice(0, 6)

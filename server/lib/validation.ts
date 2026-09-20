@@ -2696,9 +2696,58 @@ export const CompileBodySchema = z.object({
   title: z.string().max(256).optional(),
 });
 
+// ApprovedSpan (server/nvm/revision/passes/types.ts) — a 1-based, inclusive
+// line range the caller asks the 14-pass revision pipeline to leave alone,
+// plus an optional reason shown to the LLM. Until 2026-09-20 this arrived as
+// `z.array(z.unknown())`, force-cast at the route
+// (server/routes/nvm/revision.ts), so a malformed span never 400'd — it
+// silently lost its lock instead: relocateApprovedSpans
+// (server/nvm/revision/approved-spans.ts) treats a non-finite/out-of-range
+// startLine/endLine as `skipped`, and approvedSpanInstructions
+// (server/nvm/revision/rewrite-llm.ts) treats a non-string `reason` as ''.
+// Both of those consumer-side tolerances are KEPT (defence in depth for any
+// caller that reaches them outside this route) — this schema exists so the
+// one shipped sender (src/components/RevisionPanel.tsx, the only caller
+// found across src/, scripts/ and tests/ that POSTs approvedSpans over HTTP)
+// gets a 400 naming the field instead of a silent no-op lock.
+//
+// `startLine`/`endLine` are ints because the sender always sends numbers
+// (`Number(spanStart)` et al.) and a string coordinate ("3") is exactly the
+// kind of value relocateApprovedSpans's `Number.isFinite` check was built to
+// shrug off rather than reject — the .refine() below turns "shrug off" into
+// "name both fields and 400".
+//
+// `reason` is optional, matching the ApprovedSpan interface's own consumers
+// (not the TS type, which marks it required) — approvedSpanInstructions
+// already treats an absent/non-string reason as no reason at all, and the
+// UI's own "Protected spans" form always sends one anyway (min 1 char after
+// trim, capped at 300), so making it required here would only reject a
+// caller this repo doesn't have. 500, not 300, because a future non-UI
+// caller may reasonably say more than the panel's form allows; the field
+// still lands truncated to 120 chars in the prompt
+// (approvedSpanInstructions's sanitizeSingleLine(s.reason, 120)) regardless
+// of what this cap permits through. `noControlChars` is the same helper
+// SceneTargetSchema's `themeHint` uses — a reason is free text shown to the
+// LLM, not a single-line identifier, so (unlike `cast` above) no extra
+// single-line refinement is added.
+//
+// The array is capped at 200: generous for a human marking up protected
+// passages by hand (the UI form adds one span per click-through), while
+// still bounding how many entries one request can push through
+// relocateApprovedSpans's per-span document scan and into the rewrite
+// prompt's per-pass span-instruction block.
+export const ApprovedSpanSchema = z.object({
+  startLine: z.number().int().min(1),
+  endLine: z.number().int(),
+  reason: noControlChars.max(500).optional(),
+}).refine(s => s.endLine >= s.startLine, {
+  message: 'endLine must be on or after startLine',
+  path: ['endLine'],
+});
+
 export const ReviseBodySchema = z.object({
   sessionId: sessionIdField,
-  approvedSpans: z.array(z.unknown()).optional(),
+  approvedSpans: z.array(ApprovedSpanSchema).max(200).optional(),
   title: z.string().max(256).optional(),
 });
 
