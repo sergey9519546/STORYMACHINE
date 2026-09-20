@@ -131,25 +131,91 @@ describe('MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is derived from a committed measu
     );
   });
 
-  it('the sweep actually BRACKETED the boundary: some swept cast above the derived one exceeds the ceiling', () => {
+  // A grid-limited derivation is only honest while the swept shape cannot reach
+  // the ceiling at all. Above this fraction of the ceiling, the sweep has to
+  // bracket the boundary instead of stopping at the top of the grid.
+  //
+  // WHY 0.25, and why a fraction rather than "always bracket". Run 35542413222
+  // (the first sweep taken after the 2026-09-07/09-20 Burrows's-Delta hoists)
+  // measured the derivation shape at 10.1% of the ceiling at its most expensive
+  // swept cast and 6.2% at its cheapest, on a bound of 1,500,000 — everything
+  // the two bounds admit is an order of magnitude under the line. 0.25 is ~2.5x
+  // the worst of those, so the 20% machine-to-machine spread
+  // DERIVATION_MARGIN_FRACTION documents cannot trip it, while the pre-hoist
+  // regime — where the same shape read 11,848 ms at N=80 and 13,836 ms at
+  // N=100, 99% and 115% of this ceiling (run 34740951649) — is far outside it
+  // and would demand a bracketing sweep, as it should.
+  const GRID_LIMITED_MAX_FRACTION_OF_CEILING = 0.25;
+
+  it('the derivation is not silently GRID-LIMITED: the sweep BRACKETS the boundary, or the shape provably cannot reach the ceiling', () => {
     // Without this, "largest swept cast that clears the ceiling" could just mean
     // "the top of the grid" — a derivation bounded by how far somebody bothered
     // to sweep rather than by cost. The 2026-09-12 round-1 derivation failed in
     // precisely that way (it swept casts up to 60 on the cheap shape and never
     // measured what its ceiling admitted).
+    //
+    // 2026-09-20: the bracketing form alone became UNSATISFIABLE, and that is a
+    // finding about the engine rather than about the sweep. On the max-admitted
+    // shape the weight bound fixes the DOCUMENT, not the cast: at bound W a cast
+    // of N carries N x floor(W / N²) ≈ W / N pooled words, so the document gets
+    // LIGHTER as the cast grows, and since the hoists made the O(distinct²) pass
+    // ~44-56x cheaper, document size — not pair count — now dominates. The
+    // runner's own table is monotone the wrong way for bracketing (loaded
+    // cpuMsMax 1,210 ms at N=50 falling to 746 ms at N=100), and a local probe
+    // across every cast the weight bound can admit at all (N=50…223, where
+    // 30 x 223² = 1,491,870 is the last one under the bound) reads 810, 650,
+    // 485, 451, 476, 510 ms — no cast anywhere near the 12,000 ms ceiling. There
+    // is no cost boundary left on this shape to bracket, so a sweep cannot
+    // produce one, and "re-run with a higher --max-admitted" would be advice
+    // that cannot be followed.
+    //
+    // So the assertion keeps its intent and splits on the measurement: if any
+    // swept cast above the derived one exists, it must exceed the ceiling
+    // (unchanged). If none does, the derivation IS the top of the grid, and that
+    // is only acceptable when the table itself shows the shape cannot reach the
+    // ceiling — cost not trending upward across the grid, and every swept row
+    // far under the line. The moment cost starts mattering again, the bracketing
+    // requirement returns on its own.
     const derived = deriveCast(primaryRows, DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS);
-    const above = primaryRows
-      .filter((r) => r.shape === DERIVATION_SHAPE && r.n > (derived.derivedCast ?? 0))
+    const swept = primaryRows
+      .filter((r) => r.shape === DERIVATION_SHAPE)
+      .slice()
       .sort((a, b) => a.n - b.n);
-    assert.ok(
-      above.length > 0,
-      `the sweep stopped at ${derived.derivedCast}, the derived cast — nothing above it was measured, so the bound is `
-      + 'bounded by the grid, not by cost. Re-run the calibration with a higher --max-admitted',
+    const above = swept.filter((r) => r.n > (derived.derivedCast ?? 0));
+
+    if (above.length > 0) {
+      assert.ok(
+        above[0]!.cpuMsMax > derived.ceilingMs,
+        `the next swept cast up (N=${above[0]!.n}) also clears the ${derived.ceilingMs}ms ceiling at ${above[0]!.cpuMsMax}ms — `
+        + 'the derivation is grid-limited, not cost-limited',
+      );
+      return;
+    }
+
+    // Grid-limited branch. Everything below has to hold for that to be honest.
+    assert.ok(swept.length >= 3, 'a grid-limited derivation needs a grid: sweep at least three casts of the derivation shape');
+    assert.equal(
+      derived.derivedCast,
+      swept[swept.length - 1]!.n,
+      'no row above the derived cast was swept, so the derived cast must BE the top of the grid — otherwise the table is inconsistent',
     );
+    const cheapestAtTop = swept[swept.length - 1]!.cpuMsMax;
+    const costAtBottom = swept[0]!.cpuMsMax;
     assert.ok(
-      above[0]!.cpuMsMax > derived.ceilingMs,
-      `the next swept cast up (N=${above[0]!.n}) also clears the ${derived.ceilingMs}ms ceiling at ${above[0]!.cpuMsMax}ms — `
-      + 'the derivation is grid-limited, not cost-limited',
+      cheapestAtTop <= costAtBottom,
+      `the sweep stopped at ${derived.derivedCast} with nothing above it measured, and cost RISES across the grid `
+      + `(N=${swept[0]!.n} ${costAtBottom}ms -> N=${swept[swept.length - 1]!.n} ${cheapestAtTop}ms) — a higher cast could cross the `
+      + `${derived.ceilingMs}ms ceiling, so this derivation is bounded by the grid rather than by cost. `
+      + 'Re-run the calibration with a higher --max-admitted',
+    );
+    const worst = swept.reduce((a, b) => (b.cpuMsMax > a.cpuMsMax ? b : a));
+    const allowed = derived.ceilingMs * GRID_LIMITED_MAX_FRACTION_OF_CEILING;
+    assert.ok(
+      worst.cpuMsMax <= allowed,
+      `the sweep stopped at ${derived.derivedCast} with nothing above it measured, and the worst swept row `
+      + `(N=${worst.n}, ${worst.cpuMsMax}ms) is ${((worst.cpuMsMax / derived.ceilingMs) * 100).toFixed(1)}% of the `
+      + `${derived.ceilingMs}ms ceiling — past the ${(GRID_LIMITED_MAX_FRACTION_OF_CEILING * 100).toFixed(0)}% at which a `
+      + 'top-of-grid derivation stops being safe. Re-run the calibration with a higher --max-admitted so the boundary is BRACKETED',
     );
   });
 

@@ -1,17 +1,17 @@
 {
-  "_comment": "TIMINGS are measurements: rows swept by .github/workflows/calibrate-voice-bound.yml on ubuntu-latest and copied verbatim out of that run's `--json=-` block (see `machine.runId`); nothing recomputes them. The `derivation` block, `marginFraction`, the per-row `guard` column and `guardEvaluatedAgainst` are all DERIVED from those rows by `npm run measure-voice-bound -- --lock-from=<this file>` against the current tree \u2014 `guard` is a verdict, not a measurement, and the sweep necessarily ran on whatever bound values the tree carried at the time (the lock run carried a provisional cast bound of 65 and its column read REJECT for the very row the constant is derived from), so it is re-evaluated here and `guardEvaluatedAgainst` records the bounds it was re-evaluated against. tests/core/voice-bound-derivation.test.ts re-derives MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT from these rows on every CI run AND re-checks the guard column, so editing the constant without a fresh table fails that test, locking a fresh table without moving the constant fails it, and a stale verdict column fails it.",
-  "generatedAt": "2026-09-13T05:52:14.241Z",
+  "_comment": "Locked by `node --experimental-strip-types scripts/measure-voice-bound-cost.mjs --json=…`. tests/core/voice-bound-derivation.test.ts re-derives MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT from these rows; editing the constant without a fresh table fails that test.",
+  "generatedAt": "2026-09-20T22:43:06.936Z",
   "machine": {
-    "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+    "cpu": "AMD EPYC 7763 64-Core Processor",
     "cores": 4,
     "parallelism": 4,
     "memGiB": 16,
-    "node": "v22.23.2",
+    "node": "v24.20.0",
     "platform": "linux",
     "arch": "x64",
     "ci": "github-actions",
     "runner": "Linux/X64/ubuntu24/20260907.300.1",
-    "runId": "34740951649"
+    "runId": "35542413222"
   },
   "budgetMs": 30000,
   "marginFraction": 0.2,
@@ -22,209 +22,209 @@
       {
         "shape": "max-admitted",
         "n": 50,
-        "bytes": 95250,
+        "bytes": 210750,
         "distinct": 50,
-        "pooledWords": 13500,
-        "weight": 675000,
+        "pooledWords": 30000,
+        "weight": 1500000,
         "guard": "ACCEPT",
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          6245,
-          6165
+          751,
+          754
         ],
         "wallMsSamples": [
-          6084,
-          6010
+          556,
+          560
         ],
-        "cpuMsMedian": 6205,
-        "cpuMsMax": 6245,
-        "wallMsMedian": 6047,
-        "wallMsMax": 6084
+        "cpuMsMedian": 753,
+        "cpuMsMax": 754,
+        "wallMsMedian": 558,
+        "wallMsMax": 560
       },
       {
         "shape": "max-admitted",
         "n": 60,
-        "bytes": 79000,
+        "bytes": 174760,
         "distinct": 60,
-        "pooledWords": 11160,
-        "weight": 669600,
+        "pooledWords": 24840,
+        "weight": 1490400,
         "guard": "ACCEPT",
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          6386,
-          6437
+          662,
+          657
         ],
         "wallMsSamples": [
-          6237,
-          6296
+          485,
+          482
         ],
-        "cpuMsMedian": 6412,
-        "cpuMsMax": 6437,
-        "wallMsMedian": 6267,
-        "wallMsMax": 6296
+        "cpuMsMedian": 660,
+        "cpuMsMax": 662,
+        "wallMsMedian": 484,
+        "wallMsMax": 485
       },
       {
         "shape": "max-admitted",
         "n": 65,
-        "bytes": 71925,
+        "bytes": 162015,
         "distinct": 65,
-        "pooledWords": 10140,
-        "weight": 659100,
+        "pooledWords": 23010,
+        "weight": 1495650,
         "guard": "ACCEPT",
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          6544,
-          6593
+          648,
+          650
         ],
         "wallMsSamples": [
-          6405,
-          6452
+          451,
+          453
         ],
-        "cpuMsMedian": 6569,
-        "cpuMsMax": 6593,
-        "wallMsMedian": 6429,
-        "wallMsMax": 6452
+        "cpuMsMedian": 649,
+        "cpuMsMax": 650,
+        "wallMsMedian": 452,
+        "wallMsMax": 453
       },
       {
         "shape": "max-admitted",
         "n": 70,
-        "bytes": 65690,
+        "bytes": 150950,
         "distinct": 70,
-        "pooledWords": 9240,
-        "weight": 646800,
+        "pooledWords": 21420,
+        "weight": 1499400,
         "guard": "ACCEPT",
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          6648,
-          6738
+          629,
+          600
         ],
         "wallMsSamples": [
-          6510,
-          6600
+          438,
+          429
         ],
-        "cpuMsMedian": 6693,
-        "cpuMsMax": 6738,
-        "wallMsMedian": 6555,
-        "wallMsMax": 6600
+        "cpuMsMedian": 615,
+        "cpuMsMax": 629,
+        "wallMsMedian": 434,
+        "wallMsMax": 438
       },
       {
         "shape": "max-admitted",
         "n": 75,
-        "bytes": 64075,
+        "bytes": 139675,
         "distinct": 75,
-        "pooledWords": 9000,
-        "weight": 675000,
+        "pooledWords": 19800,
+        "weight": 1485000,
         "guard": "ACCEPT",
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          6930,
-          6956
+          628,
+          621
         ],
         "wallMsSamples": [
-          6791,
-          6822
+          422,
+          420
         ],
-        "cpuMsMedian": 6943,
-        "cpuMsMax": 6956,
-        "wallMsMedian": 6807,
-        "wallMsMax": 6822
+        "cpuMsMedian": 625,
+        "cpuMsMax": 628,
+        "wallMsMedian": 421,
+        "wallMsMax": 422
       },
       {
         "shape": "max-admitted",
         "n": 80,
-        "bytes": 58260,
+        "bytes": 132180,
         "distinct": 80,
-        "pooledWords": 8160,
-        "weight": 652800,
+        "pooledWords": 18720,
+        "weight": 1497600,
         "guard": "ACCEPT",
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          7114,
-          7171
+          590,
+          590
         ],
         "wallMsSamples": [
-          6993,
-          7047
+          395,
+          399
         ],
-        "cpuMsMedian": 7143,
-        "cpuMsMax": 7171,
-        "wallMsMedian": 7020,
-        "wallMsMax": 7047
+        "cpuMsMedian": 590,
+        "cpuMsMax": 590,
+        "wallMsMedian": 397,
+        "wallMsMax": 399
       },
       {
         "shape": "max-admitted",
         "n": 85,
-        "bytes": 54810,
+        "bytes": 122640,
         "distinct": 85,
-        "pooledWords": 7650,
-        "weight": 650250,
-        "guard": "REJECT",
+        "pooledWords": 17340,
+        "weight": 1473900,
+        "guard": "ACCEPT",
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          7355,
-          7436
+          538,
+          538
         ],
         "wallMsSamples": [
-          7236,
-          7313
+          390,
+          373
         ],
-        "cpuMsMedian": 7396,
-        "cpuMsMax": 7436,
-        "wallMsMedian": 7275,
-        "wallMsMax": 7313
+        "cpuMsMedian": 538,
+        "cpuMsMax": 538,
+        "wallMsMedian": 382,
+        "wallMsMax": 390
       },
       {
         "shape": "max-admitted",
         "n": 90,
-        "bytes": 50465,
+        "bytes": 114725,
         "distinct": 90,
-        "pooledWords": 7020,
-        "weight": 631800,
-        "guard": "REJECT",
+        "pooledWords": 16200,
+        "weight": 1458000,
+        "guard": "ACCEPT",
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          7389,
-          7408
+          542,
+          531
         ],
         "wallMsSamples": [
-          7276,
-          7295
+          371,
+          363
         ],
-        "cpuMsMedian": 7399,
-        "cpuMsMax": 7408,
-        "wallMsMedian": 7286,
-        "wallMsMax": 7295
+        "cpuMsMedian": 537,
+        "cpuMsMax": 542,
+        "wallMsMedian": 367,
+        "wallMsMax": 371
       },
       {
         "shape": "max-admitted",
         "n": 100,
-        "bytes": 47655,
+        "bytes": 106455,
         "distinct": 100,
-        "pooledWords": 6600,
-        "weight": 660000,
-        "guard": "REJECT",
+        "pooledWords": 15000,
+        "weight": 1500000,
+        "guard": "ACCEPT",
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          8023,
-          8020
+          519,
+          539
         ],
         "wallMsSamples": [
-          7915,
-          7911
+          380,
+          352
         ],
-        "cpuMsMedian": 8022,
-        "cpuMsMax": 8023,
-        "wallMsMedian": 7913,
-        "wallMsMax": 7915
+        "cpuMsMedian": 529,
+        "cpuMsMax": 539,
+        "wallMsMedian": 366,
+        "wallMsMax": 380
       },
       {
         "shape": "uniform-min",
@@ -237,17 +237,17 @@
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          11986,
-          11709
+          307,
+          296
         ],
         "wallMsSamples": [
-          11869,
-          11595
+          212,
+          205
         ],
-        "cpuMsMedian": 11848,
-        "cpuMsMax": 11986,
-        "wallMsMedian": 11732,
-        "wallMsMax": 11869
+        "cpuMsMedian": 302,
+        "cpuMsMax": 307,
+        "wallMsMedian": 209,
+        "wallMsMax": 212
       },
       {
         "shape": "probe-cast",
@@ -260,17 +260,17 @@
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          2890,
-          2875
+          407,
+          417
         ],
         "wallMsSamples": [
-          2725,
-          2712
+          289,
+          294
         ],
-        "cpuMsMedian": 2883,
-        "cpuMsMax": 2890,
-        "wallMsMedian": 2719,
-        "wallMsMax": 2725
+        "cpuMsMedian": 412,
+        "cpuMsMax": 417,
+        "wallMsMedian": 292,
+        "wallMsMax": 294
       },
       {
         "shape": "probe-cast",
@@ -283,17 +283,17 @@
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          4319,
-          4263
+          441,
+          445
         ],
         "wallMsSamples": [
-          4140,
-          4087
+          302,
+          304
         ],
-        "cpuMsMedian": 4291,
-        "cpuMsMax": 4319,
-        "wallMsMedian": 4114,
-        "wallMsMax": 4140
+        "cpuMsMedian": 443,
+        "cpuMsMax": 445,
+        "wallMsMedian": 303,
+        "wallMsMax": 304
       },
       {
         "shape": "probe-cast",
@@ -306,17 +306,17 @@
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          5792,
-          5785
+          592,
+          588
         ],
         "wallMsSamples": [
-          5604,
-          5598
+          367,
+          364
         ],
-        "cpuMsMedian": 5789,
-        "cpuMsMax": 5792,
-        "wallMsMedian": 5601,
-        "wallMsMax": 5604
+        "cpuMsMedian": 590,
+        "cpuMsMax": 592,
+        "wallMsMedian": 366,
+        "wallMsMax": 367
       },
       {
         "shape": "probe-cast",
@@ -329,226 +329,226 @@
         "condition": "idle",
         "repeats": 2,
         "cpuMsSamples": [
-          6425,
-          6447
+          631,
+          607
         ],
         "wallMsSamples": [
-          6233,
-          6263
+          381,
+          379
         ],
-        "cpuMsMedian": 6436,
-        "cpuMsMax": 6447,
-        "wallMsMedian": 6248,
-        "wallMsMax": 6263
+        "cpuMsMedian": 619,
+        "cpuMsMax": 631,
+        "wallMsMedian": 380,
+        "wallMsMax": 381
       }
     ],
     "loaded": [
       {
         "shape": "max-admitted",
         "n": 50,
-        "bytes": 95250,
+        "bytes": 210750,
         "distinct": 50,
-        "pooledWords": 13500,
-        "weight": 675000,
+        "pooledWords": 30000,
+        "weight": 1500000,
         "guard": "ACCEPT",
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          10212,
-          10288
+          1210,
+          1189
         ],
         "wallMsSamples": [
-          10208,
-          10289
+          1124,
+          1103
         ],
-        "cpuMsMedian": 10250,
-        "cpuMsMax": 10288,
-        "wallMsMedian": 10249,
-        "wallMsMax": 10289
+        "cpuMsMedian": 1200,
+        "cpuMsMax": 1210,
+        "wallMsMedian": 1114,
+        "wallMsMax": 1124
       },
       {
         "shape": "max-admitted",
         "n": 60,
-        "bytes": 79000,
+        "bytes": 174760,
         "distinct": 60,
-        "pooledWords": 11160,
-        "weight": 669600,
+        "pooledWords": 24840,
+        "weight": 1490400,
         "guard": "ACCEPT",
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          10780,
-          10903
+          1017,
+          1057
         ],
         "wallMsSamples": [
-          10777,
-          10877
+          953,
+          937
         ],
-        "cpuMsMedian": 10842,
-        "cpuMsMax": 10903,
-        "wallMsMedian": 10827,
-        "wallMsMax": 10877
+        "cpuMsMedian": 1037,
+        "cpuMsMax": 1057,
+        "wallMsMedian": 945,
+        "wallMsMax": 953
       },
       {
         "shape": "max-admitted",
         "n": 65,
-        "bytes": 71925,
+        "bytes": 162015,
         "distinct": 65,
-        "pooledWords": 10140,
-        "weight": 659100,
+        "pooledWords": 23010,
+        "weight": 1495650,
         "guard": "ACCEPT",
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          11091,
-          10974
+          964,
+          1001
         ],
         "wallMsSamples": [
-          11067,
-          10944
+          840,
+          933
         ],
-        "cpuMsMedian": 11033,
-        "cpuMsMax": 11091,
-        "wallMsMedian": 11006,
-        "wallMsMax": 11067
+        "cpuMsMedian": 983,
+        "cpuMsMax": 1001,
+        "wallMsMedian": 887,
+        "wallMsMax": 933
       },
       {
         "shape": "max-admitted",
         "n": 70,
-        "bytes": 65690,
+        "bytes": 150950,
         "distinct": 70,
-        "pooledWords": 9240,
-        "weight": 646800,
+        "pooledWords": 21420,
+        "weight": 1499400,
         "guard": "ACCEPT",
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          11071,
-          11001
+          978,
+          894
         ],
         "wallMsSamples": [
-          11095,
-          10954
+          866,
+          788
         ],
-        "cpuMsMedian": 11036,
-        "cpuMsMax": 11071,
-        "wallMsMedian": 11025,
-        "wallMsMax": 11095
+        "cpuMsMedian": 936,
+        "cpuMsMax": 978,
+        "wallMsMedian": 827,
+        "wallMsMax": 866
       },
       {
         "shape": "max-admitted",
         "n": 75,
-        "bytes": 64075,
+        "bytes": 139675,
         "distinct": 75,
-        "pooledWords": 9000,
-        "weight": 675000,
+        "pooledWords": 19800,
+        "weight": 1485000,
         "guard": "ACCEPT",
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          11892,
-          11776
+          908,
+          857
         ],
         "wallMsSamples": [
-          11904,
-          11790
+          783,
+          774
         ],
-        "cpuMsMedian": 11834,
-        "cpuMsMax": 11892,
-        "wallMsMedian": 11847,
-        "wallMsMax": 11904
+        "cpuMsMedian": 883,
+        "cpuMsMax": 908,
+        "wallMsMedian": 779,
+        "wallMsMax": 783
       },
       {
         "shape": "max-admitted",
         "n": 80,
-        "bytes": 58260,
+        "bytes": 132180,
         "distinct": 80,
-        "pooledWords": 8160,
-        "weight": 652800,
+        "pooledWords": 18720,
+        "weight": 1497600,
         "guard": "ACCEPT",
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          11771,
-          11848
+          876,
+          897
         ],
         "wallMsSamples": [
-          11802,
-          11907
+          829,
+          767
         ],
-        "cpuMsMedian": 11810,
-        "cpuMsMax": 11848,
-        "wallMsMedian": 11855,
-        "wallMsMax": 11907
+        "cpuMsMedian": 887,
+        "cpuMsMax": 897,
+        "wallMsMedian": 798,
+        "wallMsMax": 829
       },
       {
         "shape": "max-admitted",
         "n": 85,
-        "bytes": 54810,
+        "bytes": 122640,
         "distinct": 85,
-        "pooledWords": 7650,
-        "weight": 650250,
-        "guard": "REJECT",
+        "pooledWords": 17340,
+        "weight": 1473900,
+        "guard": "ACCEPT",
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          12132,
-          12158
+          788,
+          784
         ],
         "wallMsSamples": [
-          12144,
-          12196
+          720,
+          736
         ],
-        "cpuMsMedian": 12145,
-        "cpuMsMax": 12158,
-        "wallMsMedian": 12170,
-        "wallMsMax": 12196
+        "cpuMsMedian": 786,
+        "cpuMsMax": 788,
+        "wallMsMedian": 728,
+        "wallMsMax": 736
       },
       {
         "shape": "max-admitted",
         "n": 90,
-        "bytes": 50465,
+        "bytes": 114725,
         "distinct": 90,
-        "pooledWords": 7020,
-        "weight": 631800,
-        "guard": "REJECT",
+        "pooledWords": 16200,
+        "weight": 1458000,
+        "guard": "ACCEPT",
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          12417,
-          12560
+          809,
+          821
         ],
         "wallMsSamples": [
-          12429,
-          12502
+          709,
+          720
         ],
-        "cpuMsMedian": 12489,
-        "cpuMsMax": 12560,
-        "wallMsMedian": 12466,
-        "wallMsMax": 12502
+        "cpuMsMedian": 815,
+        "cpuMsMax": 821,
+        "wallMsMedian": 715,
+        "wallMsMax": 720
       },
       {
         "shape": "max-admitted",
         "n": 100,
-        "bytes": 47655,
+        "bytes": 106455,
         "distinct": 100,
-        "pooledWords": 6600,
-        "weight": 660000,
-        "guard": "REJECT",
+        "pooledWords": 15000,
+        "weight": 1500000,
+        "guard": "ACCEPT",
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          13836,
-          13405
+          746,
+          740
         ],
         "wallMsSamples": [
-          13894,
-          13387
+          644,
+          640
         ],
-        "cpuMsMedian": 13621,
-        "cpuMsMax": 13836,
-        "wallMsMedian": 13641,
-        "wallMsMax": 13894
+        "cpuMsMedian": 743,
+        "cpuMsMax": 746,
+        "wallMsMedian": 642,
+        "wallMsMax": 644
       },
       {
         "shape": "uniform-min",
@@ -561,17 +561,17 @@
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          19917,
-          20022
+          455,
+          463
         ],
         "wallMsSamples": [
-          19962,
-          20064
+          391,
+          402
         ],
-        "cpuMsMedian": 19970,
-        "cpuMsMax": 20022,
-        "wallMsMedian": 20013,
-        "wallMsMax": 20064
+        "cpuMsMedian": 459,
+        "cpuMsMax": 463,
+        "wallMsMedian": 397,
+        "wallMsMax": 402
       },
       {
         "shape": "probe-cast",
@@ -584,17 +584,17 @@
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          5153,
-          5088
+          616,
+          615
         ],
         "wallMsSamples": [
-          5094,
-          5034
+          578,
+          598
         ],
-        "cpuMsMedian": 5121,
-        "cpuMsMax": 5153,
-        "wallMsMedian": 5064,
-        "wallMsMax": 5094
+        "cpuMsMedian": 616,
+        "cpuMsMax": 616,
+        "wallMsMedian": 588,
+        "wallMsMax": 598
       },
       {
         "shape": "probe-cast",
@@ -607,17 +607,17 @@
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          7708,
-          7615
+          674,
+          658
         ],
         "wallMsSamples": [
-          7619,
-          7551
+          644,
+          595
         ],
-        "cpuMsMedian": 7662,
-        "cpuMsMax": 7708,
-        "wallMsMedian": 7585,
-        "wallMsMax": 7619
+        "cpuMsMedian": 666,
+        "cpuMsMax": 674,
+        "wallMsMedian": 620,
+        "wallMsMax": 644
       },
       {
         "shape": "probe-cast",
@@ -630,17 +630,17 @@
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          10433,
-          10606
+          841,
+          805
         ],
         "wallMsSamples": [
-          10429,
-          10490
+          734,
+          675
         ],
-        "cpuMsMedian": 10520,
-        "cpuMsMax": 10606,
-        "wallMsMedian": 10460,
-        "wallMsMax": 10490
+        "cpuMsMedian": 823,
+        "cpuMsMax": 841,
+        "wallMsMedian": 705,
+        "wallMsMax": 734
       },
       {
         "shape": "probe-cast",
@@ -653,30 +653,30 @@
         "condition": "loaded",
         "repeats": 2,
         "cpuMsSamples": [
-          11500,
-          11386
+          858,
+          869
         ],
         "wallMsSamples": [
-          11464,
-          11370
+          752,
+          800
         ],
-        "cpuMsMedian": 11443,
-        "cpuMsMax": 11500,
-        "wallMsMedian": 11417,
-        "wallMsMax": 11464
+        "cpuMsMedian": 864,
+        "cpuMsMax": 869,
+        "wallMsMedian": 776,
+        "wallMsMax": 800
       }
     ]
-  },
-  "guardEvaluatedAgainst": {
-    "weight": 675000,
-    "distinct": 80
   },
   "derivation": {
     "shape": "max-admitted",
     "targetMs": 15000,
     "ceilingMs": 12000,
     "marginFraction": 0.2,
-    "derivedCast": 80,
-    "derivedCpuMsMax": 11848
+    "derivedCast": 100,
+    "derivedCpuMsMax": 746
+  },
+  "guardEvaluatedAgainst": {
+    "weight": 1500000,
+    "distinct": 100
   }
 }

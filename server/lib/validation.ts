@@ -756,48 +756,44 @@ const VOICE_ELIGIBLE_MIN_WORDS = 30;
 // REJECTED) and that bypass B and every other pinned DoS fixture still
 // rejects.
 //
-// 2026-09-20 CANDIDATE, not yet derived
+// 2026-09-20 RE-DERIVATION, ROUND 4 — AND IT IS NOT A COST DERIVATION
 // (docs/audits/2026-09-20-feature-length-defects-prep/README.md, "Second
-// pass" §S2(a)). The 675,000 figure above was a COST-DERIVED bound against
-// the pre-hoist O(distinct²) Burrows's-Delta pass; the 2026-09-07/09-20
-// per-character and per-pair hoists in voice-delta.ts have since made that
-// path cheap enough that cost no longer argues for it — the runner-shaped
-// sweep below (`npm run measure-voice-bound`, max-admitted N=70..90 at a
-// 1,900,000 ceiling) measured every swept shape at <=4% of the 15,000 ms
-// half-budget target (worst 635 ms). What replaces cost as the constraint is
-// the ADMISSIBLE WINDOW the cue-parity suite already pins from both ends:
-// [1,331,970 .. 1,919,999]. The low end is 3x
+// pass" §S2(a) and "Runner lock"). The 675,000 figure above was a COST-DERIVED
+// bound against the pre-hoist O(distinct²) Burrows's-Delta pass; the
+// 2026-09-07/09-20 per-character and per-pair hoists in voice-delta.ts made
+// that path 44-56x cheaper, and cost stopped arguing for it. GitHub Actions run
+// 35542413222 (calibrate-voice-bound.yml, workflow_dispatch on this branch,
+// ubuntu-latest / AMD EPYC 7763 x4 / node v24.20.0, repeats 2, idle+loaded)
+// measured EVERY swept shape at or under 8% of the 15,000 ms half-budget target
+// under load — worst 1,210 ms, at max-admitted N=50, the shape that carries
+// this bound's full weight — against the 11,810 ms the same shape read
+// pre-hoist. Cost no longer picks this number.
+//
+// WHAT PICKS IT INSTEAD is the ADMISSIBLE WINDOW the cue-parity suite pins from
+// both ends: [1,331,970 .. 1,919,999]. The low end is 3x
 // tests/fixtures/feature-length/assembled-feature.fountain's measured
 // voice-eligible weight (443,990 — the suite's own ">= 3x headroom on a
-// legitimate committed feature" assertion), the high end is one below
+// legitimate committed feature" assertion). The high end is one below
 // 1,920,000, the real-parse weight of round-3 bypass B, the lightest payload
-// this file's DoS/bypass regressions pin as REJECTED. This sets the constant
-// to **1,500,000** — inside that window, and the branch's original proposal
-// before the 2026-09-12 re-derivation rounds above narrowed it to 675,000 for
-// cost reasons that no longer hold.
+// this file's DoS/bypass regressions pin as REJECTED. **1,500,000** sits inside
+// it, at 3.4x headroom on the assembled feature and 1.28x under bypass B. Say
+// plainly what that means: this bound is now chosen for HEADROOM, bracketed by
+// a fixture and an attack payload, and merely CHECKED against cost — the
+// opposite of rounds 1-3, and the reason the paragraph above is left as written
+// rather than re-fitted.
 //
-// THIS IS A CANDIDATE, NOT A DERIVATION. `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`
-// below is bound to a measured table (tests/fixtures/voice-bound-derivation.json)
-// by tests/core/voice-bound-derivation.test.ts, and that table still records
-// the OLD 675,000-derivation (`guardEvaluatedAgainst: { weight: 675000,
-// distinct: 80 }`, run 34740951649, ubuntu-latest, 2026-09-13). Until a fresh
-// `.github/workflows/calibrate-voice-bound.yml` run against THIS 1,500,000
-// candidate is locked into that fixture — the NEXT commit, from the runner's
-// `--json=-` output, never by hand — `voice-bound-derivation.test.ts` fails
-// BY DESIGN on exactly two bindings: its
-// `assert.deepEqual(fixture.guardEvaluatedAgainst, { weight:
-// MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT, distinct:
-// MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT })` ("the table's guard column is the
-// verdict THIS tree gives" — table says weight 675000, tree now says
-// 1500000), and its per-row `assert.equal(row.pooledWords, row.n *
-// maxAdmittedWordsPerSpeaker(row.n, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT))`
-// ("every derivation-shape row at or below the derived cast clears the
-// ceiling" — the table's pooled-word column was measured against the old
-// weight bound and no longer equals what this constant admits at each cast).
-// This is the same guard `voice-bound-derivation.test.ts`'s own header
-// describes: a bound edited without a fresh table is supposed to fail loud,
-// not silently keep the old table's numbers. Do not edit the fixture by hand
-// to make these pass.
+// DERIVED AND LOCKED, not a candidate. The companion bound
+// MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT below is re-derived from run
+// 35542413222's committed table (tests/fixtures/voice-bound-derivation.json,
+// `guardEvaluatedAgainst: { weight: 1500000, distinct: 100 }`) by
+// tests/core/voice-bound-derivation.test.ts on every CI run, and that table was
+// swept against THIS value — every max-admitted row's pooled-word column is
+// n x maxAdmittedWordsPerSpeaker(n, 1_500_000), which is the assertion that
+// ties the two together. Editing this number without a fresh
+// `.github/workflows/calibrate-voice-bound.yml` run therefore fails that suite
+// by name, which is the guard working. Do not edit the fixture by hand to make
+// it pass; the lock is a copy of the runner's `--json=-` line, never a
+// transcription.
 export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1_500_000;
 // ── Voice-eligibility CAST bound (2026-09-13, CI derivation) ───────────────
 // A SECOND, orthogonal cost bound on the same path: once every distinct
@@ -950,27 +946,81 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1_500_000;
 // derivations ABOVE (0.0173-0.0187, and the 0.022 conservative upper bound) is
 // likewise a PRE-HOIST rate and must not be reused as if it still described
 // this code.
-export const MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 80;
+//
+// RE-DERIVED 2026-09-20 FROM RUN 35542413222, AND THE METHOD CHANGED UNDER IT.
+// The weight bound above moved to 1,500,000, which moves what every
+// `max-admitted` row of the calibration table describes (the heaviest document
+// the weight bound admits AT that cast), so the table had to be re-measured on
+// the runner. It was: calibrate-voice-bound.yml, workflow_dispatch on
+// lane/land-feature-length-defects @ cfe56403, ubuntu-latest / AMD EPYC 7763
+// 64-Core x4 / 16 GiB / node v24.20.0, default inputs, repeats 2, conditions
+// idle+loaded, completed 2026-09-20T22:43:06Z. Its `--json=-` line is committed
+// verbatim at tests/fixtures/voice-bound-derivation.json and
+// tests/core/voice-bound-derivation.test.ts re-derives this constant from it:
+// derivedCast 100, derivedCpuMsMax 746 ms against a 12,000 ms ceiling — 5% of
+// the 15,000 ms half-budget target. 80 -> 100.
+//
+// THE DERIVATION IS NOW BOUNDED BY THE SWEEP, NOT BY COST, AND THAT IS SAID
+// HERE RATHER THAN LEFT TO BE NOTICED. 100 is also the LARGEST cast the run
+// swept. Nothing in the sweep crosses the ceiling, and no sweep could: on the
+// max-admitted shape the weight bound fixes the document rather than the cast —
+// a cast of N carries N x floor(W / N²) ≈ W / N pooled words — so the document
+// gets LIGHTER as the cast grows, and since the hoists left document size
+// rather than pair count dominating, cost falls with cast instead of rising.
+// The runner's own loaded column is monotone the wrong way for bracketing
+// (1,210 ms at N=50 down to 746 ms at N=100), and a local probe over every cast
+// the weight bound can admit at all (N=50…223, where 30 x 223² = 1,491,870 is
+// the last one under the bound) reads 810 / 650 / 485 / 451 / 476 / 510 ms —
+// nothing within an order of magnitude of the ceiling. So this constant is a
+// CONSERVATIVE choice, equal to the top of a measured grid, not the point where
+// cost runs out; the weight bound would admit a cast of 223 on its own, and
+// tests/security/fountain-shape-guard-cue-parity.test.ts asserts this one stays
+// strictly below that so it is not decorative.
+// tests/core/voice-bound-derivation.test.ts's bracketing assertion was
+// re-anchored in the same commit and still demands a BRACKETING sweep the
+// moment the shape's cost trends upward across the grid or any swept row
+// passes 25% of the ceiling — which the pre-hoist table (11,848 ms at N=80,
+// 13,836 ms at N=100, run 34740951649) does by a wide margin.
+export const MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 100;
 
-// 2026-09-20 MERGE (lane/land-feature-length-defects). The branch
-// scoring/feature-length-defects carried its own re-derivation of the weight
-// bound — 1,500,000, round 1 of the derivation above — and it is NOT taken:
-// the round-2 re-derivation in this file (675,000 at line ~759, plus
-// MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT above) is the current one, and it
-// exists precisely because 1,500,000 admits a 223-speaker x 30-word document
-// that costs 27-36 s. What IS taken from the branch is its cost MODEL: the two
+// 2026-09-20 MERGE (lane/land-feature-length-defects), SUPERSEDED THE SAME DAY
+// by the runner lock above and left as a dated record. This block read "the
+// branch's 1,500,000 is NOT taken … asserted against 675,000 x 0.173 us = 117
+// ms, 85x under the target". Both halves of that are now stale: the weight
+// bound IS 1,500,000 (see its own 2026-09-20 round-4 block, which is a headroom
+// derivation, not a cost one), and the reason 1,500,000 was rejected in the
+// first place — that it admits a 223-speaker x 30-word document costing 27-36 s
+// — stopped being true when the Burrows's-Delta hoists landed. Run 35542413222
+// measures that whole family at 746-1,210 ms of CPU on the runner under load.
+// What this block contributed and what SURVIVES it is the cost MODEL: the two
 // constants below, which make the bound and the measurement that justifies it
-// fail together instead of drifting apart. They are asserted against
-// MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT as it stands here (675,000 x 0.173 us =
-// 117 ms, 85x under the target), not against the branch's rejected 1,500,000.
+// fail together instead of drifting apart.
 /** The measured worst-shape cost rate behind MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
  *  in MICROSECONDS of full `analyzeFountainText` per unit of eligible weight,
- *  at the SMALL end of the measured table (0.173 us/unit at weight 301,088 —
- *  the rate falls as the shape grows, so the small end is the conservative
- *  one). Exported so the bound and the measurement that justifies it cannot
- *  drift apart silently: the margin-proof test multiplies the two and fails
- *  if the product ever crosses the review's ~10 s target. Re-measure with
- *  the n-uniform-32-word-floor shape before changing either number. */
+ *  at the SMALL end of the measured table (0.173 us/unit at weight 301,088).
+ *  Exported so the bound and the measurement that justifies it cannot drift
+ *  apart silently: the margin-proof test in
+ *  tests/security/fountain-shape-guard-cue-parity.test.ts multiplies the two
+ *  and fails if the product ever crosses the review's ~10 s target.
+ *
+ *  READ THIS BEFORE QUOTING THE RATE (2026-09-20). It is a 2026-09-05 figure,
+ *  taken on a developer box, on the n-uniform-32-word-floor shape, BEFORE the
+ *  voice-delta hoists — and its "the rate falls as the shape grows, so the
+ *  small end is the conservative one" claim no longer holds against the runner.
+ *  GitHub Actions run 35542413222 measured the heaviest shape this bound admits
+ *  — max-admitted N=50, weight exactly 1,500,000 — at 1,210 ms of CPU loaded
+ *  and 754 ms idle, i.e. **0.807 and 0.503 us/unit**, 4.7x and 2.9x ABOVE this
+ *  constant. So the model is currently OPTIMISTIC rather than conservative, by
+ *  about 5x on the runner. The value is left untouched because re-fitting it
+ *  from a different shape's measurement is exactly the drift these two
+ *  constants exist to prevent, and because the assertion clears on either
+ *  number with room: 1,500,000 x 0.173 us = 260 ms and x 0.807 us = 1,211 ms,
+ *  against a 10,000 ms target (38x and 8.3x under). Closing the gap honestly
+ *  means re-measuring THIS shape — n uniform characters on the 32-word floor —
+ *  on the runner, and moving the number to what that run says. Do not reuse
+ *  any pre-hoist rate (this one, or the 0.0173-0.0187 and 0.022 ms/unit figures
+ *  in the weight bound's round-1/round-2 derivations) as if it described this
+ *  code. */
 export const VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT = 0.173;
 /** The cost target the two constants above are held to (microseconds) — the
  *  2026-09-05 review's own ~10 s ceiling for an accepted request. */
