@@ -24,6 +24,32 @@
 //    that lane (`approvedSpansSurvive`) verify the wrong excerpt, or skip the
 //    span entirely once the range ran off the end.
 //
+// ── THE TWO THE REVIEW OF THAT FIX FOUND (2026-09-20, findings 1 and 5) ──────
+//
+// 3. THE RE-DERIVATION THREW THE LEDGER AWAY (finding 1, the blocker). The fix
+//    for (1) replaced all three diagnostics with `analyzeFountainText`'s, and
+//    that function's structure is `analyzeStructure(records, [])` — commits
+//    hard-zeroed, because it has no ledger. `commits` is the ONLY source of
+//    `totalClockPressure` (server/nvm/screenplay/structure.ts), so on the
+//    route path — which computes `analyzeStructure(records, allCommits)` —
+//    one changed byte in pass 1 reset passes 2..14 from the caller's
+//    "act3 / 100% / approachingClimax" reading to "act1 / 0% / not
+//    approaching". Six pass files branch on those fields. The ledger is not a
+//    property of the draft, so it is now threaded in and reused on every
+//    re-derivation; `(e)` below pins that, both in what the pipeline records
+//    and in which rules actually fire.
+//
+// 4. A LOST SPAN WAS KEPT, NOT DROPPED (finding 5). When a span's locked text
+//    stopped occurring in the draft, the pipeline warned and then carried the
+//    span forward at its STALE line numbers. From the next pass on,
+//    `approvedSpansSurvive` cuts the excerpt out of the NEW document at those
+//    numbers and enforces whatever text now lives there: the author's real
+//    locked lines become freely deletable, and an unrelated passage is locked
+//    in their place, with no further warning. A lost span is now dropped from
+//    enforcement for the rest of the run and reported in the result's
+//    `lostApprovedSpans` — `(c)` below pins that, including the deletion that
+//    is now correctly ACCEPTED because the lock is honestly gone.
+//
 // ── HOW THESE TESTS OBSERVE THE PIPELINE ─────────────────────────────────────
 // `runRevisionPipeline` does not expose what it hands each pass, so the tests
 // use the two seams that already exist:
@@ -40,11 +66,15 @@
 // draft.
 import { describe, it, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
 import { analyzeFountainText } from '../../server/nvm/analyze/fountain-analyzer.ts';
-import { runRevisionPipeline } from '../../server/nvm/revision/pipeline.ts';
+import { runRevisionPipeline, type RevisionResult } from '../../server/nvm/revision/pipeline.ts';
 import { registerLlmRewriter, type RewriteInput } from '../../server/nvm/revision/rewrite.ts';
 import { relocateApprovedSpans, normalizeLineEndings } from '../../server/nvm/revision/approved-spans.ts';
+import { approvedSpansSurvive } from '../../server/nvm/revision/rewrite-llm.ts';
+import { analyzeStructure } from '../../server/nvm/screenplay/structure.ts';
+import { summarizeOps, type StoryCommit } from '../../server/nvm/state/StoryCommit.ts';
 import type { ApprovedSpan } from '../../server/nvm/revision/passes/types.ts';
 import type { CompiledScreenplay } from '../../server/nvm/screenplay/compile-types.ts';
 import { logger } from '../../server/lib/logger.ts';
@@ -113,6 +143,38 @@ function captureLogger(): { calls: LogCall[]; restore: () => void } {
     calls,
     restore: () => { logger.debug = original.debug; logger.warn = original.warn; logger.error = original.error; },
   };
+}
+
+// ── StoryCommit ledger ───────────────────────────────────────────────────────
+// One commit carrying a single RAISE_CLOCK of 20. That is all analyzeStructure
+// reads commits for: `totalClockPressure` is the sum of every non-reverted
+// RAISE_CLOCK amount, and 20 clears the >= 15 threshold for `act3` on its own,
+// so the ledger's reading is act3 / 100% / approachingClimax while the SAME
+// records with no ledger read act1 / 0% / not approaching. That gap is the
+// whole of finding 1, expressed in the smallest ledger that produces it.
+function ledgerCommits(): StoryCommit[] {
+  const ops = [{ op: 'RAISE_CLOCK' as const, clockId: 'deadline', amount: 20 }];
+  return [{
+    commitId: 'c1', parentId: null, sceneIdx: 0, ops,
+    deltaSummary: summarizeOps(ops), reverted: false, createdAt: 0,
+  }];
+}
+
+/** The RevisionResult fields that existed BEFORE this lane, in declaration
+ *  order, hashed so "byte-identical" is one comparison rather than fourteen
+ *  deepEquals. `completedAt` is a clock and `lostApprovedSpans` is this lane's
+ *  new field, so neither is in the projection; the new field is asserted
+ *  separately at its own call site. */
+function preLaneOutputHash(result: RevisionResult): string {
+  const projection = {
+    passResults: result.passResults,
+    finalFountain: result.finalFountain,
+    originalFountain: result.originalFountain,
+    totalIssuesFound: result.totalIssuesFound,
+    passesWithChanges: result.passesWithChanges,
+    failedPasses: result.failedPasses,
+  };
+  return createHash('sha256').update(JSON.stringify(projection)).digest('hex');
 }
 
 after(() => { registerLlmRewriter(null); });
@@ -404,46 +466,235 @@ describe('revision pipeline: approved spans follow the text between passes', () 
     assert.deepEqual(capture.calls.filter(c => c.msg === 'revision_locked_span_lost_between_passes'), []);
   });
 
-  it('a pass that edits the locked text itself warns with indices only and keeps the old range', async () => {
+  it('(c) a span whose locked text a pass edited away is DROPPED, reported, and no longer enforced', async () => {
     const full = compiledFor(FULL_DRAFT);
     const headLine = lineNumberOf(FULL_DRAFT, 'INT. ROOM 5 - DAY');
-    const locked: ApprovedSpan = { startLine: headLine, endLine: headLine + 2, reason: 'her wording is final' };
+    // Two spans, so the test also proves the surviving one keeps working and
+    // that the DROPPED one is named by the index the CALLER gave it (1), not
+    // by its position in the pipeline's working array.
+    const keeper: ApprovedSpan = { startLine: 1, endLine: 3, reason: 'the opening stays' };
+    const doomed: ApprovedSpan = { startLine: headLine, endLine: headLine + 2, reason: 'her wording is final' };
+    const doomedText = excerptAt(FULL_DRAFT, doomed);
 
-    const seen: Array<{ passName: string; spans: ApprovedSpan[] }> = [];
+    const seen: Array<{ passName: string; fountain: string; spans: ApprovedSpan[] }> = [];
     const capture = captureLogger();
+    // The fake rewriter mirrors rewrite-llm.ts's llmRewrite: it enforces the
+    // spans the PIPELINE handed this pass, with the real, exported
+    // approvedSpansSurvive, and falls back to the unchanged draft when the
+    // lock is not honored. That is the seam finding 5 is about — a stale span
+    // makes this check cut its excerpt out of the NEW document at the OLD
+    // line numbers — so the test drives it rather than paraphrasing it.
     registerLlmRewriter(async (input: RewriteInput) => {
-      seen.push({ passName: input.passName, spans: input.approvedSpans });
+      seen.push({ passName: input.passName, fountain: input.fountain, spans: input.approvedSpans });
+      const propose = (revised: string) => {
+        const survival = approvedSpansSurvive(input.fountain, revised, input.approvedSpans);
+        if (input.approvedSpans.length > 0 && survival.checked === 0) return { revised: input.fountain, usedLLM: false };
+        return survival.ok ? { revised, usedLLM: true } : { revised: input.fountain, usedLLM: false };
+      };
       if (input.passName === 'structure') {
         // A non-LLM editor is not bound by approvedSpansSurvive; this is the
-        // case that check cannot rule out.
-        return {
-          revised: input.fountain.replace('INT. ROOM 5 - DAY', 'INT. THE BACK ROOM - DAY'),
-          usedLLM: true,
-        };
+        // case that check cannot rule out. It rewrites the locked heading, so
+        // the span's text stops occurring at all.
+        return { revised: input.fountain.replace('INT. ROOM 5 - DAY', 'INT. THE BACK ROOM - DAY'), usedLLM: true };
       }
-      return { revised: input.fountain, usedLLM: false };
+      if (input.passName === 'causality') {
+        // Pass 2 deletes what USED to be locked. With the span dropped this is
+        // a legitimate edit and must be accepted; with the stale span carried
+        // forward the old code enforced lines the author never approved.
+        return propose(input.fountain.replace('INT. THE BACK ROOM - DAY', 'EXT. THE YARD - NIGHT'));
+      }
+      return propose(input.fountain);
     });
 
+    let result;
     try {
-      await runRevisionPipeline(full.compiled, full.analysis.records, full.analysis.structure, [locked]);
+      result = await runRevisionPipeline(
+        full.compiled, full.analysis.records, full.analysis.structure, [keeper, doomed],
+      );
     } finally {
       registerLlmRewriter(null);
       capture.restore();
     }
 
-    const second = seen.find(s => s.passName === 'causality');
-    assert.ok(second);
-    assert.deepEqual(second.spans, [locked], 'a lost span keeps its previous indices');
+    const second = seen.find(s2 => s2.passName === 'causality');
+    const third = seen.find(s2 => s2.passName === 'intention');
+    assert.ok(second && third, 'passes 2 and 3 must have reached the rewriter');
 
+    // Pass 2 was handed ONLY the span that still exists — the lost one is gone
+    // from enforcement, not carried forward at indices that now address the
+    // scene above it.
+    assert.deepEqual(second.spans, [keeper], 'a lost span must be dropped from the enforced set');
+    assert.equal(excerptAt(second.fountain, second.spans[0]), excerptAt(FULL_DRAFT, keeper));
+    assert.ok(!second.fountain.includes(doomedText), 'the fixture must actually have removed the locked text');
+
+    // The rewrite that deletes the formerly locked heading is ACCEPTED,
+    // because nothing locks it any more. Under the old behaviour the stale
+    // range was still enforced against whatever lived at those lines.
+    assert.equal(result.passResults[1].changed, true, 'pass 2 must be allowed to edit text that is no longer locked');
+    assert.ok(!result.finalFountain.includes('INT. THE BACK ROOM - DAY'));
+    assert.ok(result.finalFountain.includes('EXT. THE YARD - NIGHT'));
+    // And the surviving lock is still a lock: it is in the draft at the end.
+    assert.ok(result.finalFountain.includes(excerptAt(FULL_DRAFT, keeper)));
+
+    // Reported to the caller by the caller's own index — `doomed` is index 1.
+    assert.deepEqual(result.lostApprovedSpans, [1]);
+
+    // Warned exactly once, with that same index and no text of any kind.
     const warnings = capture.calls.filter(c => c.msg === 'revision_locked_span_lost_between_passes');
-    assert.equal(warnings.length, 1);
-    assert.deepEqual(warnings[0].data?.lostSpanIndices, [0]);
+    assert.equal(warnings.length, 1, 'a span is lost once; later passes must not re-warn about it');
+    assert.deepEqual(warnings[0].data?.lostSpanIndices, [1]);
     assert.equal(warnings[0].data?.lostSpanCount, 1);
-    assert.equal(warnings[0].data?.totalApprovedSpans, 1);
+    assert.equal(warnings[0].data?.totalApprovedSpans, 2);
+    assert.equal(warnings[0].data?.remainingApprovedSpans, 1);
     assert.equal(warnings[0].data?.passName, 'causality');
     const serialized = JSON.stringify(warnings[0]);
     assert.ok(!serialized.includes('ROOM'), 'a span-loss warning must never carry screenplay text');
     assert.ok(!serialized.includes('Ada'), 'a span-loss warning must never carry screenplay text');
     assert.ok(!serialized.includes('her wording is final'), 'a span-loss warning must never carry the span reason');
+  });
+
+  it('a run that loses nothing reports lostApprovedSpans: []', async () => {
+    const full = compiledFor(FULL_DRAFT);
+    const headLine = lineNumberOf(FULL_DRAFT, 'INT. ROOM 5 - DAY');
+    const locked: ApprovedSpan = { startLine: headLine, endLine: headLine + 2, reason: 'her wording is final' };
+    registerLlmRewriter(async (input: RewriteInput) =>
+      input.passName === 'structure'
+        ? { revised: `FADE IN:\n\n${input.fountain}`, usedLLM: true }
+        : { revised: input.fountain, usedLLM: false });
+    let result;
+    try {
+      result = await runRevisionPipeline(full.compiled, full.analysis.records, full.analysis.structure, [locked]);
+    } finally {
+      registerLlmRewriter(null);
+    }
+    assert.deepEqual(result.lostApprovedSpans, []);
+  });
+});
+
+// ── (e) the ledger survives the re-derivation (review finding 1) ─────────────
+
+describe('revision pipeline: re-diagnosis keeps the caller’s StoryCommit ledger', () => {
+  const COMMITS = ledgerCommits();
+
+  it('the ledger and the text disagree about the act, which is what makes this observable', () => {
+    // The reviewer's probe, as an assertion: same records, commits vs [].
+    const analysis = analyzeFountainText(FULL_DRAFT);
+    const fromLedger = analyzeStructure(analysis.records, COMMITS);
+    const fromTextOnly = analyzeStructure(analysis.records, []);
+    assert.deepEqual(
+      { act: fromLedger.actPosition, pct: fromLedger.completionPercent, climax: fromLedger.approachingClimax },
+      { act: 'act3', pct: 100, climax: true },
+    );
+    assert.deepEqual(
+      { act: fromTextOnly.actPosition, pct: fromTextOnly.completionPercent, climax: fromTextOnly.approachingClimax },
+      { act: 'act1', pct: 0, climax: false },
+    );
+    // And analyzeFountainText's own structure IS the commit-less one — the
+    // exact value the pipeline used to adopt wholesale on re-derivation.
+    assert.equal(analysis.structure.actPosition, 'act1');
+    assert.equal(analysis.structure.approachingClimax, false);
+  });
+
+  it('(e) pass 1 changing one byte does not reset the act clock for passes 2..14', async () => {
+    const full = compiledFor(FULL_DRAFT);
+    // The caller's structure, as server/routes/nvm/revision.ts builds it.
+    const callerStructure = analyzeStructure(full.analysis.records, COMMITS);
+
+    const capture = captureLogger();
+    // Two lines added at the top: the draft changes (so the re-derivation
+    // runs) while all 18 scenes survive, so nothing but the ledger can
+    // explain a difference in what the later passes read.
+    registerLlmRewriter(async (input: RewriteInput) =>
+      input.passName === 'structure'
+        ? { revised: `FADE IN:\n\n${input.fountain}`, usedLLM: true }
+        : { revised: input.fountain, usedLLM: false });
+
+    let withLedger;
+    try {
+      withLedger = await runRevisionPipeline(
+        full.compiled, full.analysis.records, callerStructure, [], undefined, undefined, false, COMMITS,
+      );
+    } finally {
+      registerLlmRewriter(null);
+      capture.restore();
+    }
+
+    // THE CLAIM, in the form a reader of the report sees it, asserted FIRST so
+    // that a pre-fix run fails on the behaviour rather than on a log field
+    // that did not exist yet: rules which only fire on the ledger's
+    // act3/approaching-climax reading are present in passes 2..14, and absent
+    // from the identical run with no ledger.
+    registerLlmRewriter(async (input: RewriteInput) =>
+      input.passName === 'structure'
+        ? { revised: `FADE IN:\n\n${input.fountain}`, usedLLM: true }
+        : { revised: input.fountain, usedLLM: false });
+    let noLedger;
+    try {
+      noLedger = await runRevisionPipeline(full.compiled, full.analysis.records, callerStructure, []);
+    } finally {
+      registerLlmRewriter(null);
+    }
+
+    const rulesOf = (run: typeof withLedger, pass: string) =>
+      run.passResults.find(r => r.pass === pass)!.issues.map(i => i.rule);
+
+    assert.ok(
+      rulesOf(withLedger, 'intention').includes('CLIMAX_WITHOUT_CHOICE'),
+      'pass 3 must still read the ledger’s act3 after pass 1 changed the draft',
+    );
+    assert.ok(
+      !rulesOf(noLedger, 'intention').includes('CLIMAX_WITHOUT_CHOICE'),
+      'without a ledger the same run reads act1 — this is the pre-fix behaviour, pinned as the contrast',
+    );
+    for (const rule of ['NO_REVELATIONS', 'CLIMAX_EMOTIONALLY_FLAT']) {
+      assert.ok(rulesOf(withLedger, 'character-arc').includes(rule), `pass 6 must read the ledger’s clock (${rule})`);
+      assert.ok(!rulesOf(noLedger, 'character-arc').includes(rule), `pass 6 without a ledger must not (${rule})`);
+    }
+
+    // Pass 1 is unaffected either way: it reads the caller's structure
+    // directly, before any re-derivation can happen.
+    assert.deepEqual(rulesOf(withLedger, 'structure'), rulesOf(noLedger, 'structure'));
+
+    // And what the pipeline itself records about the structure it built for
+    // pass 2. Before the fix this said act1, with no ledger in sight.
+    const rediagnosed = capture.calls.filter(c => c.msg === 'revision_pass_rediagnosed');
+    assert.equal(rediagnosed.length, 1, 'the draft changed once, so it is re-diagnosed once');
+    assert.equal(rediagnosed[0].data?.passIndex, 1);
+    assert.equal(rediagnosed[0].data?.actPosition, 'act3');
+    assert.equal(rediagnosed[0].data?.ledgerCommits, 1);
+    assert.equal(rediagnosed[0].data?.sceneCount, 18, 'the RECORDS still come from the changed text');
+  });
+
+  it('(b) with `commits` omitted the pipeline output is byte-identical to the pre-lane tree', async () => {
+    // Pinned against a hash produced by running this exact scenario on
+    // 02d8cfb4 — the commit this lane branched from — with the lane's source
+    // changes absent. It is the harness half of the output-identity receipt:
+    // scripts/check-doctor-output-identity.mjs proves the doctor's 45 reports
+    // are unchanged, and this proves the pipeline itself is unchanged for a
+    // caller that passes no ledger, which is every deterministic caller
+    // (doctor.ts, calibration/reference.ts) — they call runRevisionPipeline
+    // with at most 7 arguments and so take `commits = []`.
+    const PRE_LANE_OUTPUT_SHA256 =
+      '0bc2c05561f0f5d03d81af5c1e7f2f3900498c7f75f7f2d28d3b80db1424efec';
+
+    const full = compiledFor(FULL_DRAFT);
+    registerLlmRewriter(async (input: RewriteInput) =>
+      input.passName === 'structure'
+        ? { revised: TRUNCATED_DRAFT, usedLLM: true }
+        : { revised: input.fountain, usedLLM: false });
+
+    let result;
+    try {
+      result = await runRevisionPipeline(full.compiled, full.analysis.records, full.analysis.structure, []);
+    } finally {
+      registerLlmRewriter(null);
+    }
+
+    assert.equal(
+      preLaneOutputHash(result), PRE_LANE_OUTPUT_SHA256,
+      'every field this lane did not add must hash exactly as it did on 02d8cfb4',
+    );
+    // The one field it did add, on a run with no approved spans at all.
+    assert.deepEqual(result.lostApprovedSpans, []);
   });
 });

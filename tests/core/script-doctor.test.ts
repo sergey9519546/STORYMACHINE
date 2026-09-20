@@ -1295,7 +1295,8 @@ function buildDimensionSkewedResult(
 
   return {
     passResults,
-    finalFountain: '', originalFountain: '', totalIssuesFound: 0, passesWithChanges: 0, failedPasses: [], completedAt: 0,
+    finalFountain: '', originalFountain: '', totalIssuesFound: 0, passesWithChanges: 0, failedPasses: [],
+    lostApprovedSpans: [], completedAt: 0,
   };
 }
 
@@ -1320,7 +1321,7 @@ function buildResultWithOneIssue(location: string, rule = 'DIALOGUE_ON_THE_NOSE'
   });
   return {
     passResults, finalFountain: '', originalFountain: '',
-    totalIssuesFound: 1, passesWithChanges: 0, failedPasses: [], completedAt: 0,
+    totalIssuesFound: 1, passesWithChanges: 0, failedPasses: [], lostApprovedSpans: [], completedAt: 0,
   };
 }
 

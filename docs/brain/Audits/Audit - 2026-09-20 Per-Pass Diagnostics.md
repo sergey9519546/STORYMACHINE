@@ -79,6 +79,25 @@ and `npm run gates` are clean. `npm test` and `npm run brain` were out of scope
 for this lane and were not run, so the committed graph still needs an
 integrator's `npm run brain`.
 
+**Review fixes (2026-09-20, `lane/pipeline-ledger-structure` from `02d8cfb4`,
+code commit `6061ae9d`).** A review of this lane found two defects in it, both
+fixed in §"Review findings 1 and 5 fixed" of the same README. (1) The
+re-derivation adopted `analyzeFountainText`'s structure, which is
+`analyzeStructure(records, [])` — so the StoryCommit ledger's
+`totalClockPressure`, the only source of `actPosition`/`completionPercent`/
+`approachingClimax`, was hard-zeroed for passes 2..14 the moment pass 1 changed
+a byte (measured: act3/100%/true → act1/0%/false on the route path, six pass
+files branching on it). `runRevisionPipeline` now takes the ledger as an
+optional eighth argument, default `[]`, and recomputes
+`analyzeStructure(freshRecords, commits)`. (2) A span whose locked text a pass
+edited away was carried forward at its STALE line numbers, which made
+`approvedSpansSurvive` enforce whatever text had moved into them while the
+author's real locked lines became deletable; such a span is now DROPPED from
+enforcement and reported in the result's new `lostApprovedSpans`. Output
+identity against `git archive 02d8cfb4`: 45/45 byte-identical; all six
+public-benchmark numbers unchanged; receipt
+`### 2026-09-20 — REVISION RE-DIAGNOSIS KEEPS THE LEDGER'S STRUCTURE …`.
+
 **Related:** [[Audit - 2026-09-19 Locked Spans]],
 [[Audit - 2026-09-19 Generation Prompt Inputs]],
 [[Audit - 2026-09-19 Revise Deadline]],
