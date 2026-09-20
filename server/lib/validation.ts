@@ -2736,9 +2736,35 @@ export const CompileBodySchema = z.object({
 // still bounding how many entries one request can push through
 // relocateApprovedSpans's per-span document scan and into the rewrite
 // prompt's per-pass span-instruction block.
+//
+// 2026-09-20 (review finding 2, HIGH, adversarial-probe-confirmed): the
+// 200-entry array cap above bounds the COUNT of spans, not the SIZE of any
+// one of them — this comment used to claim otherwise. `endLine` had no
+// upper bound at all, and approvedSpanInstructions (rewrite-llm.ts) sliced
+// `lines.slice(startLine - 1, endLine)` unclamped, so
+// `{startLine: 1, endLine: 9007199254740991}` x200 on a 4,000-line draft
+// built a 57 MB "APPROVED — DO NOT CHANGE" prompt block per pass (x14
+// passes) from a ~12 KB request body, with no prompt-size guard before
+// `provider.generate()`. Two bounds close that: `endLine` itself is capped
+// at APPROVED_SPAN_MAX_LINE (200,000 — matches FixSpanSchema's shape below,
+// which is also a 1-based inclusive line-range schema, though that schema
+// has no equivalent upper bound of its own to inherit; this one is new),
+// and the superRefine below on ReviseBodySchema separately bounds the SUM,
+// across every span in one request, of `(endLine - startLine + 1)` — the
+// actual line count relocateApprovedSpans/approvedSpanInstructions will
+// scan/quote — to APPROVED_SPAN_TOTAL_LINES_MAX (20,000: a full feature
+// screenplay is ~6,000 lines, so this leaves headroom for a caller who
+// genuinely wants most of a long draft protected while still rejecting the
+// pathological "cover a document many times over" shape). The per-span
+// prompt-block size itself is additionally capped, independently, inside
+// approvedSpanInstructions (rewrite-llm.ts) — defence in depth for any
+// caller that reaches the pipeline without going through this schema.
+export const APPROVED_SPAN_MAX_LINE = 200_000;
+export const APPROVED_SPAN_TOTAL_LINES_MAX = 20_000;
+
 export const ApprovedSpanSchema = z.object({
   startLine: z.number().int().min(1),
-  endLine: z.number().int(),
+  endLine: z.number().int().max(APPROVED_SPAN_MAX_LINE),
   reason: noControlChars.max(500).optional(),
 }).refine(s => s.endLine >= s.startLine, {
   message: 'endLine must be on or after startLine',
@@ -2749,6 +2775,21 @@ export const ReviseBodySchema = z.object({
   sessionId: sessionIdField,
   approvedSpans: z.array(ApprovedSpanSchema).max(200).optional(),
   title: z.string().max(256).optional(),
+}).superRefine((body, ctx) => {
+  if (!body.approvedSpans || body.approvedSpans.length === 0) return;
+  const totalLines = body.approvedSpans.reduce(
+    (sum, s) => sum + (s.endLine - s.startLine + 1),
+    0,
+  );
+  if (totalLines > APPROVED_SPAN_TOTAL_LINES_MAX) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        `combined span length (${totalLines} lines) exceeds the ` +
+        `${APPROVED_SPAN_TOTAL_LINES_MAX}-line request limit`,
+      path: ['approvedSpans'],
+    });
+  }
 });
 
 // GET /api/nvm/revise-stream's query-string counterpart to ReviseBodySchema
