@@ -513,24 +513,49 @@ function receiptTargetText(range) {
   }
 }
 
+/** A markdown thematic break — `---`, `***`, `___` (3 or more of the same
+ *  character, optionally surrounded by whitespace) on a line by itself. The
+ *  ledger uses `---` to visually separate entries; that separator carries no
+ *  content of its own and belongs to neither entry, so it is treated the
+ *  same as a blank line when trimming an entry's span (see `entriesWithSpans`
+ *  below). Does not require the three characters to be identical to each
+ *  other ONLY within one run (`-{3,}` etc.) — mixed runs like `-*-` are not a
+ *  thematic break under CommonMark and are correctly left as content. */
+const SEPARATOR_LINE_RE = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/;
+
 /** Every entry in `lines` (the FULL file, not just added lines), with its
  *  0-indexed `[start, end)` span: `start` is the heading's own index, `end`
  *  is the index of the next heading (or `lines.length`). Unlike
  *  `extractEntries()`, this sees an entry whose heading text is unchanged.
  *
- *  Also computes `contentEnd`: `end` with any trailing BLANK lines trimmed
- *  off. This is what the overlap check below actually uses, and it is not a
- *  cosmetic nicety — measured 2026-09-19 (docs/audits/2026-09-19-receipt-
- *  gate-inplace/): appending a brand-new entry right after an untouched one
- *  inserts a blank separator line ahead of the new heading, and that
- *  inserted blank line's line NUMBER falls, by plain index arithmetic,
- *  inside the PRECEDING entry's `[start, end)` span — so the overlap check
- *  read a clean append of an unrelated entry as an in-place edit of the one
- *  before it, and (with `alreadyRecognized` correctly excluding the new
- *  entry it belongs to) validated that unrelated, untouched entry as if this
- *  range had rewritten it. `contentEnd` excludes exactly that separator, so
- *  a hunk that touches nothing but the blank line ahead of a new heading no
- *  longer overlaps the entry above it. */
+ *  Also computes `contentEnd`: `end` with any trailing BLANK lines OR
+ *  markdown rule lines (`SEPARATOR_LINE_RE`) trimmed off. This is what the
+ *  overlap check below actually uses, and it is not a cosmetic nicety —
+ *  measured 2026-09-19 (docs/audits/2026-09-19-receipt-gate-inplace/):
+ *  appending a brand-new entry right after an untouched one inserts a blank
+ *  separator line ahead of the new heading, and that inserted blank line's
+ *  line NUMBER falls, by plain index arithmetic, inside the PRECEDING
+ *  entry's `[start, end)` span — so the overlap check read a clean append of
+ *  an unrelated entry as an in-place edit of the one before it, and (with
+ *  `alreadyRecognized` correctly excluding the new entry it belongs to)
+ *  validated that unrelated, untouched entry as if this range had rewritten
+ *  it. `contentEnd` excludes exactly that separator, so a hunk that touches
+ *  nothing but the blank line ahead of a new heading no longer overlaps the
+ *  entry above it.
+ *
+ *  BUG FOUND 2026-09-20 (docs/audits/2026-09-20-per-pass-diagnostics/
+ *  README.md §7): trimming only BLANK lines left a `---` rule line itself
+ *  inside the preceding entry's span whenever an author separates a newly
+ *  appended entry from the previous one with such a rule (the ledger's own
+ *  convention between many entries). The rule then overlapped the append
+ *  hunk exactly as the blank line above used to, and `entriesModifiedInPlace`
+ *  re-validated the historical entry against TODAY's field rules — the
+ *  2026-09-12 entry's `**Commands (…)**` field failed the `**Command**`
+ *  pattern this way, a false FAIL of an honest append. A separator line is
+ *  not content belonging to either entry any more than a blank line is, so
+ *  it is now trimmed the same way. This does not touch how a genuine edit
+ *  inside an entry's own field lines is detected — those lines are never
+ *  blank or rule-shaped, so the overlap test still sees them. */
 function entriesWithSpans(lines) {
   const entries = [];
   for (let i = 0; i < lines.length; i++) {
@@ -541,7 +566,10 @@ function entriesWithSpans(lines) {
   }
   for (const entry of entries) {
     let contentEnd = entry.end;
-    while (contentEnd > entry.start + 1 && lines[contentEnd - 1].trim() === '') contentEnd--;
+    while (
+      contentEnd > entry.start + 1
+      && (lines[contentEnd - 1].trim() === '' || SEPARATOR_LINE_RE.test(lines[contentEnd - 1]))
+    ) contentEnd--;
     entry.contentEnd = contentEnd;
   }
   return entries;

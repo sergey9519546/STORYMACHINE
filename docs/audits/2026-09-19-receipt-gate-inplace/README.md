@@ -227,3 +227,68 @@ HEAD)..HEAD` both report "no scoring-path files changed. OK." — this fix
 lives in gate tooling (`scripts/check-scoring-receipt.mjs` and its test
 file), not on the scoring path, so no `MEASUREMENT_RECEIPTS.md` entry is
 required for it.
+
+## § Rule-line separator fix (2026-09-20, `lane/receipt-gate-rule-span`)
+
+Found on the way by the per-pass-diagnostics lane
+(`docs/audits/2026-09-20-per-pass-diagnostics/README.md` §7), not fixed
+there: `entriesWithSpans()`'s `contentEnd` trimmed only trailing BLANK lines
+off an entry's span before the overlap test above. A markdown thematic break
+(`---`, `***`, `___`) is not blank, so when an author separates a newly
+appended entry from the previous one with such a rule — the ledger's own
+separator convention, and exactly how the real 2026-09-12 entry precedes the
+next one — the rule line stayed inside the PRECEDING entry's span, the
+append's hunk overlapped it (the hunk's first added line IS the rule line),
+and `entriesModifiedInPlace()` re-validated that historical entry against
+TODAY's field rules. Reproduced exactly as the finding describes: an old
+entry using the real ledger's own `**Commands (all run in this worktree
+…)**` (plural) phrasing failed `REQUIRED_FIELDS`'s singular
+`/\*\*\s*Command\s*:?\s*\*\*/i` pattern the moment it was re-validated,
+reporting `missing required field **Command**` for a range that never
+touched that entry — a false FAIL of an honest append, in the safe
+direction, but one that blocks a normal ledger convention.
+
+**The fix:** trailing lines that are blank OR match
+`SEPARATOR_LINE_RE = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/` are now both trimmed
+when computing `contentEnd`. Nothing else about span computation changed,
+and the 2026-09-19 existence fix directly above (in-place entries validate
+but never count as new) is untouched — verified by re-running this file's
+full existing suite (cases (b)-(f), C-DANGER, and the append-after-untouched
+regression guard) unchanged against both the pre-fix and post-fix script.
+
+**New tests** (`tests/core/receipt-gate-inplace-rewrite.test.ts`, describe
+block "a separator rule after an entry is not part of its span"):
+
+- **(g)** a well-formed new entry appended after a `---` rule following an
+  older entry whose fields (plural `**Commands (…)**`) would fail today's
+  validation if re-checked: asserts exit 0. Run against the unfixed script
+  first — failed (`1 !== 0`), stderr naming `missing required field
+  **Command**` on the OLD entry's heading, exactly the false FAIL the finding
+  describes. Passes after the fix.
+- **(h)** the same, with a `***` rule instead of `---` — same fail-first
+  result before the fix, passes after.
+- **(i)** a GENUINE in-place edit to that older entry's `Corpus fingerprint`
+  field line, with the same `---` rule sitting right after it, no new entry
+  added: asserts exit 1. This one is not fail-first — the edited field line
+  is never blank or rule-shaped, so the overlap test still sees it regardless
+  of the `contentEnd` change — and it passed identically before and after the
+  fix, confirming the separator trim does not swallow a real edit that
+  happens to sit beside a rule line.
+
+All pre-existing cases in this file — (b)-(f), C-DANGER, the
+append-after-untouched-entry regression guard, and all three
+existence-test ATTACK cases — were re-run against both the unfixed and
+fixed script and passed both times (13/13 total after the fix, 11/13
+before it: (g) and (h) are the only two that flip).
+`tests/core/scoring-receipt-guard.test.ts` (26/26),
+`tests/core/check-scoring-receipt.test.ts` (8/8),
+`tests/scripts/receipt-conversion.test.ts` (43/43),
+`tests/scripts/owner-measure-e2e.test.ts` (56/56) and
+`tests/core/ci-gates-intact.test.ts` (64/64) all still pass.
+`tests/core/honesty-audit-claims.test.ts` (15/15) passes. `npm run lint` is
+clean. `node scripts/check-scoring-receipt.mjs 5d1a14ce..HEAD` reports "no
+scoring-path files changed. OK." and `node scripts/check-scoring-receipt.mjs
+$(git merge-base origin/main HEAD)..HEAD` still reports the concurrent
+per-pass-diagnostics lane's own two scoring-path files with its own
+well-formed receipt — this fix again lives only in gate tooling, so no new
+`MEASUREMENT_RECEIPTS.md` entry is required for it.
