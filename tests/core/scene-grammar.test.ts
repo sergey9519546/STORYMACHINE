@@ -194,10 +194,22 @@ describe('scene grammar — (d) a plain INT./EXT. script is byte-identical', () 
     // The snapshot was produced by running `runScriptDoctor` on this fixture in
     // a `git archive 26d930dd` checkout — the tree immediately before this
     // change. `analyzedAt` is stripped (a wall-clock stamp the doctor refreshes
-    // on every call, including cache hits) and nothing else is.
+    // on every call, including cache hits), and so is `provenance.engineCommit`
+    // (a build stamp, not a score: `server/lib/build-info.ts` falls back to
+    // this checkout's own HEAD SHA when `GIT_SHA` is unset, so it is
+    // environment-dependent by design — see tests/core/build-info.test.ts —
+    // and the doctor's own output-identity harness,
+    // scripts/check-doctor-output-identity.mjs, treats it the same way via
+    // `--ignore-keys` rather than requiring it to match across checkouts).
+    // The snapshot was generated with `GIT_SHA=dev`; nothing else is stripped.
     const text = read('plain-int-ext.fountain');
     const report = await runScriptDoctor(text);
     const { analyzedAt: _ignored, ...stable } = report as unknown as Record<string, unknown>;
+    const provenance = stable.provenance as Record<string, unknown> | undefined;
+    if (provenance) {
+      const { engineCommit: _engineCommit, ...restProvenance } = provenance;
+      stable.provenance = restProvenance;
+    }
     const expected = read('plain-int-ext.report.json');
     assert.equal(JSON.stringify(canonical(stable), null, 2) + '\n', expected);
   });

@@ -2540,7 +2540,6 @@
   },
   "plainSummary": "PASS — scored in the bottom band, below the decline line; overall score 0/100. This is the engine's deterministic, threshold-based verdict, not a human read. Theme & Originality is the highest-scoring diagnostic dimension, at 98/100. Character is the lowest-scoring diagnostic dimension, at 26/100 — most of the trouble is around zero entropy scene. Start with the highest-priority fix: Across all 4 Act 3 scenes the protagonist initiates no action — no clock raised, no clue planted. They are carried to the ending rather than choosing it; the climax happens to them instead of being driven by them.",
   "provenance": {
-    "engineCommit": "dev",
     "groundTruthSource": "mechanical-degradation",
     "percentileBasis": "internal-calibration-corpus-20-samples",
     "rulebookCount": 3217

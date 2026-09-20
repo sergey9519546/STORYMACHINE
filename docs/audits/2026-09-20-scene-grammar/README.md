@@ -245,3 +245,23 @@ orchestrator runs them.
    says whether this change helped, and it is the only one that can.
 3. **Decide whether the forced-heading rule should accept non-Latin scripts.**
    See §2's last paragraph. One place to change it now.
+
+## Post-merge correction
+
+Test case (d), "runScriptDoctor output matches the pre-change snapshot
+exactly," compared the fixture snapshot against a fresh `runScriptDoctor`
+call while stripping only `analyzedAt`, but the snapshot's
+`provenance.engineCommit` was recorded as the literal string `"dev"` because
+it was generated with `GIT_SHA=dev` set. `server/lib/build-info.ts` falls
+back to `git rev-parse HEAD` when `GIT_SHA` is unset, so in any real
+checkout — including this one, on this branch — `engineCommit` is the HEAD
+SHA, not `"dev"`, and the test failed on every commit whose environment did
+not happen to export `GIT_SHA=dev`. The fix extends the same treatment the
+doctor's own output-identity harness (`scripts/check-doctor-output-identity.mjs`,
+via `--ignore-keys`) and `tests/core/build-info.test.ts` already give this
+field — a build stamp describing which engine ran, not part of the score —
+by also stripping `provenance.engineCommit` in the test before comparing,
+and removing the `"engineCommit": "dev"` line from the committed snapshot so
+the fixture no longer encodes an assumption about the environment it was
+generated in. No other byte of the snapshot changed, and the fix does not
+touch any scoring-path file.
