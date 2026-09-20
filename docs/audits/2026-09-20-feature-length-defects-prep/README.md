@@ -809,3 +809,141 @@ REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real
 * No push. The orchestrator pushes `lane/land-feature-length-defects`.
 * The five surface docs still lead with `main`'s 0.5313 / 0.4063 validity read,
   for the reason §10 gives, unchanged.
+
+## Candidate bound set; derivation lock follows from the runner
+
+**What changed.** `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`
+(`server/lib/validation.ts`) is set to the CANDIDATE value **1,500,000** — the
+branch's original proposal, inside the admissible window §S2(a) derived from
+both ends:
+
+* low end **1,331,970** = 3x `tests/fixtures/feature-length/assembled-feature.fountain`'s
+  measured voice-eligible weight (443,990), the suite's own ">= 3x headroom"
+  requirement;
+* high end **1,919,999** = one below 1,920,000, the real-parse weight of
+  round-3 bypass B, the lightest DoS/bypass payload the cue-parity suite pins
+  as REJECTED.
+
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` (80) is untouched — this commit only
+moves the weight bound. The comment above the constant records the candidate,
+both ends of the window, the date, and that the derivation fixture is not yet
+locked (see below). The fixture itself,
+`tests/fixtures/voice-bound-derivation.json`, is untouched by this commit.
+
+**Verification, quoted.**
+
+1. `tests/security/fountain-shape-guard-cue-parity.test.ts` — the headroom
+   line, now passing:
+   `voice-eligible-weight headroom: worst tracked fixture is "tests/fixtures/feature-length/assembled-feature.fountain" at 3.4x`
+   (exact: 1,500,000 / 443,990 = 3.3785…x, i.e. the 3.38x headroom this task's
+   brief predicted). The cost line, from the boundary-shape assertion (still
+   the max-admitted N=80 shape, since `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`
+   did not move):
+   `voice-bound worst-case cost: max-admitted N=80 (234 words/speaker) cpu 603ms (4% of the 15000ms half-budget target), wall 455ms — local: Intel(R) Xeon(R) Processor @ 2.80GHz x4 (parallelism 4, 16 GiB), node v22.22.2, linux/x64`.
+   Every pinned DoS/bypass payload (bypass B at 1,920,000 and the three
+   round-2 payloads at 5.4M/18.72M/19.656M) is still REJECTED — confirmed by
+   the suite's own "every one of this file's existing rejection fixtures is
+   still REJECTED under the new bound" check, which passed.
+
+   **Honest count: 675 pass, 3 fail — not the 676/2 this task's brief
+   predicted from the headroom assertion alone.** The two former headroom
+   failures now pass, as expected. A THIRD category surfaced on the full run
+   that neither this task's brief nor §S2(a) above anticipated: three tests in
+   the same "finding 10" describe block pin the OLD 675,000 boundary's own
+   story, not just a computed comparison, and all three now fail because that
+   story is specific to 675,000:
+   * `a 60-cast fully-eligible feature is now REJECTED (weight 909,000 > 675,000)`
+     (line 3178) — at 1,500,000 a 60-cast fully-eligible ensemble (weight
+     909,000, distinct 60 <= 80) is genuinely ACCEPTED now, not just
+     differently worded; the test's premise is stale, not just its literal.
+   * `the uniform-min N=150 shape the 2026-09-12 derivation admitted (weight
+     exactly 675,000) is now REJECTED by the cast bound` (line 3301) — its own
+     sanity assertion `assert.equal(uniformMinWeight(150),
+     MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT, …)` fails outright
+     (`675000 !== 1500000`); N=150 no longer sits "exactly on" the weight
+     bound, so the sanity premise the rest of the test is titled around is
+     gone.
+   * `the uniform-min N=151 shape is still REJECTED, and still by the WEIGHT
+     bound` (line 3309) — N=151's weight (684,030) now clears 1,500,000, so
+     the document is rejected by the CAST bound instead, and
+     `assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/)` no longer
+     matches (`bound MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` instead).
+
+   This lane deliberately did **not** edit these three — the brief said
+   "prefer not" to touch this file, and all three need more than a literal
+   swap (new premises, new prose, in one case a genuine accept/reject flip
+   that changes what the surrounding "round-2 disclosure" comment block
+   claims). They are pre-existing tests whose entire point was to document
+   the OLD 675,000 boundary by name; the owner's runner-lock commit (step 4
+   below) is the natural place to rewrite them together with
+   `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`'s re-derivation, since that commit
+   already has to touch this describe block's boundary math. Until then this
+   branch carries 3 known, explained failures in this file, not 0.
+
+2. `tests/core/voice-bound-derivation.test.ts` — **6 pass, 2 fail, exactly the
+   two fixture-vs-constant bindings this task's brief predicted, nothing
+   else**:
+   * `the table's guard column is the verdict THIS tree gives, not the one the
+     sweep's tree gave` — `assert.deepEqual(fixture.guardEvaluatedAgainst, {
+     weight: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT, distinct:
+     MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT })` fails: `{distinct: 80, weight:
+     675000}` (the committed table, still locked from the 2026-09-13 runner
+     run) vs `{distinct: 80, weight: 1500000}` (this tree).
+   * `every derivation-shape row at or below the derived cast clears the
+     ceiling …` — the per-row `assert.equal(row.pooledWords, row.n *
+     maxAdmittedWordsPerSpeaker(row.n, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT))`
+     fails at the first admitted row: `max-admitted N=50 measured 13500
+     pooled words, but the heaviest document the weight bound admits at that
+     cast carries 30000`.
+
+   These are the intended, by-design failures: the fixture is still locked
+   against the OLD 675,000 derivation, and the whole point of this test file
+   (per its own header) is that editing the constant without a fresh
+   runner-measured table fails loud. Nothing else in the file's 8 tests
+   fails — `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`'s own re-derivation
+   assertion still passes because it depends on `DOCTOR_ANALYSIS_BUDGET_DEFAULT_MS`
+   and the table's rows, neither of which this commit touched.
+
+3. **Local sweep preview (NOT locked — no file was written; `--json=-` only
+   printed to stdout).** `node --experimental-strip-types --no-warnings
+   scripts/measure-voice-bound-cost.mjs --max-admitted=50,60,65,70,75,80,85,90,100
+   --uniform-min=150 --probe-cast=20,30,40,44 --repeats=1 --conditions=idle
+   --json=-` on this sandbox (Intel(R) Xeon(R) Processor @ 2.80GHz x4, 16 GiB,
+   node v22.22.2, linux/x64). Worst-case row by % of half-budget:
+   `max-admitted:50 idle cpu 881 ms wall 682 ms guard ACCEPT` — 6% of the
+   15,000 ms half-budget target (every other row read <=5%). The printed
+   `machine.ci` value is **`"local"`** — not `"github-actions"` — which is
+   exactly why `voice-bound-derivation.test.ts`'s first assertion
+   (`fixture.machine.ci === 'github-actions'`) exists and why this sandbox's
+   sweep cannot be the one that gets locked: a table produced here would fail
+   that assertion by name even if every other number matched.
+
+4. Gates:
+
+   | gate | result |
+   |---|---|
+   | `npm run lint` | 0 |
+   | `npm run check-no-console` | 0 — 312 files, 3 tsconfig quarantine entries, all proven unreachable |
+   | `node scripts/check-scoring-receipt.mjs ca5f2e85..HEAD` | 0 — `no scoring-path files changed` (validation.ts sits outside doctor.ts's import graph) |
+   | `tests/core/honesty-audit-claims.test.ts` | 0 (15/15) |
+   | `tests/security/fountain-shape-guard-cue-parity.test.ts` | **3 fail (675/678)** — see item 1 above |
+   | `tests/core/voice-bound-derivation.test.ts` | **2 fail (6/8), by design** — see item 2 above |
+
+**The dispatch the orchestrator makes next.** Workflow
+`.github/workflows/calibrate-voice-bound.yml`, `workflow_dispatch`, ref
+`lane/land-feature-length-defects` (this branch, once pushed), default
+inputs (`uniform_min=150`, `max_admitted=50,60,65,70,75,80,85,90,100`,
+`probe_cast=20,30,40,44`, `repeats=2`, `conditions=idle,loaded`). Read the
+job summary's `--json=-` block, copy it verbatim into
+`tests/fixtures/voice-bound-derivation.json`, run `npm run measure-voice-bound
+-- --lock-from=tests/fixtures/voice-bound-derivation.json` to re-indent and
+re-evaluate the guard column against this tree, and let
+`tests/core/voice-bound-derivation.test.ts` re-derive
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` from the runner's own numbers — it may
+not still be 80 once the weight bound is 1,500,000 rather than 675,000; the
+per-cast pooled-word ceiling every `max-admitted` row carries is higher now,
+so the runner's cost sweep at each cast is measuring a heavier document than
+the 2026-09-13 table did. Same commit (or a follow-up in the same push) should
+also rewrite the three cue-parity tests named in item 1 above, whose whole
+premise is the 675,000 boundary story, to match whatever
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` the runner derives.

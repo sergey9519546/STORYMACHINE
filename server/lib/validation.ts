@@ -755,7 +755,50 @@ const VOICE_ELIGIBLE_MIN_WORDS = 30;
 // directly (150 ACCEPTED with its measured cost under the margin, 151
 // REJECTED) and that bypass B and every other pinned DoS fixture still
 // rejects.
-export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 675_000;
+//
+// 2026-09-20 CANDIDATE, not yet derived
+// (docs/audits/2026-09-20-feature-length-defects-prep/README.md, "Second
+// pass" §S2(a)). The 675,000 figure above was a COST-DERIVED bound against
+// the pre-hoist O(distinct²) Burrows's-Delta pass; the 2026-09-07/09-20
+// per-character and per-pair hoists in voice-delta.ts have since made that
+// path cheap enough that cost no longer argues for it — the runner-shaped
+// sweep below (`npm run measure-voice-bound`, max-admitted N=70..90 at a
+// 1,900,000 ceiling) measured every swept shape at <=4% of the 15,000 ms
+// half-budget target (worst 635 ms). What replaces cost as the constraint is
+// the ADMISSIBLE WINDOW the cue-parity suite already pins from both ends:
+// [1,331,970 .. 1,919,999]. The low end is 3x
+// tests/fixtures/feature-length/assembled-feature.fountain's measured
+// voice-eligible weight (443,990 — the suite's own ">= 3x headroom on a
+// legitimate committed feature" assertion), the high end is one below
+// 1,920,000, the real-parse weight of round-3 bypass B, the lightest payload
+// this file's DoS/bypass regressions pin as REJECTED. This sets the constant
+// to **1,500,000** — inside that window, and the branch's original proposal
+// before the 2026-09-12 re-derivation rounds above narrowed it to 675,000 for
+// cost reasons that no longer hold.
+//
+// THIS IS A CANDIDATE, NOT A DERIVATION. `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`
+// below is bound to a measured table (tests/fixtures/voice-bound-derivation.json)
+// by tests/core/voice-bound-derivation.test.ts, and that table still records
+// the OLD 675,000-derivation (`guardEvaluatedAgainst: { weight: 675000,
+// distinct: 80 }`, run 34740951649, ubuntu-latest, 2026-09-13). Until a fresh
+// `.github/workflows/calibrate-voice-bound.yml` run against THIS 1,500,000
+// candidate is locked into that fixture — the NEXT commit, from the runner's
+// `--json=-` output, never by hand — `voice-bound-derivation.test.ts` fails
+// BY DESIGN on exactly two bindings: its
+// `assert.deepEqual(fixture.guardEvaluatedAgainst, { weight:
+// MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT, distinct:
+// MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT })` ("the table's guard column is the
+// verdict THIS tree gives" — table says weight 675000, tree now says
+// 1500000), and its per-row `assert.equal(row.pooledWords, row.n *
+// maxAdmittedWordsPerSpeaker(row.n, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT))`
+// ("every derivation-shape row at or below the derived cast clears the
+// ceiling" — the table's pooled-word column was measured against the old
+// weight bound and no longer equals what this constant admits at each cast).
+// This is the same guard `voice-bound-derivation.test.ts`'s own header
+// describes: a bound edited without a fresh table is supposed to fail loud,
+// not silently keep the old table's numbers. Do not edit the fixture by hand
+// to make these pass.
+export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1_500_000;
 // ── Voice-eligibility CAST bound (2026-09-13, CI derivation) ───────────────
 // A SECOND, orthogonal cost bound on the same path: once every distinct
 // character clears VOICE_ELIGIBLE_MIN_WORDS, the COUNT of those characters
