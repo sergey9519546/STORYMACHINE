@@ -212,9 +212,19 @@ router.post('/api/nvm/revise', aiLimiter, validate(ReviseBodySchema), asyncHandl
   // converge.ts's routes — see REVISE_BUDGET's comment above for why this
   // route uses that pair even though it has no SessionCommandCoordinator tail
   // of its own.
+  // `allCommits` as the 8th argument (2026-09-20, review finding 1): the
+  // pipeline re-derives its diagnostics from the draft whenever a pass changes
+  // it, and analyzeFountainText()'s structure is analyzeStructure(records, [])
+  // — no ledger, so no totalClockPressure. Without the ledger here, one
+  // changed byte in pass 1 moved passes 2..14 from the act-3/100%/approaching-
+  // climax reading THIS ROUTE just computed on line ~187 down to act 1 / 0% /
+  // not approaching. The commits are not a property of the draft, so they stay
+  // valid however the text moves. The explicit `false` is
+  // forceSequentialForTest, which has to be passed positionally to reach the
+  // parameter after it; this route has always taken its default.
   const operation = runWithBudgetContext(
     REVISE_BUDGET,
-    () => runRevisionPipeline(compiled, records, structure, safeSpans, undefined, storyCtx),
+    () => runRevisionPipeline(compiled, records, structure, safeSpans, undefined, storyCtx, false, allCommits),
   );
   const raced = await withDeadline(operation, REVISE_BUDGET.timeoutMs);
   if (raced.timedOut) {
@@ -225,6 +235,9 @@ router.post('/api/nvm/revise', aiLimiter, validate(ReviseBodySchema), asyncHandl
     await operation.catch(() => {});
     return;
   }
+  // raced.value is the RevisionResult as-is, so `lostApprovedSpans` (indices
+  // into the caller's own `approvedSpans`, empty unless a pass edited the
+  // locked text out of the draft) reaches the client with no reshaping here.
   res.json(raced.value);
 }));
 
@@ -295,9 +308,13 @@ router.get('/api/nvm/revise-stream', aiLimiter, validateQuery(ReviseStreamQueryS
     // converge-stream uses on a timeout (server/routes/nvm/converge.ts).
     const operation = runWithBudgetContext(
       REVISE_BUDGET,
+      // `allCommits` — same ledger-preserving argument as POST /api/nvm/revise
+      // above. This route locks no spans (the 4th argument is []), so its
+      // result's `lostApprovedSpans` is always empty; the ledger matters here
+      // for exactly the same reason it does there.
       () => runRevisionPipeline(compiled, records, structure, [], event => {
         emitSSE(event); // pass_complete event per revision pass
-      }, storyCtxStream),
+      }, storyCtxStream, false, allCommits),
     );
     const raced = await withDeadline(operation, REVISE_BUDGET.timeoutMs);
     if (raced.timedOut) {

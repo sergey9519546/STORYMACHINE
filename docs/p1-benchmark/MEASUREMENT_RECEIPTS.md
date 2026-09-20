@@ -2596,3 +2596,182 @@ that nobody mistakes one for the other.
   using heading forms the committed corpus does not contain. It says nothing
   about whether the score discriminates, and it is not comparable to AUC-24
   or to the P1 baseline.
+
+### 2026-09-20 — REVISION RE-DIAGNOSIS KEEPS THE LEDGER'S STRUCTURE; a lost approved span is dropped, never re-anchored — output-identity receipt (no score moved; the private corpus is not present in this environment and no real-corpus figure is claimed)
+
+- **What changed on the scoring path:** two files, both inside
+  `server/nvm/revision/`, both classified scoring-path for the same single
+  reason — they are reachable from `doctor.ts`'s import graph, not because the
+  doctor calls either of them to compute a number. This range fixes the two
+  defects a review found in the 2026-09-20 per-pass-diagnostics entry above.
+  (1) `server/nvm/revision/pipeline.ts`'s re-derivation replaced all three
+  diagnostics with `analyzeFountainText(currentFountain)`'s — and that
+  function builds its structure as `analyzeStructure(records, [])`, commits
+  hard-zeroed, because it has no ledger (`fountain-analyzer.ts`'s own comment
+  says so). `commits` is the ONLY source of `totalClockPressure`
+  (`server/nvm/screenplay/structure.ts`), which decides `actPosition`,
+  `completionPercent` and `approachingClimax`. So on the route path — which
+  computes `analyzeStructure(records, allCommits)` itself — one changed byte in
+  pass 1 silently reset passes 2..14 from the caller's reading to "act 1, 0%,
+  not approaching climax"; six pass files branch on those fields.
+  `runRevisionPipeline` now takes the StoryCommit ledger as an optional eighth
+  argument (default `[]`) and recomputes `analyzeStructure(freshRecords,
+  commits)` instead of adopting the commit-less structure; the records and
+  annotations still come from the text, because there is no ledger for a draft
+  a pass just rewrote. `server/routes/nvm/revision.ts` (off the scoring path)
+  passes `allCommits` on both of its pipeline calls.
+  (2) In the same loop, a span whose locked excerpt no longer occurs in the
+  draft was warned about and then carried forward at its STALE line numbers —
+  so from the next pass on, `approvedSpansSurvive` cut the excerpt out of the
+  NEW document at the OLD numbers and enforced whatever text had moved into
+  them: the author's real locked lines became freely deletable while an
+  unrelated passage was silently locked in their place. Such a span is now
+  DROPPED from enforcement for the rest of the run, never re-anchored onto
+  different text, and reported in the result's new `lostApprovedSpans` field
+  (indices into the caller's own array, which the route returns unreshaped).
+  `server/nvm/revision/approved-spans.ts` lost a tie-break arm that could not
+  fire — `lineAlignedOccurrences` returns ascending candidates, so a strict `<`
+  already gives "earlier wins" — and its doc comment now states that its `lost`
+  bucket is a report, not a recommendation to keep using the stale range.
+- **Why no score can move.** `runScriptDoctor` reaches this pipeline only
+  inside `runDiagnoseOnly()`, and in that mode every pass's `rewritePass(...)`
+  returns its input before any rewrite work happens, so `revisedFountain` never
+  differs from the draft and neither the re-derivation nor the span re-location
+  ever executes. Beyond that gate, both changes are inert for the doctor by
+  construction: it calls `runRevisionPipeline` with at most seven arguments and
+  so takes `commits = []`, which is exactly the value `analyzeFountainText`'s
+  structure was already built with — the new code path computes the identical
+  structure object for it — and it passes no approved spans at all, so nothing
+  can be dropped or reported. The same is true of
+  `server/nvm/analyze/calibration/reference.ts`. `aggregateReport` reads no
+  field this range added, so the new `lostApprovedSpans` cannot reach a
+  `ScriptDoctorReport`. The receipt below is the evidence for that argument
+  rather than its restatement.
+- **Date:** 2026-09-20
+- **Git SHA:** the first commit on `lane/pipeline-ledger-structure`, branched
+  from `02d8cfb4`. Its own object id is not quoted here because this entry is
+  written inside that commit; `docs/audits/2026-09-20-per-pass-diagnostics/
+  README.md` §10 records the id, and
+  `git log 02d8cfb4..lane/pipeline-ledger-structure` resolves it.
+- **Baseline used:** the `git archive 02d8cfb4` tree (the commit this lane
+  branched from), extracted to a scratch directory with `node_modules`
+  symlinked in from the real checkout. Both sides of the comparison were run
+  with `GIT_SHA=dev`, because the extracted tree has no `.git` and
+  `provenance.engineCommit` would otherwise differ for a reason that has
+  nothing to do with this range.
+- **Command:** every command run for this entry, all of them in this worktree —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types tests/core/revision-per-pass-diagnostics.test.ts
+  node --experimental-strip-types tests/core/approved-spans-enforced.test.ts
+  node --experimental-strip-types tests/core/approved-span-sanitization.test.ts
+  node --experimental-strip-types tests/core/llm-seam-wiring.test.ts
+  node --experimental-strip-types tests/core/pure-core-boundary.test.ts
+  node --experimental-strip-types tests/core/honesty-audit-claims.test.ts
+  node --experimental-strip-types tests/core/pipeline-parallel.test.ts
+  node --experimental-strip-types tests/core/script-doctor.test.ts
+  node --experimental-strip-types tests/core/public-benchmark.test.ts
+  node --experimental-strip-types tests/core/brain-coverage.test.ts
+  node --experimental-strip-types tests/routes/nvm-revision.test.ts
+  node --experimental-strip-types tests/routes/nvm-revision-budget.test.ts
+  node --experimental-strip-types tests/routes/nvm-revision-budget-attempts.test.ts
+  node --experimental-strip-types tests/routes/nvm-revision-approved-spans-schema.test.ts
+  node --experimental-strip-types tests/passes/<each of the 15>.test.ts
+  git archive 02d8cfb4 | tar -x -C <scratch>/baseline
+  ln -s <checkout>/node_modules <scratch>/baseline/node_modules
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/baseline --out <scratch>/before
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/wt-p2   --out <scratch>/after
+  node scripts/check-doctor-output-identity.mjs --compare <scratch>/before <scratch>/after
+  npm run benchmark:public -- --json
+  node scripts/check-scoring-receipt.mjs 02d8cfb4..HEAD
+  ```
+  Every one exited 0. This is not `npm run measure-real`: the private
+  real-script corpus is not present in this environment, no AUC-24 value is
+  claimed anywhere in this entry, and no real-corpus figure is claimed for this
+  range.
+- **Output identity:** the compare run's own line, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+  **0 of 45 fixtures differ.**
+- **A second, narrower identity proof, at the pipeline itself.** The doctor's
+  45 reports are produced through `runDiagnoseOnly()`, where the changed code
+  provably never runs, so that PASS is necessary but not sufficient: it says
+  nothing about the sequential rewrite loop where the change actually lives.
+  So the pipeline's own output was hashed directly. On the fixture where pass 1
+  cuts an 18-scene draft to 6 scenes — the sequential loop, re-derivation and
+  all — the SHA-256 of `{passResults, finalFountain, originalFountain,
+  totalIssuesFound, passesWithChanges, failedPasses}` with `commits` omitted is
+  `0bc2c05561f0f5d03d81af5c1e7f2f3900498c7f75f7f2d28d3b80db1424efec` on the
+  `02d8cfb4` tree and the same value after the change. It is pinned as a test
+  (`(b)` in `tests/core/revision-per-pass-diagnostics.test.ts`), and on the
+  pre-change tree that test fails only on the new `lostApprovedSpans` field
+  being absent — the hash assertion above it passes there, which is the point.
+- **Public benchmark before/after:** all six floors' measured values reproduce
+  unchanged from the committed 32 distributable screenplays, matching both
+  `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first (PRIMARY),
+  all-pairs second: shuffle-drop **0.5313 / 0.5586**; climax-relocate
+  **0.4063 / 0.4443**; DIALOGUE_FLATTEN (the positive control)
+  **1.0000 / 0.9473**, 32 of 32 ordered, zero ties. Ordered/inverted/tied
+  counts are also unchanged — shuffle-drop 17/15/0, climax-relocate 8/14/10.
+  **No floor constant in `scripts/lib/auc.ts` was touched, no floor rose, no
+  floor fell, and no re-lock was performed;** that file is not in this lane's
+  diff.
+- **Corpus fingerprint:** two committed input sets, no private text read. (1)
+  The 45 in-repo identity fixtures the harness scores — 20
+  `data/screenplays/*.fountain` live-action fixtures, 20 calibration
+  `REFERENCE_CORPUS` samples, the P0 sample script, and 4 synthetic
+  concatenations at 60/120/240/300 scenes. (2) The public benchmark's 32-script
+  manifest, `tests/fixtures/public-corpus-manifest.json`, unchanged by this
+  range, sha256
+  `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e`
+  (`tests/fixtures/public-benchmark-split.json`, also unchanged:
+  `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`). Every
+  one of the 32 rows — `sceneCount`, `words`, `health`, `verdict` — came back
+  byte-identical, so no manifest re-lock was needed and none was run
+  (`tests/core/public-benchmark.test.ts`, 28/28). **The PRIVATE AUC-24 corpus
+  was not available in this environment** (`REAL_SCRIPT_CORPUS_DIR` is unset
+  here and the corpus is local-only by copyright), so no real-corpus figure is
+  claimed for this range. `AUC24_FLOOR` is untouched at 0.622 and
+  `AUC24_DEGRADATION_ID` remains `shuffle-drop/v3`.
+- **Measured effect the identity fixtures cannot show.** The whole of this
+  range is invisible to the doctor by construction, so the two behaviours were
+  measured where they live, on the same fixture, pre-change tree vs post-change
+  tree. (i) With a one-commit ledger carrying `RAISE_CLOCK` 20 — enough for
+  `act3` on its own — and a pass-1 rewrite that prepends two lines to an
+  18-scene draft: the structure the pipeline hands pass 2 reads **act1 / 0% /
+  approachingClimax false before, act3 / 100% / approachingClimax true after**,
+  against a caller structure of act3/100%/true. In reported rules: pass 3
+  (intention) gains `CLIMAX_WITHOUT_CHOICE` and pass 6 (character-arc) gains
+  `NO_REVELATIONS` and `CLIMAX_EMOTIONALLY_FLAT`, none of which fired before;
+  pass 1's rules are identical either way, because it reads the caller's
+  structure before any re-derivation can happen. The same run with no ledger
+  passed in is unchanged from the pre-change tree in every rule — that is the
+  contrast the test pins. (ii) With two locked spans and a pass-1 edit that
+  removes the second one's text: pass 2 was handed **both spans before (the
+  lost one still at startLine 41, endLine 43, now addressing the scene above
+  it), one span after**; the result's `lostApprovedSpans` reads `[1]` — the
+  caller's own index — and a pass-2 rewrite deleting the formerly locked text
+  is accepted, as it must be once the lock is honestly gone.
+- **Runner attestation:** run in the session worktree
+  (`lane/pipeline-ledger-structure`, branched from `02d8cfb4`) on 2026-09-20 by
+  the lane agent; no API key, no private corpus. I extracted the baseline tree
+  with `git archive 02d8cfb4` myself, symlinked `node_modules` in from the real
+  checkout, ran every command in the block above here, and read each one's exit
+  code and output directly from its own log. I also ran the extended test file
+  `tests/core/revision-per-pass-diagnostics.test.ts` against this range's tree
+  with the two source edits stashed — 4 of its 18 tests failed, the first
+  failure message being "pass 3 must still read the ledger's act3 after pass 1
+  changed the draft" (expected true, actual false) — and again with them
+  restored, where all 18 pass; `tests/routes/nvm-revision.test.ts` failed 3 of
+  13 the same way and passes 13/13 restored. This is an output-identity
+  receipt, not a discrimination-statistic measurement: the private real-script
+  corpus is not present in this environment, `REAL_SCRIPT_CORPUS_DIR` is unset
+  here, and no real-corpus figure is claimed for this range. The byte-level
+  identity of all 45 reports, the pipeline's own unchanged output hash, and the
+  six unchanged public-benchmark statistics are the evidence this range owes.
+- **What a reader should NOT take from this entry.** It is an output-identity
+  receipt on committed fixtures. It shows the score did not move; it says
+  nothing about whether the score discriminates, and none of its numbers is
+  comparable to AUC-24 or to the P1 baseline.

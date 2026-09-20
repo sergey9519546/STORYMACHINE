@@ -3,7 +3,10 @@
 // Each pass diagnoses a layer, marks weak spots, and rewrites (LLM or stub).
 // Each pass diagnoses THE DOCUMENT IT IS HANDED: when a pass changes the draft,
 // the records/structure/annotations the next pass reads are re-derived from the
-// changed draft, and every approved span is re-pointed at its own text in it.
+// changed draft — with the caller's StoryCommit ledger still supplying the
+// clock pressure no text reconstruction carries — and every approved span is
+// re-pointed at its own text in it, or dropped from enforcement if that text
+// is gone.
 //
 // Passes (in order):
 //  1. structure        — act balance, midpoint pressure, reversal density
@@ -22,8 +25,9 @@
 // 14. relationship-arc — static/monotone relationships, idle emotional engine
 
 import type { CompiledScreenplay, SceneAnnotation } from '../screenplay/compile-types.ts';
-import type { StructureState } from '../screenplay/structure.ts';
+import { analyzeStructure, type StructureState } from '../screenplay/structure.ts';
 import type { ScreenplaySceneRecord } from '../screenplay/memory.ts';
+import type { StoryCommit } from '../state/StoryCommit.ts';
 import type { PassResult, ApprovedSpan, StoryContext, PassName, RevisionPass, PassInput } from './passes/types.ts';
 import { logger } from '../../lib/logger.ts';
 import { isDiagnoseOnly } from './rewrite.ts';
@@ -62,6 +66,15 @@ export interface RevisionResult {
    *  must treat the report as incomplete — health/verdict/percentiles should
    *  be withheld because the issue count may be artificially low. */
   failedPasses: PassName[];
+  /** Indices into the CALLER'S `approvedSpans` array for every span whose
+   *  locked text stopped occurring in the draft part-way through the run.
+   *  Such a span is dropped from enforcement for the rest of the run rather
+   *  than carried forward at line numbers that now address different text
+   *  (2026-09-20, review finding 5), so the caller — and, through the route's
+   *  JSON response, the author — is told which lock was let go. Empty on
+   *  every run where nothing was lost, which is every diagnose-only run and
+   *  every run with no approved spans. */
+  lostApprovedSpans: number[];
   /** ISO timestamp */
   completedAt: number;
 }
@@ -138,15 +151,38 @@ async function runDiagnosePass(
  * `records`/`structure` as PASSED IN are still the caller's — a route builds
  * them from the StoryCommit ledger (server/routes/nvm/revision.ts), which
  * carries signal no text reconstruction can — and pass 1 reads exactly those.
- * Only the re-derivation, for a draft the caller never saw, comes from the
- * text.
+ *
+ * THE LEDGER SURVIVES THE RE-DERIVATION (2026-09-20, review finding 1). The
+ * re-derived `records`/`annotations` genuinely have to come from the text —
+ * there is no ledger for a draft a pass just rewrote. `structure` is the
+ * exception, and it was the bug: analyzeFountainText() builds its structure as
+ * analyzeStructure(records, []) (fountain-analyzer.ts's own comment says so),
+ * and `commits` is the ONLY source of `totalClockPressure`
+ * (../screenplay/structure.ts), which decides `actPosition`,
+ * `completionPercent` and `approachingClimax`. Taking analyzeFountainText()'s
+ * structure wholesale therefore hard-zeroed the clock the caller had already
+ * measured: on the route path, one changed byte in pass 1 moved passes 2..14
+ * from "act 3, 100%, approaching climax" to "act 1, 0%, not approaching" —
+ * fields that ./passes/structure.ts, intention.ts, pacing.ts, payoff.ts,
+ * character-arc.ts and conflict.ts all branch on. The ledger is not a property
+ * of the draft: the same commits are valid for every pass no matter how the
+ * text moves, so the re-derivation now recomputes
+ * analyzeStructure(freshRecords, commits) rather than reading the commit-less
+ * one off analyzeFountainText(). A caller with no ledger (the doctor) passes
+ * nothing and gets `[]`, which is exactly what analyzeFountainText() would
+ * have used — hence the output-identity receipt rather than a re-measured AUC.
  *
  * Approved spans follow the text: a span is a line range into ONE document, so
  * when a pass changes the draft each span is re-located by its own excerpt
- * (./approved-spans.ts) and its line numbers rewritten. Preservation itself is
- * enforced at the rewrite seam (./rewrite-llm.ts's approvedSpansSurvive
- * rejects any rewrite that drops a locked excerpt); in stub mode nothing
- * changes anyway.
+ * (./approved-spans.ts) and its line numbers rewritten. A span whose text is
+ * no longer in the draft at all is DROPPED from enforcement for the rest of
+ * the run and reported in `lostApprovedSpans` — never re-anchored onto
+ * different text, and never carried forward at its stale line numbers, which
+ * would make ./rewrite-llm.ts's approvedSpansSurvive cut the excerpt out of
+ * the NEW document at the OLD line numbers and lock whatever happens to live
+ * there now. Preservation itself is enforced at the rewrite seam
+ * (approvedSpansSurvive rejects any rewrite that drops a locked excerpt); in
+ * stub mode nothing changes anyway.
  *
  * The RESULT's `originalFountain` is untouched by all of this: it is the draft
  * as submitted, and remains the baseline a caller diffs against.
@@ -154,8 +190,13 @@ async function runDiagnosePass(
  * @param compiled      Output of compileScreenplay()
  * @param records       Screenplay memory records from buildScreenplayMemory()
  * @param structure     Current structural state from analyzeStructure()
- * @param approvedSpans Spans the author has locked — re-pointed, never dropped
+ * @param approvedSpans Spans the author has locked — re-pointed while their
+ *                      text is findable, dropped (and reported) once it is not
  * @param onProgress    H8: Optional callback — called after each pass with progress info
+ * @param commits       The caller's StoryCommit ledger, if it has one. Read
+ *                      ONLY to recompute structure for a re-derived draft (see
+ *                      above); defaults to `[]`, which is what every
+ *                      deterministic caller already effectively used.
  */
 export async function runRevisionPipeline(
   compiled: CompiledScreenplay,
@@ -171,6 +212,13 @@ export async function runRevisionPipeline(
    *  diagnose-only fast path below. No production caller passes this —
    *  runScriptDoctor (doctor.ts) never sets it, and it defaults to false. */
   forceSequentialForTest = false,
+  /** The caller's StoryCommit ledger. Appended LAST deliberately: doctor.ts
+   *  passes `forceSequentialForTest` positionally as the 7th argument, so the
+   *  only place a new parameter can go without editing a scoring-path file
+   *  this lane does not own is after it. A caller that has a ledger and no
+   *  opinion about the test hatch passes `false` explicitly — see
+   *  server/routes/nvm/revision.ts. */
+  commits: StoryCommit[] = [],
 ): Promise<RevisionResult> {
   const originalFountain = compiled.fountain;
   const annotations = compiled.annotations ?? [];
@@ -182,6 +230,7 @@ export async function runRevisionPipeline(
       passResults: [], finalFountain: originalFountain ?? '',
       originalFountain: originalFountain ?? '',
       totalIssuesFound: 0, passesWithChanges: 0, failedPasses: [],
+      lostApprovedSpans: [],
       completedAt: Date.now(),
     };
   }
@@ -208,6 +257,8 @@ export async function runRevisionPipeline(
 
   const passResults: PassResult[] = [];
   const failedPasses: PassName[] = [];
+  /** Indices into the CALLER'S `approvedSpans`, accumulated across the run. */
+  const lostApprovedSpans: number[] = [];
   let currentFountain = originalFountain;
 
   if (isDiagnoseOnly() && !forceSequentialForTest) {
@@ -287,6 +338,12 @@ export async function runRevisionPipeline(
     let passStructure = structure;
     let passAnnotations = annotations;
     let passSpans = approvedSpans;
+    // passSpanOrigins[i] is the index passSpans[i] had in the CALLER'S array.
+    // Needed because a lost span is now removed from passSpans (review finding
+    // 5), so positions stop agreeing with the caller's after the first loss —
+    // and the warning, and `lostApprovedSpans`, must name the index the caller
+    // recognizes, not a position in an array only this loop can see.
+    let passSpanOrigins = approvedSpans.map((_span, index) => index);
     let diagnosedFountain = originalFountain;
     let spanAnchorFountain = originalFountain;
 
@@ -300,11 +357,20 @@ export async function runRevisionPipeline(
         try {
           const rediagnosed = analyzeFountainText(currentFountain);
           passRecords = rediagnosed.records;
-          passStructure = rediagnosed.structure;
+          // NOT `rediagnosed.structure` (review finding 1). That one is
+          // analyzeStructure(records, []) — the commit-less structure
+          // fountain-analyzer.ts builds because it has no ledger — and
+          // `commits` is the only source of totalClockPressure, so taking it
+          // wholesale silently reset actPosition/completionPercent/
+          // approachingClimax to "act 1, 0%, not approaching" for passes
+          // 2..14 of every route run. The records must come from the text;
+          // the ledger does not, and is as true of this draft as of the last.
+          passStructure = analyzeStructure(rediagnosed.records, commits);
           passAnnotations = rediagnosed.annotations;
           diagnosedFountain = currentFountain;
           logger.debug('revision_pass_rediagnosed', {
             passIndex: i, passName: name, sceneCount: rediagnosed.records.length,
+            actPosition: passStructure.actPosition, ledgerCommits: commits.length,
           });
         } catch (err) {
           // Keep the previous diagnostics rather than handing this pass none.
@@ -319,19 +385,42 @@ export async function runRevisionPipeline(
       if (passSpans.length > 0 && currentFountain !== spanAnchorFountain) {
         const relocation = relocateApprovedSpans(spanAnchorFountain, currentFountain, passSpans);
         if (relocation.lost.length > 0) {
-          // Indices only — never the span's text or the draft's. After an
-          // accepted LLM rewrite this cannot fire (rewrite-llm.ts's
+          // A LOST SPAN IS DROPPED, NEVER RE-ANCHORED (review finding 5).
+          // Its excerpt is not in the new draft as whole lines, so there is
+          // no honest place to point it. Keeping its old line numbers was
+          // actively harmful: from the next pass on, approvedSpansSurvive
+          // (./rewrite-llm.ts) cuts the excerpt out of the NEW document at
+          // those stale numbers and enforces whatever text now lives there —
+          // so the author's real locked lines become freely deletable while
+          // some unrelated passage is silently locked in their place, with no
+          // further warning. Re-anchoring onto the nearest different text
+          // would be worse still. Dropping it is the only option that cannot
+          // lock text the author never approved; the loss is reported here
+          // and in the result's `lostApprovedSpans` so the caller can say so.
+          const lostOriginalIndices = relocation.lost.map(position => passSpanOrigins[position]);
+          for (const originalIndex of lostOriginalIndices) {
+            if (!lostApprovedSpans.includes(originalIndex)) lostApprovedSpans.push(originalIndex);
+          }
+          // Indices only — never the span's text, its reason, or the draft's.
+          // After an accepted LLM rewrite this cannot fire (rewrite-llm.ts's
           // approvedSpansSurvive rejects a rewrite that drops a locked
           // excerpt); a non-LLM editor of the draft is not bound by that.
           logger.warn('revision_locked_span_lost_between_passes', {
             passIndex: i,
             passName: name,
-            lostSpanIndices: relocation.lost,
-            lostSpanCount: relocation.lost.length,
-            totalApprovedSpans: passSpans.length,
+            // The caller's own indices, not positions in the working array.
+            lostSpanIndices: lostOriginalIndices,
+            lostSpanCount: lostOriginalIndices.length,
+            totalApprovedSpans: approvedSpans.length,
+            remainingApprovedSpans: passSpans.length - lostOriginalIndices.length,
           });
         }
-        passSpans = relocation.spans;
+        const lostPositions = new Set(relocation.lost);
+        const kept = relocation.spans
+          .map((span, position) => ({ span, position }))
+          .filter(entry => !lostPositions.has(entry.position));
+        passSpans = kept.map(entry => entry.span);
+        passSpanOrigins = kept.map(entry => passSpanOrigins[entry.position]);
         spanAnchorFountain = currentFountain;
       }
 
@@ -376,6 +465,7 @@ export async function runRevisionPipeline(
     totalIssuesFound,
     passesWithChanges,
     failedPasses,
+    lostApprovedSpans: [...lostApprovedSpans].sort((a, b) => a - b),
     completedAt: Date.now(),
   };
 }
