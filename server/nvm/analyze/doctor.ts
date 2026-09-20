@@ -2031,6 +2031,46 @@ const METHODOLOGY_CAVEAT =
 // rounding.
 const SCENE_TERM_DISCLOSURE_MIN_POINTS = 1;
 
+/** The first scene count at which one more scene buys nothing — DERIVED from
+ *  `scarcityPenalty` rather than restated, so it can never drift from the
+ *  formula. (`SCARCITY_SATURATION_SCENES` is function-local inside
+ *  `scarcityPenalty` for the TDZ reason that function's comment gives, so a
+ *  shared module-level constant is not available to state it twice.) The
+ *  search is bounded; a term that never saturates falls back to "no
+ *  saturation" and the sentence keeps the per-document wording. */
+function sceneTermSaturationScenes(): number | null {
+  for (let n = 1; n <= 1000; n++) {
+    if (scarcityPenalty(n) === scarcityPenalty(n + 1)) return n;
+  }
+  return null;
+}
+
+/**
+ * The scene-count-term clause of the disclosure sentence.
+ *
+ * CORRECTED 2026-09-20 (disclosure pass, adversarial finding 4). This clause
+ * used to read, unconditionally, "adds the scene-count term — N point(s) at S
+ * scene(s)". Since the 2026-09-07 saturation the term is
+ * `140 / min(sceneCount, 12)`, i.e. a CONSTANT 11.667 points for every draft
+ * of 12 or more scenes — so on a 231-scene feature the old clause printed
+ * "12 point(s) at 231 scene(s)" and told a writer the term reads their scene
+ * count when it demonstrably does not: a 12-scene draft and a 400-scene draft
+ * are charged the identical 12 points. Every number in the sentence was true
+ * and the attribution was false, which is the same defect class round 2 item
+ * 6 fixed one clause earlier.
+ *
+ * So: BELOW the saturation point the count is real and is stated; AT or ABOVE
+ * it the floor is stated as a floor, with the threshold named and the
+ * document's own scene count left out of the causal claim entirely.
+ */
+function sceneTermClause(sceneTermPoints: number, sceneCount: number): string {
+  const points = Math.round(sceneTermPoints);
+  const saturation = sceneTermSaturationScenes();
+  return saturation !== null && sceneCount >= saturation
+    ? `adds the scene-count term, which sits at its floor of ${points} point(s) for any draft of ${saturation} or more scenes,`
+    : `adds the scene-count term — ${points} point(s) at ${sceneCount} scene(s) —`;
+}
+
 function buildPlainSummary(
   verdict: CoverageVerdict,
   health: number,
@@ -2092,7 +2132,7 @@ function buildPlainSummary(
       `Every diagnostic dimension scores at or above the overall (lowest: ${weakest.score.label} at ${shownWeakest}/100, `
       + `${shownGap} point(s) above it). They are different statistics, not two views of one: a dimension reads issue `
       + `density inside a single craft family, on its own curve, while the overall reads density across all of them, `
-      + `adds the scene-count term — ${Math.round(sceneTermPoints)} point(s) at ${sceneCount} scene(s) — and subtracts `
+      + `${sceneTermClause(sceneTermPoints, sceneCount)} and subtracts `
       + 'any document-scale structural deductions. So the dimension scores rank the craft families against each other; '
       + 'they do not add up to the overall, and the gap is not a number to fix inside any one of them.',
     );

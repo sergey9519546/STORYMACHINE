@@ -78,10 +78,17 @@ describe('plainSummary cannot contradict the dimension scores', () => {
       /Every diagnostic dimension scores at or above the overall/,
       'the paragraph must say the dimensions sit above the overall',
     );
+    // BELOW the saturation point (12 scenes), the scene count is a real
+    // input to the term and the sentence says so. This is the branch that
+    // 2026-09-20's finding 4 left alone — see the floor case below.
     assert.match(
       summaryOf(r),
       /adds the scene-count term — 70 point\(s\) at 2 scene\(s\)/,
       'the paragraph must name what actually drove the score, with the number',
+    );
+    assert.ok(
+      !/sits at its floor/.test(summaryOf(r)),
+      'a 2-scene draft is below the saturation point, so the floor wording must not be used here',
     );
     // The gap is quoted too (round 2 item 6): on THIS document the term and
     // the gap coincide at 70, which is exactly why the old single-number
@@ -100,7 +107,21 @@ describe('plainSummary cannot contradict the dimension scores', () => {
 
     assert.ok(shownLowest > shownHealth, `premise: the lowest dimension (${shownLowest}) must sit above the overall (${shownHealth})`);
     assert.match(summaryOf(r), /Every diagnostic dimension scores at or above the overall/);
-    assert.match(summaryOf(r), /adds the scene-count term — 12 point\(s\) at 139 scene\(s\)/);
+    // CORRECTED 2026-09-20 (finding 4). This used to pin
+    // "adds the scene-count term — 12 point(s) at 139 scene(s)". The term is
+    // `140/min(sceneCount, 12)` and is therefore a CONSTANT 11.667 points for
+    // every draft of 12 or more scenes, so "at 139 scene(s)" told the writer
+    // the term reads their scene count when it does not. The sentence now
+    // states the floor AS a floor and does not attribute it to this
+    // document's count.
+    assert.match(
+      summaryOf(r),
+      /adds the scene-count term, which sits at its floor of 12 point\(s\) for any draft of 12 or more scenes,/,
+    );
+    assert.ok(
+      !/at 139 scene\(s\)/.test(summaryOf(r)),
+      'the scene-count term may not be attributed to a count it does not depend on',
+    );
     assert.ok(!/lowest-scoring diagnostic dimension/.test(summaryOf(r)));
 
     // ROUND 2, item 6 — the regression this test could NOT catch before. The
@@ -113,12 +134,55 @@ describe('plainSummary cannot contradict the dimension scores', () => {
     assert.ok(quoted, `the sentence must quote the gap as well as the dimension; got: ${summaryOf(r)}`);
     assert.equal(Number(quoted![1]), shownLowest, 'the quoted lowest dimension must be the real one');
     assert.equal(Number(quoted![2]), shownLowest - shownHealth, 'the quoted gap must be the real displayed gap');
-    const term = Number(/scene-count term — (\d+) point\(s\)/.exec(summaryOf(r))![1]);
+    const term = Number(
+      /scene-count term(?: —|, which sits at its floor of) (\d+) point\(s\)/.exec(summaryOf(r))![1],
+    );
     assert.ok(term > Number(quoted![2]) * 2, `premise of this regression: the term (${term}) must dwarf the gap (${quoted![2]}) here, or the fixture no longer exercises it`);
     assert.ok(
       !/The gap is the length of the draft/.test(summaryOf(r)),
       'the sentence may not assert that the gap IS the scene-count term on a document where it demonstrably is not',
     );
+  });
+
+  it('the scene-count clause is the SAME sentence on a 12-scene draft and on a 231-scene feature — the term does not read the count', async () => {
+    // THE POINT OF THIS TEST (2026-09-20, finding 4). `scarcityPenalty` is
+    // `140 / min(sceneCount, 12)`, so from 12 scenes upward the term is a
+    // constant 11.667 points: a 12-scene draft and a 231-scene feature are
+    // charged the IDENTICAL amount. The old sentence rendered that constant
+    // as "12 point(s) at 231 scene(s)", which reads as a per-document number
+    // and is the misattribution this asserts is gone. Two real committed
+    // documents, 19x apart in length, must now render the clause byte-for-byte
+    // the same.
+    const twelve = await runScriptDoctor(readFileSync(path.join(REPO, 'data/screenplays/dead-frequency.fountain'), 'utf8'));
+    const feature = await runScriptDoctor(readFileSync(path.join(REPO, 'tests/fixtures/feature-length/assembled-feature.fountain'), 'utf8'));
+
+    // The premises, so this cannot pass vacuously on either side.
+    assert.equal(twelve.sceneCount, 12, 'the short side must sit exactly ON the saturation point');
+    assert.equal(feature.sceneCount, 231, 'the long side must sit far above it');
+
+    const clauseOf = (summary: string): string => {
+      const m = /adds the scene-count term[^—]*?(?:—[^—]*?—)?[^,]*, and subtracts/.exec(summary)
+        ?? /adds the scene-count term.*?and subtracts/.exec(summary);
+      assert.ok(m, `the disclosure sentence must carry a scene-count clause; got: ${summary}`);
+      return m![0];
+    };
+    const short = clauseOf(summaryOf(twelve));
+    const long = clauseOf(summaryOf(feature));
+
+    assert.equal(
+      short,
+      'adds the scene-count term, which sits at its floor of 12 point(s) for any draft of 12 or more scenes, and subtracts',
+      'the 12-scene draft must render the floor clause',
+    );
+    assert.equal(
+      long,
+      short,
+      `a 231-scene feature and a 12-scene draft must render the IDENTICAL clause, because the term is identical. Got:\n  12: ${short}\n 231: ${long}`,
+    );
+    for (const summary of [summaryOf(twelve), summaryOf(feature)]) {
+      assert.ok(!/at 12 scene\(s\)/.test(summary) && !/at 231 scene\(s\)/.test(summary),
+        `neither report may attribute the saturated term to its own scene count; got: ${summary}`);
+    }
   });
 
   it('NO-FIRE on a short whose dimensions straddle the overall: the ordinary sentence is unchanged', async () => {
