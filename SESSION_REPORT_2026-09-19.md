@@ -555,4 +555,4 @@ Independent verifier at `0b7dd404` (range `1db74c21..0b7dd404`): lint, console g
 
 ### 10.1 Final verification
 
-Recorded by the orchestrator after the last full-suite run.
+Independent verifier at `9f0ea060` (range `0b7dd404..9f0ea060`, 14 commits): lint, console gate (4 quarantine entries), brain (147 notes), server reachability (36 unreachable, all allowlisted), receipt gate on both ranges naming six scoring-path files with accepted entries, doctor output identity 45 of 45 byte-identical against `53f6e377`, public benchmark unchanged (0.5313/0.5586, 0.4063/0.4443, 1.0000/0.9473; `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` 0.5113; `AUC24_DEGRADATION_ID` `shuffle-drop/v4`), build, gates, attribution on all fourteen commits. Full suite: 14,598 tests, 0 failures, 98 skipped (env-gated). Verdict: safe to push.
