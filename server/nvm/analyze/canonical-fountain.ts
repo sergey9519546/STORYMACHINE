@@ -47,15 +47,15 @@
 // the job it was built for, on the surface it was built for.
 
 import { normalizeScreenplay, isCharacterCue } from './screenplay-normalizer.ts';
-import { parseFountain, type FountainBlock } from '../../../src/lib/fountain.ts';
+import { parseFountain, isSceneHeadingLine, type FountainBlock } from '../../../src/lib/fountain.ts';
 
-const HEADING_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
 const TRANSITION_RE = /^(CUT TO|FADE (IN|OUT|TO)|DISSOLVE( TO)?|SMASH CUT|MATCH CUT|IRIS (IN|OUT)|WIPE TO|BACK TO|INTERCUT|THE END|FADE)\b/i;
 const PAREN_TAIL_RE = /\s*\([^)]*\)\s*$/;
 const PURE_PAREN_RE = /^\([^)]*\)$/;
 
+// One grammar, shared with parseFountain — see src/lib/fountain.ts's tail.
 function isHeading(t: string): boolean {
-  return HEADING_RE.test(t) || t.startsWith('.');
+  return isSceneHeadingLine(t);
 }
 function isTransition(t: string): boolean {
   return TRANSITION_RE.test(t) || (/[A-Z]\s*TO:\s*$/.test(t) && t === t.toUpperCase() && t.length <= 20);

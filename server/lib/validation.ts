@@ -35,7 +35,7 @@ import { NECESSITY_MAX_CHARS } from './necessity-certificate.ts';
 // on this range), so importing FROM the scoring-reachable src/lib/fountain.ts
 // does not touch a scoring-path file. See realVoiceEligibleWeightRejectionReason's
 // own comment for why this is now called directly instead of hand-modelled.
-import { CHARACTER_CUE_RE, CUE_INITIAL_CLASS, CUE_LETTER_CLASS, parseFountain, type FountainBlock } from '../../src/lib/fountain.ts';
+import { CHARACTER_CUE_RE, CUE_INITIAL_CLASS, CUE_LETTER_CLASS, isSceneHeadingLine, parseFountain, type FountainBlock } from '../../src/lib/fountain.ts';
 // isCharacterCue is the OTHER cue predicate in this repo — the one
 // server/nvm/analyze/screenplay-normalizer.ts's normalizeScreenplay() itself
 // uses to decide, during its double-spaced reflow, whether a line becomes a
@@ -1004,14 +1004,14 @@ const SCENE_HEADING_PREFIX_RE = /^(INT|EXT|EST|I\/E)[. ]/;
 // drop it under VOICE_ELIGIBLE_MIN_WORDS, and skip the bound just the
 // same. The predicate has to MATCH parseFountain's, not merely
 // approximate it in either direction.
-const SCENE_SEGMENT_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
+// 2026-09-20: the regex that used to sit here is now src/lib/fountain.ts's own.
 /** True exactly when src/lib/fountain.ts's parseFountain would classify a
  *  pre-trimmed line as a `scene_heading` block. Exported for
  *  tests/security/fountain-shape-guard-cue-parity.test.ts's "ROUND 5"
  *  parity proof only — every real call site inside this file passes an
  *  already-`.trim()`-ed line, matching parseFountain's own `trimmed`. */
 export function isSceneSegmentHeading(trimmedLine: string): boolean {
-  return SCENE_SEGMENT_RE.test(trimmedLine) || trimmedLine.startsWith('.');
+  return isSceneHeadingLine(trimmedLine);  // parseFountain's own predicate, not a mirror of it (2026-09-20)
 }
 
 /** One occurrence the guard counts against the CUE-COUNT bounds (distinct/

@@ -61,7 +61,7 @@
 //      preserves correctness unconditionally while costing nothing in the
 //      common (no-boneyard) case this pass's benchmark exercises.
 
-import { parseFountain, type FountainBlock } from '../../lib/fountain.ts';
+import { parseFountain, isSceneHeadingLine, type FountainBlock } from '../../lib/fountain.ts';
 
 export interface DocLike {
   /** CodeMirror's state.doc.lines convention: >= 1, even for an empty document. */
@@ -70,19 +70,17 @@ export interface DocLike {
   lineText(lineNumber: number): string;
 }
 
-// Mirrors fountain.ts's own scene_heading test (line 63) — duplicated here
-// ONLY to bound the backward search in findSceneHeadingAnchor. It only needs
-// to be a safe upper bound on "where might a scene heading be" for that
-// search to stop; it is never the authoritative classifier (the real
-// parseFountain always re-runs over the resulting slice), so an over-eager
-// match here only makes the window larger than strictly necessary, never
-// produces a wrong decoration.
-const SCENE_HEADING_LIKE_RE =
-  /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
-
+// Fountain's scene_heading test, shared with parseFountain itself since
+// 2026-09-20 (it used to be a hand-copied mirror here). It is used ONLY to
+// bound the backward search in findSceneHeadingAnchor: it needs to be a safe
+// upper bound on "where might a scene heading be" for that search to stop,
+// and it is never the authoritative classifier (the real parseFountain always
+// re-runs over the resulting slice). Sharing the grammar narrows the window
+// slightly on `...` lines, which were never headings; a narrower window is
+// only unsafe if it can EXCLUDE a real heading, and it cannot, because the
+// predicate is now the parser's own.
 function looksLikeSceneHeading(text: string): boolean {
-  const t = text.trim();
-  return SCENE_HEADING_LIKE_RE.test(t) || t.startsWith('.');
+  return isSceneHeadingLine(text.trim());
 }
 
 // Over-approximates fountain.ts's dual-dialogue cue trigger (fountain.ts:80,
