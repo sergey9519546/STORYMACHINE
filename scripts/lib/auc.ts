@@ -268,7 +268,9 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * raising one is a measurement's job, never an edit's.
  *
  * WHAT THIS TREE MEASURES, 2026-09-20 (lane/land-feature-length-defects: the
- * branch above merged onto `main` @ e79c64b4). This is the reading a CI run of
+ * branch above merged onto `main` @ e79c64b4, then onto the session head
+ * 6ca3fcd0 — the second pass measured the same six values to the last digit,
+ * so this block describes both). This is the reading a CI run of
  * tests/core/public-benchmark.test.ts recomputes, and it is not either block
  * above: shuffle-drop 0.8750 matched-pair [0.7500, 0.9688] / 0.8291 all-pairs
  * [0.7222, 0.9268], sign counts 28/4/0, mean health gap +1.8937;
@@ -283,15 +285,34 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * STRONGER manipulation and reads it better; the two figures are not a
  * disagreement, they are two different degradations.
  *
- * SO PUBLIC_ORDER_PAIRED_FLOOR IS STALE ON PURPOSE. round4(0.5938 - 0.02) is
- * 0.5738 and the constant below is 0.5269, which is the branch's own lock. It
- * is left exactly as the branch wrote it: this lane prepares the branch for the
- * owner's real-corpus measurement and does not re-lock a floor it did not
- * measure the scoring change for. `tests/core/public-benchmark.test.ts`'s
- * idempotence check ("a re-lock on an up-to-date tree must be a no-op") is
- * therefore RED on this tree, by choice, and the choice is recorded in
- * docs/audits/2026-09-20-feature-length-defects-prep/README.md. No floor is
- * BREACHED — every one of the six measured values above is above its floor.
+ * RE-LOCKED 2026-09-20, SECOND PASS (lane/land-feature-length-defects after
+ * the session head 6ca3fcd0 was merged in — the burrowsDelta corpus-statistics
+ * hoist and five non-scoring fixes). The first pass deliberately left the
+ * floors at the branch's own lock and therefore left the suite's idempotence
+ * check ("a re-lock on an up-to-date tree must be a no-op") RED. It is closed
+ * here by running `npm run benchmark:public -- --lock` on this tree and
+ * reading the diff. EVERY FLOOR ROSE OR STAYED; not one fell:
+ *
+ *   PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR        0.855  ->  0.855   (measured 0.8750)
+ *   PUBLIC_SHUFFLE_DROP_FLOOR               0.8091 -> 0.8091   (measured 0.8291)
+ *   PUBLIC_ORDER_PAIRED_FLOOR               0.5269 -> 0.5738   (measured 0.5938)
+ *   PUBLIC_ORDER_FLOOR                      0.4951 -> 0.5069   (measured 0.5269)
+ *   PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR      0.98 ->   0.98   (measured 1.0000)
+ *   PUBLIC_DIALOGUE_FLATTEN_FLOOR             0.98 ->   0.98   (measured 1.0000)
+ *
+ * The two that moved are the two the first pass named as stale; the four that
+ * did not are already at round4(measured - 0.02) (the control pair is capped
+ * there by a measurement of exactly 1.0000). The six measured values are
+ * BYTE-FOR-BYTE the first pass's, and so are tests/fixtures/public-corpus-
+ * manifest.json and tests/fixtures/public-benchmark-split.json — the `--lock`
+ * run rewrote both fixtures and neither changed a byte. That is the intended
+ * reading of the hoist: it is a performance change on the scoring path that
+ * moves no number, and this is the second independent place that says so.
+ *
+ * THE SPLIT IS STILL REPORTED AND NOT USED. All six floors above were locked
+ * from all 32 scripts, the five holdout files included, exactly as every
+ * previous lock was. No held-out evaluation has happened on this branch either,
+ * and raising a floor does not create one.
  *
  * THE PREDICTION THIS REFUTED, kept because it is the useful part. The
  * scene-count-artifact argument (doctor.ts:2092-2093 — scarcity AUC 0.938,
@@ -359,8 +380,8 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  */
 export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0.855;
 export const PUBLIC_SHUFFLE_DROP_FLOOR = 0.8091;
-export const PUBLIC_ORDER_PAIRED_FLOOR = 0.5269;
-export const PUBLIC_ORDER_FLOOR = 0.4951;
+export const PUBLIC_ORDER_PAIRED_FLOOR = 0.5738;
+export const PUBLIC_ORDER_FLOOR = 0.5069;
 export const PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR = 0.98;
 export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.98;
 

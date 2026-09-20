@@ -965,6 +965,9 @@ a preparation lane declining to re-lock a ratchet it did not measure the scoring
 change for, not a breach: every one of the six values above is ABOVE its floor.
 The decision, and the run behind it, are in
 `docs/audits/2026-09-20-feature-length-defects-prep/README.md`.
+*(SUPERSEDED BY §14 on the same day: the second pass re-locked. The floor column
+in the table above is the one that was in the tree WHEN THIS RUN HAPPENED and is
+left as written; §14 carries the current six.)*
 
 **What this section does not say.** Every limitation in §8 applies unchanged:
 N=32 at 9-14 scenes, `ARC_DED_MIN_SCENES` = 15 so the one feature-scale
@@ -972,3 +975,47 @@ deduction wired into health never fires here, twenty of the scripts are
 agent-authored, and mechanical damage is not bad writing. Nothing here is
 comparable to AUC-24; no real-corpus figure was produced, because the private
 corpus is not present in the environment this ran in.
+
+---
+
+## 14. Second pass, 2026-09-20 — the same tree with the session head merged in, and the re-lock
+
+§13 measured `lane/land-feature-length-defects` at `058f48c0`. This section
+measures the SAME branch after `git merge --no-ff 6ca3fcd0` brought in the
+session head — the `burrowsDelta` corpus-statistics hoist (`04fb13cc`,
+bit-identical by its own receipt) plus five changes off the scoring path — and
+it is the run that re-locked the floors. `npm run benchmark:public -- --lock`,
+N=32, 2000-resample bootstrap at seed 42, `GIT_SHA=dev`.
+
+**Every one of the six measured values is byte-for-byte §13's.** That is the
+finding, and it is the second independent confirmation that the hoist moves no
+number: the corpus statistics are now computed once per pair instead of 130
+times, and the benchmark cannot tell.
+
+| channel | statistic | measured | floor before | floor after |
+|---|---|---|---|---|
+| SHUFFLE_DROP | matched-pair (PRIMARY) | 0.8750 [0.7500, 0.9688] | `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` 0.855 | **0.855** (unchanged) |
+| SHUFFLE_DROP | all-pairs | 0.8291 [0.7222, 0.9268] | `PUBLIC_SHUFFLE_DROP_FLOOR` 0.8091 | **0.8091** (unchanged) |
+| CLIMAX_RELOCATE | matched-pair (PRIMARY) | 0.5938 [0.4219, 0.7500] | `PUBLIC_ORDER_PAIRED_FLOOR` 0.5269 | **0.5738** |
+| CLIMAX_RELOCATE | all-pairs | 0.5269 [0.4639, 0.5986] | `PUBLIC_ORDER_FLOOR` 0.4951 | **0.5069** |
+| DIALOGUE_FLATTEN (control) | matched-pair | 1.0000 [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_PAIRED_FLOOR` 0.98 | **0.98** (unchanged) |
+| DIALOGUE_FLATTEN (control) | all-pairs | 1.0000 [1.0000, 1.0000] | `PUBLIC_DIALOGUE_FLATTEN_FLOOR` 0.98 | **0.98** (unchanged) |
+
+**No floor fell.** Two rose, four stayed. The four that stayed were already at
+`round4(measured − 0.02)`; the control pair is capped there by a measurement of
+exactly 1.0000. The two that rose are the two §13 named as stale, and they rose
+to the values §13 predicted arithmetically (0.5738, 0.5069). `--lock` also
+rewrote `tests/fixtures/public-corpus-manifest.json` and
+`tests/fixtures/public-benchmark-split.json`, and **neither changed a byte**, so
+no script's health, verdict or scene count moved across the merge.
+
+**What has NOT changed.** The split is still pre-registered and REPORTED, not
+used: all six floors were locked from all 32 scripts, the five holdout files
+included, so no held-out evaluation has taken place on this branch either.
+Raising a floor does not create one. Every limitation in §8 applies unchanged —
+N=32 at 9-14 scenes, `ARC_DED_MIN_SCENES` = 15 so the one feature-scale
+deduction wired into health never fires here, twenty of the scripts are
+agent-authored, mechanical damage is not bad writing. The climax-relocate
+matched-pair interval still contains 0.5. Nothing here is comparable to AUC-24,
+and no real-corpus figure was produced: the private corpus is not present in the
+environment this ran in.
