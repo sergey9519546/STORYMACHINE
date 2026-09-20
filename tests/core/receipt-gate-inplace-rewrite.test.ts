@@ -346,6 +346,133 @@ function fileBaseWithMeasuredEntry(): { dir: string; before: string } {
 // BOTH modes (structuralOnly included), so a still-PENDING in-place rewrite
 // still fails by name (see C-DANGER above) while a clean in-place edit with
 // no new entry correctly fails with "gained no new entry".
+// ---------------------------------------------------------------------------
+// A separator RULE line (`---`, `***`) after an entry is not part of its
+// span — docs/audits/2026-09-20-per-pass-diagnostics/README.md §7.
+//
+// `entriesWithSpans()`'s `contentEnd` used to trim only trailing BLANK lines
+// before the overlap test. A `---` rule between two entries (the ledger's
+// own separator convention) is not blank, so it stayed inside the PRECEDING
+// entry's span, an honest append's hunk overlapped it, and
+// `entriesModifiedInPlace()` re-validated that historical entry against
+// TODAY's field rules — failing the real 2026-09-12 entry for writing
+// `**Commands (…)**` instead of `**Command**`. Fixed by trimming trailing
+// separator lines the same way blank lines are trimmed.
+// ---------------------------------------------------------------------------
+
+// A field set shaped after the real 2026-09-12 entry's own convention
+// (`**Commands (all run in this worktree…)**`, PLURAL) — the exact phrasing
+// that does not match REQUIRED_FIELDS's singular `**Command**` pattern, so
+// re-validating this entry today fails it on a field it never claimed to
+// have in the first place.
+const oldFieldsPluralCommands = (sha: string) => [
+  '- **Date:** 2026-09-12',
+  `- **Git SHA:** \`${sha}\``,
+  '- **Commands (all run in this worktree unless noted):** `npm run measure-real`',
+  '- **Measured AUC-24:** 0.700',
+  '- **Corpus fingerprint:** 50-script manifest',
+  '- **Runner attestation:** "maintainer measured this locally on 2026-09-12."',
+  '',
+];
+const OLD_PLURAL_COMMANDS_HEADING =
+  '### 2026-09-12 — LANE OLD: pre-existing entry with a plural Commands field (historical, must never be re-validated)';
+
+/** A repo with a scoring-path file and one historical entry ALREADY FILED
+ *  whose field set would fail today's REQUIRED_FIELDS check if re-validated
+ *  (plural "Commands" instead of "Command") — the exact shape of the real
+ *  2026-09-12 ledger entry. `oldBlock` is the entry's rendered text, needed
+ *  verbatim by callers that append after it without re-touching it. */
+function fileBaseWithOldPluralCommandsEntry(): { dir: string; before: string; oldBlock: string } {
+  const dir = mkRepo();
+  writeFile(dir, DOCTOR_REL, 'export const health = 1;\n');
+  writeFile(dir, RECEIPT_REL, '# Measurement Receipts Ledger\n');
+  const initSha = commitAll(dir, 'init, no entry yet');
+  const oldBlock = entryBlock(OLD_PLURAL_COMMANDS_HEADING, oldFieldsPluralCommands(initSha));
+  writeFile(dir, RECEIPT_REL, `# Measurement Receipts Ledger\n${oldBlock}`);
+  const before = commitAll(dir, 'file the historical entry with a plural Commands field (pre-existing convention)');
+  return { dir, before, oldBlock };
+}
+
+describe('receipt gate — a separator rule after an entry is not part of its span', () => {
+  it('(g) a well-formed new entry appended after a `---` rule following an older entry that would fail today\'s validation — PASSES', () => {
+    const { dir, before, oldBlock } = fileBaseWithOldPluralCommandsEntry();
+    try {
+      writeFile(dir, DOCTOR_REL, 'export const health = 2;\n');
+      const newBlock = entryBlock(MEASURED_HEADING, fieldsMeasured(before));
+      // The old entry is byte-identical to `before` — untouched. Only the
+      // rule and the new entry are added.
+      const content = `# Measurement Receipts Ledger\n${oldBlock}---\n${newBlock}`;
+      writeFile(dir, RECEIPT_REL, content);
+      const after = commitAll(dir, 'append a well-formed new entry after a --- rule; old entry untouched');
+
+      const r = runGuard(dir, before, after);
+      assert.equal(
+        r.status,
+        0,
+        'an honest append separated by a --- rule must not re-fail an untouched historical entry.'
+        + `\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+      );
+      assert.match(r.stdout, /gained a well-formed new entry/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('(h) the same, separated by a `***` rule instead — PASSES', () => {
+    const { dir, before, oldBlock } = fileBaseWithOldPluralCommandsEntry();
+    try {
+      writeFile(dir, DOCTOR_REL, 'export const health = 2;\n');
+      const newBlock = entryBlock(MEASURED_HEADING, fieldsMeasured(before));
+      const content = `# Measurement Receipts Ledger\n${oldBlock}***\n${newBlock}`;
+      writeFile(dir, RECEIPT_REL, content);
+      const after = commitAll(dir, 'append a well-formed new entry after a *** rule; old entry untouched');
+
+      const r = runGuard(dir, before, after);
+      assert.equal(
+        r.status,
+        0,
+        'an honest append separated by a *** rule must not re-fail an untouched historical entry.'
+        + `\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+      );
+      assert.match(r.stdout, /gained a well-formed new entry/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('(i) a GENUINE in-place edit to that older entry\'s field line, beside the same rule, no new entry — still FAILS (the detector still sees real edits)', () => {
+    const dir = mkRepo();
+    writeFile(dir, DOCTOR_REL, 'export const health = 1;\n');
+    writeFile(dir, RECEIPT_REL, '# Measurement Receipts Ledger\n');
+    const initSha = commitAll(dir, 'init, no entry yet');
+    const oldBlockBefore = entryBlock(OLD_PLURAL_COMMANDS_HEADING, oldFieldsPluralCommands(initSha));
+    writeFile(dir, RECEIPT_REL, `# Measurement Receipts Ledger\n${oldBlockBefore}---\n`);
+    const before = commitAll(dir, 'file the historical entry, already followed by a --- rule');
+
+    writeFile(dir, DOCTOR_REL, 'export const health = 2;\n');
+    const editedFields = oldFieldsPluralCommands(initSha).map((line) => (
+      line.startsWith('- **Corpus fingerprint:**')
+        ? '- **Corpus fingerprint:** 51-script manifest (recount)'
+        : line
+    ));
+    const oldBlockAfter = entryBlock(OLD_PLURAL_COMMANDS_HEADING, editedFields);
+    writeFile(dir, RECEIPT_REL, `# Measurement Receipts Ledger\n${oldBlockAfter}---\n`);
+    const after = commitAll(dir, 'genuine in-place edit to the old entry\'s field line, no new entry added, rule kept');
+
+    try {
+      const r = runGuard(dir, before, after);
+      assert.equal(
+        r.status,
+        1,
+        'a genuine field-line edit inside an entry must still fail the range even when a --- rule sits '
+        + `right after it — the separator trim must not swallow real content changes.\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('receipt gate — REGRESSION: an in-place edit must never count as a NEW entry (existence test)', () => {
   it('ATTACK A: a one-word typo fix inside a previous, valid, measured entry\'s Corpus fingerprint line, no new entry — must FAIL', () => {
     const { dir, before } = fileBaseWithMeasuredEntry();

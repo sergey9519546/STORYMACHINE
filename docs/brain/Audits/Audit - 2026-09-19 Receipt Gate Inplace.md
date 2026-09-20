@@ -59,3 +59,11 @@ reviewer's probe found this lane's own fix had introduced a NEW false pass —
 fix, an appended bullet) as EXISTENCE of a new one — fixed by making
 in-place entries contribute validation only, never existence; see
 "§ Regression found in review and fixed" in the directory's README.
+
+**2026-09-20 (fix lane, `lane/receipt-gate-rule-span`):** a `---`/`***` rule
+line separating a newly appended entry from the previous one stayed inside
+the preceding entry's span (`contentEnd` trimmed only blank lines), so an
+honest append re-validated a historical entry against today's field rules —
+false-failing the real 2026-09-12 entry's plural `**Commands (…)**` field.
+Fixed by trimming trailing separator lines the same way blank lines are
+trimmed; see "§ Rule-line separator fix" in the directory's README.
