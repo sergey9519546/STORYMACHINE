@@ -2127,7 +2127,7 @@ that nobody mistakes one for the other.
      constant is not in the single-line shape it edits.
   3. The decomposition table's third row was a penalty delta labelled as a
      health delta with a contradicting sign. Corrected; the arithmetic it
-     summarises (+5.693 scarcity, −7.625 density, health up 1.931) was and is
+     summarises (+5.693 scarcity, −7.632 density, health up 1.931) was and is
      right everywhere else.
 - **Scoring-path status of THIS range:**
   `node scripts/check-scoring-receipt.mjs main..HEAD` reports **no
@@ -2596,3 +2596,272 @@ that nobody mistakes one for the other.
   using heading forms the committed corpus does not contain. It says nothing
   about whether the score discriminates, and it is not comparable to AUC-24
   or to the P1 baseline.
+
+---
+
+### 2026-09-07 — FEATURE-LENGTH DEFECTS: the health formula stops paying for deletion and for length, plus three report-honesty fixes (PENDING OWNER MEASUREMENT — no real-corpus run happened)
+
+**Branch:** `scoring/feature-length-defects`, **eighteen** commits on `main` @
+`ad3f6fa7` — the round-2 tip the reviewer re-checked is `13d64bb5` (seventeen
+commits: eight from round 1 after the rebase and split, nine from round 2), and
+the eighteenth is the correction commit that carries this sentence. *(CORRECTED
+TWICE: on 2026-09-11 this line read "six commits on `main` @ `9b199b72`" and
+there were SEVEN — the entry was written in the sixth commit and a seventh
+followed it without the count being updated; later the same day it read
+"thirteen" and "six round-2 commits" when `git rev-list --count ad3f6fa7..13d64bb5`
+was 17 with nine in round 2 — the same mechanism, three commits after the entry
+was last touched. The pre-rebase tip `4643d590`, named further down as the object
+of the round-1 review, is no longer an ancestor of either branch. The branch was
+rebased onto `ad3f6fa7`, its formula commit SPLIT into two so the two halves are
+separately landable, and the round-2 ledger is at the end of this entry.)* **This is a scoring-path change and its AUC-24 is not
+known.**
+`node scripts/check-scoring-receipt.mjs main..HEAD` exits **1** on this entry,
+which is the intended state: the entry is an honest ledger row, not a receipt.
+
+- **Command:** `npm run benchmark:public` · `npm run benchmark:public -- --lock`
+  (once, in the commit that changed the formula) ·
+  `node --experimental-strip-types tests/core/blind-pairs-discrimination.test.ts` ·
+  `node --experimental-strip-types tests/core/calibration.test.ts` ·
+  `npm run test:metamorphic` ·
+  `node scripts/check-doctor-output-identity.mjs --tree . --out <dir>` and
+  `--compare <before> <after>` · `npm run lint` · `npm test`. Every one was run
+  in the foreground in this worktree and its output read. **`npm run
+  measure-real` was NOT among them** — see the attestation below.
+- **Corpus fingerprint:** none for AUC-24 — no private corpus was read, and no
+  AUC-24 value appears anywhere in this entry. The corpus that WAS read is the
+  32 committed distributable screenplays the public benchmark scores (20 CC0 in
+  `data/screenplays/` + the 12 blind-pair fixtures), locked by sha256 per file
+  in `tests/fixtures/public-corpus-manifest.json` and
+  `tests/fixtures/public-benchmark-split.json`, both re-locked in this range.
+- **Git SHA:** measured at each commit of `scoring/feature-length-defects` in
+  turn, against the baseline `main` @ `9b199b72`; the running table in
+  `docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md` §8 carries one block per
+  commit.
+- **Measured AUC-24:** **PENDING** — the private 761-script corpus is not
+  present in this environment, so this branch has no AUC-24 number and claims
+  none.
+
+**What changed, and what moved.** Two formula constants and four report
+defects:
+
+1. `voice-delta.ts` abstains PER CHARACTER instead of per script (18 of 45
+   in-repo fixtures scored before, 44 of 45 after), with a 220x performance fix
+   (42,062 ms → 191 ms on a 200-name payload) proven bit-identical against a
+   from-scratch reference implementation, and the shape guard's cost model
+   moved with it.
+2. `ORPHAN_CLUE` gained a proper-noun / title / location guard. The critical
+   tier of a 139-scene document was eight character names; retitling the script
+   changed the writer's first instruction. It no longer can.
+3. `SUB_DENSITY_STEEPNESS` 50 → 2 and `scarcityPenalty` saturates at 15 scenes.
+4. `meanAbsDialogueShareDeltaNormalised` added, EXPOSED AND NOT WIRED — a
+   measured null (16 of 32 under `CLIMAX_RELOCATE`; wiring it lowers that
+   channel 0.5469 → 0.5156).
+5. `buildPlainSummary` / `buildStrengths` can no longer contradict the five
+   dimension scores. Strings only: output identity over all 45 fixtures is
+   **PASS modulo `plainSummary`, `strengths` and `provenance.engineCommit`**.
+
+**Public-benchmark movement (distributable text, reproducible by anyone, no
+corpus and no key):**
+
+| channel | `main` @ `9b199b72` | this branch | floor, re-locked |
+|---|---|---|---|
+| `SHUFFLE_DROP` matched-pair | 0.5313 | **0.8750** [0.7500, 0.9688] | 0.855 |
+| `SHUFFLE_DROP` all-pairs | 0.5586 | 0.8306 [0.7236, 0.9277] | 0.8106 |
+| `CLIMAX_RELOCATE` matched-pair | 0.4219 | **0.5469** [0.3750, 0.7188] | 0.5269 |
+| `CLIMAX_RELOCATE` all-pairs | 0.4673 | 0.5151 [0.4551, 0.5767] | 0.4951 |
+| `DIALOGUE_FLATTEN` control | 1.0000 / 0.9473 | 1.0000 / 1.0000 | 0.98 / 0.98 |
+
+Sign counts moved with them: shuffle-drop 17/15/0 → 28/4/0 with the mean
+health gap going from **−1.93** (the damaged copy scored higher) to **+2.10**;
+climax-relocate's exact ties fell from 11 of 32 to 1, and zero scripts remain
+pinned at health 76.0. Blind matched pairs 1 of 6 → 4 of 6, mean gap −0.0167 →
++0.3833. Calibration band monotonicity intact, 21/21, and not one of the 20
+samples moves. Metamorphic 7 hard passes; the new `stapled_shorts` witness went
+from +8.2 (registered known-failing) to −2.0 and was promoted to `hard`.
+
+**In-repo blast radius:** all 45 output-identity fixtures byte-differ; health
+moves on **25 of 45** (RMS 9.580, mean +2.944, largest +32.2 on
+`transfer-window`), **6 verdicts flip**, 5 grades flip. **Six** assertions moved
+and are each re-anchored with the measurement that justifies them, never a
+widened tolerance — the public-benchmark pinning guard is INVERTED, three
+formula spot-checks are re-run, two synthetic craft pairs return to `todo`
+with `COMPOSITE_MIN_GAP` left at 5.0, and one 1e-6 tolerance becomes the 0.1
+display rounding it always relied on. *(CORRECTED 2026-09-11: this said "Four",
+and the branch's own seventh commit moved two more —
+`tests/core/agency-signal.test.ts` and
+`tests/core/feature-scale-discrimination.test.ts` — without the count here being
+updated. The doc's §8.4 and §10 together were right; this entry, which is what
+the owner reads, was not.)* Full table:
+`docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md` §8.4.
+
+**WHAT THE OWNER'S AUC-24 RUN CAN AND CANNOT SETTLE.** *(REWRITTEN 2026-09-11.
+This paragraph said: "`scarcityPenalty` saturating at 15 scenes is
+byte-identical for every script of 15 scenes or fewer … on the private corpus,
+whose median is 118 scenes, it will move every script by roughly 8 points" and
+called that "the single largest thing the owner's run has to check". The 8 points
+was arithmetically right — `140/15 − 140/118 = 8.147` — and it pointed at the
+half of the change AUC-24 cannot see.)*
+
+Two separable things happen to a feature-length script, and only one of them can
+move a matched-pair rank statistic.
+
+* **A near-uniform LEVEL SHIFT, which cannot move AUC-24.** At the private
+  corpus's median 118 scenes the term goes from `140/118 = 1.186` to
+  `140/12 = 11.667`, so every script loses **10.480 points** (9.92 at 80 scenes,
+  10.97 at 200). That is what will move verdicts, grades and all 72 rows of
+  `tests/fixtures/real-corpus-manifest.json` — the re-lock this ledger's owner
+  note already asks for. Both halves of a matched pair lose the same amount, so
+  by itself this cannot change AUC-24 at all.
+* **THE SCARCITY CHANNEL'S DEGRADATION DELTA GOING TO EXACTLY ZERO, which can.**
+  For a 118-scene script the drop recipe leaves ~79 scenes. Before saturation
+  that term contributed `140/79 − 140/118 = +0.586` points of separation; after
+  it contributes `140/12 − 140/12 = 0.000`. For every script of roughly 22
+  scenes or more — essentially the whole private corpus — the channel
+  `doctor.ts`'s own measurements credit with AUC 0.938 contributes **nothing** to
+  this degradation.
+
+So AUC-24 **CAN** settle whether health still orders an intact feature above a
+shuffle-dropped copy of itself once the scarcity channel contributes nothing and
+the sub-1 density curve is near-linear. It **CANNOT** settle which of the two
+formula changes is responsible (they are now separate commits and
+`scoring/feature-length-saturation-only` carries the saturation alone, but
+neither half has its own AUC-24 receipt), it cannot settle whether the
+~10.5-point level shift is right (that is the manifest re-lock and the band
+averages, not an AUC), and it says nothing about craft. Whether AUC-24 stays
+above its 0.622 floor is not knowable from this repository. If it falls, that is
+a real finding about this change: do not answer it by moving the floor in
+`scripts/lib/auc.ts`.
+
+#### Round 2 (2026-09-11) — the revision round an independent review asked for
+
+The review is `docs/audits/2026-09-07-innovation/scoring-review.md` (verdict
+REVISE, nine numbered items plus cosmetics, on tip `4643d590`). Its finding was
+that five statements on the branch were untrue as written while every headline
+MEASUREMENT reproduced on the reviewer's own implementation. Round 2 closes all
+nine, in the failure direction first. **Every number below came out of a run in
+this worktree; no AUC-24 value is claimed here either.** The six commits:
+
+1. **The voice-eligible-weight bound, re-derived.** Rebasing onto `main` @
+   `ad3f6fa7` exposed a collision: main's own 2,927-line
+   `tests/fixtures/feature-length/assembled-feature.fountain` (58 eligible
+   characters, 7,655 pooled words, eligible weight 443,990) was REJECTED by the
+   300,000 bound, because this branch's per-character voice eligibility makes the
+   shape guard read the eligible subset. Re-derived to **1,500,000**, bracketed
+   from below by 3x the heaviest tracked fixture and from above by the lightest
+   PINNED payload (round-3 bypass B, real-parse weight 1,920,000). Measured worst
+   shape at the bound ~120 ms against the review's ~10 s target; no pinned
+   payload changes decision. Two new assertions hold the bound to the
+   measurement.
+2. **The length pathology, closed over ORDERINGS.** The witness passed by pinning
+   one arrangement: 7 of 14 orderings of its own twelve parts still outscored the
+   best part. `SCARCITY_SATURATION_SCENES` 15 → **12**, which is the largest value
+   at which the term contributes EXACTLY ZERO to that comparison, and the witness
+   now asserts the maximum over 14 seeded orderings. Also closes the review's
+   items 2 (the slope-constraint table's real population, its two non-reproducing
+   rows, and the four omitted scripts that are the four still inverted), 4 (the
+   third and fourth credit-cap residues, including a `CREDIT_FULL_SCENES` that
+   exists nowhere), 6 (the scene-term disclosure sentence, which quoted a 12-point
+   term as the explanation of a 4-point gap) and 7 (this entry's own framing,
+   rewritten above).
+3. **The printed caveats are rendered FROM the run.** `npm run benchmark:public`
+   printed five numbers its own table contradicted in the same output.
+   `PUBLIC_BENCHMARK_LIMITS` is now `publicBenchmarkLimits(result)`, with five
+   tests that parse the rendered text and refuse any figure the run did not
+   produce.
+4. **`ORPHAN_CLUE`'s guard, two of three shapes closed and the third measured
+   rather than claimed.** Three measured suppressions of genuine props, including
+   the exact example the guard's own comment used to justify itself. The TITLE
+   cause is fixed — the guard now excludes a title token only when it occurs
+   nowhere outside the title page, which closes the two shapes where a script is
+   named after its own central object. The LEARNING-PASS cause was narrowed
+   (requiring the introduction marker), measured, and REVERTED: it closed the
+   other two shapes and put four real character names back into the clue channel
+   on the CC0 corpus (`mise` "renee-okafor", `the-defense-rests` "judge-paretsky"
+   and "court-clerk-etta", `the-key-under-the-mat` "real-estate-agent"), because
+   the corpus also introduces people with no marker at all. "BRASS KEY" beside a
+   character called KEY is lexically identical to "JUDGE PARETSKY" beside a
+   character called PARETSKY; the corpus has four of the second and none of the
+   first. So those two shapes are `todo` fixtures with their measured id lists,
+   the false claim is removed from all three live places, and a new corpus-wide
+   property test asserts no multi-word seeded clue on any of the 20 CC0 scripts
+   shares a word with a cue name — which is what caught the four and what will
+   catch the next one at the guard instead of three files away.
+5. **The verdict tier closes on its own merits, and the NOT-WIRED guard widens.**
+   The verdict-tier assertion round 1 re-opened as `todo` is a hard check again
+   (intact 79 CONSIDER / flattened 58.2 PASS — nothing moved to meet it), the
+   GRADE-tier check beside it is labelled as the thinner of the two, and
+   `structural-signals.test.ts`'s NOT-WIRED guard now reads all 68 scoring-path
+   files instead of `doctor.ts` alone.
+6. **This receipt, the measurement doc, the owner note and the brain graph.**
+
+**Public-benchmark movement, round 2 final (re-locked twice; both before → after
+prints are in the doc's §8.3):**
+
+| channel | `main` @ `ad3f6fa7` | round 1 | round 2 final | floor |
+|---|---|---|---|---|
+| `SHUFFLE_DROP` matched-pair | 0.5313 | 0.8750 | **0.8750** [0.7500, 0.9688] | 0.855 |
+| `SHUFFLE_DROP` all-pairs | 0.5586 | 0.8306 | 0.8291 [0.7222, 0.9268] | 0.8091 |
+| `SHUFFLE_DROP` sign counts | 17/15/0 | 28/4/0 | 28/4/0 | — |
+| `SHUFFLE_DROP` mean gap | −1.93125 | +2.109375 | **+1.89375** | — |
+| `CLIMAX_RELOCATE` matched-pair | 0.4219 | 0.5469 | **0.5469** [0.3750, 0.7188] | 0.5269 |
+| `CLIMAX_RELOCATE` all-pairs | 0.4673 | 0.5151 | 0.5151 [0.4473, 0.5820] | 0.4951 |
+| `CLIMAX_RELOCATE` ties | 11 of 32 | 1 of 32 | 1 of 32 | — |
+| `DIALOGUE_FLATTEN` control | 1.0000 / 0.9473 | 1.0000 / 1.0000 | 1.0000 / 1.0000, gap 26.40 | 0.98 / 0.98 |
+| blind matched pairs | 1 of 6, −0.0167 | 4 of 6, +0.3833 | 4 of 6, +0.3833 | none |
+| calibration | MONO, gap 25.32 | unchanged | unchanged, 21/21 | — |
+| `stapled_shorts` | +8.2 KNOWN FAIL | −2.0 on ONE ordering | **−1.6 over all 14** | — |
+
+**ONE floor moved, and it moved DOWN.** The saturation move took
+`PUBLIC_SHUFFLE_DROP_FLOOR` 0.8106 → 0.8091 (all-pairs 0.8306 → 0.8291), because
+the saturation point went from 15 scenes to 12 and one of the 1,024 all-pairs
+comparisons went with it. `AUC24_FLOOR` is untouched at 0.622. It was intended,
+measured before being locked, and the `auc.ts` diff read.
+
+**A SECOND re-lock happened and was undone, and that belongs in the ledger.**
+Item 3's first attempt at the clue guard took all four measurement floors UP
+(0.855 → 0.8863, 0.8091 → 0.8233, 0.5269 → 0.5738, 0.4951 → 0.5039) on a reading
+of 0.9063 / 0.8433 / 0.5938. The one full `npm test` then showed that attempt had
+re-admitted character names (see item 4 above), it was reverted, and the four
+floors were re-locked back to exactly the values the saturation commit left. **No
+number in this entry comes from that reverted tree**, and the four floors are
+where measurement puts them on the tree that ships.
+
+**In-repo blast radius, round 2 final against `main` @ `ad3f6fa7`:** 45 fixtures
+compared, health moves on **25**, RMS **9.839**, mean **+2.292**, largest
+**+32.2** on `transfer-window`, **6 verdicts flip**, 5 grades flip. Ignored keys
+in that comparison, stated: `plainSummary` (differs in 34 of 45 — by design, the
+disclosure sentence), `strengths` (4 of 45) and `provenance.engineCommit` (45 of
+45). `node scripts/check-doctor-output-identity.mjs --compare` reports FAIL
+without those three ignores, which is the expected state for a formula change.
+
+**Three residues this round did NOT close, recorded so nobody has to rediscover
+them.** (a) Three of the 32 public scripts are still inverted under the drop —
+`transfer-window` +8.9, `room-12` +8.4, `quiet-season` +0.5 — and all three sit
+on the density POWER branch, which the sub-1 slope constraint provably cannot
+reach. (b) Below 12 scenes the scarcity term still decreases, so a staple whose
+best part is shorter than 12 scenes still collects
+`140/bestPartScenes − 140/12` for length alone (3.889 points for a 9-scene best
+part). (c) The clue guard still suppresses a prop that is comma-continued AND
+shares a word with a cue name; that shape is a `todo` fixture with its measured
+id list.
+
+**Round-2 commands, all run in the foreground in this worktree:**
+`npm run benchmark:public` · `npm run benchmark:public -- --lock` (twice, each in
+the commit that changed the formula) · `npm run test:metamorphic` ·
+`node scripts/check-doctor-output-identity.mjs --tree <main export> --out <dir>`,
+`--tree . --out <dir>` and `--compare <before> <after> --ignore-keys
+plainSummary,strengths,provenance.engineCommit` · the touched suites
+individually · `npm run lint` · `npm run check-no-console` ·
+`npm run check-docs` · `npm run honesty-audit` · `npm run check-brain` ·
+`npm test` once on the final tree.
+
+**Runner attestation:** I ran every command listed above myself, in this
+worktree, in the foreground, and read each one's output; every number in this
+entry and in `docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md` came out of
+one of those runs and none is transcribed from another document or from any
+prior measurement. I did **not** run `npm run measure-real`, and I could not:
+the private 761-script corpus is not present in this environment. No AUC-24
+value is claimed anywhere in this entry, and this entry is therefore marked
+PENDING and is not a receipt for this range. The conversion recipe — all three
+of `pendingReason`'s scans, not just the heading — is in
+`docs/brain/Owner/Owner - R5 Measurement and Merge.md`.

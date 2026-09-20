@@ -498,6 +498,75 @@ function ssrfSafeUrlField() {
 // "weight" shape, 4x the occurrences — differ by 328x: the first is under
 // MIN_WORDS, the second is not.
 //
+// ── 2026-09-07 UPDATE (branch scoring/feature-length-defects) — READ THIS
+// BEFORE THE GRID BELOW, because two of its premises changed. ──────────────
+// (1) ELIGIBILITY IS NO LONGER ALL-OR-NOTHING. voice-delta.ts's analyzeVoices
+//     used to abstain for the WHOLE script if ANY one character fell under
+//     MIN_WORDS=30 — the "binary switch" this comment describes at length.
+//     It now EXCLUDES that character from the pair set and scores the rest,
+//     because the old rule made the channel structurally dead on every real
+//     feature (they all have a one-line walk-on). So the guard's model moved
+//     with it: voiceEligibleWeightReason reads the ELIGIBLE SUBSET, and a
+//     document with one walk-on no longer skips the bound entirely. The
+//     change is strictly stricter — it rejects a superset of what it
+//     rejected before — and it closes the round-7 residual recorded at the
+//     end of this comment (a 400-scene document with a genuine walk-on,
+//     previously ACCEPTED, measured at ~12-14s).
+// (2) THE COST GRID BELOW IS NOW A HISTORICAL WORST CASE, NOT THE CURRENT
+//     ONE. Its numbers were driven by burrowsDelta re-deriving BOTH
+//     characters' full frequency tables once per function word per pair.
+//     voice-delta.ts now derives each character's table once and reuses it.
+//     Measured on this branch, same box, on the exact payload the grid's
+//     distinct=200 row describes (200 eligible names, 11,970 pooled words,
+//     19,900 pairs): analyzeVoices alone went from 42,062 ms to 191 ms, and
+//     a deliberately extreme 520-name / 249,600-word cast (weight
+//     129,792,000, 433x this bound) now costs 563 ms.
+// (3) 2026-09-11, ROUND 2 — THE BOUND IS NOW RE-DERIVED FROM THE NEW RATE,
+//     because leaving it was no longer a conservative choice but a wrong
+//     answer on a committed fixture. This branch's round 1 deliberately did
+//     NOT raise MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT ("not a scoring lane's to
+//     do unilaterally", and the suite's synthetic 150-name feature was left
+//     at 1.2x headroom). Rebasing onto main @ ad3f6fa7 settled it: main's own
+//     `tests/fixtures/feature-length/assembled-feature.fountain` — a 2,927-
+//     line legitimate feature, 58 eligible characters pooling 7,655 words,
+//     eligible weight 443,990 — is REJECTED by the 300,000 bound. A guard
+//     that refuses a feature the repository itself ships as "what a real
+//     draft looks like" is a defect, not caution, and `does not reject
+//     tests/fixtures/feature-length/assembled-feature.fountain` failed on
+//     the rebased tree before this change (that is the fail-first evidence).
+//
+//     RE-DERIVED, measured on this box, same method as the round-2 grid: the
+//     worst shape at a given weight is the one that maximises the eligible
+//     CAST (pairs grow as n²/2 while weight grows as n × 32n), so it is n
+//     uniform characters each sitting exactly on the 32-word floor. Full
+//     `analyzeFountainText` (parse + every analyzer pass + analyzeVoices), to
+//     bound what a request actually costs rather than one function:
+//
+//       n     eligible weight   pairs     analyzeFountainText   rate
+//        97           301,088    4,656                  52 ms   0.173 us/unit
+//       250         2,000,000   31,125                 156 ms   0.078 us/unit
+//       260         2,163,200   33,670                 150 ms   0.069 us/unit
+//       500         8,000,000  124,750                 501 ms   0.063 us/unit
+//
+//     The round-2 grid's worst rate was 0.022 MS/unit; it is now 0.00017
+//     ms/unit at the small end and falls with size. The rate alone would
+//     admit ~69,000,000 under the 10 s target — NOT taken. The bound is set
+//     by two LEGITIMATE-DOCUMENT constraints instead, and they bracket it
+//     tightly:
+//       lower: >= 3x headroom on the heaviest tracked fixture, main's
+//              assembled-feature at 443,990  ->  >= 1,331,970
+//       upper: strictly BELOW every payload this file pins as rejected. The
+//              binding one is round-3 bypass B (200 uniform names, 4 double-
+//              spaced hard-wrapped occurrences each), whose real-parse weight
+//              measures 1,920,000 — so the bound must stay under that or a
+//              pinned payload would start being accepted.
+//     1,500,000 is the round value inside [1,331,970, 1,920,000). It gives
+//     3.4x headroom on assembled-feature, keeps bypass A/B, R6-0/1/2 and the
+//     three round-2 payloads (5,400,000 / 18,720,000 / 19,656,000) rejected,
+//     keeps the legacy-vs-real-parse equivalence decisions identical, and its
+//     own worst shape costs ~120 ms. NO pinned payload changed decision: that
+//     is the test, not the claim.
+//
 // THE FIX (MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT below): track, per distinct
 // character (grouped by BASE NAME — stripping (V.O.)/(O.S.)/(CONT'D) the
 // same way fountain-analyzer.ts's normalizeCharacterName does before
@@ -805,12 +874,39 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 675_000;
 // But it is the fix to point at — free and bit-identical — rather than a pair
 // cap, which would move scores.
 export const MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 80;
+
+// 2026-09-20 MERGE (lane/land-feature-length-defects). The branch
+// scoring/feature-length-defects carried its own re-derivation of the weight
+// bound — 1,500,000, round 1 of the derivation above — and it is NOT taken:
+// the round-2 re-derivation in this file (675,000 at line ~759, plus
+// MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT above) is the current one, and it
+// exists precisely because 1,500,000 admits a 223-speaker x 30-word document
+// that costs 27-36 s. What IS taken from the branch is its cost MODEL: the two
+// constants below, which make the bound and the measurement that justifies it
+// fail together instead of drifting apart. They are asserted against
+// MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT as it stands here (675,000 x 0.173 us =
+// 117 ms, 85x under the target), not against the branch's rejected 1,500,000.
+/** The measured worst-shape cost rate behind MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+ *  in MICROSECONDS of full `analyzeFountainText` per unit of eligible weight,
+ *  at the SMALL end of the measured table (0.173 us/unit at weight 301,088 —
+ *  the rate falls as the shape grows, so the small end is the conservative
+ *  one). Exported so the bound and the measurement that justifies it cannot
+ *  drift apart silently: the margin-proof test multiplies the two and fails
+ *  if the product ever crosses the review's ~10 s target. Re-measure with
+ *  the n-uniform-32-word-floor shape before changing either number. */
+export const VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT = 0.173;
+/** The cost target the two constants above are held to (microseconds) — the
+ *  2026-09-05 review's own ~10 s ceiling for an accepted request. */
+export const VOICE_ELIGIBLE_WEIGHT_COST_TARGET_US = 10_000_000;
 // 2026-09-06 review round 7 follow-up, non-blocking — RESIDUAL accepted
-// worst case, recorded here rather than left unstated: a document sitting
+// worst case. CLOSED 2026-09-07 by the per-character eligibility change (see
+// this section's 2026-09-07 UPDATE): the shape below is now REJECTED, and
+// tests/security/…'s R5-6 and R4-2b controls were re-anchored to say so.
+// Kept for the measurement. A document sitting
 // at the analyzer's own 400-scene ceiling, with a genuine (not hand-model-
-// invented) one-or-two-word walk-on character, is legitimately ACCEPTED by
+// invented) one-or-two-word walk-on character, was legitimately ACCEPTED by
 // this bound (nonZeroWordCounts.length < 2, or allEligible false for a
-// REAL reason) and measures ~12-14s in runScriptDoctor — 200 names x 10
+// REAL reason) and measured ~12-14s in runScriptDoctor — 200 names x 10
 // occurrences at 125,608 chars: 12,340ms; 600 names x 15 occurrences at
 // 488,602 chars: 13,566ms; it plateaus (4x the dialogue volume adds only
 // ~10%). Both sides agree here: the walk-on really is under
@@ -1710,28 +1806,13 @@ export function legacyVoiceEligibleWeightRejectionReason(text: string): string |
       voiceWordCounts.set(occ.voiceKey, (voiceWordCounts.get(occ.voiceKey) ?? 0) + occ.dialogueWords);
     }
   }
-  const nonZeroVoiceWordCounts = [...voiceWordCounts.values()].filter((words) => words > 0);
-  if (nonZeroVoiceWordCounts.length >= 2) {
-    let allEligible = true;
-    let totalEligibleWords = 0;
-    for (const words of nonZeroVoiceWordCounts) {
-      if (words < VOICE_ELIGIBLE_MIN_WORDS) { allEligible = false; break; }
-      totalEligibleWords += words;
-    }
-    if (allEligible) {
-      const voiceEligibleWeight = nonZeroVoiceWordCounts.length * totalEligibleWords;
-      if (voiceEligibleWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) {
-        return `has too large a cast where every named character speaks enough to be individually voice-scored (more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in distinct speaking characters × their total pooled dialogue words) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
-      }
-      // Mirrors the production cast bound (2026-09-13) over this retired
-      // approximation, so the ROUND 7 equivalence proof keeps comparing the
-      // two DATA SOURCES rather than two different sets of bounds.
-      if (nonZeroVoiceWordCounts.length > MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT) {
-        return `has more speaking characters who each speak enough to be individually voice-scored than this server analyzes in one pass (${nonZeroVoiceWordCounts.length}, more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT}) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`;
-      }
-    }
-  }
-  return null;
+  // Same single implementation of the bound the real-parse path uses — see
+  // voiceEligibleWeightReason. Only the WALK differs between these two
+  // functions, which is the whole point of the round-7 equivalence test, and
+  // sharing the implementation is also what keeps the 2026-09-13 cast bound
+  // (MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT) applying to BOTH: the proof keeps
+  // comparing two DATA SOURCES rather than two different sets of bounds.
+  return voiceEligibleWeightReason(voiceWordCounts);
 }
 
 // ── Real-parse voice-eligibility bound (2026-09-06 review round 7,
@@ -1985,33 +2066,66 @@ function realVoiceEligibleWeightRejectionReason(text: string, cueLineOccurrences
   // section's own header comment for the measured 12,407ms cost of the
   // faithful (unfiltered) alternative, and the regression test pinning
   // both facts (guard rejects, analyzer abstains) on the same document.
-  const nonZeroWordCounts = [...wordCounts.values()].filter((w) => w > 0);
-  if (nonZeroWordCounts.length >= 2) {
-    let allEligible = true;
-    let totalEligibleWords = 0;
-    for (const words of nonZeroWordCounts) {
-      if (words < VOICE_ELIGIBLE_MIN_WORDS) { allEligible = false; break; }
-      totalEligibleWords += words;
-    }
-    if (allEligible) {
-      const voiceEligibleWeight = nonZeroWordCounts.length * totalEligibleWords;
-      if (voiceEligibleWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) {
-        // 2026-09-05 review round 3, LOW item — this state is a legitimate
-        // large fully-speaking ensemble, not malformed input (measured: the
-        // pre-round-2 buildPlausibleFeature() fixture, a genuine 72s
-        // payload, trips exactly this branch) — say so, not just the bound
-        // name.
-        return `has too large a cast where every named character speaks enough to be individually voice-scored (more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in distinct speaking characters × their total pooled dialogue words) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
-      }
-      // The cast bound is checked SECOND, deliberately: every payload the
-      // weight bound already rejected keeps the message it has always had (the
-      // pinned DoS/bypass fixtures carry 200-520 speakers and would otherwise
-      // all start answering with this one), so this branch only ever speaks for
-      // a document the weight bound admits.
-      if (nonZeroWordCounts.length > MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT) {
-        return `has more speaking characters who each speak enough to be individually voice-scored than this server analyzes in one pass (${nonZeroWordCounts.length}, more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT}) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`;
-      }
-    }
+  return voiceEligibleWeightReason(wordCounts);
+}
+
+/** The voice-eligible-weight bound itself, over a per-base-name pooled word
+ *  map. Factored out (2026-09-07) so the real-parse path above and the
+ *  retired legacy path below evaluate ONE implementation of the bound and
+ *  cannot drift — the round-7 equivalence test compares their decisions, and
+ *  a bound duplicated in two places is exactly the drift that test exists to
+ *  catch.
+ *
+ *  ELIGIBILITY IS PER CHARACTER, NOT ALL-OR-NOTHING (2026-09-07). This
+ *  mirrors `voice-delta.ts`'s `analyzeVoices`, which as of the same date
+ *  excludes a character under `VOICE_MIN_WORDS` from the pair set instead of
+ *  abstaining for the whole script. The old model — "evaluate a weight at
+ *  all only once EVERY distinct character clears the floor" — was a faithful
+ *  mirror of the old analyzer and is now a HOLE: with per-character
+ *  abstention a 520-name cast where 519 names are talkative and one is a
+ *  one-line walk-on runs 519 x 518 / 2 Burrows's-Delta pairs, and under the
+ *  old gate that document was never even measured against the bound (the
+ *  measured cost of exactly that shape was 322,435 ms; see this section's
+ *  header grid). The eligible SET is now what the bound reads, which is also
+ *  what the cost model always said drives the cost:
+ *  (eligible-character count) x (their total pooled words).
+ *
+ *  This makes the guard strictly stricter — it rejects a superset of what it
+ *  rejected before, never a subset — so no document that was rejected is now
+ *  accepted. What it costs is stated, not assumed: the round-7 residual
+ *  ("a document at the analyzer's own 400-scene ceiling with a genuine
+ *  one-or-two-word walk-on is legitimately ACCEPTED and measures ~12-14 s")
+ *  is closed by this change rather than left standing, and every tracked
+ *  fixture's new headroom is asserted in
+ *  tests/security/fountain-shape-guard-cue-parity.test.ts. */
+function voiceEligibleWeightReason(wordCounts: Map<string, number>): string | null {
+  let eligibleCount = 0;
+  let totalEligibleWords = 0;
+  for (const words of wordCounts.values()) {
+    if (words < VOICE_ELIGIBLE_MIN_WORDS) continue;
+    eligibleCount++;
+    totalEligibleWords += words;
+  }
+  // Under two eligible characters analyzeVoices abstains outright: there is
+  // no pair to compute and therefore no cost to bound.
+  if (eligibleCount < 2) return null;
+  const voiceEligibleWeight = eligibleCount * totalEligibleWords;
+  if (voiceEligibleWeight > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT) {
+    // 2026-09-05 review round 3, LOW item — this state is a legitimate
+    // large ensemble, not malformed input (measured: the pre-round-2
+    // buildPlausibleFeature() fixture, a genuine 72s payload, trips exactly
+    // this branch) — say so, not just the bound name.
+    return `has too large a cast of individually voice-scorable characters (more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} in characters who each speak at least ${VOICE_ELIGIBLE_MIN_WORDS} words × their total pooled dialogue words) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT`;
+  }
+  // The CAST-COUNT bound, checked SECOND and deliberately so (2026-09-13,
+  // merged here 2026-09-20): every payload the weight bound already rejects
+  // keeps the message it has always had — the pinned DoS/bypass fixtures carry
+  // 200-520 speakers and would otherwise all start answering with this one — so
+  // this branch only ever speaks for a document the weight bound admits. It
+  // bounds analyzeVoices's O(distinct^2) pair count directly, which a scalar
+  // weight cannot: weight is not a cost proxy across shapes.
+  if (eligibleCount > MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT) {
+    return `has more speaking characters who each speak enough to be individually voice-scored than this server analyzes in one pass (${eligibleCount}, more than ${MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT}) — this is a cast-size and analysis-cost limit, not a formatting error; trim the cast or split the draft — bound MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`;
   }
   return null;
 }

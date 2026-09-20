@@ -86,6 +86,14 @@ const DIALOGUE_DED_MIN_LINES = 10;
 
 const VERDICT_RANK: Record<CoverageVerdict, number> = { PASS: 0, CONSIDER: 1, RECOMMEND: 2 };
 
+/** Grade order, lowest first — the tier that still separates the flattened
+ *  fixture from its source after the 2026-09-07 density recalibration. Same
+ *  shape as VERDICT_RANK above; see that constant's own use for why a rank
+ *  map rather than a string compare. */
+const GRADE_RANK: Record<string, number> = {
+  troubled: 0, uneven: 1, solid: 2, strong: 3, excellent: 4,
+};
+
 /** Ordered scene bodies, slug included, for the permutation invariant. */
 function sceneBlocks(fountain: string): string[] {
   return scenesFromFountain(fountain).map(s => s.trim()).filter(Boolean);
@@ -246,12 +254,59 @@ describe('Feature-scale discrimination — dialogueDeduction moves health', () =
       `both fixtures must produce a verdict (intact ${String(intact.verdict)}, ` +
       `flattened ${String(flattened.verdict)})`,
     );
+    // The GRADE tier still separates. Asserted here, and labelled honestly
+    // (round 2, item 9a): this is the THINNER of the two tier checks in this
+    // file, not an equal partner to the verdict-tier one below. The grade
+    // boundary it crosses is 75, and with the 20.0-point delta gate two lines
+    // up enforced, any intact score below 95 makes a grade drop arithmetically
+    // implied — so on these fixtures it adds little beyond the gate. It is kept
+    // because the two checks read DIFFERENT thresholds (grade 75, verdict 60)
+    // and a future fixture could cross one without the other, not because it is
+    // strong evidence on its own. Measured on this tree: intact 79 `strong`,
+    // flattened 58.2 `solid`.
     assert.ok(
-      VERDICT_RANK[flattened.verdict] < VERDICT_RANK[intact.verdict],
+      GRADE_RANK[flattened.grade] < GRADE_RANK[intact.grade],
       `a draft whose dialogue has collapsed to one repeated word must not hold the same ` +
-      `verdict tier as the draft it came from (intact ${intact.verdict}, ` +
-      `flattened ${flattened.verdict}). With dialogueDeduction forced to zero both sides ` +
-      'read CONSIDER, which is the regression this assertion catches.',
+      `GRADE as the draft it came from (intact ${intact.health} ${intact.grade}, ` +
+      `flattened ${flattened.health} ${flattened.grade})`,
     );
   });
+
+  // RE-OPENED as `todo` 2026-09-07 and CLOSED AGAIN 2026-09-11 (round 2), on
+  // its own merits and not by moving anything.
+  //
+  // The history, because a re-opened-then-closed assertion is worth less than
+  // the record of why. Round 1 of this branch recalibrated the sub-1 density
+  // curve, which lifted short-and-mid-length scripts generally, and this
+  // 21-scene fixture crossed back over the PASS line: intact 81.4 CONSIDER,
+  // flattened 60.5 CONSIDER — a 20.9-point drop that landed 0.5 points ABOVE
+  // health 60. The delta gate and the grade drop still passed, so the honest
+  // move was a `todo` carrying the number rather than a deleted assertion, a
+  // widened gate, or a moved PASS line. The comment said what would close it:
+  // "the flattened fixture scoring below 60 again on its own merits".
+  //
+  // That is what happened. Round 2 moved the scarcity saturation point from 15
+  // scenes to 12 and fixed three false suppressions in the clue guard, and the
+  // fixture now measures intact 79 CONSIDER / flattened 58.2 PASS — a
+  // 20.8-point drop that crosses the line by 1.8. Neither change was made for
+  // this assertion and neither threshold moved: health 60 is still the PASS
+  // ceiling and the delta gate is still 20.0. Re-measure before touching it.
+  it(
+    'flattening every line of dialogue drops the VERDICT tier too',
+    async () => {
+      const intact = await runScriptDoctor(INTACT);
+      const flattened = await runScriptDoctor(DIALOGUE_FLATTENED);
+      assert.ok(
+        intact.verdict !== undefined && flattened.verdict !== undefined,
+        `both fixtures must produce a verdict (intact ${String(intact.verdict)}, `
+        + `flattened ${String(flattened.verdict)})`,
+      );
+      assert.ok(
+        VERDICT_RANK[flattened.verdict] < VERDICT_RANK[intact.verdict],
+        `a draft whose dialogue has collapsed to one repeated word must not hold the same `
+        + `verdict tier as the draft it came from (intact ${intact.verdict}, `
+        + `flattened ${flattened.verdict})`,
+      );
+    },
+  );
 });

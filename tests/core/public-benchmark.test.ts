@@ -79,6 +79,9 @@ import {
   measurePublicBenchmark,
   partitionFor,
   relockFloorSource,
+  blindPairOrdering,
+  pinnedScriptCount,
+  publicBenchmarkLimits,
   type ScriptRow,
 } from '../../scripts/lib/public-benchmark.ts';
 
@@ -315,25 +318,32 @@ describe('public benchmark — the pre-registered split', () => {
 });
 
 describe('public benchmark — the three degradations', () => {
-  it('CLIMAX_RELOCATE\'s N is a third frozen — 10 exact ties, 9 of them scripts pinned at health 76.0', () => {
-    // Round-2 review finding 6.7. Ten of the 32 intact scripts sit at exactly
-    // health 76.0 (a saturated density penalty at 10.0 plus a 14.0 scarcity
-    // term). Relocating a scene inside a script that is already pinned cannot
-    // move it, so 10 of 32 pairs are EXACT ties contributing 0.5 apiece by
-    // construction — 11 until the 2026-09-12 position-one fix, which unfroze one
-    // pair. That is why this channel's interval is narrower than shuffle-drop's
-    // — pinning, not precision — and the number is asserted so the reason cannot
-    // quietly stop being true while the interval keeps looking tight.
+  it('CLIMAX_RELOCATE\'s N is no longer frozen — the density pin is gone, so the ties are too', () => {
+    // INVERTED 2026-09-07 (branch scoring/feature-length-defects), which is
+    // what this assertion's own failure message asked for: "If the density
+    // cap stopped pinning scripts, that is a real scoring change and the
+    // interval means something different now."
+    //
+    // Round-2 review finding 6.7 recorded the opposite state and it was
+    // right about it: ten of the 32 intact scripts sat at exactly health 76.0
+    // (the sub-1 density penalty at its 10-point saturation plus a 14.0
+    // scarcity term), so 11 of 32 CLIMAX_RELOCATE pairs were EXACT ties
+    // contributing 0.5 apiece by construction, and the channel's narrow
+    // interval was pinning rather than precision. The sub-1 curve's steepness
+    // moved 50 -> 2 and that saturation is gone: measured now, 1 tie of 32
+    // and 0 scripts at exactly 76.0. The assertion is inverted rather than
+    // deleted, so a change that REINTRODUCES the pin fails here.
     const pinnedAt76 = result.scripts.filter((s) => s.health === 76.0).length;
     assert.ok(
-      climaxRelocate.tied >= 8,
-      `only ${climaxRelocate.tied} of ${climaxRelocate.n} CLIMAX_RELOCATE pairs are exact ties (was 10). If the `
-      + 'density cap stopped pinning scripts, that is a real scoring change and the interval means something '
-      + 'different now — re-read the doc\'s tie discussion before trusting the AUC.',
+      climaxRelocate.tied <= 3,
+      `${climaxRelocate.tied} of ${climaxRelocate.n} CLIMAX_RELOCATE pairs are exact ties (was 11 before the `
+      + 'density recalibration, 1 after). A rising tie count means a saturation came back and the interval is '
+      + 'narrowing on pinning again — read the doc\'s tie discussion before trusting the AUC.',
     );
     assert.ok(
-      pinnedAt76 >= 6,
-      `only ${pinnedAt76} scripts sit at exactly health 76.0 (was 10) — the pinning that explains the ties changed`,
+      pinnedAt76 <= 2,
+      `${pinnedAt76} scripts sit at exactly health 76.0 (was 10 before the density recalibration, 0 after) — `
+      + 'the saturation that froze a third of this channel is back',
     );
     assert.equal(
       climaxRelocate.ordered + climaxRelocate.inverted + climaxRelocate.tied,
@@ -620,5 +630,93 @@ describe('public benchmark — the numbers in the docs are the numbers the code 
       + 'rather than being filed next to the AUC-24 receipts.',
     );
     assert.match(receipts, /npm run benchmark:public/);
+  });
+});
+
+// ── The printed narrative may not contradict the printed table ──────────────
+// ROUND 2, item 5. An independent reviewer ran `npm run benchmark:public` on
+// this branch and found the caveats block printing FIVE numbers the same
+// output's own table contradicted forty lines above: shuffle-drop
+// "0.5313 / 0.5586" under a table reading 0.8750 / 0.8306, "ALL FOUR intervals
+// contain 0.5" when the shuffle-drop intervals no longer did, "Control:
+// 1.0000 / 0.9473" against 1.0000 / 1.0000, "Ten of the 32 scripts sit pinned
+// ... 11 of 32 pairs are EXACT ties" against 0 pinned and 1 tie, and "1 of 6"
+// blind pairs against 4 of 6. Nothing caught it: the block was a frozen string
+// and no test referenced it. `publicBenchmarkLimits` now renders it from the
+// BenchmarkResult, and these assertions are the guard that keeps it that way —
+// they parse the RENDERED TEXT and refuse any figure the run did not produce,
+// so a future hard-coded number fails here rather than shipping as a
+// contradiction.
+describe('public benchmark — the printed caveats agree with the printed measurement', () => {
+  const rendered = publicBenchmarkLimits(result);
+
+  it('every four-decimal figure in the caveats is a value this run produced', () => {
+    const allowed = new Set<string>(['0.5000']);
+    for (const d of result.degradations) {
+      for (const v of [d.aucPaired, d.aucAllPairs, d.ciPaired.lo, d.ciPaired.hi, d.ciAllPairs.lo, d.ciAllPairs.hi]) {
+        allowed.add(v.toFixed(4));
+      }
+    }
+    allowed.add(blindPairOrdering(result).meanGap.toFixed(4));
+    const found = [...rendered.matchAll(/\d\.\d{4}/g)].map((m) => m[0]);
+    assert.ok(found.length >= 10, `the caveats must still quote the measurement; found ${found.length} figures`);
+    const stale = [...new Set(found)].filter((v) => !allowed.has(v));
+    assert.deepEqual(
+      stale,
+      [],
+      `the caveats quote ${stale.join(', ')}, which this run did not produce. A caveat that contradicts the `
+      + 'number it qualifies is the defect round 2 item 5 closed — interpolate it from the result.',
+    );
+  });
+
+  it('the pinned-script and tie counts in the caveats are the measured ones', () => {
+    const pinned = pinnedScriptCount(result);
+    assert.match(
+      rendered,
+      new RegExp(`${pinned} of the ${result.scripts.length} scripts sit pinned`),
+      `the caveats must report the measured pinned count (${pinned})`,
+    );
+    assert.match(
+      rendered,
+      new RegExp(`${climaxRelocate.tied} of\\s+${climaxRelocate.n} pairs`),
+      `the caveats must report the measured tie count (${climaxRelocate.tied})`,
+    );
+    const movable = climaxRelocate.n - climaxRelocate.tied;
+    assert.match(rendered, new RegExp(`rests on ${movable} movable scripts`));
+  });
+
+  it('the blind-pairs count in the caveats is recomputed, not retyped', () => {
+    const blind = blindPairOrdering(result);
+    assert.equal(blind.of, 6, 'the corpus must still carry six blind pairs');
+    assert.match(rendered, new RegExp(`\\(${blind.ordered} of ${blind.of} ordered`));
+    // And it must agree with the dedicated craft test's own reading, which is
+    // the other place this number lives.
+    assert.ok(blind.ordered >= 0 && blind.ordered <= 6);
+  });
+
+  it('the interval verdict states which intervals contain 0.5, and is right', () => {
+    const measurement = result.degradations.filter((d) => d.role === 'measurement');
+    const intervals = measurement.flatMap((d) => [d.ciPaired, d.ciAllPairs]);
+    const crossing = intervals.filter((i) => i.lo <= 0.5 && i.hi >= 0.5).length;
+    if (crossing === intervals.length) {
+      assert.match(rendered, /ALL FOUR of the measurement intervals contain 0\.5/);
+    } else if (crossing === 0) {
+      assert.match(rendered, /NONE of the four measurement intervals contains 0\.5/);
+    } else {
+      assert.match(rendered, new RegExp(`${crossing} of the four measurement intervals still contain 0\\.5`));
+      // Named, not counted only — a reader has to be able to tell WHICH.
+      for (const [id, label] of [['SHUFFLE_DROP', 'shuffle-drop'], ['CLIMAX_RELOCATE', 'climax-relocate']] as const) {
+        const d = byId.get(id)!;
+        if (d.ciPaired.lo <= 0.5 && d.ciPaired.hi >= 0.5) {
+          assert.match(rendered, new RegExp(`${label} matched-pair`));
+        }
+      }
+    }
+  });
+
+  it('the caveats name the control with its measured sign counts and gap', () => {
+    const control = result.degradations.find((d) => d.role === 'control')!;
+    assert.match(rendered, new RegExp(`${control.ordered} of ${control.n} scripts with ${control.tied} ties`));
+    assert.match(rendered, new RegExp(`${control.meanGap.toFixed(2)} points`));
   });
 });

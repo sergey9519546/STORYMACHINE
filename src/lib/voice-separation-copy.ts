@@ -45,8 +45,10 @@
 //     SPEAKS, so "81 characters" is not evidence that two of them have
 //     dialogue, and this module does not pretend otherwise.
 //
-// The per-character abstention that would let the channel report at feature
-// length is on the owner-gated scoring branch and is deliberately untouched.
+// The per-character abstention that lets the channel report at feature length
+// arrived with scoring/feature-length-defects and was merged on 2026-09-20, so
+// the tile now has a THIRD state — reported, but on a subset of the cast — and
+// `voiceSeparationTooltip` below owns that sentence too.
 //
 // Pure, no I/O — safe in the browser bundle and in a server renderer. It reads
 // a report field and returns a string; nothing here can move a score.
@@ -57,6 +59,11 @@
 export interface VoiceAnalysisReading {
   pairs: ReadonlyArray<{ swapRisk: boolean }>;
   scored: boolean;
+  /** The characters the analyzer held OUT of the pair set because each speaks
+   *  under VOICE_MIN_WORDS — populated since the per-character abstention
+   *  change. Optional, because a report written before that change carries no
+   *  such field and every surface here must still render. */
+  excludedCharacters?: ReadonlyArray<string>;
 }
 
 /** The label every surface uses for this channel. */
@@ -133,9 +140,27 @@ export function voiceSeparationAbstentionReason(
     + 'so the channel reports nothing rather than a pair count the text cannot support.';
 }
 
+/** Appended to VOICE_SEPARATION_DEFINITION when the analyzer held characters
+ *  out of the pair set. Until the per-character abstention change a single
+ *  character under the 30-word floor abstained the WHOLE analysis, so the tile
+ *  read N/A on every feature-length script while the definition promised a
+ *  per-pair filter the code did not implement. The filter is per character now,
+ *  and this names who it dropped, so a partial matrix is never unexplained.
+ *  It lives here, with the other three sentences, because
+ *  tests/core/voice-separation-abstention.test.ts holds every surface to
+ *  stating this channel in the module's words rather than its own. */
+export const VOICE_SEPARATION_EXCLUDED_PREFIX =
+  'Characters with under 30 words of dialogue are left out of the pairs, not scored against '
+  + 'anybody:';
+
+/** How many held-out names the sentence lists before it counts the rest. */
+const VOICE_SEPARATION_EXCLUDED_SHOWN = 6;
+
 /**
- * The tooltip for the tile, in whichever of its two states it is in: the
- * reading instruction when there is a reading, the reason when there is not.
+ * The tooltip for the tile, in whichever of its THREE states it is in: the
+ * reason when the channel abstained, the reading instruction when it reported
+ * on everybody, and the reading instruction plus the held-out names when it
+ * reported on a subset.
  *
  * One function rather than a ternary at each surface, for the reason
  * src/lib/percentile-copy.ts's header records about the comparability gate: a
@@ -145,6 +170,13 @@ export function voiceSeparationTooltip(
   voiceAnalysis: VoiceAnalysisReading | null | undefined,
   characterCount: number,
 ): string {
-  return voiceSeparationAbstentionReason(voiceAnalysis, characterCount)
-    ?? VOICE_SEPARATION_DEFINITION;
+  const abstained = voiceSeparationAbstentionReason(voiceAnalysis, characterCount);
+  if (abstained !== null) return abstained;
+  const excluded = voiceAnalysis?.excludedCharacters ?? [];
+  if (excluded.length === 0) return VOICE_SEPARATION_DEFINITION;
+  const shown = excluded.slice(0, VOICE_SEPARATION_EXCLUDED_SHOWN).join(', ');
+  const rest = excluded.length > VOICE_SEPARATION_EXCLUDED_SHOWN
+    ? ` and ${excluded.length - VOICE_SEPARATION_EXCLUDED_SHOWN} more`
+    : '';
+  return `${VOICE_SEPARATION_DEFINITION} ${VOICE_SEPARATION_EXCLUDED_PREFIX} ${shown}${rest}.`;
 }

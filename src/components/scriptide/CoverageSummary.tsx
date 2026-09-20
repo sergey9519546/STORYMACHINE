@@ -647,6 +647,13 @@ export default function CoverageSummary({
   }, [onClose]);
 
   const top = report?.topPriorities?.[0];
+  // The Voice Separation tile's description is state-dependent — scored with
+  // everybody in, scored with sparse characters held out, or not scored at all
+  // — and every one of those three sentences belongs to
+  // src/lib/voice-separation-copy.ts, not to this file. The 2026-09-20 merge
+  // moved the held-out branch (this branch's own contribution) into
+  // `voiceSeparationTooltip` rather than keeping a second copy of the wording
+  // here; the tile passes its state and takes the sentence back.
   const root = report?.rootCauses?.[0];
   const reportIsComplete = report ? isWholeDraftAnalysisComplete(report) : false;
   // The span the "Jump to line" button targets. A root cause already carries

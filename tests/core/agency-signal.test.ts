@@ -407,10 +407,39 @@ interface CorpusRow {
   d2Disagreement: boolean;
 }
 
+// RE-MEASURED 2026-09-07 (branch scoring/feature-length-defects), per this
+// table's own instruction ("re-measure the whole table"). THREE cells moved,
+// all in the same direction and all for one reason:
+//
+//   code-blue.fountain          d2Disagreement  false -> true
+//   the-defense-rests.fountain  d2Disagreement  false -> true
+//   the-detour.fountain         d1Disagreement  false -> true
+//
+// Nothing else in the table changed: every protagonist, scene count, peak
+// scene set, `anyAgencyAtPeak`, `allSpectatorAtPeak` and act-3 count is
+// identical, and the whole table was re-run rather than the three rows
+// patched.
+//
+// THE MECHANISM, and it is worth reading before treating this as drift.
+// `legacyIsPassive` (agency-signal.ts) reproduces structure.ts's
+// PROTAGONIST_PASSIVITY_CLIMAX predicate exactly, and one of its three terms
+// is `record.seededClueIds.length === 0`. The same branch gave the clue
+// channel a proper-noun / title / location guard, because at feature scale
+// `ORPHAN_CLUE`'s critical tier was eight character names and retitling a
+// script changed the writer's first instruction. Removing those name-seeds
+// leaves some scenes with zero seeded clues that previously had some, so the
+// legacy predicate now calls them passive — and the agency-aware read
+// DISAGREES with it on three more scripts.
+//
+// These two stats exist to measure exactly that disagreement (they are
+// bounded comparison stats, NOT rules and NOT deductions — see this module's
+// header), so a rise here is the instrument reading, not the instrument
+// breaking: it says the legacy predicate was partly propped up by clue-seeds
+// that were character names. Both are UNWIRED, so no score moves with them.
 const LOCKED_CORPUS_TABLE: CorpusRow[] = [
   { file: 'chain-of-custody.fountain', protagonist: 'NELL', sceneCount: 13, peakSceneIdxs: [0, 1, 3, 7], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
   { file: 'close-quarters.fountain', protagonist: 'ROSALIND', sceneCount: 13, peakSceneIdxs: [5], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
-  { file: 'code-blue.fountain', protagonist: 'RIVA', sceneCount: 14, peakSceneIdxs: [5], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
+  { file: 'code-blue.fountain', protagonist: 'RIVA', sceneCount: 14, peakSceneIdxs: [5], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: true },  // d2 re-measured 2026-09-07
   { file: 'counter-offer.fountain', protagonist: 'WREN', sceneCount: 10, peakSceneIdxs: [0, 2], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
   { file: 'dead-frequency.fountain', protagonist: 'MAYA', sceneCount: 12, peakSceneIdxs: [4, 8], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 3, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
   { file: 'high-voltage.fountain', protagonist: 'JUNE', sceneCount: 13, peakSceneIdxs: [0, 1, 2, 5, 9], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
@@ -422,8 +451,8 @@ const LOCKED_CORPUS_TABLE: CorpusRow[] = [
   { file: 'runoff.fountain', protagonist: 'SARA', sceneCount: 9, peakSceneIdxs: [8], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
   { file: 'same-page.fountain', protagonist: 'ALEX', sceneCount: 11, peakSceneIdxs: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
   { file: 'soft-launch.fountain', protagonist: 'NADIA', sceneCount: 12, peakSceneIdxs: [0, 2], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
-  { file: 'the-defense-rests.fountain', protagonist: 'DESI', sceneCount: 12, peakSceneIdxs: [1, 3, 4, 5, 6, 7, 9, 10, 11], anyAgencyAtPeak: true, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
-  { file: 'the-detour.fountain', protagonist: 'MAYA', sceneCount: 11, peakSceneIdxs: [0, 1, 2, 3, 4, 5, 8, 9], anyAgencyAtPeak: true, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: true },
+  { file: 'the-defense-rests.fountain', protagonist: 'DESI', sceneCount: 12, peakSceneIdxs: [1, 3, 4, 5, 6, 7, 9, 10, 11], anyAgencyAtPeak: true, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: true },  // d2 re-measured 2026-09-07
+  { file: 'the-detour.fountain', protagonist: 'MAYA', sceneCount: 11, peakSceneIdxs: [0, 1, 2, 3, 4, 5, 8, 9], anyAgencyAtPeak: true, allSpectatorAtPeak: false, act3InitiativeCount: 1, act3SceneCount: 3, d1Disagreement: true, d2Disagreement: true },  // d1 re-measured 2026-09-07
   { file: 'the-key-under-the-mat.fountain', protagonist: 'NORA', sceneCount: 11, peakSceneIdxs: [2], anyAgencyAtPeak: false, allSpectatorAtPeak: true, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
   { file: 'transfer-window.fountain', protagonist: 'DEV', sceneCount: 10, peakSceneIdxs: [1, 4], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 3, d1Disagreement: false, d2Disagreement: false },
   { file: 'two-lane.fountain', protagonist: 'CORA', sceneCount: 13, peakSceneIdxs: [1, 9], anyAgencyAtPeak: false, allSpectatorAtPeak: false, act3InitiativeCount: 0, act3SceneCount: 4, d1Disagreement: false, d2Disagreement: false },
@@ -472,11 +501,14 @@ describe('agency-signal — measured evidence table over the 20 tracked CC0 scri
     assert.ok(allSpectatorCount > 0 && allSpectatorCount < n, `allSpectatorAtPeak fired on ${allSpectatorCount}/${n} scripts — expected selective, not 0 or all`);
     // D1/D2 disagreement is the rarer, higher-bar event (legacy predicate
     // must ALSO match the passivity shape, on top of this module finding
-    // agency) — measured at 1/20 and 3/20 respectively. Assert bounds, not
-    // exact re-derivation of the count here, so the per-file test loop
-    // above (which DOES pin exact values) remains the single source of
-    // truth for any single script's read.
-    assert.equal(d1DisagreeCount, 1, 'measured 2026-08-04: mise.fountain only');
-    assert.equal(d2DisagreeCount, 3, 'measured 2026-08-04: quiet-season.fountain, the-detour.fountain, undertow.fountain');
+    // agency) — measured at 1/20 and 3/20 in 2026-08-04, and at 2/20 and
+    // 5/20 after the 2026-09-07 clue-channel proper-noun guard. Assert exact
+    // counts here, not bounds, so a silent drift in either direction shows
+    // up; the per-file loop above remains the single source of truth for any
+    // single script's read, and the header explains the mechanism behind the
+    // rise (fewer name-seeds means the legacy predicate calls more scenes
+    // passive, so the agency-aware read disagrees with it more often).
+    assert.equal(d1DisagreeCount, 2, 'measured 2026-09-07: mise.fountain, the-detour.fountain');
+    assert.equal(d2DisagreeCount, 5, 'measured 2026-09-07: quiet-season, the-detour, undertow, code-blue, the-defense-rests');
   });
 });

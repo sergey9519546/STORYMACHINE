@@ -17,6 +17,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import {
+  publicBenchmarkLimits,
   PUBLIC_BENCHMARK_LIMITS,
   PUBLIC_CONTROL_RATIONALE,
   PUBLIC_CORPUS_SETS,
@@ -223,7 +224,7 @@ async function main(): Promise<void> {
   out('-'.repeat(78));
   out(PUBLIC_CONTROL_RATIONALE);
   out('-'.repeat(78));
-  out(PUBLIC_BENCHMARK_LIMITS);
+  out(publicBenchmarkLimits(result));
   out('-'.repeat(78));
 
   if (lock) {

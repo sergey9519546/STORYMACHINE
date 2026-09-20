@@ -1670,7 +1670,219 @@ function tokenEvidenceByScene(text: string, token: string): ClueEvidence {
  *  introduction ordering is now detected instead of being silently relabeled.
  *  The content-word channel enters only for clusters that pass the information
  *  test; the rest are returned as recurring imagery. */
-function detectClueLifecycle(scenes: SceneUnit[]): {
+// -- Proper-noun / title / location guard for the clue channel (2026-09-07) --
+// MEASURED DEFECT this closes, on a 139-scene document: 8 of the 10 top
+// priorities were ORPHAN_CLUE, and the letter printed the top three verbatim
+// under "PRIORITIES TO ADDRESS FIRST" -- every one of them a character's full
+// name ("ramon-delgado", "detective-osei", "ray-bellweather") or the script's
+// own title. Retitling the same body ZEBRA PANCAKE QUANTUM produced the
+// critical finding *Clue "zebra-pancake-quantum" was planted in Scene 1 but
+// never paid off*, which is a controlled experiment, not an anecdote: the
+// first thing a writer is told to fix moved because the title page changed.
+//
+// WHY THE EXISTING GUARD MISSED THEM. detectClueLifecycle already refuses a
+// caps token EQUAL to a dialogue cue. Three shapes walk straight past that:
+//
+//   1. A cue of "NELL" against an inline introduction reading "DISPATCHER
+//      NELL ARCEO (40s)" -- CAPS_TOKEN_RE takes up to three caps words, so
+//      the token is "dispatcher nell arceo" and set equality fails.
+//   2. The title page. segmentScenes prepends every block before the first
+//      scene heading into scene 1 (see its own code), so `Title: THE LONG
+//      WAY DOWN` is scene-1 body text to this walk and seeds "long way" and
+//      "down" as plants owed a payoff.
+//   3. A location out of a scene heading recurring as inline caps in action.
+//
+// This is EXCLUSION, not suppression: no rule is silenced and no catalogue
+// entry is added or removed. A token that is a name, a title word, or a
+// location is simply not a clue candidate, which is what the channel already
+// claimed about names and only half-implemented.
+//
+// The per-WORD test is deliberately "EVERY word is a name word", never "any":
+// "BRASS KEY" beside a character called KEY stays a clue, because `brass` is
+// not a name word. That asymmetry is the whole difference between excluding
+// proper nouns and excluding half the props in the script.
+//
+// ── ROUND 2 (2026-09-11): the asymmetry above was FALSE as first shipped, and
+// two more shapes suppressed genuine props. An independent review measured all
+// three on this file's own fixture body:
+//
+//   (i)  `BRASS KEY` beside a character called KEY did NOT stay a clue. The
+//        full-name learning pass below read the caps run "BRASS KEY", saw that
+//        it contained the already-known cue word `key`, and added `brass` to
+//        nameWords — after which `words.every(w => nameWords.has(w))` was true
+//        and the prop was excluded. The exact example the comment used to
+//        justify "every, never any" was the counterexample, and
+//        clue-proper-noun-guard.test.ts's FIRES case never put a character
+//        called KEY in the script, so the claim was asserted in three places
+//        and tested in none.
+//   (ii) A script TITLED after its central object lost that object. Title
+//        `THE BRASS KEY` + prop `BRASS KEY` seeded nothing for the prop (and
+//        admitted a nonsense cluster id instead); a one-word real-word title
+//        (`LEVERAGE`) with a prop of the same name silenced the channel
+//        entirely. Screenplays are routinely named after the thing the story
+//        turns on, so this was not an edge case.
+//   (iii) One step of outward chaining into a prop was enough to delete it.
+//        The comment below claimed "the set cannot chain outward through
+//        unrelated props"; a caps phrase "MARA REVOLVER" in an action line
+//        taught `revolver` as a name word and the REVOLVER stopped being a
+//        clue, while the same body with the prop never cue-adjacent kept it.
+//
+// ONE of the two causes is fixed below and the other is not, and which is
+// which matters. The TITLE cause IS fixed: the guard now excludes a title token
+// only when it occurs nowhere outside the title-page region, so shapes (ii)a
+// and (ii)b are closed and are hard fixtures. The LEARNING-PASS cause is NOT:
+// narrowing it was tried, measured, and reverted because it re-admitted four
+// real character names on the 20 CC0 scripts — the full record, with the four
+// ids and their introduction lines, is above the pass itself, together with why
+// shapes (i) and (iii) are lexically undecidable here. Those two are `todo`
+// fixtures in clue-proper-noun-guard.test.ts carrying their measured id lists,
+// and a hard corpus-wide property in the same file asserts that no multi-word
+// seeded clue on any of the 20 scripts shares a word with a cue name — which is
+// what caught the four, and what will catch the next one at the guard instead
+// of in an unrelated locked table three files away.
+function buildProperNounGuard(
+  scenes: SceneUnit[],
+  titlePageText: string,
+  speakerNames: ReadonlySet<string>,
+): (token: string) => boolean {
+  // Every individual word of every cue name.
+  const nameWords = new Set<string>();
+  for (const name of speakerNames) {
+    for (const word of name.split(/\s+/)) {
+      if (word.length >= 2) nameWords.add(word);
+    }
+  }
+  // LEARN THE FULL NAME FROM THE INTRODUCTION CONVENTION. A cue of "NELL"
+  // against an inline introduction reading "DISPATCHER NELL ARCEO" tells us
+  // that `dispatcher` and `arceo` are parts of that character's name, not
+  // planted objects — the screenplay itself said so, in the one place the
+  // convention puts it. Without this pass the strict "every word" test below
+  // keeps "ramon delgado" (cue DELGADO, `ramon` unknown) and even the bare
+  // "dispatcher", which is exactly the noise measured in the critical tier.
+  //
+  // ONE condition, not two — and the second one was TRIED, MEASURED and
+  // REVERTED on 2026-09-11 (round 2 item 3). The record, because the next
+  // person will have the same idea:
+  //
+  // The condition is that the caps run must contain an ALREADY-KNOWN cue word.
+  // That is what lets a cue of DELGADO exclude "ramon delgado", and it is also
+  // what made the three suppressions in the header possible, because a PROP can
+  // contain a cue word too.
+  //
+  // THE FIX TRIED: also require the INTRODUCTION MARKER — a comma or an opening
+  // parenthesis immediately after the run, optionally after an `and`-joined
+  // caps run for list introductions. That is what the convention looks like in
+  // much of this repository's corpus ("DISPATCHER NELL ARCEO, 40s", "RIVA CHEN,
+  // 30s, August's former research partner", "JORDY LANE and FEN ABIODUN,
+  // growing more animated") and not what a prop looks like ("A hidden BRASS KEY
+  // glints under the mat"). It closed two of the three shapes.
+  //
+  // WHY IT WAS REVERTED: measured over the 20 CC0 scripts, the corpus also
+  // introduces people with NO marker at all, and four character names came
+  // straight back into the clue channel —
+  //
+  //   mise                   "renee-okafor"       "Front-of-house manager RENEE OKAFOR checks a printed ..."
+  //   the-defense-rests      "judge-paretsky"     "JUDGE PARETSKY watches over reading glasses, unreadable."
+  //   the-defense-rests      "court-clerk-etta"   "COURT CLERK ETTA MOSS passes with a cart of files."
+  //   the-key-under-the-mat  "real-estate-agent"  "A REAL ESTATE AGENT walks the room with a clipboard ..."
+  //
+  // Trading four real character names on real scripts for two synthetic
+  // fixtures is the wrong direction for a guard whose whole job is excluding
+  // names, so the broad condition stays and the two shapes it cannot handle are
+  // `todo` fixtures in tests/core/clue-proper-noun-guard.test.ts with their
+  // measured id lists.
+  //
+  // WHY THEY CANNOT BE HANDLED HERE, stated so nobody re-tries it blind:
+  // "BRASS KEY" beside a character called KEY is LEXICALLY IDENTICAL to "JUDGE
+  // PARETSKY" beside a character called PARETSKY — a multi-word caps run, one of
+  // whose words is a cue name, in an action line. The corpus contains four of
+  // the second shape and none of the first. Separating them needs information
+  // this pass does not have (a role-title lexicon, or animacy), and this file's
+  // one-list-per-signal convention is a reason to measure such a lexicon before
+  // adding one, not to add it on the strength of two fixtures.
+  //
+  // One pass, not a fixed point: only tokens containing an already-known cue
+  // word teach new words. That bounds the reach at one step — and ONE STEP IS
+  // ENOUGH to reach a prop, which is shape (iii) in the header and is exactly
+  // what the retracted claim ("the set cannot chain outward through unrelated
+  // props") got wrong. It chains one step, and that step can land on a prop.
+  const cueWords = new Set(nameWords);
+  for (const s of scenes) {
+    for (const token of extractDistinctiveTokens(s.rawText)) {
+      const words = token.split(/\s+/).filter(Boolean);
+      if (words.length < 2) continue;
+      if (!words.some(w => cueWords.has(w))) continue;
+      for (const w of words) if (w.length >= 2) nameWords.add(w);
+    }
+  }
+
+  // Title-page tokens, extracted by the SAME walk that produces clue
+  // candidates, so the two can never disagree about what a token is.
+  const titleTokens = new Set(extractDistinctiveTokens(titlePageText));
+  // ...and the individual words too: `Title: THE LONG WAY DOWN` yields
+  // "long way" and "down", but an action line may mention "THE LONG WAY"
+  // alone.
+  const titleWords = new Set<string>();
+  for (const token of titleTokens) {
+    for (const word of token.split(/\s+/)) {
+      if (word.length >= 3) titleWords.add(word);
+    }
+  }
+  // THE TITLE GUARD IS NARROWED TO WHAT IT WAS FOR (2026-09-11, round 2 item
+  // 3). The defect it closes is structural, not lexical: segmentScenes folds
+  // every block before the first scene heading into scene 1, so `Title: THE
+  // LONG WAY DOWN` is scene-1 BODY TEXT to this walk and seeds "long way" and
+  // "down" as plants. Excluding title WORDS everywhere also deleted every prop
+  // a script is named after — measured: title `THE BRASS KEY` lost the BRASS
+  // KEY, title `LEVERAGE` lost a planted LEVERAGE and silenced the channel.
+  //
+  // So the test becomes "does this token exist anywhere OUTSIDE the title
+  // page". Body tokens are extracted from the same scene text with the
+  // title-page lines removed; a token present there is the writer's prop and
+  // is never excluded as a title, and a token present ONLY in the folded-in
+  // title page is excluded exactly as before. Nothing is silenced that was
+  // reported, and nothing is reported that the title page invented.
+  const titlePageLines = new Set(
+    titlePageText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0),
+  );
+  const bodyTokens = new Set<string>();
+  for (const s of scenes) {
+    const body = s.rawText
+      .split(/\r?\n/)
+      .filter(line => !titlePageLines.has(line.trim()))
+      .join('\n');
+    for (const token of extractDistinctiveTokens(body)) bodyTokens.add(token);
+  }
+
+  // Location tokens out of the scene headings themselves. A heading is
+  // "INT. RIVERSIDE MOTEL - NIGHT"; the location words are the ones between
+  // the prefix and the time-of-day tail.
+  const locationWords = new Set<string>();
+  for (const s of scenes) {
+    const withoutPrefix = s.slug.replace(/^\s*(INT\.?\/EXT\.?|I\/E|INT\.?|EXT\.?|EST\.?)\s*/i, '');
+    const withoutTail = withoutPrefix.replace(/\s+[-–—]\s+[^-–—]*$/, '');
+    for (const word of withoutTail.toLowerCase().split(/[^a-z0-9']+/)) {
+      if (word.length >= 3) locationWords.add(word);
+    }
+  }
+
+  return (token: string): boolean => {
+    if (speakerNames.has(token)) return true;
+    const words = token.split(/\s+/).filter(Boolean);
+    if (words.length === 0) return true;
+    // TITLE: only when the token exists nowhere but the folded-in title page.
+    if (!bodyTokens.has(token)
+      && (titleTokens.has(token) || words.every(w => titleWords.has(w)))) {
+      return true;
+    }
+    // EVERY word must be a name / location word -- see the header for why
+    // "any" would be wrong.
+    return words.every(w => nameWords.has(w))
+      || words.every(w => locationWords.has(w));
+  };
+}
+
+function detectClueLifecycle(scenes: SceneUnit[], titlePageText: string): {
   seedsByScene: Record<number, string[]>;
   payoffsByScene: Record<number, string[]>;
   unresolvedByScene: Record<number, string[]>;
@@ -1686,6 +1898,19 @@ function detectClueLifecycle(scenes: SceneUnit[]): {
   // so the guard must be by-name, not by-line.
   const speakerNames = new Set<string>();
   for (const s of scenes) {
+    // THE CUE SET, from the parsed dialogue rather than a text scan
+    // (2026-09-07). This loop used to read ONLY s.rawText, which is
+    // `orderedLines.join('\n')` — action lines plus dialogue TEXT, with the
+    // cue lines already stripped out by extractSceneContent. So the guard it
+    // built was very nearly empty, and "the speaker guard DISCARDS character
+    // names" (this file's own comment at CAPS_TOKEN_RE) was true of the
+    // intent and not of the code. s.characters and dialogueLines[].speaker
+    // are the parsed cues, already extension-normalised.
+    for (const name of s.characters) speakerNames.add(name.trim().toLowerCase());
+    for (const dl of s.dialogueLines) {
+      if (dl.speaker) speakerNames.add(dl.speaker.trim().toLowerCase());
+    }
+    // Kept as a second source: a cue-shaped line that survived into rawText.
     for (const line of s.rawText.split(/\r?\n/)) {
       const t = line.trim();
       if (t && CUE_LINE_RE.test(t) && !/^(INT\.|EXT\.|CUT|FADE|SMASH)/.test(t)) {
@@ -1693,10 +1918,11 @@ function detectClueLifecycle(scenes: SceneUnit[]): {
       }
     }
   }
+  const nonClue = buildProperNounGuard(scenes, titlePageText, speakerNames);
   const tokenEvidence = new Map<string, ClueEvidence[]>();
   for (const s of scenes) {
     for (const token of extractDistinctiveTokens(s.rawText)) {
-      if (speakerNames.has(token)) continue;
+      if (nonClue(token)) continue;
       const arr = tokenScenes.get(token);
       const ev = tokenEvidenceByScene(s.rawText, token);
       if (arr) { arr.push(s.sceneIdx); tokenEvidence.get(token)!.push(ev); }
@@ -2364,7 +2590,15 @@ export function analyzeFountainText(fountain: string): FountainAnalysis {
   const ironyMarkerCounts = computeIronyMarkerCount(sceneRawTexts);
 
   // ── Phase 2: cross-scene clue seeding/payoff ──────────────────────────────
-  const { seedsByScene, payoffsByScene, unresolvedByScene, recurringImagery } = detectClueLifecycle(sceneUnits);
+  // Everything before the first scene heading is the title page. segmentScenes
+  // prepends those blocks into scene 1's body (see its own code), so without
+  // handing them to the clue walk separately the walk cannot tell `Title: THE
+  // LONG WAY DOWN` from an action line -- see buildProperNounGuard's header.
+  const firstHeadingIdx = blocks.findIndex(b => b.type === 'scene_heading');
+  const titlePageText = (firstHeadingIdx > 0 ? blocks.slice(0, firstHeadingIdx) : [])
+    .map(b => b.text)
+    .join('\n');
+  const { seedsByScene, payoffsByScene, unresolvedByScene, recurringImagery } = detectClueLifecycle(sceneUnits, titlePageText);
 
   // ── Phase 2b: cross-scene question-answer latency (Wave 1182) ────────────
   const questionLatency = detectQuestionLatency(sceneUnits);

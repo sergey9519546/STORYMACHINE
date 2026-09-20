@@ -5,12 +5,12 @@ sources: [docs/p1-benchmark/owner-measurement-plan.json, scripts/owner-measure.m
 status: active
 ---
 
-# Owner Item — Measure and Merge the Stacked Scoring Branch
+# Owner Item — Measure and Merge the Parked Scoring Branches
 
 **Why only the owner:** it needs the same local, copyright-restricted corpus
-as [[Owner - Run Measure Real]], plus a judgment call on a scoring-path
-change whose costs are written down and whose benefit is not yet measured on
-real writing. The corpus cannot reach CI, so [[Gate - Receipt Gate]] can only
+as [[Owner - Run Measure Real]], plus a judgment call on scoring-path changes
+whose costs are written down and whose benefit has not been measured on real
+writing. The corpus cannot reach CI, so [[Gate - Receipt Gate]] can only
 check that a human ran the measurement, never that the number is real.
 
 ## The command
@@ -238,10 +238,10 @@ correction of the "same two functions" reason, and the two-part account of
 what AUC-24 can and cannot settle (the ~10.5-point level shift is
 rank-preserving and cannot move it; the scarcity channel's degradation delta
 going from +0.586 to exactly 0.000 for every script of about 22 scenes or more
-is what the run tests) live in the fuller version of this note ON THE BRANCH
-(`docs/brain/Owner/Owner - R5 Measurement and Merge.md` at `bcc96f85`) and in
-the branch's `docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md` §8.2a. Read
-that section before answering the accept/reject prompt.
+is what the run tests) are in "The decision tree, and what AUC-24 can and
+cannot settle" below — merged in from the branch copy of this note at
+`bcc96f85` — and in `docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md` §8.2a.
+Read that section before answering the accept/reject prompt.
 
 **One stated caveat travels with the stack**, and `owner:measure` prints it at
 the point it applies: it carries the first branch's 1,500,000 voice-eligible
@@ -254,6 +254,105 @@ last needs one `npm run brain` afterwards — all three branches and the docs
 branch regenerated `brain.graph.json`/`GRAPH.md` independently — and
 `docs/brain/Measurements Index.md`'s `## docs/scoring (N)` count needs the
 arithmetic fixed by hand, because each side increments it.
+
+### The decision tree, and what AUC-24 can and cannot settle
+
+Merged in from the branch copy of this note at `bcc96f85` — the fuller
+account the section above used to point at. Where it restates the branch
+table, the table above is the current one.
+
+**THE ORDER CHANGED 2026-09-07, and the two heads are ALTERNATIVES, not a
+stack.** `scoring/feature-length-defects` branches from `main` independently of
+the other three and attacks the SAME defect from the opposite direction. R5
+replaces the density denominator `wordCount^0.7` with `(sceneCount·30)^0.7`; the
+feature-length branch measured exactly that substitution on the public benchmark
+and it **inverts** — paired shuffle-drop **0.0938**, worse than doing nothing —
+because a scene drop shrinks that denominator by `(2/3)^0.7 = 0.752` while
+weighted issues fall to about 0.55 of intact, so it normalises by the quantity
+the degradation attacks. The same benchmark puts the feature-length branch at
+**0.8750** on that channel.
+
+**CORRECTION 2026-09-11, and it is the reason the sibling branch exists.** This
+paragraph used to end "Both cannot land: the two rewrite **the same two
+functions** in `doctor.ts`." That reason is wrong.
+`git diff 9b199b72..52bf410a -- server/nvm/analyze/doctor.ts` shows R5 changing
+`densityPenalty`'s denominator and curve and leaving `scarcityPenalty`
+**untouched**. They collide on ONE function, not two.
+
+The CONCLUSION survives — R5's denominator inverts at 0.0938 on its own tip, and
+the feature-length branch's scarcity saturation is identity on the public corpus,
+so R5 + saturation would still read 0.0938 there, and a merge would still have to
+pick one density formula. But the two halves of the feature-length branch are
+**independently landable**, because they are two different functions:
+
+* `SUB_DENSITY_STEEPNESS` 50 → 2, inside `densityPenalty` — this is the half
+  that collides with R5, and the half that carries both public measurement
+  channels.
+* `scarcityPenalty` saturating at `140/min(sceneCount, 12)` — this is the half
+  that fixes the STAPLE pathology, and the only half with any effect at feature
+  length. It does NOT collide with R5 at all.
+
+`scoring/feature-length-saturation-only` is that second half on its own, pushed,
+with its own PENDING receipt and its own re-locked floors.
+
+**THE DECISION TREE, in order.**
+
+1. **Measure `scoring/feature-length-defects`.** If its AUC-24 holds above
+   0.622, land it. The R5 stack's density change is then superseded on the
+   evidence, and what remains worth salvaging from the stack is
+   `scoring/advice-rule-fixes`'s six detector-correctness fixes, which touch no
+   formula.
+2. **If it does NOT hold, measure `scoring/feature-length-saturation-only`
+   next**, before reaching for the R5 stack. It is the same branch minus the
+   steepness change, so if AUC-24 rejected the steepness this is the half that
+   survives — and it is the half that fixes the staple pathology, which nothing
+   in the R5 stack addresses. Know two things before landing it: the mean health
+   gap under the drop gets slightly WORSE on the public corpus (−1.93 → −2.15),
+   because the saturation alone does not fix the deletion reward; and the staple
+   witness passes there at a margin of exactly **0.0** rather than 1.6, because
+   without the steepness change the density term is pinned at its ceiling for
+   both documents and the margin is carried entirely by a deduction that is
+   often zero.
+3. **If neither holds, the R5 stack is still there** and nothing has been lost.
+   Its own costs are in the "What to expect" section below.
+
+The numbers behind all three readings are in
+[[Measurement - FEATURE_LENGTH_DEFECTS_2026-09-07]] §8.2 (the candidate
+comparison) and §8.2a (what AUC-24 can and cannot settle). Read §8.2a before
+deciding — it is the section that says which half of the change the run
+measures.
+
+**WHAT TO CHECK ON THOSE TWO BRANCHES, corrected 2026-09-11.** This note used to
+say: "its scarcity saturation is byte-identical for every script of 15 scenes or
+fewer, so the public benchmark and the calibration corpus are both blind to it.
+On the private corpus (median 118 scenes) it will move EVERY script by roughly 8
+points. That is the single largest unmeasured effect in this queue." The 8 points
+was arithmetically right and it pointed at the half AUC-24 cannot see. Two
+separable things happen, and only one of them can move a matched-pair rank
+statistic:
+
+* **A near-uniform LEVEL SHIFT, which cannot move AUC-24.** At 118 scenes the
+  term goes from `140/118 = 1.186` to `140/12 = 11.667`, so every script loses
+  **10.480 points** (9.92 at 80 scenes, 10.97 at 200). This is what will move
+  verdicts, grades and all 72 rows of
+  `tests/fixtures/real-corpus-manifest.json` — the re-lock this note already
+  asks for. Both halves of a matched pair lose the same amount, so by itself it
+  cannot change AUC-24 at all.
+* **THE SCARCITY CHANNEL'S DEGRADATION DELTA GOING TO EXACTLY ZERO, which can.**
+  For a 118-scene script the drop recipe leaves ~79 scenes. Before saturation
+  that term contributed `140/79 − 140/118 = +0.586` points of separation; after
+  it contributes `140/12 − 140/12 = 0.000`. For every script of roughly 22 scenes
+  or more — essentially the whole corpus — the channel `doctor.ts`'s own
+  measurements credit with AUC 0.938 now contributes **nothing** to this
+  degradation. That is what the run is testing.
+
+So: AUC-24 **can** settle whether health still orders an intact feature above a
+shuffle-dropped copy of itself with the scarcity channel contributing zero and
+the density curve near-linear. It **cannot** settle which of the two changes is
+responsible on the combined branch (neither half has its own AUC-24 receipt —
+which is why the sibling branch exists), it cannot settle whether the
+~10.5-point level shift is right (that is the manifest re-lock and the band
+averages), and it says nothing about craft.
 
 ## Read the probe before the AUC
 
