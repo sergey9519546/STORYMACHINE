@@ -181,6 +181,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-20 Approved Spans Schema.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Burrows Delta Hoist.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Burrows Delta Hoist",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Burrows Delta Hoist.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B1 B2.md",
       "type": "audit",
       "title": "Audit — 2026-09-20 Dead Weight B1 B2",
@@ -1526,6 +1532,14 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-20 Approved Spans Schema.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Burrows Delta Hoist.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Burrows Delta Hoist.md",
       "to": "docs/brain/Patterns.md"
     },
     {
