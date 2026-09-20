@@ -1169,3 +1169,93 @@ REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real
    comparable to 0.731.
 4. **Merge decision.** Unchanged from §S5 step 5, with one item removed from the
    "not in" column: the shape guard no longer blocks.
+
+## § Cost-rate constant left open, and how to close it
+
+The "one thing left OPEN" item above (`VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT
+= 0.173`) asked a specific question: is the runner's `uniform-min` row from run
+35542413222 (N=150, weight 675,000, 463 ms loaded / 307 ms idle) the SAME shape
+the 0.173 constant was fitted on, so it could be re-fit from that row instead of
+staying stale? **No — checked, not assumed, and the answer is different shapes,
+confirmed from two independent directions:**
+
+1. **The generator itself refuses to produce the constant's shape.**
+   `scripts/lib/voice-bound.ts`'s `buildUniformCast` — the one generator
+   `uniform-min`, `max-admitted` and every fixture in the security suite share —
+   throws unless `wordsPerSpeaker` is a multiple of 6 (`the paragraph's word
+   count`) and at least 30. `uniform-min` is `buildUniformCast(cast, 30)`: every
+   speaker at exactly 30 words, the CURRENT `VOICE_ELIGIBLE_MIN_WORDS` floor. The
+   constant's own comment and the margin-proof test both name its shape as "n
+   uniform characters on the 32-word floor" — and 32 is not a multiple of 6, so
+   the current shared generator cannot produce it at ANY N. The 2026-09-05
+   figure was measured against a different, no-longer-present ad hoc generator,
+   predating this file (the header of `voice-bound.ts` dates both of today's
+   generators to 2026-09-12, a week after 0.173 was taken).
+2. **An independent prior review already caught the same gap from the other
+   side.** `docs/audits/2026-09-07-innovation/scoring-review.md` (§"The
+   re-derived DoS bound checks out"): "the worst-shape grid uses 32 words per
+   character where `VOICE_ELIGIBLE_MIN_WORDS` is 30, and 30 is the heavier shape
+   at fixed weight (~3% more characters, ~7% more pairs)". That is a real,
+   quantified difference in what each shape measures at a given weight bound,
+   not a rounding note — it is exactly why the two shapes cannot be treated as
+   interchangeable inputs to the same rate.
+
+**Because they are different shapes, per the task's own branching: the constant
+is NOT changed** (still 0.173, still cross-checked in its comment against the
+runner's actual worst-shape reading — max-admitted N=50, 0.807 us/unit loaded /
+0.503 us/unit idle — with both readings shown to clear the 10,000 ms target:
+1,500,000 x 0.173 us = 260 ms, 38x under; x 0.807 us = 1,211 ms, 8.3x under).
+
+**No sweep was added to `scripts/measure-voice-bound-cost.mjs`'s shape list.**
+The task's own bar for adding one is "a small, obviously-correct addition" and,
+failing that, naming the `--uniform-min` input that already reproduces the
+shape. Neither applies here:
+
+- **No existing input reproduces it.** `uniform-min` and `max-admitted` both
+  route through `buildUniformCast`, whose words-per-speaker is fixed at 30 (the
+  first) or computed from the weight bound (the second) — neither is
+  adjustable to 32 by choosing a different `N`, because words-per-speaker and
+  cast are independent parameters and 32 is categorically excluded (not a
+  multiple of 6) regardless of `N`. The closest same-code approximation,
+  `--uniform-min=97` (matching the historical shape's cast exactly), measures a
+  DIFFERENT weight — 30 x 97² = 282,270, not 301,088 — a ~6.3% lighter document,
+  which is precisely the wrong kind of approximation for a rate whose whole
+  point is weight-normalized cost.
+- **Adding a true `uniform-32` shape is not a small change to verify locally.**
+  It would mean introducing a second dialogue-paragraph unit alongside
+  `DLG_UNIFORM`/`DLG_PROBE` sized so `voice-delta.ts`'s letter-only tokenizer
+  counts exactly 32 words per speaker, in a file three other suites depend on
+  for byte-stable timings (`voice-bound.ts`'s own header: "changing a generator
+  here changes the measurement, the test and the constant together, or the
+  fixture test fails"). Because the original 2026-09-05 generator no longer
+  exists in the repository, this would be a NEW 32-word shape approximating a
+  lost one from its two known outputs (n=97 -> weight 301,088), not a verified
+  reproduction of it — the opposite of the "obviously correct" bar this task
+  set.
+
+**What would close this honestly, and the exact dispatch to do it:** add a
+`uniform-32` entry to `VOICE_BOUND_SHAPES` in `scripts/lib/voice-bound.ts` (a
+`buildUniformCast`-style generator using a 32-word paragraph, or a
+`wordsPerSpeaker` override that bypasses the multiple-of-6 check with its own
+verified paragraph text), wire it into `scripts/measure-voice-bound-cost.mjs`'s
+CLI the same way `--uniform-min=`/`--max-admitted=` already are, confirm
+locally that `pooledWordCount` on its generated dialogue reads exactly 32
+per speaker, then have the owner dispatch
+`.github/workflows/calibrate-voice-bound.yml` with an input naming that shape
+(e.g. `uniform_32=97` alongside the existing defaults) so the row comes back
+with a `machine.ci`/`machine.runId` stamp the same way `uniform-min` and
+`max-admitted` did in run 35542413222. That is new generator code plus a fresh
+runner sweep — genuinely out of scope for a lane restricted to
+`server/lib/validation.ts`, the margin-proof test, `docs/CLAIMS_REGISTER.md`
+and this README, so it is recorded here rather than attempted piecemeal.
+
+Gate table for this decision (no code path changed; documentation only):
+
+| gate | result |
+|---|---|
+| `npm run lint` | 0 |
+| `tests/core/voice-bound-derivation.test.ts` | 0 (8/8) |
+| `tests/security/fountain-shape-guard-cue-parity.test.ts` | 0 (681/681) |
+| `tests/core/honesty-audit-claims.test.ts` | 0 (15) |
+| `tests/core/brain-coverage.test.ts` | 0 (8/8), no wikilinks added |
+| `node scripts/check-scoring-receipt.mjs a36ae76a..HEAD` | 0 — no scoring-path files changed |

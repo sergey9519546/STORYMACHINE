@@ -1020,7 +1020,37 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 100;
  *  on the runner, and moving the number to what that run says. Do not reuse
  *  any pre-hoist rate (this one, or the 0.0173-0.0187 and 0.022 ms/unit figures
  *  in the weight bound's round-1/round-2 derivations) as if it described this
- *  code. */
+ *  code.
+ *
+ *  CONFIRMED NOT THE SAME SHAPE AS THE RUNNER'S `uniform-min` ROW (2026-09-20,
+ *  land-feature-length-defects). It is tempting to read run 35542413222's
+ *  `uniform-min` N=150 row (463 ms loaded / 675,000 weight = 0.686 us/unit) as
+ *  a same-shape re-fit of this constant, because both are "every speaker
+ *  uniform at the eligibility floor". They are not the same generator:
+ *  `scripts/lib/voice-bound.ts`'s `buildUniformCast` — the single generator
+ *  `uniform-min`, `max-admitted` and this bound's own security-suite fixtures
+ *  all share — hard-rejects any words-per-speaker that is not a multiple of 6
+ *  (`wordsPerSpeaker must be a multiple of 6`), so it CANNOT produce a 32-word
+ *  speaker at all; `uniform-min` sits its speakers on 30 words, this
+ *  constant's shape on 32. The 2026-09-07 review (`docs/audits/2026-09-07-
+ *  innovation/scoring-review.md`) independently flagged the same gap from the
+ *  other side: "the worst-shape grid uses 32 words per character where
+ *  VOICE_ELIGIBLE_MIN_WORDS is 30, and 30 is the heavier shape at fixed weight
+ *  (~3% more characters, ~7% more pairs)" — i.e. the two shapes do not even
+ *  rank the same document the same way at a fixed weight bound, which is a
+ *  real difference in what is being measured, not a rounding note. Re-fitting
+ *  this constant from `uniform-min`'s row would therefore be exactly the
+ *  cross-shape drift this comment already warns against, just with a
+ *  same-looking label. The constant is left at 0.173 (still cross-checked
+ *  against the runner's actual worst admitted shape above). Closing this
+ *  honestly needs a purpose-built 32-word-per-speaker generator measured on
+ *  the runner — not achievable by passing a different N to `uniform-min` or
+ *  `max-admitted`, since neither's words-per-speaker is adjustable to 32 (the
+ *  shared 6-word paragraph is the only unit `buildUniformCast` accepts, and 32
+ *  is not a multiple of 6). See
+ *  docs/audits/2026-09-20-feature-length-defects-prep/README.md, "Runner lock
+ *  (run 35542413222)", for the full reasoning and what a closing sweep would
+ *  require. */
 export const VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT = 0.173;
 /** The cost target the two constants above are held to (microseconds) — the
  *  2026-09-05 review's own ~10 s ceiling for an accepted request. */
