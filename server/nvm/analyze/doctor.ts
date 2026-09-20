@@ -1645,7 +1645,7 @@ function buildAccelerationStrength(
   fountain: string | undefined, sceneCount: number,
 ): string | null {
   if (!fountain || sceneCount < RUN20_ACCEL_MIN_SCENES) return null;
-  const scenes = fountain.split(/^(?=INT\.|EXT\.)/mi).filter(s => /^(INT\.|EXT\.)/i.test(s));
+  const scenes = scenesFromFountain(fountain);  // ONE grammar — see scene-split.ts (row 5, 2026-09-20)
   if (scenes.length < RUN20_ACCEL_MIN_SCENES) return null;
   const w = scenes.map(s => s.split(/\s+/).length);
   const q = Math.floor(w.length / 4);

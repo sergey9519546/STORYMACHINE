@@ -1415,7 +1415,17 @@ describe('ROUND 5 (finding 1, BLOCKER): scene-segmentation predicate parity with
   // full-word alternatives), trailing spaces, and ordinary action.
   const EDGE_CASES: Array<[string, string, boolean]> = [
     ['.FORCED SCENE HEADING', 'Fountain forced-heading form', true],
-    ['.', 'a bare period alone (fountain.ts applies no further exclusion on the forced form)', true],
+    // 2026-09-20 (scene-grammar lane, row 6 of SESSION_REPORT_2026-09-19.md):
+    // this case used to expect `true` and pinned the defect. Fountain forces a
+    // heading with `.` + an alphanumeric; a bare `.`, `..` and `...` are prose,
+    // which is the whole point of reserving the leading dot. Both sides now say
+    // false, and the parity property this suite exists for is unaffected —
+    // the guard is no longer a mirror of parseFountain's predicate, it is that
+    // predicate (validation.ts's isSceneSegmentHeading calls it directly).
+    ['.', 'a bare period alone is NOT a Fountain forced heading', false],
+    ['..', 'two periods are not a forced heading', false],
+    ['...and then nothing.', 'an ellipsis opening a dialogue continuation is prose, not a heading', false],
+    ['.2 HOURS LATER', 'a forced heading may start with a digit', true],
     ['!This is forced action, not a heading.', 'forced action (!) must NOT be a heading', false],
     ['INTERPOL AGENTS STORM THE ROOM', 'a prefix-shaped word with no [. ] boundary must NOT match', false],
     ['INT.LOCATION - DAY', 'no space after the period — the period alone satisfies [. ]', true],

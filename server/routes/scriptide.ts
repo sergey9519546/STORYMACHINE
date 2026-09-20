@@ -1,4 +1,5 @@
 import express from 'express';
+import { isSceneHeadingLine } from '../../src/lib/fountain.ts';
 import { Type } from '@google/genai';
 import { generateContent, modelForTask, getImageProvider, getTTSProvider } from '../engine/ai.ts';
 import { llmReady } from '../lib/ai-config.ts';
@@ -424,30 +425,29 @@ router.get('/api/scriptide/load', gameLimiter, asyncHandler(async (req, res) => 
 // which doesn't need to change: detecting "is this even Fountain" needs
 // nothing the doctor computes.
 //
-// SCENE_HEADING_RE mirrors src/lib/fountain.ts's parseFountain heading test
-// (identical to canonical-fountain.ts's own HEADING_RE) — duplicated rather
-// than imported because both of those modules sit on the scoring path
-// (src/lib/fountain.ts feeds fountain-analyzer.ts's sceneCount, the single
-// highest-AUC term the doctor emits — doctor.ts:2092-2093) and this route is
-// under a hard no-scoring-path-touch constraint for this change.
+// The heading test is src/lib/fountain.ts's own parseFountain predicate,
+// imported rather than mirrored since 2026-09-20. It was a hand-copy, kept
+// separate because src/lib/fountain.ts sits on the scoring path (it feeds
+// fountain-analyzer.ts's sceneCount, the highest-AUC term the doctor emits —
+// doctor.ts:2092-2093) and this route's lane was under a no-scoring-path-touch
+// constraint. Importing a pure predicate from it cannot move the score; drift could.
 // tests/routes/format-unrecognized.test.ts asserts this mirror agrees with
 // the real parser's scene_heading classification on all 20 calibration
 // corpus samples plus this file's own fixtures, so a future drift in either
 // original regex is caught rather than silently diverging.
-const SCENE_HEADING_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
 
 /** True when at least one line of `fountain` reads as a Fountain scene
  *  heading — the standard INT./EXT./EST./... slugline vocabulary, or a
  *  forced heading (a line starting with a single "."), matching
  *  src/lib/fountain.ts's own scene_heading test closely enough to agree with
- *  it on real screenplay text (see SCENE_HEADING_RE's comment above).
+ *  it on real screenplay text because it IS that test.
  *  Exported (this file's only other export is the router itself) solely so
  *  tests/routes/format-unrecognized.test.ts can assert agreement with the
  *  real parser directly, rather than only indirectly through HTTP fixtures. */
 export function hasSceneHeading(fountain: string): boolean {
   return fountain.split('\n').some(line => {
     const trimmed = line.trim();
-    return trimmed !== '' && (SCENE_HEADING_RE.test(trimmed) || trimmed.startsWith('.'));
+    return trimmed !== '' && isSceneHeadingLine(trimmed);
   });
 }
 

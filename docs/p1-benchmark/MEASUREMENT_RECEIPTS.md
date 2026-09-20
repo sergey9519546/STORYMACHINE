@@ -2355,3 +2355,122 @@ that nobody mistakes one for the other.
   no real-corpus figure is claimed for this range. The byte-level identity of
   all 45 reports and the six unchanged public-benchmark statistics are the
   evidence this range owes.
+
+### 2026-09-20 — SCENE GRAMMAR UNIFIED: scenesFromFountain uses the doctor's own heading grammar and '..'/'...' are no longer headings (PUBLIC-CORPUS — not an AUC-24 receipt; the private corpus is not present in this environment, so no real-corpus figure is claimed)
+
+- **Date:** 2026-09-20
+- **Git SHA:** the lane commit on `lane/scene-grammar`, branched from
+  `26d930dd` — a real commit in this repository, and the baseline every
+  before/after figure below is measured against.
+- **Why this entry exists.** Scoring-path files changed:
+  `src/lib/fountain.ts` (the parser's scene-heading test),
+  `server/nvm/analyze/scene-split.ts` (`scenesFromFountain`, the splitter under
+  the emotional arc and nine other signal modules),
+  `server/nvm/analyze/doctor.ts` (one inline copy of that splitter),
+  `server/nvm/analyze/screenplay-normalizer.ts` and
+  `server/nvm/analyze/canonical-fountain.ts`.
+  `node scripts/check-scoring-receipt.mjs 26d930dd..HEAD` requires a receipt
+  for this range, and this is it.
+- **What changed, in one sentence each.** (1) `scenesFromFountain` split on
+  `INT.`/`EXT.` alone while the doctor's own `sceneCount` recognised the full
+  slugline vocabulary and Fountain forced headings, so on an
+  `EST.`/`I/E.`/`INT./EXT.`/`.FORCED` script the arc — and therefore
+  `arcIncoherenceDeduction`, the one feature-scale deduction wired into health
+  — saw too few scenes to fire at all. (2) The parser treated any line starting
+  with `.` as a forced heading; Fountain requires `.` + alphanumeric, so a
+  `...` continuation line inside dialogue became a scene heading. Both are
+  rows 5 and 6 of `SESSION_REPORT_2026-09-19.md` §4, both VERIFIED there.
+  There is now ONE predicate, `isSceneHeadingLine` in `src/lib/fountain.ts`,
+  used by the parser and by all six former copies of it.
+- **Command:** every command run for this entry, all of them in this
+  worktree —
+  ```
+  npm run lint
+  node --experimental-strip-types --test tests/core/scene-grammar.test.ts
+  node --experimental-strip-types --test tests/core/calibration.test.ts
+  node --experimental-strip-types --test tests/core/public-benchmark.test.ts
+  node --experimental-strip-types --test tests/core/auc24-table.test.ts
+  node --experimental-strip-types --test tests/core/real-script-corpus.test.ts
+  node --experimental-strip-types --test tests/core/story-graph-corpus-auc.test.ts
+  node --experimental-strip-types --test tests/core/honesty-audit-claims.test.ts
+  node --experimental-strip-types --test tests/security/fountain-shape-guard-cue-parity.test.ts
+  npm run benchmark:public -- --json          # before (on 26d930dd) and after
+  git archive 26d930dd | tar -x -C <baseline>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree .          --out <after>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --compare <before> <after>
+  npm run gates
+  node scripts/check-scoring-receipt.mjs 26d930dd..HEAD
+  ```
+- **Corpus fingerprint:** the committed PUBLIC 32-script set — 20 CC0
+  screenplays in `data/screenplays/` plus the 12 blind-pair fixtures — read
+  through `tests/fixtures/public-corpus-manifest.json`, whose bytes this lane
+  did not change: sha256
+  `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e`
+  (`tests/fixtures/public-benchmark-split.json`, also unchanged:
+  `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`). Every
+  one of the 32 rows — `sceneCount`, `words`, `health`, `verdict` — came back
+  byte-identical after the change, so no `--lock` was needed and none was run.
+  **The PRIVATE AUC-24 corpus was not available in this environment**
+  (`REAL_SCRIPT_CORPUS_DIR` is unset here and the corpus is local-only by
+  copyright), so no real-corpus figure is claimed for this range.
+- **Runner attestation:** run in the session worktree
+  (`lane/scene-grammar`, branched from `26d930dd`) on 2026-09-20 by the lane
+  agent; no API key, no private corpus. Every command in the block above was
+  executed here and its output read; every number below is copied from that
+  output.
+- **Measured public AUCs, before → after (N = 32; matched-pair is PRIMARY;
+  seeded 2000-resample percentile bootstrap, seed 42):**
+  - `SHUFFLE_DROP` — matched-pair **0.5313 → 0.5313**, all-pairs
+    **0.5586 → 0.5586**; ordered/inverted/tied **17/15/0 → 17/15/0**.
+  - `CLIMAX_RELOCATE` — matched-pair **0.4063 → 0.4063**, all-pairs
+    **0.4443 → 0.4443**; ordered/inverted/tied **8/14/10 → 8/14/10**.
+  - `DIALOGUE_FLATTEN` (positive control) — matched-pair **1.0000 → 1.0000**,
+    all-pairs **0.9473 → 0.9473**; ordered/inverted/tied **32/0/0 → 32/0/0**.
+  - **All six numbers are unchanged, so none of the six floor constants in
+    `scripts/lib/auc.ts` moved and no floor was re-locked. `scripts/lib/auc.ts`
+    is not in this lane's diff. No floor rose; no floor fell.** The reason is
+    not luck and was checked: across the 20 CC0 screenplays, the 20 calibration
+    samples, the P0 sample and the committed `tests/fixtures/*.fountain`
+    scripts — 41 documents — there are **0 non-INT/EXT headings, 0 forced
+    `.HEADING` lines, 0 `..`-leading lines and 0 space-form `INT `/`EXT `
+    headings**. This corpus cannot see either defect, which is exactly why
+    neither defect was caught by it.
+- **Output identity:** `check-doctor-output-identity.mjs --compare` against a
+  `git archive 26d930dd` baseline, both sides `GIT_SHA=dev` →
+  **"OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt
+  excluded)."** **0 of 45 fixtures differ**, so there is no per-fixture
+  attribution table to write: the 41 file-backed fixtures contain none of the
+  heading forms this change affects (counted above) and the 4 synthetic
+  fixtures are generated `INT.` headings. This is a genuine limit of the
+  instrument, not a proof of no effect — see the two figures below, measured
+  on inputs the fixture set does not contain.
+- **Measured effect on inputs the fixture set DOES NOT contain** (both figures
+  produced here, pre-change tree vs post-change tree, same script, same
+  command):
+  - A 16-scene script whose headings are `EST.`/`I/E.`/`INT./EXT.`/`.FORCED`
+    (`tests/fixtures/scene-grammar/mixed-headings.fountain`):
+    `scenesFromFountain` returned **3 scenes before, 16 after**, against the
+    doctor's own `sceneCount` of 16 on both trees. The emotional arc it feeds
+    went from **3 points to 16**, crossing `ARC_DED_MIN_SCENES` = 15.
+  - A 5-scene script with one `...and then nothing.` continuation line inside a
+    dialogue block: **before, scenes 5 → 6 and health 62 → 37.8 (verdict
+    CONSIDER → PASS) purely from adding that line; after, 5 → 5 and 62 → 62.**
+- **Measured AUC-24:** **none is claimed for this range, and none was produced
+  here.** The private corpus is not present in this environment. The owner's
+  next `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` and
+  `npm run lock-auc24` on degradation recipe `shuffle-drop/v3` are the first
+  real-corpus figures this grammar will produce, and the first AUC-24 figures
+  of any kind that will reflect it. `AUC24_FLOOR` is untouched at 0.622.
+  **`tests/core/real-script-corpus.test.ts`'s manifest must be re-locked as
+  part of that run:** scene counts change on every corpus script that uses an
+  `EST.`/`I/E.`/`INT./EXT.`/forced heading or contains a `...`-leading line, and
+  the manifest pins health/verdict/sceneCount per script. That test is
+  env-gated and skipped here (1 pass / 73 skipped), so this lane could not and
+  did not re-lock it.
+- **What a reader should NOT take from this entry.** It is a public-corpus
+  receipt. It shows that on the 32 committed scripts the score is byte-for-byte
+  what it was, and it shows two measured deltas on synthetic inputs that use
+  heading forms the committed corpus does not. It says nothing about whether
+  the score discriminates, and it is not comparable to AUC-24 or to the P1
+  baseline.

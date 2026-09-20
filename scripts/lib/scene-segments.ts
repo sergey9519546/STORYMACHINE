@@ -78,7 +78,14 @@
 // degradation must still rearrange the whole document; the test states this
 // divergence rather than leaving it to be discovered.
 
-import { parseFountain } from '../../src/lib/fountain.ts';
+// 2026-09-20 (scene-grammar lane): the two functions this file used to define
+// itself — `splitLinesKeepingEndings` and `sceneHeadingLineIndices` — moved
+// into `src/lib/fountain.ts` beside the parser they read, so that the engine
+// and this harness cannot hold different opinions about where a scene starts.
+// Same code, same behaviour; this file re-exports them so every existing
+// importer is unaffected.
+import { sceneHeadingLineIndices, splitLinesKeepingEndings } from '../../src/lib/fountain.ts';
+export { sceneHeadingLineIndices, splitLinesKeepingEndings } from '../../src/lib/fountain.ts';
 
 /** One script, split at scene boundaries, losslessly. */
 export interface FountainSceneSegmentation {
@@ -88,35 +95,6 @@ export interface FountainSceneSegmentation {
   /** One verbatim slice per scene: its heading line and everything up to (not
    *  including) the next heading. Empty when the text has no scene heading. */
   scenes: string[];
-}
-
-/**
- * Split into lines, each KEEPING its own trailing newline, so that joining the
- * pieces reproduces the input exactly (including CRLF and a missing final
- * newline). `String.split` cannot do this without losing the terminators.
- */
-export function splitLinesKeepingEndings(text: string): string[] {
-  return text.match(/[^\n]*\n|[^\n]+/g) ?? [];
-}
-
-/**
- * The parser's own scene-heading lines, as 0-based indices into
- * `text.split(/\r?\n/)`.
- *
- * `parseFountain` emits exactly one block per input line and numbers them from
- * 1, so `lineNumber - 1` is the index. (It can append one synthetic
- * `block-eof-boneyard` block past the end for an unclosed boneyard; that block
- * is never a `scene_heading`, and the bound below drops it regardless.)
- */
-export function sceneHeadingLineIndices(text: string): number[] {
-  const lineCount = text.split(/\r?\n/).length;
-  const out: number[] = [];
-  for (const block of parseFountain(text)) {
-    if (block.type !== 'scene_heading') continue;
-    const index = block.lineNumber - 1;
-    if (index >= 0 && index < lineCount) out.push(index);
-  }
-  return out;
 }
 
 /**
