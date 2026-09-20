@@ -619,3 +619,75 @@ Independent verifier at `9f0ea060` (range `0b7dd404..9f0ea060`, 14 commits): lin
 ### 11.1 Final verification
 
 Independent verifier at `6ca3fcd0`: full suite 14,601 tests, 0 failures, 98 skipped; identity 45 of 45; six benchmark numbers unchanged; verdict safe to push.
+
+## 12. 2026-09-20, fifth pass — the candidate is green
+
+SHAs verified against `origin/lane/land-feature-length-defects`:
+`git log --oneline ca5f2e85..origin/lane/land-feature-length-defects` returns,
+oldest first, `cfe56403`, `706adf3a`, `852354f5`, `a36ae76a` — matching what
+§11, item 2 called the lane's one remaining blocker.
+
+1. **The voice-bound derivation ran on the runner.** The candidate weight
+   bound 1,500,000 was set on the branch (`cfe56403`; inside the admissible
+   window 1,331,970 to 1,919,999 recorded in §11, item 2), the orchestrator
+   dispatched `.github/workflows/calibrate-voice-bound.yml` by
+   `workflow_dispatch` on `lane/land-feature-length-defects`, and run
+   35542413222 (ubuntu-latest, AMD EPYC 7763 x4, node v24.20.0, default
+   sweep, repeats 2, idle and loaded) completed in 2 minutes 15 seconds —
+   the same sweep took about 11 minutes before the hoist. Every swept shape
+   sits at 8% or less of the 15,000 ms half-budget under load (worst
+   max-admitted N=50 at 1,210 ms; the pre-hoist table's same family read
+   11,810 ms). The printed lock line was copied verbatim into
+   `tests/fixtures/voice-bound-derivation.json` and re-indented by the tool
+   (`706adf3a`); `machine.ci` reads `github-actions`, `runId` 35542413222.
+
+2. **The distinct-cast bound follows the table**: `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT`
+   80 -> 100, set from the derivation test's own failure message. Stated
+   honestly: 100 is the top of the swept grid, not the point where cost
+   runs out — on the max-admitted shape cost now falls as the cast grows
+   (1,210 ms at N=50 to 746 ms at N=100), so no sweep can bracket a cost
+   ceiling any more. The test's "the sweep bracketed the boundary"
+   assertion was re-anchored to split on the measurement: bracketing is
+   still required whenever a swept cast above the derived one exists; when
+   none does, the grid-limited case must be proved safe by the table itself
+   (at least three swept casts, the derived cast at the top of the grid,
+   cost non-increasing across the grid, every row at or under 25% of the
+   ceiling). Both bounds are now picked for headroom and checked against
+   cost, the reverse of rounds one to three.
+
+3. **Five cue-parity tests re-anchored to the derived bounds** (`852354f5`):
+   the realistic few-big shape's boundary is now cast 97/98 and the weight
+   bound fires there; the document that sits exactly on the weight bound is
+   the max-admitted shape at the cast bound (150 words x 100 speakers =
+   1,500,000, +/-1 sensitive); uniform-min N=150 is rejected by the cast
+   bound with its weight under the weight bound; N=250 violates both and
+   still reports the weight bound (ordering preserved); the band loop runs
+   101 to 223 and a new test proves N=224 crosses into the weight bound.
+   Every pinned DoS payload still rejected, including bypass B at
+   1,920,000. Headroom on the feature fixture: 3.4x.
+
+4. **Result**: `origin/lane/land-feature-length-defects` at `a36ae76a` has
+   zero failing tests among everything run — cue-parity 681/681,
+   voice-bound-derivation 8/8, public-benchmark 33/33, blind pairs 4 of 6,
+   calibration 21/21, `npm run gates` 0, lint, console, build, brain fresh,
+   receipt gate clean on the lock range. The audit's runbook is reduced to
+   four owner steps: fetch, `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run
+   measure-real`, manifest re-lock, `npm run lock-auc24` on v4, then the
+   merge decision.
+
+5. **One item recorded, not patched**:
+   `VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT = 0.173` is a 2026-09-05
+   developer-box, pre-hoist rate; the runner measured the heaviest admitted
+   shape at 0.807 µs/unit loaded (4.7x above it). The margin-proof clears
+   on either number (8.3x under target at the worse rate), and re-fitting
+   from a different shape's measurement is the drift the constant pair
+   exists to prevent, so it needs one more runner sweep of that shape. Row
+   69 and row 116 of the claims register were updated for the new bounds.
+
+### 12.1 State of the branches
+
+| branch | head | state |
+|---|---|---|
+| session branch | `3b05e696` | verified 14,601 / 0 at `6ca3fcd0` plus docs |
+| `lane/land-feature-length-defects` | `a36ae76a` | green, awaiting the real-corpus run; raises the primary public floor |
+| `lane/land-advice-rule-fixes` | `671b7cf2` | held; lowers it |

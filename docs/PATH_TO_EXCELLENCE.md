@@ -92,7 +92,9 @@ the worst admitted shapes. The feature-length candidate on
 `lane/land-feature-length-defects` (tip `ca5f2e85`) closed three of its four
 failing tests in a second pass and is now one method blocker — a
 GitHub Actions runner re-derivation of the voice-weight bound, which the
-lane could not fabricate — away from green.
+lane could not fabricate — away from green. The runner derivation then
+ran (run 35542413222), and the feature-length candidate now has zero
+failing tests, awaiting only the owner's real-corpus AUC-24.
 
 2026-09-20 closed the remaining §4 rows under owner authorization: row 3
 (per-pass diagnostics), rows 5 and 6 (the unified scene-heading grammar),
