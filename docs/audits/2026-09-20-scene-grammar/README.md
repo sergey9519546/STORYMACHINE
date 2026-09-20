@@ -304,3 +304,51 @@ rows byte-identical across all three degradations, so no floor in
 `scripts/lib/auc.ts` moved and none was re-locked. No AUC-24 figure is
 claimed — see `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`'s
 "FORCED HEADINGS IN ANY SCRIPT" entry for the full receipt.
+
+## § Review findings 4 and 6 fixed
+
+Lane `lane/scene-split-cr-and-recipe-v4`, from `02d8cfb4`, in
+`docs/audits/2026-09-20-scene-grammar/README.md`'s own successor review
+(the same 2026-09-20 grammar-lane material, re-audited after the
+unicode-forced-heading merge landed on top of it).
+
+**Finding 6 (MEDIUM, CONFIRMED).** `scenesFromFountain` reaches
+`parseFountain` via `sceneHeadingLineIndices`, and `parseFountain` splits on
+`text.split('\n')` alone — a bare `\r` (classic Mac line endings) is
+invisible to it, so a CR-only script reads as one line and undercounts
+scenes relative to its CRLF/LF twin. Meanwhile `analyzeFountainText`'s own
+`normalizeScreenplay` strips `\r\n?` -> `\n` whenever its double-spaced-import
+heuristic fires, so `runScriptDoctor`'s `sceneCount` and
+`scenesFromFountain(...).length` — fed the same raw text by `doctor.ts` — can
+silently disagree about the same document, the exact "the arc and the report
+see a different film" defect this lane's original grammar fix closed for the
+heading-vocabulary case. Fixed: `scenesFromFountain` normalizes `\r\n?` ->
+`\n` at the top of the function, before segmenting. Evidence: new
+`tests/core/scene-split-line-endings.test.ts`; fail-first quoted there and in
+`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`'s 2026-09-20 "SCENE SPLIT
+NORMALIZES LINE ENDINGS" entry.
+
+**Finding 4 (CONFIRMED).** The AUC-24 recipe's shared segmentation dependency
+(`scripts/lib/scene-segments.ts` -> `src/lib/fountain.ts`'s
+`isSceneHeadingLine`) changed twice after the `shuffle-drop/v3` bump without a
+matching id bump: the ellipsis-heading fix (`..`/`...` are not headings) and
+the Unicode forced-heading widening, both already landed on this branch by
+the unicode-forced-heading merge above. `AUC24_DEGRADATION_ID` bumps to
+`shuffle-drop/v4`; `AUC24_FLOOR` untouched at 0.622; no table has ever been
+locked, so nothing is invalidated. `scripts/lib/auc.ts`'s narrative and
+`scripts/lib/rebuild-experiment-lib.mjs`'s lineage header are both extended
+with a dated paragraph, and `CLAUDE.md`'s Standing Task section gets the v4
+sentence in the style of the v2 and v3 ones. Verified that the CR-only fix
+above does NOT affect this recipe: `shuffleDropDegrade` calls
+`scripts/lib/scene-segments.ts` directly, not `scenesFromFountain`, and
+`countFountainScenes` on a bare-`\r` probe reads the same scene count before
+and after this lane's commit.
+
+Gates: `npm run lint`, `npm run check-no-console`, `npm run gates`, and
+`node scripts/check-scoring-receipt.mjs 02d8cfb4..HEAD` all pass;
+`check-doctor-output-identity.mjs --compare` against `git archive 02d8cfb4`
+(both sides `GIT_SHA=dev`) — PASS, 45/45 byte-identical (no fixture is
+CR-only); `npm run benchmark:public -- --json` — all six floor statistics
+unchanged. Full receipt in
+`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`'s 2026-09-20 "SCENE SPLIT
+NORMALIZES LINE ENDINGS; AUC-24 RECIPE ID BUMPED TO shuffle-drop/v4" entry.
