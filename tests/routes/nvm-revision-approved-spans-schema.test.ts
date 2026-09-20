@@ -19,10 +19,11 @@
 // rewrites nothing. This file only asserts the schema boundary (400 vs
 // 200-shape), not pass content — that is nvm-revision.test.ts's job.
 //
-// BUDGET: this file spends 10 of its own 20-request/60s aiLimiter budget
+// BUDGET: this file spends 15 of its own 20-request/60s aiLimiter budget
 // (node:test runs each file in its own process, so the budget is per-file —
-// see nvm-revision.test.ts's header) — all 10 requests go to
-// POST /api/nvm/revise.
+// see nvm-revision.test.ts's header) — all 15 requests go to
+// POST /api/nvm/revise. (10 pre-existing + 5 added 2026-09-20 for review
+// finding 2's per-span/per-request line-count bounds, below.)
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startTestServer, freshSessionId, type TestServer } from './helpers.ts';
@@ -116,6 +117,49 @@ describe('POST /api/nvm/revise — approvedSpans schema (typed line ranges, not 
   it('rejects 201 well-formed spans with 400 (one past the array-length cap)', async () => {
     const spans = Array.from({ length: 201 }, (_, i) => ({ startLine: i + 1, endLine: i + 1 }));
     await assertRejected(spans);
+  });
+
+  // Review finding 2 (2026-09-20, HIGH, adversarial-probe-confirmed):
+  // `endLine` had no upper bound at all pre-change — a single span could
+  // name any line up to Number.MAX_SAFE_INTEGER-scale, and
+  // approvedSpanInstructions sliced unclamped. Pre-change: 200 (the span
+  // reached the pipeline and was clamped there — see approvedSpansSurvive's
+  // "clamped to the document" comment — but the route itself never said no).
+  it('rejects endLine: 9007199254740991 (nearly Number.MAX_SAFE_INTEGER) with 400 naming approvedSpans/endLine', async () => {
+    await assertRejected([{ startLine: 1, endLine: 9007199254740991 }], 'approvedSpans\\.0\\.endLine');
+  });
+
+  // Pre-change: 200.
+  it('rejects endLine: 200001 with 400 (one past the new per-span line-number cap)', async () => {
+    await assertRejected([{ startLine: 1, endLine: 200001 }], 'approvedSpans\\.0\\.endLine');
+  });
+
+  // Pre-change: 200 — no whole-request bound existed on the SUM of span
+  // lengths, only on the array's entry COUNT. 200 spans of 101 lines each
+  // sum to 20,200, one over the new 20,000-line request total.
+  it('rejects 200 spans whose combined length (20,200 lines) exceeds the per-request total with 400 naming approvedSpans', async () => {
+    const spans = Array.from({ length: 200 }, (_, i) => ({
+      startLine: i * 101 + 1,
+      endLine: i * 101 + 101,
+    }));
+    await assertRejected(spans, 'approvedSpans');
+  });
+
+  // Exactly at the new per-request total (200 spans x 100 lines = 20,000):
+  // must still be accepted, not off-by-one rejected.
+  it('accepts 200 spans whose combined length is exactly 20,000 lines (the per-request total)', async () => {
+    const spans = Array.from({ length: 200 }, (_, i) => ({
+      startLine: i * 100 + 1,
+      endLine: i * 100 + 100,
+    }));
+    await assertAccepted(spans);
+  });
+
+  // The 20,000-line total is a REQUEST-wide bound, not a per-span one: a
+  // single span spanning the whole allowance must be accepted the same way
+  // 200 smaller spans summing to it are, above.
+  it('accepts a single span covering lines 1..20000 (the per-request total, in one span)', async () => {
+    await assertAccepted([{ startLine: 1, endLine: 20000 }]);
   });
 
   // Unchanged behavior: approvedSpans has always been optional.

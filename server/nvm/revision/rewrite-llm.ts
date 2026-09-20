@@ -71,15 +71,83 @@ import {
  * code. sanitizeSingleLine collapses every whitespace run (LF included) to
  * one space, which is what actually keeps the forged fence and the injected
  * instruction out of the prompt structure.
+ *
+ * BOUNDING (2026-09-20, review finding 2, HIGH). `server/lib/validation.ts`'s
+ * `ApprovedSpanSchema`/`ReviseBodySchema` now reject an out-of-bounds
+ * `endLine` and an over-large combined span total at the one shipped HTTP
+ * caller — but this function is also reachable by anything that calls the
+ * revision pipeline directly (its own doc comment above already documents
+ * that `relocateApprovedSpans` tolerates a non-finite/out-of-range span for
+ * exactly that reason), so the bound is enforced here too, independently:
+ * `endLine` is clamped to `lines.length` (the same clamp
+ * `approvedSpansSurvive` below already applies) and a span whose clamped
+ * range is empty (a `startLine` past the end of the document) is skipped
+ * outright rather than excerpting nothing. The resulting prompt block is
+ * additionally capped at `APPROVED_SPAN_BLOCK_MAX_CHARS` characters, further
+ * capped at the draft's own length in characters — the draft itself is the
+ * natural bound; this block quotes pieces of it, so it has no legitimate
+ * reason to need to be larger than the whole of it — which is what
+ * actually stops the `{startLine: 1, endLine: 9007199254740991}` x200 shape
+ * from building a 57 MB block regardless of what any caller's schema allowed
+ * through. `draftLength` alone would be too tight a bound to ever admit even
+ * ONE legitimate whole-document span: the marker/reason wrapper
+ * (`  [APPROVED — DO NOT CHANGE — reason: ...]\n`, up to ~150 chars) makes a
+ * full-draft excerpt's section a little LARGER than the draft it quotes, so
+ * `APPROVED_SPAN_BLOCK_OVERHEAD_CHARS` gives every draft that same fixed
+ * headroom — enough for exactly one such wrapper, not enough for a second
+ * whole-draft span to also sneak under the cap. `APPROVED_SPAN_BLOCK_MIN_
+ * CHARS` is a separate floor for the opposite edge — a very short draft (a
+ * few dozen characters) where the wrapper overhead alone can exceed
+ * `draftLength + APPROVED_SPAN_BLOCK_OVERHEAD_CHARS` too — sized generously
+ * enough to admit an ordinary single span with a full 500-char reason on
+ * any realistic short draft. Neither exists to make room for the
+ * pathological many-huge-spans shape this bound is here to stop; a span
+ * that would push the block past the cap (after that headroom) is dropped
+ * whole (never partially included, which would risk truncating an excerpt
+ * mid-line and showing the model a fabricated partial instruction), and
+ * `revision_approved_span_block_truncated` is logged at warn — counts only,
+ * never span text or reasons — when any span is dropped this way.
  */
+const APPROVED_SPAN_BLOCK_MAX_CHARS = 200_000;
+const APPROVED_SPAN_BLOCK_MIN_CHARS = 4_096;
+const APPROVED_SPAN_BLOCK_OVERHEAD_CHARS = 256;
+
 function approvedSpanInstructions(spans: ApprovedSpan[], lines: string[]): string {
   if (spans.length === 0) return '';
-  const sections = spans.map(s => {
-    const excerpt = lines.slice(s.startLine - 1, s.endLine).join('\n');
+  const draftLength = lines.length === 0 ? 0 : lines.join('\n').length;
+  const blockCharCap = Math.min(
+    APPROVED_SPAN_BLOCK_MAX_CHARS,
+    Math.max(draftLength + APPROVED_SPAN_BLOCK_OVERHEAD_CHARS, APPROVED_SPAN_BLOCK_MIN_CHARS),
+  );
+  const sections: string[] = [];
+  let usedChars = 0;
+  let droppedCount = 0;
+  for (const s of spans) {
+    if (!Number.isFinite(s.startLine) || s.startLine < 1 || s.startLine > lines.length) {
+      continue;
+    }
+    const clampedEnd = Number.isFinite(s.endLine) ? Math.min(s.endLine, lines.length) : lines.length;
+    if (clampedEnd < s.startLine) continue;
+    const excerpt = lines.slice(s.startLine - 1, clampedEnd).join('\n');
     const reason = typeof s.reason === 'string' ? sanitizeSingleLine(s.reason, 120) : '';
     const reasonClause = reason.length > 0 ? ` — reason: ${reason}` : '';
-    return `  [APPROVED — DO NOT CHANGE${reasonClause}]\n${excerpt}`;
-  });
+    const section = `  [APPROVED — DO NOT CHANGE${reasonClause}]\n${excerpt}`;
+    if (usedChars + section.length > blockCharCap) {
+      droppedCount++;
+      continue;
+    }
+    usedChars += section.length;
+    sections.push(section);
+  }
+  if (droppedCount > 0) {
+    logger.warn('revision_approved_span_block_truncated', {
+      totalSpans: spans.length,
+      includedSpans: sections.length,
+      droppedSpans: droppedCount,
+      blockCharCap,
+    });
+  }
+  if (sections.length === 0) return '';
   return '\nApproved sections that MUST remain unchanged:\n' + sections.join('\n\n');
 }
 
