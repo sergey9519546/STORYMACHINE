@@ -175,6 +175,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B3.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Dead Weight B3",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B3.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
       "type": "branch",
       "title": "Branch — Adversarial 2026-09-12",
@@ -1472,6 +1478,10 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B3.md",
       "to": "docs/brain/Patterns.md"
     },
     {
