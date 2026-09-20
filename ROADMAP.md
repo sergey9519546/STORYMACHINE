@@ -279,6 +279,20 @@ it, with the calibration corpus untouched, and waits for the owner's
 `docs/brain/Owner/Owner - R5 Measurement and Merge.md` gives the order). The
 exit gate below is unaffected and still unmet.
 
+**Update (2026-09-20) — the climax-relocate paired reading above is stale;
+lead with the blind pairs instead.** The `0.4219` quoted above predates the
+2026-09-12 climax-relocate position-one fix (adversarial finding 12); the
+current, re-locked matched-pair reading is **0.4063** (shuffle-drop matched-pair
+is unchanged at 0.5313). Both intervals still contain 0.5 — see CLAUDE.md's
+Standing task section for the full table. The number this repo's own
+`docs/PATH_TO_EXCELLENCE.md:458` narration once put beside these ("the blind
+pairs went from one of six to four of six") describes an unmerged scoring
+branch's own measurement, not `main`: re-measured on HEAD `26d930dd`, the
+blind-pair harness
+(`tests/core/blind-pairs-discrimination.test.ts`) orders **1 of 6** pairs,
+mean health gap -0.0167. That is the only always-on CI test against
+independent real writing and is the number to lead with over any AUC here.
+
 **Decision: proceed to P2 while structural work continues.** The dialogue
 channel is solved — that's real discrimination on real writing. The
 structural gap is an analyzer-layer problem that doesn't block shipping a

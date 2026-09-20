@@ -49,7 +49,27 @@ separate good from bad writing.** Lead with what is
 true and verifiable (reproducibility, determinism, inspectability), never
 with the rule count. The rule count is neither the wedge nor load-bearing.
 
-Measured proof points (honest, as of 2026-07-14):
+Measured proof points (honest, as of 2026-07-14; the first bullet below is
+the current number and supersedes nothing that follows — it is added, not
+substituted):
+- **The current validity read (2026-09-20, this is the number to lead
+  with).** The blind-pair harness — twelve screenplays written blind, six
+  matched excellent/bad pairs, the only CI-run test on independent real
+  writing — orders **1 of 6 pairs** correctly, mean health gap -0.0167
+  (measured on HEAD `26d930dd`; `tests/core/blind-pairs-discrimination.test.ts`).
+  The public benchmark's two measurement channels (32 committed
+  screenplays, runs in CI, no corpus needed) read matched-pair AUC
+  **0.5313** for shuffle-drop and **0.4063** for climax-relocate
+  (`scripts/lib/auc.ts`); both 95% confidence intervals contain 0.5, so on
+  9-14-scene distributable prose the doctor does not reliably prefer an
+  intact script to a mechanically damaged copy of itself. The positive
+  control (dialogue-flatten) reads matched-pair AUC 1.0000 — it proves the
+  instrument can register a manipulation the score is built to catch, not
+  that the score is valid on ordinary craft variation. The AUC-24 figure
+  quoted below (0.731) was measured on a scene-segmentation recipe
+  superseded 2026-09-12/19 (`shuffle-drop/v3`); no AUC-24 figure exists yet
+  on the current recipe. See CLAUDE.md's Standing task section and
+  `docs/CLAIMS_REGISTER.md` row 121 for the full accounting.
 - **Discrimination is thin and synthetic.** 6 hand-authored paired
   good/bad scenarios; **all 6 are now hard CI assertions** (0 `todo` in the
   file) but two pass by only +1.4. No runnable discrimination test on *real*
