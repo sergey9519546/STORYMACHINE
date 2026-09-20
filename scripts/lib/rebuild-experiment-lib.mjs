@@ -149,6 +149,26 @@ export function bootstrapCi(pairs, iterations = BOOTSTRAP_DEFAULT, seed = 42) {
 // `scripts/lib/auc.ts`'s header makes about AUC-24, for the same reason.
 //
 // `degradeDialogueFlatten` never used the segmenter and is unchanged.
+//
+// ── A SECOND SEGMENTATION CHANGE, 2026-09-20 (scene-split-cr-and-recipe-v4
+//    lane, review finding 4) ────────────────────────────────────────────────
+// The shared grammar `segmentFountainScenes`/`sceneHeadingLineIndices` read
+// (`src/lib/fountain.ts`'s `isSceneHeadingLine`) changed again after the
+// 2026-09-12 note above was written: a `...`-leading dialogue or action line
+// is no longer misread as a forced scene heading (Fountain's actual rule is
+// "`.` followed by a non-`.` character"), and the forced-heading character
+// class widened from `[A-Za-z0-9]` to any Unicode letter or number. So a
+// FRESH RERUN of `degradeShuffle`/`degradeMidpointDrop` (or of
+// `scripts/rebuild-experiment.mjs`) today segments differently again from
+// both the 2026-07-29 baseline AND from a rerun taken between 2026-09-12 and
+// 2026-09-20 — same disclosure as above, now with a second recipe change to
+// account for. `scripts/lib/auc.ts`'s `AUC24_DEGRADATION_ID` bumped to
+// `shuffle-drop/v4` for the same underlying grammar change; this file carries
+// no version constant of its own; the dated baseline document is unaffected
+// and not edited. The same lane's bare-`\r` normalization fix landed only in
+// `server/nvm/analyze/scene-split.ts`'s `scenesFromFountain` (the emotional-arc
+// splitter), not in `scripts/lib/scene-segments.ts`, so it does not change
+// this file's segmentation of a bare-`\r` script either.
 
 /** The heading view, for callers and tests that want slugs rather than slices.
  *  Shape unchanged; grammar is now the parser's, via scene-segments.ts.

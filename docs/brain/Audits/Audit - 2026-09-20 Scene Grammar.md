@@ -111,6 +111,14 @@ this audit's §2 deferred, now made; see
 headings (decision 2026-09-20)" and the "FORCED HEADINGS IN ANY SCRIPT" entry
 in `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`.
 
+**2026-09-20 addendum (review findings 4 and 6 fixed):** `scenesFromFountain`
+now normalizes `\r\n?` -> `\n` before segmenting (a bare `\r` used to read as
+no line break at all), and `AUC24_DEGRADATION_ID` bumps to `shuffle-drop/v4`
+to catch up with the ellipsis and Unicode grammar changes above, which had
+changed the AUC-24 recipe's segmentation without a matching id bump; see
+`docs/audits/2026-09-20-scene-grammar/README.md`'s "§ Review findings 4 and 6
+fixed" and the matching entry in `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`.
+
 **Related:** [[Audit - 2026-09-19 Harness Honesty]],
 [[Audit - 2026-09-12 Adversarial Review]], [[Gate - AUC-24 Ratchet]],
 [[Gate - Public Benchmark]], [[Gate - Output-Identity Harness]],

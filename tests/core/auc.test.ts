@@ -336,9 +336,13 @@ describe('shuffleDropDegrade — the segmentation change is real, not cosmetic',
     // A table locked under the old recipe must never be compared to a new
     // measurement, and the artifact is self-describing, so the id carries it.
     // v3 (2026-09-19, harness-honesty lane): reassembly now inserts a `\n`
-    // after a relocated scene slice missing its own terminator — see
+    // after a relocated scene slice missing its own terminator. v4
+    // (2026-09-20, scene-split-cr-and-recipe-v4 lane): the shared heading
+    // grammar this recipe reads was corrected (a `...`-leading line is no
+    // longer a forced heading) and widened (Unicode letters/numbers after the
+    // forced-heading dot) after the v3 bump, without a matching id bump — see
     // AUC24_DEGRADATION_ID's own comment in scripts/lib/auc.ts.
-    assert.equal(AUC24_DEGRADATION_ID, 'shuffle-drop/v3');
+    assert.equal(AUC24_DEGRADATION_ID, 'shuffle-drop/v4');
     assert.match(AUC24_DEGRADATION.recipe, /scene-segments\.ts/);
     assert.match(AUC24_DEGRADATION.recipe, /NOT the INT\.\/EXT\.-only split/);
     assert.match(AUC24_DEGRADATION.recipe, /lacks its own line terminator/);

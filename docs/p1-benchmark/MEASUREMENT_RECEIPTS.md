@@ -2775,3 +2775,130 @@ that nobody mistakes one for the other.
   receipt on committed fixtures. It shows the score did not move; it says
   nothing about whether the score discriminates, and none of its numbers is
   comparable to AUC-24 or to the P1 baseline.
+
+### 2026-09-20 — SCENE SPLIT NORMALIZES LINE ENDINGS; AUC-24 RECIPE ID BUMPED TO shuffle-drop/v4 (PUBLIC-CORPUS — not an AUC-24 receipt; the private corpus is not present in this environment, so no real-corpus figure is claimed; no table has ever been locked, so nothing is invalidated)
+
+- **Date:** 2026-09-20
+- **Git SHA:** `c607f4b5` on `lane/scene-split-cr-and-recipe-v4`, branched
+  from `02d8cfb4` — a real commit in this repository, and the baseline every
+  before/after figure below is measured against.
+- **Why this entry exists.** One scoring-path file changed:
+  `server/nvm/analyze/scene-split.ts` (`scenesFromFountain`, the splitter
+  under the emotional arc and nine other signal modules).
+  `node scripts/check-scoring-receipt.mjs 02d8cfb4..HEAD` requires a receipt
+  for this range, and this is it.
+- **What changed, in one sentence each.** (1) Review finding 6:
+  `scenesFromFountain` reaches `parseFountain` (via `sceneHeadingLineIndices`)
+  and `splitLinesKeepingEndings`, neither of which treats a bare `\r` as a
+  line break, so a script using classic Mac line endings read as one line and
+  undercounted scenes relative to its CRLF/LF twin — `scenesFromFountain` now
+  normalizes `\r\n?` -> `\n` before segmenting, at the top of the function.
+  (2) Review finding 4: the AUC-24 recipe's shared segmentation dependency
+  (`scripts/lib/scene-segments.ts` -> `src/lib/fountain.ts`'s
+  `isSceneHeadingLine`) changed twice after the `shuffle-drop/v3` bump without
+  a matching id bump — a `...`-leading line stopped being misread as a forced
+  scene heading, and the forced-heading class widened to any Unicode letter
+  or number — so `AUC24_DEGRADATION_ID` bumps to `shuffle-drop/v4`
+  (`scripts/lib/auc.ts`); `AUC24_FLOOR` is untouched at 0.622.
+- **Command:** every command run for this entry, all of them in this
+  worktree —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types --test tests/core/scene-split-line-endings.test.ts
+  node --experimental-strip-types --test tests/core/scene-grammar.test.ts
+  node --experimental-strip-types --test tests/core/scene-segments.test.ts
+  node --experimental-strip-types --test tests/core/auc.test.ts
+  node --experimental-strip-types --test tests/core/auc24-table.test.ts
+  node --experimental-strip-types --test tests/core/public-benchmark.test.ts
+  node --experimental-strip-types --test tests/core/public-benchmark-limits.test.ts
+  node --experimental-strip-types --test tests/core/calibration.test.ts
+  node --experimental-strip-types --test tests/core/script-doctor.test.ts
+  node --experimental-strip-types --test tests/core/fountain-analyzer.test.ts
+  node --experimental-strip-types --test tests/core/emotional-arc.test.ts
+  node --experimental-strip-types --test tests/core/honesty-audit-claims.test.ts
+  node --experimental-strip-types --test tests/scripts/report-unverified-gates.test.ts
+  npm run benchmark:public -- --json          # before (on 02d8cfb4) and after
+  git archive 02d8cfb4 | tar -x -C <baseline>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree .          --out <after>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --compare <before> <after>
+  npm run gates
+  node scripts/check-scoring-receipt.mjs 02d8cfb4..HEAD
+  ```
+- **Corpus fingerprint:** the committed PUBLIC 32-script set — 20 CC0
+  screenplays in `data/screenplays/` plus the 12 blind-pair fixtures — read
+  through `tests/fixtures/public-corpus-manifest.json`, whose bytes this lane
+  did not change. Every one of the 32 rows — `sceneCount`, `words`, `health`,
+  `verdict` — came back byte-identical after the change, so no `--lock` was
+  needed and none was run. Plus the 45 in-repo output-identity fixtures (20
+  CC0 screenplays, 20 calibration samples, the P0 sample, and 4 synthetic
+  concatenations) — **none is CR-only** (counted: all use `\n` or, where
+  present in the source files, `\r\n`), so this identity check is a limit of
+  the instrument for finding 6's fix specifically — the measured effect below
+  covers what the fixture set cannot see. **The PRIVATE AUC-24 corpus was not
+  available in this environment** (`REAL_SCRIPT_CORPUS_DIR` is unset here and
+  the corpus is local-only by copyright), so no real-corpus figure is claimed
+  for this range.
+- **Runner attestation:** run in the session worktree
+  (`lane/scene-split-cr-and-recipe-v4`, branched from `02d8cfb4`) on
+  2026-09-20 by the lane agent; no API key, no private corpus. Every command
+  in the block above was executed here and its output read directly from its
+  own log; every number below is copied from that output.
+- **Output identity:** `check-doctor-output-identity.mjs --compare` against a
+  `git archive 02d8cfb4` baseline, both sides `GIT_SHA=dev` →
+  **"OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt
+  excluded)."** **0 of 45 fixtures differ** — expected, since none of the 45
+  is CR-only (counted above), so this identity check cannot see finding 6's
+  fix at all; the measured effect below is on an input the fixture set does
+  not contain.
+- **Measured public AUCs, before → after (N = 32; matched-pair is PRIMARY;
+  seeded 2000-resample percentile bootstrap, seed 42):**
+  - `SHUFFLE_DROP` — matched-pair **0.5313 → 0.5313**, all-pairs
+    **0.5586 → 0.5586**.
+  - `CLIMAX_RELOCATE` — matched-pair **0.4063 → 0.4063**, all-pairs
+    **0.4443 → 0.4443**.
+  - `DIALOGUE_FLATTEN` (positive control) — matched-pair **1.0000 → 1.0000**,
+    all-pairs **0.9473 → 0.9473**.
+  - **All six numbers are unchanged, so none of the six floor constants in
+    `scripts/lib/auc.ts` moved and no floor was re-locked.** None of the 32
+    committed public-benchmark scripts is CR-only, and `shuffleDropDegrade`
+    reads scene boundaries through `scripts/lib/scene-segments.ts`, which
+    this change does not touch — so the recipe's behaviour on this corpus is
+    unaffected by finding 6's fix by construction, not by measurement luck.
+- **Measured effect on an input the fixture set does not contain** (both
+  figures produced here, before this commit vs after, same script, same
+  command): a double-spaced 3-scene script using classic Mac (`\r`-only) line
+  endings — `analyzeFountainText`'s own `normalizeScreenplay` heuristic fired
+  and reported `sceneCount = 3`, while `scenesFromFountain(...).length` was
+  **1** before this commit (the whole document read as one line and one
+  heading) and is **3** after — matching `sceneCount` for the first time. A
+  minimal (non-double-spaced) 2-scene CR-only probe went from
+  `scenesFromFountain(...).length = 1` to `2`, matching its CRLF and LF twins
+  (both already `2`).
+- **Measured AUC-24 recipe change:** `countFountainScenes`
+  (`scripts/lib/scene-segments.ts`, which `shuffleDropDegrade` calls) on a
+  script containing an `...and then nothing.` dialogue line reads **2** at
+  this commit; the same probe against a `git archive 26d930dd` checkout (the
+  commit the `shuffle-drop/v3` bump's own tree was built on) reads **3** —
+  the ellipsis-heading fix that already landed on this branch, between the v3
+  bump and this commit, changed the recipe's segmentation without a matching
+  id bump. `AUC24_DEGRADATION_ID` is now `shuffle-drop/v4`. Verified by the
+  same probe that a bare-`\r` script's segmentation through
+  `scripts/lib/scene-segments.ts` is **unchanged by this commit**:
+  `countFountainScenes` on the CR-only probe above reads **1** both before
+  and after — finding 6's fix landed only in
+  `server/nvm/analyze/scene-split.ts`'s separate `scenesFromFountain`.
+- **Measured AUC-24:** **none is claimed for this range, and none was
+  produced here.** The private corpus is not present in this environment.
+  The owner's next `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` and
+  `npm run lock-auc24` on degradation recipe `shuffle-drop/v4` are the first
+  real-corpus figures this recipe id will produce; `AUC24_FLOOR` is untouched
+  at 0.622, and since `tests/fixtures/auc24-table.json` has never existed,
+  nothing is invalidated by the id bump.
+- **What a reader should NOT take from this entry.** It is a public-corpus
+  receipt. It shows that on the 32 committed scripts and the 45 output-identity
+  fixtures the score is byte-for-byte what it was, because none of them is
+  CR-only, and it shows two measured deltas on synthetic inputs the committed
+  corpus does not contain. It says nothing about whether the score
+  discriminates, and it is not comparable to AUC-24 or to the P1 baseline.

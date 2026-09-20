@@ -208,6 +208,22 @@ where a script with no trailing newline could have its un-terminated final
 scene welded onto the next scene's heading once the shuffle moved it out of
 last position (verified by probe); `AUC24_FLOOR` is untouched and, since no
 table has ever been locked, nothing is invalidated.**
+**2026-09-20 (scene-split-cr-and-recipe-v4 lane): `AUC24_DEGRADATION_ID` bumped
+again, to `shuffle-drop/v4` — the shared heading grammar the recipe reads
+(`scripts/lib/scene-segments.ts` -> `src/lib/fountain.ts`) was corrected and
+widened in two lanes that landed after the v3 bump without a matching id
+bump: a `...`-leading dialogue or action line is no longer misread as a
+forced scene heading (verified by probe: a script with an `...and then
+nothing.` line went from 3 scenes to 2 under `countFountainScenes`), and the
+forced-heading rule now accepts any Unicode letter or number after the dot,
+not only ASCII. `AUC24_FLOOR` is untouched at 0.622 and, since no table has
+ever been locked, nothing is invalidated. The same lane also fixed
+`server/nvm/analyze/scene-split.ts`'s `scenesFromFountain` (a separate
+splitter, feeding the emotional arc and a dozen signal modules, not the
+AUC-24/public-benchmark recipes) to normalize `\r\n?` -> `\n` before
+segmenting, so a bare-`\r` script no longer undercounts scenes relative to
+its CRLF/LF twin there; this does not touch `shuffleDropDegrade`, which still
+reads scene boundaries off raw text via `scripts/lib/scene-segments.ts`.**
 
 It is NOT comparable to the 761-script P1 baseline
 (`docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`), which reports
