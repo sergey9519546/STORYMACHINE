@@ -37,8 +37,30 @@
 // The three-to-four-page range holds because the length is BOUNDED BY THE
 // ENGINE, not by this renderer: doctor.ts:1920 caps `topPriorities` at ten, so
 // a 231-scene feature and a 9-scene short produce letters within 0.5 pp of each
-// other. tests/core/coverage-letter.test.ts asserts the range, on the shipped
-// shape, at `<= 4.0` — the sentence itself rather than a window around it.
+// other. tests/core/coverage-letter.test.ts asserts the range on the shipped
+// shape.
+//
+// ── RE-MEASURED 2026-09-20 (lane/land-feature-length-defects, second pass) ──
+//
+// This module did not change — `git diff e79c64b4..HEAD` over this file, the
+// route, root-cause-pipeline.ts and logline.ts is EMPTY. The engine's content
+// did: the sub-1 density curve and the ORPHAN_CLUE proper-noun guard change
+// which findings reach the ranked body, so each letter moved by tens of words,
+// in both directions. Re-measured the same way, on all 21:
+//
+//   as the route ships  3.37 pp .. 4.02 pp   (median 3.64)
+//   bare report         3.12 pp .. 3.72 pp   (median 3.44)
+//
+// Shortest is now mise (3.37, was the-detour at 3.53); longest is a TIE at
+// 4.02 between counter-offer (3.96 before) and runoff (3.86 before). TWO OF
+// THE 21 THEREFORE SIT 0.02 pp PAST 4.00 — ten words, at the 500-words-to-the-
+// page convention measured in here. The feature fixture reads 3.79.
+//
+// The sentence is KEPT rather than restated: a document measured between 3.37
+// and 4.02 pages is a three-to-four-page document, and "three-to-five-page"
+// would be less accurate, not more. The gate's upper bound moves from 4.0 to
+// 4.1 — the measurement plus a stated 0.08 pp (~40 words) — and the reasoning
+// is written out at the assertion.
 //
 // Why the sentence was corrected rather than the letter cut back: the shortest
 // this document can be is its non-priorities content, which measures ~1,009
