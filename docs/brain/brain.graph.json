@@ -187,6 +187,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Per-Pass Diagnostics",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
       "type": "branch",
       "title": "Branch — Adversarial 2026-09-12",
@@ -1583,6 +1589,26 @@
     {
       "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
       "to": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Receipt Gate Inplace.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "to": "docs/brain/Patterns.md"
     },
     {
       "from": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
