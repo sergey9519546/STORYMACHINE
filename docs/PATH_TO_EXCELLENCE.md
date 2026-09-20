@@ -98,7 +98,15 @@ ARCHITECTURE), and row 18 (dead-weight proposal B3 removed). See
 `1db74c21`, full suite: 14,561 tests, 0 failures, 98 skipped. The owner
 still needs to run `measure-real` and `lock-auc24` on the corpus and commit
 `tests/fixtures/auc24-table.json` before 2026-11-01 — no real-corpus figure
-has been claimed for the new grammar.
+has been claimed for the new grammar. A second pass on 2026-09-20 decided
+three of the owner's remaining items: Unicode forced scene headings are now
+recognized, proposal B2 (the v5.0 closure) was removed, and the receipt
+gate's Command-label pattern was widened in lockstep with its simulation-
+language scan (`SESSION_REPORT_2026-09-19.md` §9). `scoring/advice-rule-
+fixes` is landed on `lane/land-advice-rule-fixes` but not merged into main:
+the landing is gate-clean, but it lowers the public benchmark's primary
+shuffle-drop floor below its prior value, so the merge is held pending the
+owner's real-corpus AUC-24 run on that branch.
 
 **2026-09-13 — CI green, and the story track begins: four defects only
 the runner could show, the owner's run as one command, and generation

@@ -337,3 +337,119 @@ Open for the owner:
 5. Proposals A/B1/B2 and the v5.0 test files.
 6. `converge-stream` still has no `cast` parameter; `allowIntroduce` is
    inert in the loop.
+
+## 9. 2026-09-20, second pass — the owner's five items
+
+**Receipt gate follow-up, before the five items.** The owner's task named a
+`---` separator being read as part of the previous receipt entry's span; that
+was already fixed in `2942fdb7` (separator lines are trimmed from the span
+before the in-place-rewrite check runs). The open judgment call from that
+same follow-up — whether to accept a `**Commands (…):**` label as equivalent
+to `**Command:**` — was decided as widen-in-lockstep: `fa293293` extends
+`REQUIRED_FIELDS`'s Command pattern to match the plural, parenthetical form
+three honest 2026-09-12-and-after receipt entries already use, and extends
+the simulation-language scan to key on the same pattern so a widened field
+name cannot become a blind spot. See
+`docs/audits/2026-09-19-receipt-gate-inplace/README.md` §
+"Command label widened in lockstep with the claim scan".
+
+**Item 1, the real-corpus measurement.** Cannot run in this environment:
+there is no corpus here and `REAL_SCRIPT_CORPUS_DIR` is unset. This remains
+the owner's step. Exact commands, unchanged from §8: `REAL_SCRIPT_CORPUS_DIR=
+<corpus> npm run measure-real`, then re-lock
+`tests/fixtures/real-corpus-manifest.json`, then `npm run lock-auc24` on the
+`shuffle-drop/v3` recipe to produce `tests/fixtures/auc24-table.json` for the
+first time, checked against `AUC24_FLOOR = 0.622`.
+
+**Item 3, Unicode forced scene headings — decided YES.** `5c473f68` widens
+`FORCED_SCENE_HEADING_RE` from ASCII-only to `/^\.(?=[\p{L}\p{N}])/u`, on the
+grounds that Fountain's own rule for a forced heading is "a period followed
+by a character," not "a period followed by an ASCII character." `.МОСКВА`,
+`.ԵՐԵՎԱՆ` and `.東京` are now read as scene headings. The output-identity
+harness stays 45/45 (no committed fixture contains a non-ASCII forced
+heading), the public benchmark is unchanged, and the fix appends its own
+receipt.
+
+**Item 5, proposals A/B1/B2 — decided.** Proposal A is kept, per its own
+recommendation; no change made. Proposal B1 was already in place, since
+`a2448714` (2026-08-24) — that gate-repair commit already put
+`tests/critics` in `scripts/run-tests.mjs`'s `TEST_ROOTS`. This lane verified
+what actually runs under B1: 34 assertions (critics-engine 2, event-store
+32), and found that `server/nvm/kernel/event-store.test.ts` runs but does
+not type-check (11 `tsc` errors) — its `tsconfig.json` exclusion now carries
+that reason instead of standing unexplained. Proposal B2 was executed as the
+v5.0 closure removal: `4fb420ba` deletes 42 source files / 16,153 lines plus
+7 never-run test files and their in-tree reports, 64 files total, backed by a
+resolved-import dependency map showing zero live importers (the only two
+imports found were from a v5.0 benchmark file, which was removed in the same
+commit). The console-gate quarantine shrank 23 → 5 files and the
+reachability allowlist shrank 78 → 36 files. Recovery point (if this needs
+reverting) is `bf4f3bff`. `server/nvm/benchmarks/index.ts` was edited in the
+same commit to drop three catalog entries that pointed at the removed code.
+Record: `docs/audits/2026-09-20-dead-weight-b1-b2/`.
+
+**Item 2, landing `scoring/advice-rule-fixes` — done on a lane branch and
+deliberately NOT merged.** The branch `origin/lane/land-advice-rule-fixes`
+sits at `671b7cf2` (merge commit `089cc1b3`, receipt `3b84db66`, audit
+`docs/audits/2026-09-20-advice-rule-fixes-landing/`). The landing itself is
+complete and gate-clean: the conflicts were docs-only (a generated brain
+file, and the receipts doc where both sides' entries were kept); the branch's
+PENDING receipt was rewritten in place as a measured public-corpus entry,
+with the original 2026-09-04 text archived beneath it; the blind-pair harness
+held at 1 of 6 ordered (mean gap moved from −0.0167 to +0.0333, still exit 0
+on the registered known-failing result); the branch's own fixture pair now
+orders by issue count the right way round — excellent 132 issues vs bad 150
+(before the branch's fixes it was backwards: excellent 158 vs bad 148); the
+calibration suite holds; and 38 of the 45 output-identity fixtures moved (29
+in health, 3 verdicts, and `screenplay/room-12` dropping 33.5 → 0.0 — traced
+to the calibration reference distribution being recomputed at runtime from a
+corpus that the same six fixes also raised, not to a detector regression on
+that script).
+
+But the public benchmark's PRIMARY channel fell: shuffle-drop matched-pair
+went 0.5313 → 0.4375, below its prior floor of 0.5113, with 4 of 32 pairs
+flipping from ordered to inverted (one flipped the other way, net 17 → 14
+ordered). All-pairs fell 0.5586 → 0.5298. The DIALOGUE_FLATTEN positive
+control fell too, from 1.0000 to 0.9844, on one pair that is now tied because
+both sides clamp at health 0 (its mean gap actually widened, +29.30 →
++34.65, so the instrument reads more strongly there, not less).
+Climax-relocate rose, 0.4063 → 0.4375. The lane re-locked all six public
+floors downward to match.
+
+CLAUDE.md's rule is that the shuffle-drop AUC must not regress below its
+floor, and that re-locking after a regression silently lowers the ratchet —
+so the orchestrator held the merge rather than land it. The instrument that
+actually decides this is the real-corpus AUC-24 against the 0.622 ratchet,
+which only the owner can run, and only on this branch. The owner has two
+options, stated plainly:
+
+(a) Run `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` on
+`origin/lane/land-advice-rule-fixes`. If AUC-24 holds at ≥ 0.622, merge the
+branch and accept the lowered public floors as a measured cost, with the
+reasoning already written into its receipt.
+
+(b) If AUC-24 falls below 0.622 on that branch, do not merge it. Put the six
+advice-rule fixes back on the parked list with that number recorded against
+them.
+
+**Item 4, branch deletion — blocked.** This session's push credential is
+scoped to its own branch; a delete attempt on another branch returns HTTP
+403, and the GitHub tools available here have no delete call either. The nine
+tips identified for deletion are recorded so the owner (or a session with
+delete rights) can act on them directly:
+`calibrate/voice-bound-2026-09-13` (`c66ca57f`), `13b` (`e4db6c77`), `13c`
+(`4653a78e`), `13d` (`213795e7`), `claude/advice-rule-fixes-pending-
+measurement` (`68c64eca`), `claude/r5-verbosity-bias-pending-measurement`
+(`0f625c27`), `lane/healthcheck-ipv4` (`17e6bfe3`), `lane/node-24`
+(`faeb759a`), `lane/per-pass-diagnostics` (`e3c3b53a`). The last three are
+ancestors of HEAD; the rest are patch-identical to work that has already
+landed or been renamed elsewhere. One-line delete command per tip:
+`git push origin --delete <branch-name>`.
+
+**Verification.** Final verification: see the last paragraph of this
+section. _Final suite figures at the session head are recorded in §9.1 once
+the verifier reports._
+
+### 9.1 Final verification
+
+Filled in after the last full-suite run.
