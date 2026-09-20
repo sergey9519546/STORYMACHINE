@@ -708,10 +708,21 @@ const REQUIRED_FIELDS = [
  *  label-derived regex. Command carries an explicit `pattern` instead — the
  *  SAME COMMAND_FIELD_RE used in REQUIRED_FIELDS above — so that widening
  *  what counts as a Command field (singular/plural, with a parenthetical)
- *  widens what this scan reads in lockstep. Without that, a
- *  `**Commands (…):** (simulated local execution)` field would satisfy the
- *  required-field check yet never be looked at here, and simulation language
- *  in it would slip through silently. */
+ *  widens what this scan reads too. What that actually guarantees (fixed
+ *  2026-09-19, docs/audits/2026-09-19-receipt-gate-inplace/): the
+ *  required-field presence check, this simulation-language scan, and the
+ *  PENDING field scan all locate a field with the SAME `findFieldLine()` —
+ *  a per-line match, never a joined-body one — so a field only counts as
+ *  present when there is a SINGLE LINE all three scans can see it on. Before
+ *  that fix the presence check alone tested the joined body, so a Command
+ *  label that wrapped onto a second line — e.g. `**Commands (all run` /
+ *  `in this worktree):**` — satisfied the presence check (the parenthetical
+ *  matched across the newline) while the other two scans, which read line by
+ *  line, never saw the field at all; simulation language or a PENDING marker
+ *  in such a field slipped through silently (2026-09-19 adversarial finding,
+ *  Finding 3). Sharing one line-matching primitive is what makes that
+ *  impossible now: the field is either found in the same place by all three,
+ *  or found by none of them. */
 const CLAIM_FIELD_LABELS = [
   { label: 'Command', pattern: COMMAND_FIELD_RE },
   { label: 'Git SHA' },
@@ -746,14 +757,32 @@ const HAS_DIGIT_RE = /[0-9]/;
  *  a two-line window (the disclaimer routinely wraps onto the next line). */
 const SHA_DISCLAIMED_RE = /does\s+not\s+exist|nonexistent|non-existent|no\s+longer\s+exists|not\s+resolvable|unresolvable|could\s+not\s+get\s+object/i;
 
+/** The index of the line in `entryLines` where a field's bolded label
+ *  STARTS, matched against ONE LINE at a time — never a joined body — or -1
+ *  if no line matches. This is the single primitive every field-locating
+ *  scan in this file goes through: the required-field presence check, the
+ *  claim/simulation-language scan, and the PENDING field scan. A label that
+ *  wraps its parenthetical onto a second line (`**Commands (all run` /
+ *  `in this worktree):**`) does not match here even though it would match a
+ *  regex run against `entryLines.join('\n')` — and because every scan shares
+ *  this function, a field is either found in the same place by all of them,
+ *  or found by none. See Finding 3 (2026-09-19,
+ *  docs/audits/2026-09-19-receipt-gate-inplace/) for the bug this closes: the
+ *  presence check used to test the joined body directly, so a two-line label
+ *  could satisfy "field present" while remaining invisible to the other two
+ *  scans. */
+function findFieldLine(entryLines, pattern) {
+  return entryLines.findIndex((l) => pattern.test(l));
+}
+
 /** A field's full text (its labeled line plus any continuation lines, up to
  *  the next bolded bullet at any indent), located by a caller-supplied regex
- *  rather than a label string — shared by fieldValue() (label-based lookup)
- *  and the PENDING required-field scan (which needs each REQUIRED_FIELDS
- *  pattern, including the "Git SHA (or Baseline used)" alternation, tried in
- *  turn against the same line-matching logic). */
+ *  rather than a label string via `findFieldLine()` — shared by fieldValue()
+ *  (label-based lookup) and the PENDING required-field scan (which needs each
+ *  REQUIRED_FIELDS pattern, including the "Git SHA (or Baseline used)"
+ *  alternation, tried in turn against the same line-matching logic). */
 function fieldValueByPattern(entryLines, pattern) {
-  const start = entryLines.findIndex((l) => pattern.test(l));
+  const start = findFieldLine(entryLines, pattern);
   if (start === -1) return null;
   const out = [entryLines[start]];
   for (let i = start + 1; i < entryLines.length; i++) {
@@ -876,8 +905,17 @@ export function validateEntry(entry, { objectExists = shaResolves } = {}) {
   }
 
   for (const field of REQUIRED_FIELDS) {
-    if (!field.patterns.some((re) => re.test(body))) {
-      problems.push(`missing required field **${field.label}** (see §3's entry template)`);
+    // Per-line, via findFieldLine() — NOT `re.test(body)` against the joined
+    // entry text. A field only counts as present when the claim scan and the
+    // PENDING scan (both per-line) can see it too; see findFieldLine()'s
+    // docstring and Finding 3 (2026-09-19).
+    if (!field.patterns.some((re) => findFieldLine(entry.lines, re) !== -1)) {
+      problems.push(
+        `missing required field **${field.label}** (see §3's entry template). If you wrote this `
+        + "field's label across two lines — e.g. wrapping a parenthetical qualifier onto its own "
+        + 'line — that is not a recognized field: every scan in this file reads a field label from '
+        + 'a single line, so put the whole bolded label back on one line.',
+      );
     }
   }
 

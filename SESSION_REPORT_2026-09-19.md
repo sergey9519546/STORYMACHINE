@@ -453,3 +453,106 @@ the verifier reports._
 ### 9.1 Final verification
 
 Independent verifier at `0b7dd404` (range `1db74c21..0b7dd404`): lint, console gate (5 quarantine entries), brain (147 notes), server reachability (36 unreachable, all allowlisted), receipt gate on both ranges, doctor output identity 45 of 45 byte-identical against `53f6e377`, public benchmark unchanged (0.5313/0.5586, 0.4063/0.4443, 1.0000/0.9473; `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` still 0.5113), build, gates, attribution on all nine commits. Full suite: 14,577 tests, 0 failures, 98 skipped (env-gated). Verdict: safe to push.
+
+## 10. 2026-09-20, third pass — review round two and the feature-length candidate
+
+1. **Event-store test type-checks** (`c243c2d0`). The eleven fixture-drift
+   `tsc` errors in `server/nvm/kernel/event-store.test.ts` are fixed — nine
+   `AtomicFact` literals carrying a `content` field the type does not have,
+   one `StoryOp` array widened to `string` for lack of a return-type
+   annotation, and one read off `EmotionState.type` instead of `dominant` —
+   and the file's `tsconfig.json` exclude entry is removed. Console-gate
+   quarantine 5 → 4 as measured, and 4 → 3 counted with no `dist/` on disk
+   (the gate's exemption matcher only lists entries that resolve to
+   something on disk, so a built `dist/` adds one to both counts).
+
+2. **Adversarial review of the 2026-09-20 code** (read-only) found 1
+   BLOCKER, 2 HIGH, 3 MEDIUM, and the cases where the prose stated an
+   invariant the code did not implement. Fixed the same day:
+   - BLOCKER (`6061ae9d`): the per-pass re-diagnosis in `pipeline.ts`
+     replaced the caller's `analyzeStructure(records, allCommits)` with
+     `analyzeFountainText`'s commit-less structure, zeroing
+     `totalClockPressure`, so once pass 1 changed a single byte, passes 2
+     through 14 read act 1 at 0% where the ledger said act 3 at 100% — five
+     passes branch on those fields. `runRevisionPipeline` now carries the
+     ledger through and recomputes `analyzeStructure(rediagnosedRecords,
+     commits)`. Same commit: a lost approved span is now dropped from
+     enforcement and reported in `lostApprovedSpans`, never re-anchored onto
+     text the author did not approve. Output identity held 45 of 45; the
+     no-ledger path is pinned byte-identical by hash.
+   - HIGH (`2e4d39a1`): the receipt gate's required-field presence check
+     tested the joined entry body while the simulation-language scan and the
+     unresolved-measurement-marker scan both tested per line, so a two-line
+     `**Commands (…)**` label counted as present but was never scanned by
+     the other two.
+     All three now resolve a field from the same per-line matcher; a wrapped
+     label is rejected with a hint instead of passing silently.
+   - HIGH (`20bdf2df`): `ApprovedSpanSchema.endLine` had no upper bound —
+     200 valid spans could turn a 287 KB draft into a 57 MB prompt block per
+     revision pass. Spans are now bounded per span (200,000 lines), per
+     request (20,000 lines total), and the assembled prompt block cannot
+     exceed the draft it is built from.
+   - MEDIUM ×2 (`c607f4b5`): `scenesFromFountain` now normalizes `\r\n?`
+     line endings (a lone-CR paste used to read as one scene while the
+     report counted three); `AUC24_DEGRADATION_ID` is bumped to
+     `shuffle-drop/v4` because the forced-heading grammar change moved the
+     recipe's segmentation again after the `v3` bump (a bare `...` line no
+     longer reads as a forced heading, and Unicode forced headings are now
+     recognized). `AUC24_FLOOR` is untouched at 0.622; no table has ever
+     been locked, so nothing already committed is invalidated. The owner's
+     lock must be run on `v4`.
+   - Recorded, not fixed: span relocation is O(spans × lines) per pass
+     (measured 2.6 s on a 10k-line / 200-span worst case); nested spans can
+     relocate independently of each other; a `**Command:**` label inside a
+     fenced code block still satisfies presence (pre-existing).
+
+3. **`scoring/feature-length-defects` prepared for measurement** on
+   `origin/lane/land-feature-length-defects` (tip `4029b245`: merge
+   `058f48c0`, receipt `0e24a004`, measurement `6381692f`, audit
+   `docs/audits/2026-09-20-feature-length-defects-prep/`). Thirteen
+   conflicts resolved, six of them code. The public benchmark on the merged
+   tree, no floor re-locked: shuffle-drop matched-pair 0.5313 → 0.8750
+   [0.7500, 0.9688], all-pairs 0.5586 → 0.8291; climax-relocate
+   matched-pair 0.4063 → 0.5938, all-pairs 0.4443 → 0.5269; control
+   1.0000 / 1.0000; scripts pinned at health 76.0, 10 → 0; blind pairs 1 of
+   6 → 4 of 6 (mean gap −0.0167 → +0.3833), reproducing the branch's own
+   claim. Calibration is unmoved. Output identity moves on 25 of 45
+   fixtures, attributed per term: `scarcityPenalty` (the four synthetic
+   long fixtures lose about 9 points each), `densityPenalty` steepness 50 →
+   2, and the `ORPHAN_CLUE` proper-noun guard. The feature-length fixture
+   moves 84.4 → 74.4, with the voice channel now scoring 1,770 pairs
+   instead of abstaining across the whole script.
+
+   NOT merged: four tests are left failing on purpose —
+   `fountain-shape-guard-cue-parity` (the committed feature fixture now
+   reads at 1.52x headroom against the 675,000 voice-eligible-weight bound,
+   where the branch's own margin assertion demands 3x; this blocks landing
+   regardless of the AUC-24 result — the audit's §9 names three options,
+   the cleanest being to land the `burrowsDelta` hoist first so both bounds
+   can rise), the public-benchmark re-lock idempotence check on
+   `PUBLIC_ORDER_PAIRED_FLOOR` (stale in the cautious direction — a re-lock
+   would raise it, not lower it), a scene-grammar equality assertion that
+   was masking a real word-count difference between its two fixtures, and a
+   coverage-letter page-count promise. The decisive number is still the
+   real-corpus AUC-24 on that branch.
+
+4. **Contrast with `lane/land-advice-rule-fixes`** (`671b7cf2`, §9 above):
+   that landing lowers the primary shuffle-drop floor (0.5313 → 0.4375);
+   this one raises it (→ 0.8750). Both wait on the same owner-run AUC-24;
+   of the two, the feature-length branch is the one with evidence in its
+   favor so far.
+
+5. **Owner list**, restated compactly:
+   (a) `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` on the
+   session branch and on `origin/lane/land-feature-length-defects`; re-lock
+   the real-corpus manifest; `npm run lock-auc24` on recipe `v4`, table
+   committed before 2026-11-01.
+   (b) Settle the cue-parity headroom on the feature-length branch — land
+   the `burrowsDelta` hoist first.
+   (c) Decide `advice-rule-fixes` from its own AUC-24 run.
+   (d) Delete the nine branches named in §9, item 4.
+   (e) `converge-stream` has no `cast`; `allowIntroduce` is still inert.
+
+### 10.1 Final verification
+
+Independent verifier at `9f0ea060` (range `0b7dd404..9f0ea060`, 14 commits): lint, console gate (4 quarantine entries), brain (147 notes), server reachability (36 unreachable, all allowlisted), receipt gate on both ranges naming six scoring-path files with accepted entries, doctor output identity 45 of 45 byte-identical against `53f6e377`, public benchmark unchanged (0.5313/0.5586, 0.4063/0.4443, 1.0000/0.9473; `PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR` 0.5113; `AUC24_DEGRADATION_ID` `shuffle-drop/v4`), build, gates, attribution on all fourteen commits. Full suite: 14,598 tests, 0 failures, 98 skipped (env-gated). Verdict: safe to push.

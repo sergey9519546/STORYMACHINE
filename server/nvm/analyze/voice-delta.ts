@@ -14,9 +14,12 @@
 // extractor gap" paragraphs below are HISTORY: fountain-analyzer.ts:2482
 // now builds `dialogueByCharacter` from its own DialogueLine[] and calls
 // analyzeVoices on every analysed script, and doctor.ts:2292 attaches the
-// result to the report. What is still true, and is why this module is not a
+// result to the report. That importer is what puts this module on doctor.ts's
+// import graph: it is SCORING-PATH, and any edit to it needs a measurement
+// receipt (2026-09-20). What is still true, and is why this module is not a
 // candidate for the order-sensitivity question, is the CONFIRMED
-// order-INVARIANCE recorded here.
+// order-INVARIANCE recorded here. The 2026-08-03 text below is left as
+// written because it is a dated record.
 // Zero importers anywhere in the repo except its own test
 // (tests/core/voice-delta.test.ts). CONFIRMED order-INVARIANT (not
 // probed numerically, but true by construction): Burrows's Delta is a
@@ -93,48 +96,70 @@ function relativeFrequencies(lines: string[], functionWords: Set<string>): Recor
 }
 
 /**
- * Compute mean and standard deviation of a function word's frequency across samples.
+ * Mean and standard deviation of EVERY function word's frequency across the
+ * combined two-sample corpus, in a single pass over the function-word set.
  *
- * PERFORMANCE (2026-09-07): this used to be called once per function word
- * from `burrowsDelta`, and each call re-derived BOTH samples' full frequency
- * tables from scratch — ~63 function words x 2 full re-tokenizations of each
- * character's pooled dialogue, per pair. That was invisible while
+ * TWO HOISTS LIVE HERE, AND THEY COMPOSE.
+ *
+ * (1) PER PAIR, 2026-09-20. This replaces `corpusStats(allDialogues, word,
+ * functionWords)`, which `burrowsDelta` called once PER WORD from inside its
+ * loop and which re-derived `relativeFrequencies` for BOTH sides on every call
+ * — 2 x 65 = 130 full re-tokenizations per pair, of two maps the caller
+ * already held in `freqA` / `freqB`. See the hoist note on
+ * `deltaFromFrequencies` below.
+ *
+ * (2) PER CHARACTER, 2026-09-07. `analyzeVoices` is O(distinct^2) in pairs, so
+ * even one re-tokenization per pair re-derives the same character's pooled
+ * dialogue once for every partner it has. It therefore builds each eligible
+ * character's frequency table ONCE and calls `deltaFromFrequencies` with the
+ * two tables directly; the redundancy this removed showed up as a measured
+ * 42,062 ms on a 200-name payload. That path was invisible while
  * `analyzeVoices` abstained on any script with a one-line walk-on (i.e. every
- * real feature); with per-character abstention the O(n^2) pair loop actually
- * runs, and the redundancy showed up as a measured 42,062 ms on a 200-name
- * payload. `burrowsDelta` now derives each sample's table once and calls
- * `statsOf` below with the two frequencies directly. The arithmetic is
- * unchanged and in the same order, so the output is bit-identical — asserted
- * against a from-scratch reference implementation in
- * tests/core/voice-delta.test.ts.
+ * real feature); with per-character abstention the pair loop actually runs.
  *
- * Kept exported-shaped (not deleted) because it is the readable statement of
- * what the z-scores are computed against.
+ * BIT-IDENTITY CONTRACT (why this is written the long way). The arithmetic here
+ * is the old `corpusStats` body with its two `Array.prototype.reduce` calls
+ * unrolled over the exactly two samples it was ever handed — `Object.values({
+ * a, b })`, always length 2, always in that order — including the literal `0`
+ * each reduce seeded from. Floating-point addition is not associative, so the
+ * per-word accumulation SEQUENCE (seed, then a, then b) is what makes the
+ * result bit-identical, not merely close. Do not "simplify" this to
+ * `(fA + fB) / 2`-shaped expressions that re-associate the additions, and do
+ * not reorder the two samples. `tests/core/voice-delta-hoist-identity.test.ts`
+ * holds a frozen verbatim copy of the pre-hoist implementation and asserts
+ * `Object.is(old, new)` over every pair it generates.
  */
-function corpusStats(
-  allDialogues: Record<string, string[]>,
-  word: string,
+function combinedCorpusStats(
+  freqA: Record<string, number>,
+  freqB: Record<string, number>,
   functionWords: Set<string>,
-): { mean: number; sd: number } {
-  const freqs = Object.values(allDialogues).map(
-    lines => relativeFrequencies(lines, functionWords)[word],
-  );
-  return statsOf(freqs);
-}
+): Record<string, { mean: number; sd: number }> {
+  // `Object.values({ a, b }).length` — the divisor the old corpusStats used.
+  // It was always 2 on this call path, so that function's `length === 0` and
+  // `length < 2` early returns were unreachable from burrowsDelta and are not
+  // reproduced here; burrowsDelta's own degenerate-input guard is unchanged.
+  const SAMPLE_COUNT = 2;
+  const stats: Record<string, { mean: number; sd: number }> = {};
 
-/** mean/sd of an already-computed frequency sample, in the exact order
- *  corpusStats always used: sum/n, then the population variance about that
- *  mean, then sqrt — with sd forced to 1 when the sample is degenerate (one
- *  element, or zero spread) so the z-scores stay finite. */
-function statsOf(freqs: number[]): { mean: number; sd: number } {
-  if (freqs.length === 0) return { mean: 0, sd: 1 };
+  for (const word of functionWords) {
+    const fA = freqA[word];
+    const fB = freqB[word];
 
-  const mean = freqs.reduce((s, f) => s + f, 0) / freqs.length;
-  if (freqs.length < 2) return { mean, sd: 1 };
+    let meanSum = 0;
+    meanSum = meanSum + fA;
+    meanSum = meanSum + fB;
+    const mean = meanSum / SAMPLE_COUNT;
 
-  const variance = freqs.reduce((s, f) => s + (f - mean) ** 2, 0) / freqs.length;
-  const sd = Math.sqrt(variance);
-  return { mean, sd: sd > 0 ? sd : 1 };
+    let varianceSum = 0;
+    varianceSum = varianceSum + (fA - mean) ** 2;
+    varianceSum = varianceSum + (fB - mean) ** 2;
+    const variance = varianceSum / SAMPLE_COUNT;
+
+    const sd = Math.sqrt(variance);
+    stats[word] = { mean, sd: sd > 0 ? sd : 1 };
+  }
+
+  return stats;
 }
 
 /**
@@ -165,9 +190,19 @@ export function burrowsDelta(
 /** The z-score half of Burrows's Delta, over two already-computed frequency
  *  tables. Split out so `analyzeVoices` can build each character's table ONCE
  *  and reuse it across every pair that character appears in — see
- *  `corpusStats`'s performance note. For this two-sample delta the "corpus"
+ *  `combinedCorpusStats`'s hoist (2). For this two-sample delta the "corpus"
  *  each word is z-scored against is the two samples themselves, exactly as
- *  before. */
+ *  before.
+ *
+ *  HOISTED 2026-09-20 (perf, bit-identical): the statistics used to be read
+ *  from `corpusStats({ a, b }, word, words)` INSIDE the loop below, and that
+ *  helper re-ran `relativeFrequencies` over BOTH sides on every one of the 65
+ *  iterations — 130 full re-tokenizations per pair, of exactly the two maps
+ *  the caller already holds. They do not depend on `word` beyond indexing, so
+ *  they are computed once, above the loop. Same arithmetic, same order, same
+ *  doubles: `maxDeltaDiff = 0` over every pair measured. Measured 44x-56x
+ *  faster on the shapes `server/lib/validation.ts`'s voice-eligibility bounds
+ *  are derived against, where `analyzeVoices` is ~99% of the cost. */
 function deltaFromFrequencies(
   freqA: Record<string, number>,
   freqB: Record<string, number>,
@@ -176,8 +211,10 @@ function deltaFromFrequencies(
   let sumAbsDelta = 0;
   let count = 0;
 
+  const stats = combinedCorpusStats(freqA, freqB, words);
+
   for (const word of words) {
-    const { mean, sd } = statsOf([freqA[word], freqB[word]]);
+    const { mean, sd } = stats[word];
     const zA = (freqA[word] - mean) / sd;
     const zB = (freqB[word] - mean) / sd;
     sumAbsDelta += Math.abs(zA - zB);
@@ -266,7 +303,7 @@ export function analyzeVoices(
 
   // Each eligible character's frequency table, derived ONCE. Without this the
   // pair loop re-tokenizes the same character's pooled dialogue in every pair
-  // it appears in — see corpusStats's performance note.
+  // it appears in — see combinedCorpusStats's hoist (2).
   const freqByCharacter = new Map<string, Record<string, number>>();
   for (const char of eligible) {
     freqByCharacter.set(char, relativeFrequencies(dialogueByCharacter[char], DEFAULT_FUNCTION_WORDS));

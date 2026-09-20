@@ -28,8 +28,9 @@
 //
 // RATE-LIMIT BUDGET. aiLimiter is a process-global singleton at 20 requests /
 // 60s keyed by IP (server/lib/session-store.ts), and node:test runs each test
-// FILE in its own process — so the budget is per-file. This file spends 8 of
-// those 20 (three 400s and four 200s on /api/nvm/revise, two SSE opens). POST
+// FILE in its own process — so the budget is per-file. This file spends 9 of
+// those 20 (three 400s and five 200s on /api/nvm/revise, two SSE opens; the
+// ninth is the 2026-09-20 lostApprovedSpans test below). POST
 // /api/live/intent is the app's third aiLimiter route on the shipped surface;
 // it lives in tests/routes/live-intent.test.ts rather than here specifically
 // so the two files' spends cannot add up against one shared budget.
@@ -73,6 +74,14 @@ interface RevisionResultShape {
   totalIssuesFound: number;
   passesWithChanges: number;
   failedPasses: string[];
+  /** 2026-09-20 (review finding 5): indices into the caller's own
+   *  `approvedSpans` for every lock the pipeline had to let go part-way
+   *  through the run, because a pass edited the locked text out of the draft.
+   *  Keyless mode rewrites nothing, so on this route it is always `[]` — but
+   *  it must be PRESENT and an array, because a client that cannot tell
+   *  "nothing was lost" from "the field is missing" cannot report a lost lock
+   *  at all. */
+  lostApprovedSpans: number[];
   completedAt: number;
 }
 
@@ -97,6 +106,11 @@ function assertRevisionResultShape(body: RevisionResultShape, expectedTitle: str
     assert.equal(p.changed, false, `${p.pass}: keyless mode must not rewrite the draft`);
   }
   assert.deepEqual(body.failedPasses, [], 'no pass may throw on a well-formed session');
+  assert.ok(Array.isArray(body.lostApprovedSpans), 'lostApprovedSpans must always be present as an array');
+  assert.deepEqual(
+    body.lostApprovedSpans, [],
+    'keyless mode rewrites nothing, so no approved span can be lost between passes',
+  );
   assert.equal(body.passesWithChanges, 0, 'keyless mode rewrites nothing, so no pass changed the text');
   assert.equal(
     body.finalFountain, body.originalFountain,
@@ -250,6 +264,42 @@ describe('routes/nvm/revision — screenplay memory, 14-pass revise, and its SSE
       'revise reaches up to 14 sequential LLM rewrites — it must be on aiLimiter (20/min), never gameLimiter (120/min)',
     );
     assertRevisionResultShape(await res.json() as RevisionResultShape, 'THE LOCKED DOOR');
+  });
+
+  // 2026-09-20 (pipeline-ledger-structure lane, review finding 5). The
+  // pipeline now DROPS an approved span whose locked text a pass edited out of
+  // the draft, rather than carrying its stale line numbers forward and letting
+  // the rewrite seam enforce whatever text moved into them. Dropping a lock
+  // silently would be its own defect, so the drop is reported — and this route
+  // returns the RevisionResult unreshaped, which is the only reason the report
+  // reaches a client at all. Asserted on a request that DOES lock spans: the
+  // shape assertion above runs on requests with no `approvedSpans` at all,
+  // where an empty array proves nothing about the reporting path.
+  it('POST /api/nvm/revise reports lostApprovedSpans, empty when every lock held', async () => {
+    const sid = await seedThreeScenes();
+    const res = await fetch(`${server.baseUrl}/api/nvm/revise`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: sid,
+        title: 'THE LOCKED DOOR',
+        approvedSpans: [
+          { startLine: 1, endLine: 2, reason: 'the title page stays' },
+          { startLine: 3, endLine: 4, reason: 'and the line under it' },
+        ],
+      }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json() as RevisionResultShape;
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(body, 'lostApprovedSpans'),
+      'the field must be serialized, not dropped as undefined — a client cannot report a lock it never hears about',
+    );
+    assert.deepEqual(
+      body.lostApprovedSpans, [],
+      'keyless mode returns the draft byte-identical, so both locks survive every pass',
+    );
+    assert.equal(body.finalFountain, body.originalFountain);
   });
 
   // ── GET /api/nvm/revise-stream ─────────────────────────────────────────────

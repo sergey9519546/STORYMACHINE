@@ -78,6 +78,17 @@ scoring path, as the lane brief stated. `tsc --noEmit` and `check-no-console`
 are clean. `npm test` and `npm run brain` were out of scope for this lane and
 were not run.
 
+**2026-09-20 addendum (review finding 2, HIGH):** the schema above bounded
+span *count* but not per-span or per-request *size* — `endLine` had no
+upper bound and `approvedSpanInstructions` sliced unclamped, so
+`{startLine: 1, endLine: 9007199254740991}` x200 on a 4,000-line draft built
+a 57 MB prompt block. Fixed with a per-span `endLine` ceiling and a
+per-request total-line-count `superRefine` in `server/lib/validation.ts`,
+plus an independent char-cap/clamp inside `approvedSpanInstructions`
+(`server/nvm/revision/rewrite-llm.ts`) for callers that bypass the route.
+Full writeup: `docs/audits/2026-09-20-approved-spans-schema/README.md` §
+"Review finding 2: per-span and per-request bounds".
+
 **Related:** [[Audit - 2026-09-20 Per-Pass Diagnostics]],
 [[Audit - 2026-09-19 Cast Grounding]], [[Patterns]],
 `docs/audits/2026-09-20-approved-spans-schema/README.md`.

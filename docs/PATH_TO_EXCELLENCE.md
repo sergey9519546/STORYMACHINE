@@ -106,7 +106,14 @@ language scan (`SESSION_REPORT_2026-09-19.md` §9). `scoring/advice-rule-
 fixes` is landed on `lane/land-advice-rule-fixes` but not merged into main:
 the landing is gate-clean, but it lowers the public benchmark's primary
 shuffle-drop floor below its prior value, so the merge is held pending the
-owner's real-corpus AUC-24 run on that branch.
+owner's real-corpus AUC-24 run on that branch. A third pass the same day
+fixed one BLOCKER and two HIGH findings from an adversarial review of that
+day's code (a re-diagnosis bug that zeroed clock pressure across passes 2-14,
+a receipt-gate scan that could miss a wrapped Command label, and an
+unbounded approved-span prompt block). `scoring/feature-length-defects` was
+also prepared for measurement and now measures 0.8750 shuffle-drop
+(matched-pair) and 4 of 6 blind pairs on `lane/land-feature-length-defects`,
+held for the same owner real-corpus run.
 
 **2026-09-13 — CI green, and the story track begins: four defects only
 the runner could show, the owner's run as one command, and generation

@@ -437,8 +437,28 @@ export const PUBLIC_FLOORS = [
  *  newline). No v2 table has ever been locked
  *  (`tests/fixtures/auc24-table.json` still does not exist), so nothing is
  *  invalidated by this bump either. `AUC24_FLOOR` is untouched, per the same
- *  rule as the v2 bump. */
-export const AUC24_DEGRADATION_ID = 'shuffle-drop/v3';
+ *  rule as the v2 bump.
+ *
+ *  BUMPED TO v4 ON 2026-09-20 (scene-split-cr-and-recipe-v4 lane, review
+ *  finding 4): the shared segmentation dependency this recipe reads
+ *  (`scripts/lib/scene-segments.ts` -> `src/lib/fountain.ts`'s
+ *  `isSceneHeadingLine`) changed TWICE after the v3 bump above without a
+ *  matching id bump — a `...`-leading dialogue or action line stopped being
+ *  misread as a forced scene heading (Fountain's actual rule is "`.` followed
+ *  by a non-`.` character"; VERIFIED by probe: `countFountainScenes` on a
+ *  script containing an `...and then nothing.` line read 3 scenes at
+ *  `26d930dd` and reads 2 at HEAD), and the forced-heading character class
+ *  widened from `[A-Za-z0-9]` to any Unicode letter or number so
+ *  `.МОСКВА`-style headings are now recognised. Both are segmentation changes
+ *  by this file's own definition. No table has ever been locked, so nothing
+ *  is invalidated; `AUC24_FLOOR` is untouched at 0.622, same rule as every
+ *  prior bump. The same lane's CR-normalization fix (see `shuffleDropDegrade`'s
+ *  comment, below) does NOT affect this recipe — it landed in
+ *  `server/nvm/analyze/scene-split.ts`'s `scenesFromFountain`, a different
+ *  splitter that `shuffleDropDegrade` never calls; `scripts/lib/
+ *  scene-segments.ts` still reads scene boundaries off raw, unnormalized
+ *  text. */
+export const AUC24_DEGRADATION_ID = 'shuffle-drop/v4';
 
 /** Human-readable description of `AUC24_DEGRADATION_ID`, embedded in the
  *  committed table so the artifact is self-describing. */
@@ -452,7 +472,11 @@ export const AUC24_DEGRADATION = {
     + '(index % 3 === 2); any pre-first-heading head is preserved verbatim at the top; scenes are '
     + 'rejoined with a `\\n` inserted after any relocated slice that lacks its own line terminator '
     + '(v3, 2026-09-19), so a script with no trailing newline cannot have its last scene welded '
-    + 'onto the next one when the shuffle moves it out of last position',
+    + 'onto the next one when the shuffle moves it out of last position; the forced-heading grammar '
+    + 'was corrected on 2026-09-20 so a `..`/`...` line is never a heading and any Unicode letter or '
+    + 'number after the dot is (v4) — a bare `\\r` line ending is still NOT normalized here (that fix '
+    + 'landed only in server/nvm/analyze/scene-split.ts\'s separate scenesFromFountain splitter, which '
+    + 'this recipe does not call)',
   seedTemplate: 'seedFromString("degrade:" + <manifest entry.file>)',
   prng: 'mulberry32 (makePrng) + djb2 (seedFromString), server/nvm/repro/seed.ts',
   subsetSize: AUC24_SUBSET,
@@ -555,6 +579,31 @@ export function degradationSeed(seedKey: string): number {
  * and losing a scene from the count. `AUC24_DEGRADATION_ID` bumps to
  * `shuffle-drop/v3` for this reason too — see that constant's comment for the
  * full account and the probe. `AUC24_FLOOR` is untouched.
+ *
+ * ── A THIRD SEGMENTATION FIX, 2026-09-20 (scene-split-cr-and-recipe-v4 lane)
+ * ───────────────────────────────────────────────────────────────────────────
+ * This function's own body is again UNCHANGED. What changed is the heading
+ * grammar `segmentFountainScenes` reads (`src/lib/fountain.ts`'s
+ * `isSceneHeadingLine`), in two lanes that both landed on this branch AFTER
+ * the v3 bump above without a matching id bump: a `...`-leading line is no
+ * longer misread as a forced heading (VERIFIED by probe:
+ * `countFountainScenes` on a script with an `...and then nothing.` dialogue
+ * line read 3 at `26d930dd`, 2 at HEAD), and the forced-heading character
+ * class widened to any Unicode letter or number. `AUC24_DEGRADATION_ID` bumps
+ * to `shuffle-drop/v4` for this reason — see that constant's comment for the
+ * full account. `AUC24_FLOOR` is untouched, and no table has ever been
+ * locked, so nothing is invalidated.
+ *
+ * The same lane also fixed a bare-`\r` undercount, but in
+ * `server/nvm/analyze/scene-split.ts`'s `scenesFromFountain` — a different
+ * splitter, used by the emotional arc and signal modules, that this function
+ * does not call. `segmentFountainScenes` still reads scene boundaries off the
+ * RAW, unnormalized text, so this recipe's behaviour on a bare-`\r` script is
+ * UNCHANGED by that fix (VERIFIED by probe: a bare-`\r` script still reads as
+ * one scene through `scripts/lib/scene-segments.ts`'s `countFountainScenes`,
+ * both before and after that fix). Stated here because it is exactly the kind
+ * of divergence this file's own bump rule exists to catch, and in this
+ * instance there is nothing new to catch.
  *
  * It stays a TOTAL function — a script with no headings comes back unchanged
  * rather than throwing, which `tests/core/auc.test.ts` pins. A no-op IS an

@@ -35,6 +35,7 @@ import type { RevisionIssue } from '../../server/nvm/revision/passes/types.ts';
 import '../../server/nvm/revision/rewrite-llm.ts';
 import { rewritePass, type RewriteInput } from '../../server/nvm/revision/rewrite.ts';
 import * as ai from '../../server/engine/ai.ts';
+import { logger } from '../../server/lib/logger.ts';
 
 const FOUNTAIN = [
   'INT. APARTMENT - DAY',
@@ -213,5 +214,156 @@ describe('approvedSpans[].reason sanitization', () => {
     await rewritePass(baseInput([]));
     const prompt = spy.capturedPrompt();
     assert.ok(!prompt.includes('Approved sections that MUST remain unchanged'));
+  });
+});
+
+// ── Review finding 2 (2026-09-20, HIGH, adversarial-probe-confirmed) ────────
+//
+// `ApprovedSpanSchema` (server/lib/validation.ts) bounds `endLine` and the
+// per-request total line count now, but approvedSpanInstructions() is also
+// reachable by any caller of the revision pipeline that does not go through
+// that schema (the pipeline's own defence-in-depth posture — see this
+// function's doc comment at its definition). This block pins that
+// second, independent bound: `{startLine: 1, endLine: 1e15}` x200 on a
+// 4,000-line draft used to build a 57 MB "APPROVED — DO NOT CHANGE" prompt
+// block; it must now build a block no larger than the per-call char cap and
+// never larger than the draft it is quoting from.
+describe('approvedSpanInstructions size bound (finding 2 defence-in-depth)', () => {
+  let spy: ReturnType<typeof fakeProvider> | undefined;
+  let originalWarn: typeof logger.warn;
+  let warnCalls: Array<{ msg: string; data?: Record<string, unknown> }>;
+
+  function spyOnWarn(): void {
+    originalWarn = logger.warn;
+    warnCalls = [];
+    logger.warn = ((msg: string, data?: Record<string, unknown>) => {
+      warnCalls.push({ msg, data });
+    }) as typeof logger.warn;
+  }
+
+  after(() => {
+    spy?.restore();
+    if (originalWarn) logger.warn = originalWarn;
+  });
+
+  it('200 spans of {startLine: 1, endLine: 1e15} on a 4,000-line draft produce a block bounded by both the char cap and the draft length, with one counts-only truncation log', async () => {
+    spyOnWarn();
+    spy = fakeProvider();
+
+    // ~72 chars/line x 4,000 lines ~= 288 KB — matches the finding's
+    // "4000-line / 287 KB draft" shape, comfortably over the 200,000-char
+    // block cap so the cap (not the draft length) is the binding constraint.
+    const bigDraft = Array.from(
+      { length: 4000 },
+      (_, i) => `Line ${i + 1} of a very long screenplay draft padded out to a realistic column width.`,
+    ).join('\n');
+    const hugeSpans: ApprovedSpan[] = Array.from({ length: 200 }, () => ({
+      startLine: 1,
+      endLine: 1e15,
+      reason: '',
+    }));
+
+    const input: RewriteInput = {
+      fountain: bigDraft,
+      issues: ONE_ISSUE,
+      passName: 'dialogue',
+      approvedSpans: hugeSpans,
+    };
+    await rewritePass(input);
+
+    const prompt = spy.capturedPrompt();
+    const draftFenceIdx = prompt.indexOf('--- FOUNTAIN DRAFT ---');
+    assert.ok(draftFenceIdx !== -1);
+    const blockStart = prompt.indexOf('Approved sections that MUST remain unchanged:');
+    // Every one of the 200 spans here requests the WHOLE draft (endLine
+    // clamps to lines.length), and this draft is well over the 200,000-char
+    // block cap on its own — so even the FIRST span's excerpt alone already
+    // exceeds the cap. Per the "dropped whole, never partially included"
+    // rule (see approvedSpanInstructions's doc comment), that means every
+    // span is dropped and the block is empty here. That is the correct,
+    // bounded outcome for this pathological all-whole-draft shape — the
+    // assertions below hold either way (empty, or some prefix that fits).
+    const block = blockStart === -1 ? '' : prompt.slice(blockStart, draftFenceIdx);
+
+    assert.ok(
+      block.length <= 200_000,
+      `block must not exceed the 200,000-char cap (was ${block.length})`,
+    );
+    assert.ok(
+      // A single included section can carry a small fixed marker/reason
+      // overhead beyond the raw excerpt text it quotes (the "[APPROVED — DO
+      // NOT CHANGE]" bracket itself) — allow headroom for exactly one such
+      // marker line, not for the excerpt content to exceed the draft.
+      block.length <= bigDraft.length + 256,
+      `block must never exceed roughly the draft's own length (block ${block.length}, draft ${bigDraft.length})`,
+    );
+
+    // Pre-fix this exact shape built a 57 MB block (200 spans x the whole
+    // 288 KB draft each) — orders of magnitude past either bound above.
+    assert.ok(block.length < 57 * 1024 * 1024, 'sanity: must be nowhere near the pre-fix 57 MB shape');
+
+    const truncationLogs = warnCalls.filter(c => c.msg === 'revision_approved_span_block_truncated');
+    assert.equal(truncationLogs.length, 1, 'the truncation log must fire exactly once');
+    const logData = truncationLogs[0].data ?? {};
+    assert.equal(logData.totalSpans, 200);
+    assert.equal(typeof logData.includedSpans, 'number');
+    assert.equal(typeof logData.droppedSpans, 'number');
+    assert.ok((logData.droppedSpans as number) > 0, 'the 200 whole-draft-sized spans cannot all fit under the cap');
+    assert.equal((logData.includedSpans as number) + (logData.droppedSpans as number), 200);
+
+    // Counts only — never span text, excerpt content or draft text.
+    const serializedLog = JSON.stringify(warnCalls);
+    assert.ok(!serializedLog.includes('Line 1 of a very long screenplay'), 'the draft text must never appear in a log line');
+    assert.ok(!serializedLog.includes('APPROVED'), 'the marker/excerpt text must never appear in a log line');
+  });
+
+  it('when spans exceed the cap only cumulatively, earlier spans survive intact and later ones are dropped whole (never truncated mid-line)', async () => {
+    spy = fakeProvider();
+
+    // Sized so ONE whole-draft excerpt fits comfortably under the
+    // 200,000-char cap, but two of them together do not — the case the doc
+    // comment calls "dropped whole, never partially included".
+    const mediumDraft = Array.from(
+      { length: 4000 },
+      (_, i) => `Line ${String(i + 1).padStart(4, '0')} of a padded screenplay draft.`,
+    ).join('\n');
+    assert.ok(mediumDraft.length < 200_000 && mediumDraft.length * 2 > 200_000,
+      'test fixture must be sized so one whole-draft span fits and two do not');
+
+    const spans: ApprovedSpan[] = Array.from({ length: 5 }, () => ({ startLine: 1, endLine: 1e15, reason: '' }));
+    const input: RewriteInput = {
+      fountain: mediumDraft,
+      issues: ONE_ISSUE,
+      passName: 'dialogue',
+      approvedSpans: spans,
+    };
+    await rewritePass(input);
+
+    const prompt = spy.capturedPrompt();
+    const blockStart = prompt.indexOf('Approved sections that MUST remain unchanged:');
+    assert.ok(blockStart !== -1, 'the first span must survive intact');
+    const draftFenceIdx = prompt.indexOf('--- FOUNTAIN DRAFT ---');
+    const block = prompt.slice(blockStart, draftFenceIdx);
+
+    // The one surviving section must contain the FULL, untruncated excerpt —
+    // never a partial/mid-line fragment of the draft.
+    assert.ok(block.includes(mediumDraft), 'the surviving section must quote the draft in full, not a truncated prefix');
+    assert.equal(
+      (block.match(/\[APPROVED — DO NOT CHANGE\]/g) ?? []).length,
+      1,
+      'only one of the five identical whole-draft spans can fit under the cap',
+    );
+    assert.ok(block.length <= 200_000);
+  });
+
+  it('a span whose clamped range is empty (startLine past the end of a short draft) is skipped, not excerpted as empty', async () => {
+    spy = fakeProvider();
+    const pastEndSpan: ApprovedSpan = { startLine: 999, endLine: 1000, reason: '' };
+    await rewritePass(baseInput([pastEndSpan]));
+    const prompt = spy.capturedPrompt();
+    assert.ok(
+      !prompt.includes('Approved sections that MUST remain unchanged'),
+      'an out-of-range-only span must produce no block at all, not an empty-excerpt one',
+    );
   });
 });

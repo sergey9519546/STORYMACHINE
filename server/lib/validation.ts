@@ -873,6 +873,40 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 675_000;
 // computeReachableSet), so it is scoring-path and needs a measurement receipt.
 // But it is the fix to point at — free and bit-identical — rather than a pair
 // cap, which would move scores.
+//
+// LANDED 2026-09-20 — AND NEITHER BOUND MOVED, DELIBERATELY. The hoist above
+// shipped on `lane/burrows-delta-hoist` with its output-identity receipt
+// (docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, 2026-09-20; lane record at
+// docs/audits/2026-09-20-burrows-delta-hoist/README.md): bit-identical over
+// 3,706 pairs at `maxDeltaDiff = 0`, all 45 doctor reports byte-identical, all
+// six public-benchmark floors unmoved. Measured on that lane's sandbox, three
+// runs each, OLD module vs NEW module in one process:
+//
+//   * `analyzeVoices` on `max-admitted` at cast 80 (3,160 pairs, the shape
+//     MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is DERIVED against):
+//     5,974 / 5,966 / 6,047 ms -> 121 / 118 / 118 ms — 50.6x.
+//   * `analyzeVoices` on `uniform-min` at cast 150 (11,175 pairs, the shape
+//     MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT is derived against):
+//     10,343 / 10,566 / 10,187 ms -> 236 / 236 / 237 ms — 43.8x.
+//   * `analyzeFountainText` END TO END on the max-admitted document:
+//     5,666 / 6,163 / 6,166 ms -> 151 / 133 / 131 ms — 43.1x, which is the
+//     "~99% of the derivation shape's cost" claim above, measured from the
+//     outside.
+//
+// NOTHING HERE WAS RE-DERIVED ON THOSE TIMINGS, and that is the point. Both
+// bounds, and the committed table at tests/fixtures/voice-bound-derivation.json
+// that MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is re-derived from, were measured
+// BEFORE the hoist, on the runner, under `npm test`. They are therefore now
+// CONSERVATIVE by roughly the ratios above rather than wrong — the admitted
+// worst shape costs far less than the derivation charged it — and a bound that
+// is too strict rejects documents it could serve, which is a narrowing to
+// re-open on purpose with a fresh `npm run measure-voice-bound` on the runner,
+// not a silent side effect of a perf lane. Raising either number here without
+// re-locking that table fails tests/core/voice-bound-derivation.test.ts, which
+// is the guard working. Any per-ms-per-unit rate quoted in the round-1/round-2
+// derivations ABOVE (0.0173-0.0187, and the 0.022 conservative upper bound) is
+// likewise a PRE-HOIST rate and must not be reused as if it still described
+// this code.
 export const MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 80;
 
 // 2026-09-20 MERGE (lane/land-feature-length-defects). The branch
@@ -2850,9 +2884,35 @@ export const CompileBodySchema = z.object({
 // still bounding how many entries one request can push through
 // relocateApprovedSpans's per-span document scan and into the rewrite
 // prompt's per-pass span-instruction block.
+//
+// 2026-09-20 (review finding 2, HIGH, adversarial-probe-confirmed): the
+// 200-entry array cap above bounds the COUNT of spans, not the SIZE of any
+// one of them — this comment used to claim otherwise. `endLine` had no
+// upper bound at all, and approvedSpanInstructions (rewrite-llm.ts) sliced
+// `lines.slice(startLine - 1, endLine)` unclamped, so
+// `{startLine: 1, endLine: 9007199254740991}` x200 on a 4,000-line draft
+// built a 57 MB "APPROVED — DO NOT CHANGE" prompt block per pass (x14
+// passes) from a ~12 KB request body, with no prompt-size guard before
+// `provider.generate()`. Two bounds close that: `endLine` itself is capped
+// at APPROVED_SPAN_MAX_LINE (200,000 — matches FixSpanSchema's shape below,
+// which is also a 1-based inclusive line-range schema, though that schema
+// has no equivalent upper bound of its own to inherit; this one is new),
+// and the superRefine below on ReviseBodySchema separately bounds the SUM,
+// across every span in one request, of `(endLine - startLine + 1)` — the
+// actual line count relocateApprovedSpans/approvedSpanInstructions will
+// scan/quote — to APPROVED_SPAN_TOTAL_LINES_MAX (20,000: a full feature
+// screenplay is ~6,000 lines, so this leaves headroom for a caller who
+// genuinely wants most of a long draft protected while still rejecting the
+// pathological "cover a document many times over" shape). The per-span
+// prompt-block size itself is additionally capped, independently, inside
+// approvedSpanInstructions (rewrite-llm.ts) — defence in depth for any
+// caller that reaches the pipeline without going through this schema.
+export const APPROVED_SPAN_MAX_LINE = 200_000;
+export const APPROVED_SPAN_TOTAL_LINES_MAX = 20_000;
+
 export const ApprovedSpanSchema = z.object({
   startLine: z.number().int().min(1),
-  endLine: z.number().int(),
+  endLine: z.number().int().max(APPROVED_SPAN_MAX_LINE),
   reason: noControlChars.max(500).optional(),
 }).refine(s => s.endLine >= s.startLine, {
   message: 'endLine must be on or after startLine',
@@ -2863,6 +2923,21 @@ export const ReviseBodySchema = z.object({
   sessionId: sessionIdField,
   approvedSpans: z.array(ApprovedSpanSchema).max(200).optional(),
   title: z.string().max(256).optional(),
+}).superRefine((body, ctx) => {
+  if (!body.approvedSpans || body.approvedSpans.length === 0) return;
+  const totalLines = body.approvedSpans.reduce(
+    (sum, s) => sum + (s.endLine - s.startLine + 1),
+    0,
+  );
+  if (totalLines > APPROVED_SPAN_TOTAL_LINES_MAX) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        `combined span length (${totalLines} lines) exceeds the ` +
+        `${APPROVED_SPAN_TOTAL_LINES_MAX}-line request limit`,
+      path: ['approvedSpans'],
+    });
+  }
 });
 
 // GET /api/nvm/revise-stream's query-string counterpart to ReviseBodySchema

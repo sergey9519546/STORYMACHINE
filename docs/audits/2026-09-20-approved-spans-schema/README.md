@@ -212,3 +212,136 @@ the new server schema (integers >= 1, `startLine <= endLine`, non-empty
 recorded this gap), [[Audit - 2026-09-20 Approved Spans Schema]] (brain note),
 [[Audit - 2026-09-19 Cast Grounding]] (the prior lane whose
 `noControlChars`/`themeHint` pattern this schema reuses).
+
+---
+
+## § Review finding 2: per-span and per-request bounds
+
+**HIGH, adversarial-probe-confirmed.** The schema landed by §2 above bounded
+`startLine >= 1` and `endLine >= startLine`, but left `endLine` with **no
+upper bound**, and `approvedSpanInstructions` (`server/nvm/revision/
+rewrite-llm.ts`) sliced `lines.slice(s.startLine - 1, s.endLine)` unclamped.
+A probe found that `{startLine: 1, endLine: 9007199254740991}` x200 (the
+array's own 200-entry cap) on a 4,000-line / 287 KB draft built a **57 MB**
+"APPROVED — DO NOT CHANGE" prompt block per revision pass — x14 passes — from
+a ~12 KB request body, with no prompt-size guard anywhere before
+`provider.generate()` (only `maxOutputTokens` was budgeted). The §2 schema
+comment claimed the 200-entry array cap bounded the prompt block; it only
+ever bounded the span *count*, never the size of any one span or their sum.
+
+### Fix — two independent bounds, at two layers
+
+**1. `server/lib/validation.ts` (the HTTP boundary).**
+
+- `ApprovedSpanSchema.endLine` gained `.max(APPROVED_SPAN_MAX_LINE)`
+  (`200_000`) — an absolute per-span ceiling, deliberately shaped like
+  `FixSpanSchema`'s sibling `startLine`/`endLine` object+refine pattern
+  (`server/lib/validation.ts` ~2934), though `FixSpanSchema` itself has no
+  upper bound of its own for this schema to inherit — this is a new number,
+  chosen the same way `endLine`'s lower bound already was: generous for any
+  real single-span use, hostile for the "line past the end of a
+  representable document" shape the probe used.
+- `ReviseBodySchema` gained a `.superRefine` enforcing a **whole-request**
+  bound: the SUM over every span in `approvedSpans` of
+  `(endLine - startLine + 1)` must not exceed `APPROVED_SPAN_TOTAL_LINES_MAX`
+  (`20_000`) — chosen because a full feature screenplay is ~6,000 lines (see
+  `NORTH_STAR`/`CLAUDE.md`'s own P1 lore), so 20,000 leaves headroom for a
+  caller who genuinely wants most of a long draft locked, while still
+  rejecting the "cover the document many times over" shape a malicious or
+  buggy caller could otherwise send within the 200-entry array cap alone.
+  The issue is added with `path: ['approvedSpans']` so the 400 body names
+  the field (`validate()`'s `{error: "<path>: <message>"}` shape).
+- The block comment above `ApprovedSpanSchema` was rewritten to say what is
+  now actually bounded (per-span ceiling + per-request sum), not what the
+  old comment claimed (array-entry count only).
+
+**2. `server/nvm/revision/rewrite-llm.ts` (defence in depth).**
+`approvedSpanInstructions` is reachable by anything that calls the revision
+pipeline directly, not only through the one HTTP route the schema above
+guards (its own pre-existing doc comment already documents that
+`relocateApprovedSpans` tolerates a non-finite/out-of-range span for exactly
+that reason). So the bound is enforced again, independently, inside the
+function itself:
+
+- `endLine` is clamped to `lines.length` (the same clamp
+  `approvedSpansSurvive` already applies a few lines down in the same file),
+  and a span whose *clamped* range is empty (a `startLine` past the end of
+  the document) is skipped outright rather than excerpting nothing.
+- The assembled block is capped at `APPROVED_SPAN_BLOCK_MAX_CHARS`
+  (`200_000` chars) — the same order of magnitude as the per-request line
+  bound above, expressed in characters because this is the actual prompt
+  text budget, not a line count — and additionally never exceeds
+  `draftLength + APPROVED_SPAN_BLOCK_OVERHEAD_CHARS` (`256`), where
+  `draftLength` is the draft's own length in characters: the block only ever
+  quotes pieces of the draft, so it has no legitimate reason to be much
+  larger than the whole of it. The `+256` headroom exists only so that a
+  single legitimate whole-document span (marker + full excerpt) is not
+  itself rejected purely for the wrapper text's own overhead — it does not
+  create room for a second such span. `APPROVED_SPAN_BLOCK_MIN_CHARS`
+  (`4_096`) is a separate floor for the opposite edge (a very short draft
+  where even one span's wrapper overhead could otherwise exceed
+  `draftLength + 256`).
+- A span whose section would push the running total past the cap is dropped
+  **whole**, never partially included — partial inclusion would risk
+  truncating an excerpt mid-line and showing the model a fabricated partial
+  instruction. When any span is dropped this way, `revision_approved_span_
+  block_truncated` is logged once at `warn`, with `totalSpans`,
+  `includedSpans`, `droppedSpans` and `blockCharCap` — counts only, never
+  span text, excerpt content or the reason string.
+
+### Tests (fail-first)
+
+`tests/routes/nvm-revision-approved-spans-schema.test.ts` gained 5 cases
+(10 -> 15 in the file, all still against the same `aiLimiter` 20-request
+budget):
+
+| case | pre-fix | post-fix |
+|---|---|---|
+| `endLine: 9007199254740991` | 200 | 400 (`approvedSpans.0.endLine: ...`) |
+| `endLine: 200001` | 200 | 400 (`approvedSpans.0.endLine: ...`) |
+| 200 spans x 101 lines (sum 20,200) | 200 | 400 (`approvedSpans: combined span length (20200 lines) exceeds the 20000-line request limit`) |
+| 200 spans x 100 lines (sum 20,000, exactly at the cap) | 200 | 200 (unchanged — off-by-one-correct) |
+| one span, lines 1..20000 (the cap, in one span) | 200 | 200 (unchanged) |
+
+`tests/core/approved-span-sanitization.test.ts` gained a new describe block
+("`approvedSpanInstructions` size bound") with 3 cases, run at the module
+layer (`rewritePass` with a fake `geminiProvider.generate` capturing the
+built prompt, same technique the file already used for the `reason`-
+sanitization cases):
+
+- 200 spans of `{startLine: 1, endLine: 1e15}` on a 4,000-line (~327 KB)
+  draft: pre-fix this exact shape is the one measured at 57 MB; post-fix the
+  block is bounded to `<= 200_000` chars (here, every span individually
+  exceeds the cap on its own since the draft exceeds it, so the correctly
+  bounded outcome is an empty block — verified explicitly, not assumed) and
+  the truncation log fires exactly once with `totalSpans: 200` and
+  `includedSpans + droppedSpans === 200`, no span/draft text anywhere in the
+  logged data.
+- A "cumulative but not individual" case (5 whole-draft spans on a ~160 KB
+  draft, sized so ONE whole-draft excerpt fits under the cap but two do not):
+  pins that the one surviving section quotes the draft **in full** (never a
+  truncated mid-line fragment) and that exactly one of the five identical
+  spans survives.
+- A span whose clamped range is empty (`startLine` past the end of a short,
+  6-line draft) produces **no block at all**, not an empty-excerpt one.
+
+All three files (`nvm-revision-approved-spans-schema.test.ts`,
+`approved-span-sanitization.test.ts`, and the untouched
+`approved-spans-enforced.test.ts`) pass in full post-fix; see the gate table
+in the commit for the complete run.
+
+### A note on the cap's own trade-off
+
+For a draft longer than `APPROVED_SPAN_BLOCK_MAX_CHARS` (200,000 chars —
+above a typical feature screenplay in Fountain plain text, but not
+impossible for an especially long one), a *single* span that legitimately
+asks to lock the entire document will not fit under the cap either, and is
+dropped the same way a pathological span is. This is an intentional
+consequence of the fix, not an oversight: the alternative (partially
+including a huge excerpt) risks showing the model a truncated, potentially
+mid-line "approved" block that misrepresents the actual boundary of what is
+locked — worse than dropping the lock and logging it. The
+`revision_approved_span_block_truncated` warning is the signal for that case
+in production; nothing in this lane's scope wires it further (e.g. into a
+user-facing warning on the revise response) — a natural follow-up for
+whichever lane next touches `server/routes/nvm/revision.ts`.

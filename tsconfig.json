@@ -39,24 +39,23 @@
   // adapters/commit-to-events.ts, all reachable from server/engine/Stage.ts —
   // was never excluded and is untouched.
   //
-  // Only three real quarantine entries remain, each with its own reason:
+  // Only two real quarantine entries remain, each with its own reason:
   //   - **/*.bench.ts          benchmarks are not part of the type-checked app.
-  //   - server/nvm/kernel/event-store.test.ts
-  //                            RUNS (scripts/run-tests.mjs TEST_FILES, 32
-  //                            passing assertions over the live event store)
-  //                            but does not type-check: it builds AtomicFact
-  //                            literals with a `content` field the type does
-  //                            not have, plus an EmotionState `.type` read.
-  //                            Un-excluding it produces 11 tsc errors. Fixing
-  //                            the fixtures is its own change.
   //   - tests/story-vector.test.ts
   //                            intentionally emptied by the 2026-08-03 audit
   //                            fix; its assertions live in the suites that run.
+  //
+  // server/nvm/kernel/event-store.test.ts used to be listed here too: it RAN
+  // (scripts/run-tests.mjs TEST_FILES, 32 passing assertions over the live
+  // event store) but did not type-check, because its fixtures had drifted
+  // from AtomicFact/EmotionState/StoryOp. That gap is closed (2026-09-20;
+  // docs/audits/2026-09-20-dead-weight-b1-b2/README.md, "event-store.test.ts
+  // now type-checks") — the fixtures were fixed, not the entry deleted for
+  // any other reason, and the file is no longer excluded.
   "exclude": [
     "node_modules",
     "dist",
     "**/*.bench.ts",
-    "server/nvm/kernel/event-store.test.ts",
     "tests/story-vector.test.ts"
   ]
 }

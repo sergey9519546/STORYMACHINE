@@ -118,13 +118,19 @@ function lineAlignedOccurrences(haystack: string, needle: string): number[] {
  * adds) is carried through untouched, and the input array and its objects are
  * never mutated.
  *
- * A span whose excerpt is absent keeps its previous indices and is reported in
- * `lost`. That is deliberately not an exception: after an LLM rewrite this
- * cannot happen (./rewrite-llm.ts rejects any rewrite that does not preserve
- * every locked excerpt verbatim), but a non-LLM editor of the draft is not
- * bound by that check, and losing the whole span array because one span's text
- * was edited would be a worse failure than carrying one stale range forward
- * with a warning.
+ * A span whose excerpt is absent keeps its previous indices HERE and is
+ * reported in `lost`. That is deliberately not an exception: after an LLM
+ * rewrite it cannot happen (./rewrite-llm.ts rejects any rewrite that does not
+ * preserve every locked excerpt verbatim), but a non-LLM editor of the draft
+ * is not bound by that check, and throwing away the whole span array because
+ * one span's text was edited would be a worse failure than reporting the one.
+ *
+ * Returning the stale range is a REPORT, not a recommendation to keep using
+ * it. This function's contract is same-length, same-order, so a caller can
+ * read `lost` positionally; ./pipeline.ts, the only caller, then DROPS every
+ * `lost` span from enforcement for the rest of the run rather than carrying a
+ * range that now addresses different text. See that file's finding-5 comment
+ * for why carrying it forward silently relocated the author's lock.
  */
 export function relocateApprovedSpans(
   prevDoc: string,
@@ -168,11 +174,20 @@ export function relocateApprovedSpans(
       return span;
     }
 
+    // "Earlier wins" on a tie needs no tie-break clause: lineAlignedOccurrences
+    // returns candidates in ASCENDING line order (it scans left to right), so
+    // the first candidate at the minimum distance is already the earliest one
+    // and a strict `<` never replaces it with an equidistant later match. This
+    // loop used to carry an `|| (distance === bestDistance && candidates[i] <
+    // bestStart)` arm for that case; it could not fire for any input and is
+    // gone (2026-09-20, review finding 5). The behaviour is unchanged, and
+    // `ties between equidistant occurrences go to the earlier one` in
+    // tests/core/revision-per-pass-diagnostics.test.ts still pins it.
     let bestStart = candidates[0];
     let bestDistance = Math.abs(bestStart - startLine);
     for (let i = 1; i < candidates.length; i++) {
       const distance = Math.abs(candidates[i] - startLine);
-      if (distance < bestDistance || (distance === bestDistance && candidates[i] < bestStart)) {
+      if (distance < bestDistance) {
         bestStart = candidates[i];
         bestDistance = distance;
       }
