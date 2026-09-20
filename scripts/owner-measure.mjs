@@ -7,7 +7,7 @@
 // The owner's one blocking step for P1 is a measurement only they can run: the
 // corpus is local-only and copyright-restricted, it cannot reach CI, and
 // tests/core/auc24-table.test.ts SKIPS until tests/fixtures/auc24-table.json
-// exists — a gate that BLOCKS CI from 2026-10-01. Until today the procedure
+// exists — a gate that BLOCKS CI from 2026-11-01 (Decision #11). Until today the procedure
 // for that step lived in seven documents: the branch ORDER and the three-scan
 // receipt-conversion recipe in docs/brain/Owner/Owner - R5 Measurement and
 // Merge.md, the pre-flight in Owner - Run Measure Real.md, the lock in
@@ -1277,7 +1277,7 @@ export function moveBranchRef(ctx, branch, newSha, oldSha, tree = '(the measured
   return newSha;
 }
 
-/** The last step: the committed table the 2026-10-01 deadline is about. */
+/** The last step: the committed table the 2026-11-01 deadline is about. */
 function lockAuc24Step(ctx, tree, label, accepted) {
   if (ctx.dryRun) {
     console.log('  --dry-run       : lock-auc24 not run (it writes tests/fixtures/auc24-table.json)');
@@ -1299,7 +1299,7 @@ function lockAuc24Step(ctx, tree, label, accepted) {
   console.log('                    Do not compare it to 0.731.');
   if (!accepted) {
     console.log('  note            : nothing was accepted, so this table is locked on the baseline. The');
-    console.log('                    2026-10-01 deadline is the TABLE, not the branches.');
+    console.log('                    2026-11-01 deadline is the TABLE, not the branches.');
   }
 }
 

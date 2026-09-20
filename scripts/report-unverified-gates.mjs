@@ -120,9 +120,14 @@ export const GATES = [
   {
     file: 'tests/fixtures/auc24-table.json',
     suite: 'tests/core/auc24-table.test.ts',
-    // The gate with the nearest deadline: it is the one whose work is a
-    // single local command with no open design questions left.
-    expires: '2026-10-01',
+    // Moved from 2026-10-01 to 2026-11-01 (Decision #11, docs/DECISION_LOG.md):
+    // AUC24_DEGRADATION_ID was bumped to shuffle-drop/v3 on 2026-09-19, so a
+    // table locked before that date would already be invalid on the current
+    // recipe — the first valid table can only be locked from here on. This is
+    // still the gate whose work is a single local command with no open design
+    // questions left; it is now aligned with the craft-kb gate below, the
+    // latest existing deadline in this file.
+    expires: '2026-11-01',
     protects:
       'The AUC-24 ratchet, recomputed in CI from committed NUMBERS (24 intact/degraded '
       + 'health pairs) rather than from corpus text that can never reach CI. The floor '

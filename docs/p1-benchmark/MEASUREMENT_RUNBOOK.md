@@ -432,8 +432,9 @@ figure, and it makes every later change to those numbers a reviewable diff.
 
 **Until it is locked:** `tests/core/auc24-table.test.ts` skips with a message
 naming this command, and `scripts/report-unverified-gates.mjs` lists the
-missing file as an unverified gate with an expiry of **2026-10-01**, after
-which that CI step exits non-zero and blocks the build.
+missing file as an unverified gate with an expiry of **2026-11-01** (moved
+from 2026-10-01 by Decision #11, `docs/DECISION_LOG.md`), after which that CI
+step exits non-zero and blocks the build.
 
 ---
 

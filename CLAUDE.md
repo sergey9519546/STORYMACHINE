@@ -183,7 +183,7 @@ committed table of 24 intact/degraded health values — but only once that table
 exists: it is produced by `npm run lock-auc24` on the owner's machine, is not
 committed yet, and until it is, that test skips and
 `scripts/report-unverified-gates.mjs` reports the gap (blocking from
-2026-10-01). Both the floor and the degradation recipe now live in
+2026-11-01, Decision #11). Both the floor and the degradation recipe now live in
 `scripts/lib/auc.ts`; edit the constant there, not a literal in a test.
 
 **THE RECIPE'S SCENE SEGMENTATION CHANGED ON 2026-09-12, AND THE 0.731 WAS

@@ -28,6 +28,12 @@ An expiry forces a revisit — the gate closes, someone deletes it, or
 someone deliberately moves the date in a reviewable diff. It does not
 change any gate's pass/fail criteria.
 
+**Later moved.** The `auc24-table` gate's 2026-10-01 date set here was moved
+to 2026-11-01 by [[Decision 11 - Move the AUC-24 Table Deadline]]
+(2026-09-20) — the reviewed-move option this same decision's rationale
+names. The decision and dates above are otherwise unchanged as a record of
+what was set on 2026-09-03.
+
 ## Sources
 
 - `docs/DECISION_LOG.md` — "Decision #5"
