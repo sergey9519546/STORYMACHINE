@@ -361,10 +361,18 @@ function fileBaseWithMeasuredEntry(): { dir: string; before: string } {
 // ---------------------------------------------------------------------------
 
 // A field set shaped after the real 2026-09-12 entry's own convention
-// (`**Commands (all run in this worktree…)**`, PLURAL) — the exact phrasing
-// that does not match REQUIRED_FIELDS's singular `**Command**` pattern, so
-// re-validating this entry today fails it on a field it never claimed to
-// have in the first place.
+// (`**Commands (all run in this worktree…)**`, PLURAL). As of the
+// 2026-09-19 Command-label-widening fix (COMMAND_FIELD_RE in
+// scripts/check-scoring-receipt.mjs) this plural, parenthetical form is
+// itself an ACCEPTED Command field — see
+// tests/core/scoring-receipt-guard.test.ts's Command-label-widening suite
+// for that behavior directly. It is still used here, unchanged, because
+// these cases (g)/(h)/(i) are about the separator-span fix, not the field
+// pattern: they exercise whether an UNTOUCHED historical entry gets dragged
+// into re-validation by a `---`/`***` rule sitting next to it, and whether a
+// GENUINE in-place edit beside that rule still fails the range for gaining
+// no new entry — both hold regardless of whether this entry's own Command
+// field would separately pass or fail REQUIRED_FIELDS.
 const oldFieldsPluralCommands = (sha: string) => [
   '- **Date:** 2026-09-12',
   `- **Git SHA:** \`${sha}\``,

@@ -623,10 +623,25 @@ function entriesModifiedInPlace(range, alreadyRecognized) {
  *  (`### <YYYY-MM-DD> — …`) deliberately does not match. */
 const ENTRY_HEADING_RE = /^###\s+(\d{4}-\d{2}-\d{2})\b(.*)$/;
 
+/** A bolded Command field label: `**Command:**`, `**Command**:`, the plural
+ *  `**Commands:**`, or either with a parenthetical qualifier before the
+ *  colon — `**Commands (all run in this worktree):**`. Three honest
+ *  historical entries in the ledger (2026-09-12 and after) use the plural
+ *  form because more than one command was run; both singular and plural,
+ *  with or without a parenthetical, are the same claim and must be read the
+ *  same way by every scan that looks at this field — see CLAIM_FIELD_LABELS
+ *  below, which reuses this exact pattern so the field can't widen out from
+ *  under the simulation-language check. The closing `**` is required right
+ *  after the optional parenthetical/colon, so `**Commander:**` or
+ *  `**Command line:**` — a different label that merely starts with the same
+ *  letters — do NOT match. */
+const COMMAND_FIELD_RE = /\*\*\s*Commands?(?:\s*\([^)]*\))?\s*:?\s*\*\*/i;
+
 /** Fields required by §3's template. Matched on the bolded label, tolerating
- *  both `**Command:**` and `**Command**:` (the ledger contains both). */
+ *  both `**Command:**` and `**Command**:` (the ledger contains both), plus
+ *  the plural/parenthetical Command forms above. */
 const REQUIRED_FIELDS = [
-  { label: 'Command', patterns: [/\*\*\s*Command\s*:?\s*\*\*/i] },
+  { label: 'Command', patterns: [COMMAND_FIELD_RE] },
   { label: 'Corpus fingerprint', patterns: [/\*\*\s*Corpus\s+fingerprint\s*:?\s*\*\*/i] },
   { label: 'Runner attestation', patterns: [/\*\*\s*Runner\s+attestation\s*:?\s*\*\*/i] },
   {
@@ -645,8 +660,23 @@ const REQUIRED_FIELDS = [
  *  copyright restrictions)". Prose fields elsewhere in an entry are NOT
  *  scanned with this list, because honest entries legitimately reason about
  *  what a weaker instrument "would be" (the 2026-08-21 W1/W2 entry argues
- *  exactly that about AUC) — those get the narrower whole-entry list below. */
-const CLAIM_FIELD_LABELS = ['Command', 'Git SHA', 'Baseline used', 'Runner attestation', 'Attestation'];
+ *  exactly that about AUC) — those get the narrower whole-entry list below.
+ *
+ *  Most entries here are plain labels, looked up with fieldValue()'s
+ *  label-derived regex. Command carries an explicit `pattern` instead — the
+ *  SAME COMMAND_FIELD_RE used in REQUIRED_FIELDS above — so that widening
+ *  what counts as a Command field (singular/plural, with a parenthetical)
+ *  widens what this scan reads in lockstep. Without that, a
+ *  `**Commands (…):** (simulated local execution)` field would satisfy the
+ *  required-field check yet never be looked at here, and simulation language
+ *  in it would slip through silently. */
+const CLAIM_FIELD_LABELS = [
+  { label: 'Command', pattern: COMMAND_FIELD_RE },
+  { label: 'Git SHA' },
+  { label: 'Baseline used' },
+  { label: 'Runner attestation' },
+  { label: 'Attestation' },
+];
 const CLAIM_FIELD_SIMULATION_RE = /\b(?:simulated|simulation|hypothetical(?:ly)?|estimated|approximated|extrapolated|would\s+be|not\s+actually\s+run|mocked)\b/i;
 
 /** Phrasings that cannot occur in an honest receipt anywhere in the entry.
@@ -809,8 +839,8 @@ export function validateEntry(entry, { objectExists = shaResolves } = {}) {
     }
   }
 
-  for (const label of CLAIM_FIELD_LABELS) {
-    const value = fieldValue(entry.lines, label);
+  for (const { label, pattern } of CLAIM_FIELD_LABELS) {
+    const value = pattern ? fieldValueByPattern(entry.lines, pattern) : fieldValue(entry.lines, label);
     if (!value) continue;
     const hit = CLAIM_FIELD_SIMULATION_RE.exec(value);
     if (hit) {

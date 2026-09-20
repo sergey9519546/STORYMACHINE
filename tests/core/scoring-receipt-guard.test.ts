@@ -298,6 +298,144 @@ describe('measurement-receipt entry validation — PENDING entries', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Part 1c — the Command label widening (2026-09-19, orchestrator decision)
+// ---------------------------------------------------------------------------
+//
+// WHY THIS EXISTS: three honest historical entries (2026-09-12 and after) use
+// the PLURAL, parenthetical form `**Commands (all run in this worktree):**`
+// because more than one command was actually run. Before this fix,
+// REQUIRED_FIELDS's Command pattern only matched the singular `**Command:**`
+// / `**Command**:`, so a NEW entry honestly written in the plural form would
+// fail with "missing required field **Command**" — the gate was punishing the
+// more precise phrasing. The fix widens the Command pattern to accept
+// `**Command:**`, `**Commands:**`, and either with an optional parenthetical
+// qualifier before the colon (`**Commands (...):**`), and makes the
+// simulation-language scan (CLAIM_FIELD_LABELS) use the EXACT SAME pattern
+// for the Command field — so the field can't be widened on one side of the
+// gate without being widened on the other. Without that lockstep, a
+// `**Commands (...):** (simulated local execution)` field would satisfy the
+// required-field check yet never be looked at by the simulation scan, which
+// still only recognized `**Command:**`.
+describe('measurement-receipt entry validation — Command label widening', () => {
+  it('ACCEPTS a well-formed entry whose Command field is plural with a parenthetical qualifier', () => {
+    const heading = '### 2026-09-19 — fixture, plural parenthetical Command field';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-19',
+      '- **Git SHA:** `e40f4cf5`',
+      '- **Commands (all run in this worktree):** `npm run lint` -> exit 0, `npm test` -> exit 0',
+      '- **Corpus fingerprint:** 71-script manifest',
+      '- **Runner attestation:** "maintainer measured this locally."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    assert.deepEqual(
+      problems,
+      [],
+      `a plural, parenthetical Commands field must be accepted as the Command field; got:\n${problems.join('\n')}`,
+    );
+  });
+
+  it('ACCEPTS a well-formed entry whose Command field is plural with no parenthetical', () => {
+    const heading = '### 2026-09-19 — fixture, plain plural Commands field';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-19',
+      '- **Git SHA:** `e40f4cf5`',
+      '- **Commands:** `npm run lint` -> exit 0, `npm test` -> exit 0',
+      '- **Corpus fingerprint:** 71-script manifest',
+      '- **Runner attestation:** "maintainer measured this locally."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    assert.deepEqual(
+      problems,
+      [],
+      `a plain plural Commands field must be accepted as the Command field; got:\n${problems.join('\n')}`,
+    );
+  });
+
+  it('REJECTS a plural, parenthetical Commands field that admits simulation — the lockstep guarantee', () => {
+    const heading = '### 2026-09-19 — fixture, plural Commands field with simulation language';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-19',
+      '- **Git SHA:** `e40f4cf5`',
+      '- **Commands (all run in this worktree):** (simulated local execution)',
+      '- **Corpus fingerprint:** 71-script manifest',
+      '- **Runner attestation:** "maintainer measured this locally."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    assert.ok(problems.length > 0, 'a plural Commands field admitting simulation must fail validation');
+    const joined = problems.join('\n');
+    assert.match(
+      joined,
+      /the \*\*Command\*\* field contains "simulated"/,
+      'the failure must be attributed to simulation language in the Command field, not a missing-field problem — '
+      + `got:\n${joined}`,
+    );
+    assert.doesNotMatch(
+      joined,
+      /missing required field \*\*Command\*\*/,
+      `a plural Commands field must not ALSO be reported as a missing Command field; got:\n${joined}`,
+    );
+  });
+
+  it('REJECTS a plural Commands field carrying PENDING — the PENDING scan inherits the widened pattern', () => {
+    const heading = '### 2026-09-19 — fixture with a clean heading, plural Commands field';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-19',
+      '- **Git SHA:** `e40f4cf5`',
+      '- **Commands:** PENDING owner run',
+      '- **Corpus fingerprint:** 71-script manifest',
+      '- **Runner attestation:** "maintainer measured this locally."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    assert.ok(problems.length > 0, 'a plural Commands field carrying PENDING must fail validation');
+    assert.match(
+      problems.join('\n'),
+      /the \*\*Command\*\* field contains "PENDING"/,
+      `the PENDING scan must name the Command field, proving REQUIRED_FIELDS's widened pattern reached it; got:\n${problems.join('\n')}`,
+    );
+  });
+
+  it('does NOT widen past the Command label itself — **Commander:** alone still reads as a missing Command field', () => {
+    const heading = '### 2026-09-19 — fixture, look-alike label Commander';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-19',
+      '- **Git SHA:** `e40f4cf5`',
+      '- **Commander:** `npm test` -> exit 0',
+      '- **Corpus fingerprint:** 71-script manifest',
+      '- **Runner attestation:** "maintainer measured this locally."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    assert.match(
+      problems.join('\n'),
+      /missing required field \*\*Command\*\*/,
+      `**Commander:** must not be read as a Command field; got:\n${problems.join('\n')}`,
+    );
+  });
+
+  it('does NOT widen past the Command label itself — **Command line:** alone still reads as a missing Command field', () => {
+    const heading = '### 2026-09-19 — fixture, look-alike label Command line';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-19',
+      '- **Git SHA:** `e40f4cf5`',
+      '- **Command line:** `npm test` -> exit 0',
+      '- **Corpus fingerprint:** 71-script manifest',
+      '- **Runner attestation:** "maintainer measured this locally."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    assert.match(
+      problems.join('\n'),
+      /missing required field \*\*Command\*\*/,
+      `**Command line:** must not be read as a Command field; got:\n${problems.join('\n')}`,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Part 2 — the push-event range, driven through the real script
 // ---------------------------------------------------------------------------
 
