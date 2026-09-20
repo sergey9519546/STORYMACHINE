@@ -187,7 +187,10 @@ describe('the real gate list', () => {
     const out = REPORTER_OUTPUT;
     assert.match(out, /tests\/core\/auc24-table\.test\.ts/);
     assert.match(out, /missing:\s+tests\/fixtures\/auc24-table\.json/);
-    assert.match(out, /expires:\s+2026-10-01/);
+    // Moved 2026-11-01 (Decision #11): AUC24_DEGRADATION_ID bumped to
+    // shuffle-drop/v3 on 2026-09-19, so the first valid table can only be
+    // locked now.
+    assert.match(out, /expires:\s+2026-11-01/);
     assert.match(out, /npm run lock-auc24/);
   });
 
