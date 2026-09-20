@@ -436,6 +436,120 @@ describe('measurement-receipt entry validation — Command label widening', () =
 });
 
 // ---------------------------------------------------------------------------
+// Part 1d — required-field presence must be PER LINE, like the other scans
+// (Finding 3, 2026-09-19, docs/audits/2026-09-19-receipt-gate-inplace/)
+// ---------------------------------------------------------------------------
+//
+// WHY THIS EXISTS: the required-field presence check used to test each
+// REQUIRED_FIELDS pattern against `entry.lines.join('\n')` — the JOINED
+// entry body — while the simulation-language scan (fieldValueByPattern) and
+// the PENDING field scan both matched PER LINE. COMMAND_FIELD_RE's
+// `(?:\s*\([^)]*\))?` matches ACROSS a newline on the joined body but never
+// on a single line when the parenthetical wraps, so a two-line label like
+//   - **Commands (all run
+//     in this worktree):** estimated from a prior run
+// satisfied the required-Command-field check while remaining invisible to
+// the scans that would have caught the "estimated" simulation language or a
+// PENDING marker in that same field. An adversarial reviewer's probe found
+// this accepted for "estimated", "would be the same", "extrapolated",
+// "simulated" and "PENDING" — every one of which is rejected when written on
+// one line. The fix makes the presence check per-line too (via the shared
+// `findFieldLine()` primitive), so a field only counts as present when the
+// other scans can see it on the same line.
+describe('measurement-receipt entry validation — required-field presence is per line', () => {
+  it('REJECTS a two-line wrapped Command label carrying simulation language ("estimated")', () => {
+    const heading = '### 2026-09-19 — fixture, two-line wrapped Command label, estimated';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-19',
+      '- **Git SHA:** `e40f4cf5`',
+      '- **Commands (all run',
+      '  in this worktree):** estimated from a prior run',
+      '- **Corpus fingerprint:** 71-script manifest',
+      '- **Runner attestation:** "maintainer measured this locally."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    const joined = problems.join('\n');
+    assert.ok(
+      problems.length > 0,
+      'a two-line wrapped Command label whose value reads "estimated" must not be accepted; '
+      + 'it was accepted today (Finding 3)',
+    );
+    assert.ok(
+      /missing required field \*\*Command\*\*/.test(joined) || /the \*\*Command\*\* field contains "estimated"/.test(joined),
+      `the failure must name the unscannable/missing Command field or the simulation scan on it; got:\n${joined}`,
+    );
+  });
+
+  it('REJECTS the split-before-colon form (`- **Command` / `:** estimated`)', () => {
+    const heading = '### 2026-09-19 — fixture, split-before-colon Command label, estimated';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-19',
+      '- **Git SHA:** `e40f4cf5`',
+      '- **Command',
+      '  :** estimated from a prior run',
+      '- **Corpus fingerprint:** 71-script manifest',
+      '- **Runner attestation:** "maintainer measured this locally."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    const joined = problems.join('\n');
+    assert.ok(
+      problems.length > 0,
+      'a split-before-colon Command label whose value reads "estimated" must not be accepted',
+    );
+    assert.ok(
+      /missing required field \*\*Command\*\*/.test(joined) || /the \*\*Command\*\* field contains "estimated"/.test(joined),
+      `the failure must name the unscannable/missing Command field or the simulation scan on it; got:\n${joined}`,
+    );
+  });
+
+  it('REJECTS a two-line wrapped Command label even with HONEST content, and says why', () => {
+    const heading = '### 2026-09-19 — fixture, two-line wrapped Command label, honest content';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-19',
+      '- **Git SHA:** `e40f4cf5`',
+      '- **Commands (all run',
+      '  in this worktree):** `npm run lint` -> exit 0, `npm test` -> exit 0',
+      '- **Corpus fingerprint:** 71-script manifest',
+      '- **Runner attestation:** "maintainer measured this locally."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    const joined = problems.join('\n');
+    assert.match(
+      joined,
+      /missing required field \*\*Command\*\*/,
+      'a wrapped label is not a recognized field even when the content is honest — every scan reads '
+      + `a field from a single line; got:\n${joined}`,
+    );
+    assert.match(
+      joined,
+      /single line/,
+      `the diagnostic must hint that the label needs to be on one line; got:\n${joined}`,
+    );
+  });
+
+  it('ACCEPTS the honest single-line form of the same field', () => {
+    const heading = '### 2026-09-19 — fixture, honest single-line Commands field';
+    const lines = [
+      '',
+      '- **Date:** 2026-09-19',
+      '- **Git SHA:** `e40f4cf5`',
+      '- **Commands (all run in this worktree):** `npm run lint` -> exit 0, `npm test` -> exit 0',
+      '- **Corpus fingerprint:** 71-script manifest',
+      '- **Runner attestation:** "maintainer measured this locally."',
+    ];
+    const problems: string[] = validateEntry({ heading, lines }, { objectExists: alwaysExists });
+    assert.deepEqual(
+      problems,
+      [],
+      `the single-line form of the same field must still be accepted; got:\n${problems.join('\n')}`,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Part 2 — the push-event range, driven through the real script
 // ---------------------------------------------------------------------------
 

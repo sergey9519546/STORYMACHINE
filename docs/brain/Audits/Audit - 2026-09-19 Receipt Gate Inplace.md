@@ -75,3 +75,13 @@ use, with the simulation-language claim scan widened in lockstep over the
 SAME pattern so a plural Command field can't carry unscanned simulation
 language; see "§ Command label widened in lockstep with the claim scan" in
 the directory's README.
+
+**2026-09-20 (fix lane, `lane/receipt-gate-per-line`, Finding 3):** the
+required-field presence check matched the joined entry body while the
+simulation-language scan and the PENDING scan matched per line, so a Command
+label wrapped across two lines could satisfy "field present" while staying
+invisible to both scans — a two-line `**Commands (all run` / `in this
+worktree):** estimated …` field was accepted; the previous entry's
+"lockstep" claim did not hold. Fixed by routing all three through one
+per-line `findFieldLine()` primitive; see "§ Required-field presence is per
+line, like the scans" in the directory's README.

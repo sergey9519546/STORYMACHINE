@@ -432,3 +432,85 @@ still exits 0 — no new `MEASUREMENT_RECEIPTS.md` entry is required for this
 lane's own change, since it never touches the scoring path itself.
 `tests/core/brain-coverage.test.ts` passed 8/8 with this section and its
 brain-note pointer line added.
+
+## § Required-field presence is per line, like the scans (2026-09-19 continued,
+## Finding 3, CONFIRMED by an adversarial reviewer's probe)
+
+**The gap:** the required-field presence check (`validateEntry`,
+`scripts/check-scoring-receipt.mjs`, ~line 837) tested each
+`REQUIRED_FIELDS` pattern against the JOINED entry body
+(`entry.lines.join('\n')`), while the simulation-language claim scan
+(`fieldValueByPattern`) and the PENDING field scan both matched PER LINE
+(`entryLines.findIndex((l) => pattern.test(l))`). `COMMAND_FIELD_RE`'s
+`(?:\s*\([^)]*\))?` matches ACROSS a newline on the joined body but never on
+a single line when the parenthetical wraps onto its own line. So an entry
+whose Command label spans two lines —
+
+```
+- **Commands (all run
+  in this worktree):** estimated from a prior run
+```
+
+— satisfied the required Command field (the joined-body regex bridges the
+newline) while the simulation scan and the PENDING scan never located the
+field at all, because each tests one line at a time and no single line
+carries the whole label. The reviewer's probe accepted this shape with
+"estimated", "would be the same", "extrapolated", "simulated", and "PENDING"
+in the value — every one rejected when the same label is written on one
+line. A narrower pre-existing form, splitting before the colon
+(`- **Command` / `:** estimated …`), was accepted the same way. The
+"lockstep" comment written for the Command-widening fix above (§ this file)
+claimed the required-field scan and the simulation scan "move in lockstep";
+they did not — they used two different matching strategies (joined-body vs.
+per-line) that happened to agree on every single-line fixture tested at the
+time.
+
+**The fix:** one shared primitive, `findFieldLine(entryLines, pattern)`,
+returns the per-line index where a field's bolded label starts (or -1).
+`fieldValueByPattern()` is refactored onto it instead of its own inline
+`findIndex`, and the required-field presence check in `validateEntry()` now
+calls `field.patterns.some((re) => findFieldLine(entry.lines, re) !== -1)`
+instead of `field.patterns.some((re) => re.test(body))`. All three
+consumers — required-field presence, the claim/simulation scan, and the
+PENDING field scan — now resolve a field through the exact same per-line
+matcher, so they cannot diverge on where (or whether) a field starts again.
+The "lockstep" comment beside `CLAIM_FIELD_LABELS` is rewritten to say what
+is actually guaranteed: a field is either found in the same place by all
+three scans, or found by none of them. The missing-field diagnostic also
+gained a hint: when no line matches, the message now tells the author that a
+label wrapped across two lines is not a recognized field and to put it back
+on one line — the wrapped-but-honest case (below) would otherwise read as an
+unexplained rejection.
+
+**New tests** (`tests/core/scoring-receipt-guard.test.ts`, describe block
+"measurement-receipt entry validation — required-field presence is per
+line"):
+
+1. The two-line `**Commands (all run` / `in this worktree):** estimated …`
+   entry — REJECTED (fails today: accepted).
+2. The split-before-colon form, `- **Command` / `:** estimated` — REJECTED
+   (fails today: accepted).
+3. A two-line label with otherwise HONEST content — also REJECTED, as
+   "missing required field **Command**", with the message naming that a
+   wrapped label needs to be on one line.
+4. The honest single-line `**Commands (all run in this worktree):**` form —
+   still ACCEPTED, unchanged.
+5. All pre-existing cases in the file (36 tests total after this addition)
+   pass unchanged.
+
+**Gates run:** `tests/core/scoring-receipt-guard.test.ts` (36/36),
+`tests/core/receipt-gate-inplace-rewrite.test.ts` (13/13),
+`tests/core/check-scoring-receipt.test.ts` (8/8),
+`tests/scripts/receipt-conversion.test.ts` (43/43),
+`tests/scripts/owner-measure-e2e.test.ts` (56/56),
+`tests/scripts/owner-measure-plan.test.ts` (30/30),
+`tests/core/ci-gates-intact.test.ts` (64/64),
+`tests/core/honesty-audit-claims.test.ts` (15/15). `npm run lint` is clean.
+This lane touches only `scripts/check-scoring-receipt.mjs`, a test file, and
+this audit doc, so `node scripts/check-scoring-receipt.mjs 02d8cfb4..HEAD`
+reports "no scoring-path files changed. OK." `node
+scripts/check-scoring-receipt.mjs $(git merge-base origin/main HEAD)..HEAD`
+was also run and still exits 0, confirming the real ledger's entries (all
+single-line labels) are unaffected by this fix.
+`tests/core/brain-coverage.test.ts` passed 8/8 with this section and its
+brain-note pointer line added.
