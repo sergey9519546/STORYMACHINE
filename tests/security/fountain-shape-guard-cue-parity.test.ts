@@ -129,6 +129,7 @@ import { ANALYZER_SCENE_CEILING } from '../../server/nvm/analyze/fountain-analyz
 // versions at every cast this file uses before the move.
 import {
   buildUniformMin,
+  buildUniformCast,
   buildMaxAdmitted,
   buildProbeCastFeature,
   uniformMinWeight,
@@ -3166,20 +3167,62 @@ describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — reali
     assert.equal(fountainShapeRejectionReason(text), null);
   });
 
-  // Round-2 disclosure (brief item 2): the bound that keeps the worst-case
-  // shape's cost under the half-budget target does NOT admit every cast the
-  // round-1 draft happened to accept. A 60-cast fully-eligible ensemble
-  // (weight 909,000) exceeds 675,000 and is now correctly REJECTED — say so
-  // directly, rather than let it silently regress with no test either way.
-  // Unlocking a cast this large safely is the analyzer-side pair-cap
-  // (capping analyzeVoices's O(distinct²) pair count), not a further raise
-  // of this bound — see MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT's own comment,
-  // item (d).
-  it('a 60-cast fully-eligible feature is now REJECTED (weight 909,000 > 675,000) — the cost-safe bound does not stretch to this cast; the analyzer-side pair cap is what would', () => {
-    const text = buildProbeCastFeature(60);
-    const reason = fountainShapeRejectionReason(text);
-    assert.ok(reason, 'expected a 60-cast fully-eligible feature to be rejected under the cost-derived bound');
-    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  // Round-2 disclosure, RE-ANCHORED 2026-09-20 to the bounds this tree ships
+  // (weight 1,500,000; cast MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT, derived from
+  // the runner table locked at tests/fixtures/voice-bound-derivation.json, run
+  // 35542413222).
+  //
+  // WHAT STOOD HERE AND WHY IT COULD NOT BE PATCHED. The previous version of
+  // this test pinned a 60-cast fully-eligible ensemble as REJECTED and carried
+  // the old boundary's arithmetic in its own title ("weight 909,000 >
+  // 675,000"). Under the bounds now shipped that document is ACCEPTED — the
+  // PREMISE was stale, not merely the literal — so swapping numbers into it
+  // would have produced a test that asserts something untrue about the guard.
+  // It is replaced by the boundary itself, asserted from both sides on the
+  // realistic few-big shape this bound exists to keep serving, with the
+  // rejecting bound named.
+  //
+  // MEASURED, not restated: over the committed probe-cast generator the
+  // largest cast the pair of bounds admits is 97 (eligible weight 1,491,084)
+  // and the smallest it refuses is 98 (1,507,632) — and what refuses it is the
+  // WEIGHT bound, because on this shape ~15,380 pooled words times the cast
+  // crosses 1,500,000 at 98, two casts BELOW the cast bound of 100. So on a
+  // realistic ensemble the cast bound never fires first; that is a property of
+  // this pair of bounds worth failing on if it changes.
+  it('the realistic few-big shape\'s accept/reject boundary is cast 97/98, and the WEIGHT bound is what fires there (the cast bound never fires first on this shape)', () => {
+    const verdicts = new Map<number, string | null>();
+    for (let cast = 90; cast <= 105; cast++) verdicts.set(cast, fountainShapeRejectionReason(buildProbeCastFeature(cast)));
+    const accepted = [...verdicts.entries()].filter(([, r]) => r === null).map(([c]) => c);
+    const rejected = [...verdicts.entries()].filter(([, r]) => r !== null).map(([c]) => c);
+    assert.ok(accepted.length > 0 && rejected.length > 0, 'the 90-105 sweep must bracket the boundary from both sides');
+    const largestAccepted = Math.max(...accepted);
+    const smallestRejected = Math.min(...rejected);
+    assert.equal(
+      smallestRejected,
+      largestAccepted + 1,
+      `the guard's verdict on this shape must be monotone in cast — accepted ${JSON.stringify(accepted)}, rejected ${JSON.stringify(rejected)}`,
+    );
+    assert.equal(
+      largestAccepted,
+      97,
+      `the largest realistic few-big cast the bounds admit is ${largestAccepted}, not the 97 this boundary was re-anchored to on 2026-09-20 — `
+      + 'a bound moved without this test moving with it',
+    );
+    assert.match(
+      verdicts.get(smallestRejected)!,
+      /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/,
+      `cast ${smallestRejected} must be refused by the WEIGHT bound: on this shape the weight product crosses first, `
+      + `two casts below the cast bound of ${MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT}. If the CAST bound now fires here, it has been lowered into the realistic range`,
+    );
+    // And the honest statement of what the re-derivation bought, in the same
+    // place the old narrowing was disclosed: the 60-cast ensemble the 675,000
+    // bound refused is served now.
+    assert.equal(
+      fountainShapeRejectionReason(buildProbeCastFeature(60)),
+      null,
+      'a 60-cast fully-eligible ensemble (eligible weight 916,200) was REJECTED under the 675,000 bound and is ACCEPTED under this one — '
+      + 'if it is rejected again, the re-derivation has been undone',
+    );
   });
 
   // ── The worst shape the guard admits, and the cast bound derived from it ──
@@ -3294,33 +3337,101 @@ describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — reali
     assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT/);
   });
 
-  // The 2026-09-12 boundary, restated honestly: the uniform-min N=150 document
-  // that sat exactly ON the weight bound and was ACCEPTED then is REJECTED now.
-  // That is the narrowing this lane makes, and it is the whole point — that
-  // document cost 21,133ms of CPU on the machine that gates this repository.
-  it('the uniform-min N=150 shape the 2026-09-12 derivation admitted (weight exactly 675,000) is now REJECTED by the cast bound — the narrowing, stated rather than hidden', () => {
-    const text = buildUniformMin(150);
-    assert.equal(uniformMinWeight(150), MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT, 'sanity: this document still sits exactly on the weight bound');
-    const reason = fountainShapeRejectionReason(text);
+  // WHAT SITS EXACTLY ON THE WEIGHT BOUND NOW (re-anchored 2026-09-20).
+  //
+  // The test that stood here opened with `assert.equal(uniformMinWeight(150),
+  // MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT)` — "sanity: this document still sits
+  // exactly on the weight bound" — which was true of 675,000 (150 x 150 x 30)
+  // and is not true of any uniform-min cast at 1,500,000: 30N² = 1,500,000 has
+  // no integer solution (N = 223.6). The document that sits exactly on the
+  // bound is now the MAX-ADMITTED shape at the cast bound —
+  // maxAdmittedWordsPerSpeaker(100, 1,500,000) = 150 words each, weight
+  // 100 x 15,000 = 1,500,000 exactly — which is simultaneously ON both bounds,
+  // and is ACCEPTED. One paragraph more per speaker (156 words) crosses the
+  // weight bound and is refused by name.
+  //
+  // This is ±1 sensitive in the weight bound by construction: at 1,499,999 the
+  // per-speaker ceiling drops to 144 words and the equality below fails.
+  it('the document that sits EXACTLY on the weight bound is the max-admitted shape at the cast bound, it is ACCEPTED, and one paragraph more per speaker is REJECTED by the WEIGHT bound', () => {
+    const cast = MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT;
+    const wordsPerSpeaker = maxAdmittedWordsPerSpeaker(cast, MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT);
+    assert.equal(
+      cast * (cast * wordsPerSpeaker),
+      MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+      `sanity: ${cast} speakers at ${wordsPerSpeaker} words each must land exactly ON the weight bound `
+      + `(${cast * cast * wordsPerSpeaker} vs ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT}) — if it does not, one of the two bounds moved and this boundary has to be recomputed`,
+    );
+    assert.equal(
+      fountainShapeRejectionReason(buildUniformCast(cast, wordsPerSpeaker)),
+      null,
+      'the document sitting exactly on BOTH bounds must be accepted — a bound that rejects its own boundary is off by one',
+    );
+    const overWeight = fountainShapeRejectionReason(buildUniformCast(cast, wordsPerSpeaker + 6));
+    assert.ok(overWeight, `expected ${cast} speakers at ${wordsPerSpeaker + 6} words each (weight ${cast * cast * (wordsPerSpeaker + 6)}) to be rejected`);
+    assert.match(overWeight!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
+
+  // The 2026-09-12 narrowing, still stated rather than hidden — and now
+  // unambiguous about WHICH bound makes it. uniform-min N=150 sat exactly on
+  // the old 675,000 weight bound and was ACCEPTED under it; it cost 21,133 ms
+  // of CPU on the machine that gates this repository, and it is REJECTED here.
+  // Under the 1,500,000 bound its weight (675,000) is 2.2x under the weight
+  // bound, so the CAST bound is the only thing that can be rejecting it, which
+  // the assertion checks both ways.
+  it('the uniform-min N=150 shape the 2026-09-12 derivation admitted is still REJECTED — now unambiguously by the CAST bound, with its weight well under the weight bound', () => {
+    assert.ok(
+      uniformMinWeight(150) < MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
+      `sanity: N=150 must be a document the WEIGHT bound would admit (${uniformMinWeight(150)} vs ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT}), or this says nothing about the cast bound`,
+    );
+    const reason = fountainShapeRejectionReason(buildUniformMin(150));
     assert.ok(reason, 'expected the old N=150 boundary document to be rejected under the cast bound');
     assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT/);
   });
 
-  it('the uniform-min N=151 shape is still REJECTED, and still by the WEIGHT bound — the cast bound is checked second so no pinned rejection changed its message', () => {
-    const text = buildUniformMin(151);
+  // The old N=151 test asserted this document was rejected by the WEIGHT bound
+  // — true at 675,000, where 151 speakers at the floor weighed 684,030. At
+  // 1,500,000 that weight is admitted and the CAST bound is what refuses it, so
+  // the assertion follows the guard rather than the other way round. The
+  // ORDERING property the old test's title was really about (weight is checked
+  // FIRST, so no payload the weight bound already rejected changed its message)
+  // is not dropped — it is asserted directly below, on a document that violates
+  // BOTH bounds and must still report the weight one.
+  it('the uniform-min N=151 shape is still REJECTED — by the CAST bound now, since its weight clears the raised weight bound', () => {
     assert.equal(uniformMinWeight(151), 684_030);
-    const reason = fountainShapeRejectionReason(text);
-    assert.ok(reason, 'expected N=151 (one speaker past the weight boundary) to be rejected');
-    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+    assert.ok(uniformMinWeight(151) < MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT, 'sanity: N=151 no longer crosses the weight bound');
+    const reason = fountainShapeRejectionReason(buildUniformMin(151));
+    assert.ok(reason, 'expected N=151 to be rejected');
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT/);
+  });
+
+  it('a document that violates BOTH bounds still reports the WEIGHT bound — weight is evaluated first, so no pinned rejection ever changed its message', () => {
+    const cast = 250;
+    assert.ok(uniformMinWeight(cast) > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT, `sanity: uniform-min N=${cast} (weight ${uniformMinWeight(cast)}) must cross the weight bound`);
+    assert.ok(cast > MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT, `sanity: uniform-min N=${cast} must cross the cast bound too`);
+    const reason = fountainShapeRejectionReason(buildUniformMin(cast));
+    assert.ok(reason, `expected uniform-min N=${cast} to be rejected`);
+    assert.match(
+      reason!,
+      /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/,
+      'a document over BOTH bounds must keep the weight bound\'s wording — the cast bound is checked second precisely so that every DoS payload this file pins keeps the message it was pinned with',
+    );
   });
 
   // The band the cast bound newly rejects, CHECKED rather than restated. The
-  // constant's comment said "121-150" for a day; it is 81-150, and prose is how
-  // that happened, so the range is asserted against the guard here: every one of
-  // these documents weighs comfortably under MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT
-  // (so the weight bound alone would admit it) and is rejected by the cast bound.
-  for (const cast of [81, 90, 110, 150]) {
-    it(`uniform-min N=${cast} weighs ${uniformMinWeight(cast)} — under the weight bound — and is rejected by the CAST bound (the 81-150 band)`, () => {
+  // constant's comment said "121-150" for a day; prose is how that happened, so
+  // the range is asserted against the guard here: every one of these documents
+  // weighs under MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT (so the weight bound alone
+  // would admit it) and is rejected by the cast bound.
+  //
+  // RE-ANCHORED 2026-09-20 with the derived bounds: the band was 81-150 when
+  // the pair read (675,000, 80); it is 101-223 now. Both ends are arithmetic,
+  // not choices — it opens one past the cast bound, and it closes at the
+  // largest cast the weight bound admits at the 30-word eligibility floor,
+  // floor(sqrt(1,500,000 / 30)) = 223, because N=224 weighs 1,505,280 and is
+  // taken by the weight bound instead. That closing end is asserted below so
+  // the band cannot silently run off the end of the weight bound.
+  for (const cast of [101, 110, 150, 223]) {
+    it(`uniform-min N=${cast} weighs ${uniformMinWeight(cast)} — under the weight bound — and is rejected by the CAST bound (the 101-223 band)`, () => {
       assert.ok(
         uniformMinWeight(cast) <= MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
         `sanity: N=${cast} must be a document the WEIGHT bound would admit, or it says nothing about the cast bound`,
@@ -3330,6 +3441,15 @@ describe('finding 10: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT re-derivation — reali
       assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT/);
     });
   }
+
+  it('the band ENDS at 223: uniform-min N=224 crosses the weight bound and is taken by it, not by the cast bound', () => {
+    const lastCastBandMember = Math.floor(Math.sqrt(MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT / 30));
+    assert.equal(lastCastBandMember, 223, `the largest uniform-min cast the weight bound admits is ${lastCastBandMember}, not 223 — the weight bound moved`);
+    assert.ok(uniformMinWeight(lastCastBandMember + 1) > MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT);
+    const reason = fountainShapeRejectionReason(buildUniformMin(lastCastBandMember + 1));
+    assert.ok(reason, `expected uniform-min N=${lastCastBandMember + 1} to be rejected`);
+    assert.match(reason!, /MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT/);
+  });
 
   it(`the band starts at ${BOUNDARY_CAST + 1}: uniform-min N=${BOUNDARY_CAST} is still ACCEPTED`, () => {
     assert.equal(fountainShapeRejectionReason(buildUniformMin(BOUNDARY_CAST)), null);
