@@ -265,3 +265,42 @@ and removing the `"engineCommit": "dev"` line from the committed snapshot so
 the fixture no longer encodes an assumption about the environment it was
 generated in. No other byte of the snapshot changed, and the fix does not
 touch any scoring-path file.
+
+## § Unicode forced headings (decision 2026-09-20)
+
+`FORCED_SCENE_HEADING_RE` widened from `/^\.(?=[A-Za-z0-9])/` to
+`/^\.(?=[\p{L}\p{N}])/u` — a leading `.` followed by ANY Unicode letter or
+number is now a forced scene heading, in `lane/unicode-forced-heading` off
+this lane's `bf4f3bff` merge commit. §2's "The one place the grammar is
+narrower than before" named `.МОСКВА` as an owner decision deferred to a
+separate, measured change; this is that change. Fountain's own rule is "a
+period followed by a character", not "a period followed by an ASCII
+character"; the repository already ships `tests/core/multilingual-headings
+.test.ts` for the standard slugline vocabulary, and the owner's own projects
+include Armenian- and Russian-language material. `..`, `...` and a `.`
+followed by punctuation or a space stay non-headings — none of those bytes
+is `\p{L}` or `\p{N}`, so row 6's ellipsis fix is unaffected.
+
+Every consumer of `FORCED_SCENE_HEADING_RE` / `isSceneHeadingLine` was
+checked (`grep -rn 'FORCED_SCENE_HEADING_RE\|isSceneHeadingLine' src server
+scripts --include=*.ts`): none builds a second regex from `.source`, so
+adding the `u` flag needed no other edit, and `server/lib/validation.ts`'s
+parity guard (`isSceneSegmentHeading`, which calls `isSceneHeadingLine`
+directly since this lane's earlier commit) picks up the widening with no
+code change of its own — proven by the new Cyrillic/Armenian/CJK cases added
+to `tests/security/fountain-shape-guard-cue-parity.test.ts`'s edge-case
+table.
+
+Evidence: `tests/core/scene-grammar.test.ts`'s new "(e) forced headings in
+any Unicode script" block — `.МОСКВА - ДЕНЬ`, `.ԵՐԵՎԱՆ` and `.東京` were
+`false` before this change and are `true` after; a 3-scene
+Cyrillic/Armenian/CJK fixture went from `scenesFromFountain(...).length` 0
+and `sceneCount` 1 to 3 and 3. Output identity against this lane's own
+`bf4f3bff` baseline: **PASS, 45/45 byte-identical** — none of the 45
+fixtures contains a non-Latin forced heading. `npm run benchmark:public
+-- --json` before/after: all six public-benchmark numbers unchanged
+(0.5313/0.5586, 0.4063/0.4443, 1.0000/0.9473) and all 32 per-script pair
+rows byte-identical across all three degradations, so no floor in
+`scripts/lib/auc.ts` moved and none was re-locked. No AUC-24 figure is
+claimed — see `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`'s
+"FORCED HEADINGS IN ANY SCRIPT" entry for the full receipt.

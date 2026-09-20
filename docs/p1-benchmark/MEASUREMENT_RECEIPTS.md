@@ -2474,3 +2474,125 @@ that nobody mistakes one for the other.
   heading forms the committed corpus does not. It says nothing about whether
   the score discriminates, and it is not comparable to AUC-24 or to the P1
   baseline.
+
+### 2026-09-20 — FORCED HEADINGS IN ANY SCRIPT: the forced-heading rule accepts a Unicode letter or number after the dot (PUBLIC-CORPUS — not an AUC-24 receipt; the private corpus is not present in this environment, so no real-corpus figure is claimed)
+
+- **Date:** 2026-09-20
+- **Git SHA:** the lane commit on `lane/unicode-forced-heading`, branched
+  from `bf4f3bff` — a real commit in this repository, and the baseline every
+  before/after figure below is measured against.
+- **Why this entry exists.** Exactly one scoring-path file changed:
+  `src/lib/fountain.ts` (`FORCED_SCENE_HEADING_RE` and its explaining
+  comment). `node scripts/check-scoring-receipt.mjs bf4f3bff..HEAD` requires
+  a receipt for this range, and this is it.
+- **What changed, in one sentence.** `FORCED_SCENE_HEADING_RE` — the Fountain
+  forced-scene-heading test `parseFountain` and every one of its six former
+  copies now call through `isSceneHeadingLine` — widened from
+  `/^\.(?=[A-Za-z0-9])/` to `/^\.(?=[\p{L}\p{N}])/u`: a leading `.` followed
+  by ANY Unicode letter or number is a forced heading, not only an ASCII one.
+  The 2026-09-20 scene-grammar lane (`docs/audits/2026-09-20-scene-grammar/
+  README.md` §2, "The one place the grammar is narrower than before")
+  flagged `.МОСКВА` as deliberately unrecognised and named this as the one
+  place to widen it later. Fountain's own rule is "a period followed by a
+  character", not "a period followed by an ASCII character", the repository
+  already ships `tests/core/multilingual-headings.test.ts` for the standard
+  slugline vocabulary, and the owner's own projects include Armenian- and
+  Russian-language material. `..`, `...` and a `.` followed by punctuation or
+  a space are still not headings — none of those characters is `\p{L}` or
+  `\p{N}`, so row 6 of `SESSION_REPORT_2026-09-19.md` §4 (the ellipsis fix,
+  same lane) is unaffected. Every consumer of the constant was checked
+  (`grep -rn 'FORCED_SCENE_HEADING_RE\|isSceneHeadingLine' src server
+  scripts --include=*.ts`): none builds a second regex from `.source`, so
+  the added `u` flag needed no other edit, and the parity guard
+  (`server/lib/validation.ts`'s `isSceneSegmentHeading`, which now calls
+  `isSceneHeadingLine` directly rather than mirroring it) picks up the
+  widening automatically.
+- **Command:** every command run for this entry, all of them in this
+  worktree —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types --test tests/core/scene-grammar.test.ts
+  node --experimental-strip-types --test tests/core/multilingual-headings.test.ts
+  node --experimental-strip-types --test tests/core/scene-segments.test.ts
+  node --experimental-strip-types --test tests/core/fountain-analyzer.test.ts
+  node --experimental-strip-types --test tests/core/script-doctor.test.ts
+  node --experimental-strip-types --test tests/core/calibration.test.ts
+  node --experimental-strip-types --test tests/core/public-benchmark.test.ts
+  node --experimental-strip-types --test tests/core/honesty-audit-claims.test.ts
+  node --experimental-strip-types --test tests/security/fountain-shape-guard-cue-parity.test.ts
+  node --experimental-strip-types --test tests/core/incremental-reparse.test.ts
+  node --experimental-strip-types --test tests/core/editor-decorations.test.ts
+  npm run benchmark:public -- --json          # before (on bf4f3bff) and after
+  git archive bf4f3bff | tar -x -C <baseline>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree .          --out <after>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --compare <before> <after>
+  npm run build
+  npm run gates
+  node scripts/check-scoring-receipt.mjs bf4f3bff..HEAD
+  ```
+- **Corpus fingerprint:** the committed PUBLIC 32-script set — 20 CC0
+  screenplays in `data/screenplays/` plus the 12 blind-pair fixtures — read
+  through `tests/fixtures/public-corpus-manifest.json`, whose bytes this lane
+  did not change: sha256
+  `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e`
+  (`tests/fixtures/public-benchmark-split.json`, also unchanged:
+  `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`). Every
+  one of the 32 rows — `sceneCount`, `words`, `health`, `verdict` — came back
+  byte-identical after the change, so no `--lock` was needed and none was
+  run. Plus the 45 in-repo output-identity fixtures (20 CC0 screenplays, 20
+  calibration samples, the P0 sample, 4 synthetic concatenations, and the
+  `tests/fixtures/*.fountain` set) — none contains a non-Latin forced
+  heading, so this identity check is a limit of the instrument, not proof of
+  no effect; the two measured deltas below cover what the fixture set
+  cannot see. **The PRIVATE AUC-24 corpus was not available in this
+  environment** (`REAL_SCRIPT_CORPUS_DIR` is unset here and the corpus is
+  local-only by copyright), so no real-corpus figure is claimed for this
+  range.
+- **Runner attestation:** run in the session worktree
+  (`lane/unicode-forced-heading`, branched from `bf4f3bff`) on 2026-09-20 by
+  the lane agent; no API key, no private corpus. Every command in the block
+  above was executed here and its output read directly from its own log;
+  every number below is copied from that output.
+- **Output identity:** `check-doctor-output-identity.mjs --compare` against a
+  `git archive bf4f3bff` baseline, both sides `GIT_SHA=dev` →
+  **"OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt
+  excluded)."** **0 of 45 fixtures differ** — expected, since the fixture set
+  has no forced headings in any non-Latin script (counted above).
+- **Measured public AUCs, before → after (N = 32; matched-pair is PRIMARY;
+  seeded 2000-resample percentile bootstrap, seed 42):**
+  - `SHUFFLE_DROP` — matched-pair **0.5313 → 0.5313**, all-pairs
+    **0.5586 → 0.5586**; ordered/inverted/tied **17/15/0 → 17/15/0**.
+  - `CLIMAX_RELOCATE` — matched-pair **0.4063 → 0.4063**, all-pairs
+    **0.4443 → 0.4443**; ordered/inverted/tied **8/14/10 → 8/14/10**.
+  - `DIALOGUE_FLATTEN` (positive control) — matched-pair **1.0000 → 1.0000**,
+    all-pairs **0.9473 → 0.9473**; ordered/inverted/tied **32/0/0 → 32/0/0**.
+  - **All six numbers are unchanged, so none of the six floor constants in
+    `scripts/lib/auc.ts` moved and no floor was re-locked. `scripts/lib/
+    auc.ts` is not in this lane's diff. No floor rose; no floor fell.** Every
+    per-script pair row (`real`, `degraded`, `intactScenes`, `degradedScenes`
+    for every one of the 32 scripts, all three degradations) came back
+    byte-for-byte identical between the two `--json` runs — none of the 32
+    committed scripts contains a forced heading in a non-Latin script, so
+    this widening cannot move a number on this corpus.
+- **Measured effect on an input the fixture set does not contain** (both
+  figures produced here, pre-change tree vs post-change tree, same script,
+  same command): a 3-scene script with Cyrillic, Armenian and CJK forced
+  headings (`.МОСКВА - ДЕНЬ`, `.ЕРЕВАН - НОЧЬ`, `.東京 - ДЕНЬ`,
+  `tests/fixtures/scene-grammar/unicode-forced-headings.fountain`):
+  `scenesFromFountain` returned **0 scenes before, 3 after**, and the
+  doctor's own `sceneCount` went from **1 to 3** on the same text.
+- **Measured AUC-24:** **none is claimed for this range, and none was
+  produced here.** The private corpus is not present in this environment.
+  The owner's next `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`
+  and `npm run lock-auc24` on degradation recipe `shuffle-drop/v3` remain
+  the obligations named in the 2026-09-20 scene-grammar entry above; this
+  change does not add a new one, since no committed AUC-24 manifest exists
+  yet to re-lock. `AUC24_FLOOR` is untouched at 0.622.
+- **What a reader should NOT take from this entry.** It is a public-corpus
+  receipt. It shows that on the 32 committed scripts the score is byte-for-
+  byte what it was, and it shows one measured delta on a synthetic input
+  using heading forms the committed corpus does not contain. It says nothing
+  about whether the score discriminates, and it is not comparable to AUC-24
+  or to the P1 baseline.

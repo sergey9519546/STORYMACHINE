@@ -287,16 +287,23 @@ export function splitLinesKeepingEndings(text: string): string[] {
 //   * the standard slugline vocabulary, case-insensitive, followed by `.` or a
 //     space: INT, EXT, EST, I/E, INT/EXT and the spelled-out / non-English
 //     forms the parser has always listed;
-//   * a FORCED heading: a leading `.` immediately followed by an alphanumeric.
+//   * a FORCED heading: a leading `.` immediately followed by a Unicode
+//     letter or number.
 //
-// The forced-heading rule is deliberately `[A-Za-z0-9]` and not a Unicode
-// letter class. That is what Fountain's own reference implementations do, it
-// is what this change's brief specified, and widening it is a scoring
-// change that would need its own measurement — a forced heading written in a
-// non-Latin script (`.МОСКВА`) is NOT recognised here, exactly as it was not
-// recognised in any meaningful sense before (it was recognised, but so was
-// every `...` line, which is the defect this file exists to fix). If that
-// widening is ever wanted it belongs in one place now, which is the point.
+// ── Unicode forced headings (decision 2026-09-20) ──────────────────────────
+// The forced-heading rule was `[A-Za-z0-9]`, not a Unicode letter class, so a
+// forced heading written in a non-Latin script (`.МОСКВА`) was not
+// recognised — flagged as an owner decision the day this file was written.
+// Fountain's own rule is "a period followed by a character", not "a period
+// followed by an ASCII character", and the owner's projects include
+// Armenian- and Russian-language material; `tests/core/multilingual-headings
+// .test.ts` already covers the standard slugline vocabulary in those
+// scripts. Decided: `FORCED_SCENE_HEADING_RE` accepts any Unicode letter or
+// number after the dot (`\p{L}` / `\p{N}`, which requires the `u` flag) —
+// `.МОСКВА - ДЕНЬ`, `.ԵՐԵՎԱՆ` and `.東京` are headings now. `..`, `...` and a
+// `.` followed by punctuation or a space are still not headings: none of
+// those characters is `\p{L}` or `\p{N}`, so row 6's ellipsis fix (this same
+// lane) is unaffected.
 //
 // ── Callers ───────────────────────────────────────────────────────────────
 // `docs/audits/2026-09-20-scene-grammar/README.md` §1 is the full inventory of
@@ -329,13 +336,15 @@ export const SCENE_HEADING_PREFIX_RE =
   /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
 
 /**
- * A Fountain FORCED scene heading: a leading `.` followed immediately by an
- * alphanumeric. `.INT. WAREHOUSE` and `.THE VOID` are headings; `..`, `...`,
+ * A Fountain FORCED scene heading: a leading `.` followed immediately by a
+ * Unicode letter or number (`\p{L}` / `\p{N}` — any script, not just ASCII;
+ * decision 2026-09-20, see this file's grammar comment above). `.INT.
+ * WAREHOUSE`, `.THE VOID`, `.МОСКВА` and `.東京` are headings; `..`, `...`,
  * `.  spaced` and a bare `.` are not. The lookahead keeps the `.` itself in
  * the matched line, so callers that strip the marker (`docx.ts`, `fdx.ts`,
  * `screenplay-layout.ts`, `page-refs.ts`) are unaffected.
  */
-export const FORCED_SCENE_HEADING_RE = /^\.(?=[A-Za-z0-9])/;
+export const FORCED_SCENE_HEADING_RE = /^\.(?=[\p{L}\p{N}])/u;
 
 /**
  * True exactly when `parseFountain` classifies this line as a `scene_heading`

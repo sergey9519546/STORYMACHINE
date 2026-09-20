@@ -35,6 +35,14 @@
 // (c) is deliberately a test that already passed: the forced-heading fix has a
 // direction, and a change that quietly stopped recognising real forced
 // headings would be a worse bug than the one being fixed.
+//
+// ── (e), added 2026-09-20: Unicode forced headings ─────────────────────────
+// `FORCED_SCENE_HEADING_RE` was `/^\.(?=[A-Za-z0-9])/` — ASCII only, so
+// `.МОСКВА` was not recognised. Decided: any Unicode letter or number after
+// the dot is a forced heading (`\p{L}` / `\p{N}`, `u` flag). Fail-first,
+// measured against this file's own pre-edit tree: `.МОСКВА - ДЕНЬ`,
+// `.ԵՐԵՎԱՆ` and `.東京` all read `false`; the 3-scene fixture below read
+// `scenesFromFountain(...).length === 0` and `sceneCount === 1`.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -225,3 +233,38 @@ describe('scene grammar — (d) a plain INT./EXT. script is byte-identical', () 
     }
   });
 });
+
+describe('scene grammar — (e) forced headings in any Unicode script (decision 2026-09-20)', () => {
+  // `FORCED_SCENE_HEADING_RE` used to be `/^\.(?=[A-Za-z0-9])/` — ASCII only.
+  // Fountain's own rule is "a period followed by a character", not "a period
+  // followed by an ASCII character", and the owner's own projects include
+  // Armenian- and Russian-language material. Decided: any Unicode letter or
+  // number after the dot (`\p{L}` / `\p{N}`) is a forced heading.
+
+  test('a forced heading written in Cyrillic, Armenian or CJK is a heading', () => {
+    // PRE-change: all four false — `М`, `Е`, `й` and `京` are not `[A-Za-z0-9]`.
+    assert.equal(isSceneHeadingLine('.МОСКВА - ДЕНЬ'), true);
+    assert.equal(isSceneHeadingLine('.ЕРЕВАН'), true);
+    assert.equal(isSceneHeadingLine('.ԵՐԵՎԱՆ'), true);
+    assert.equal(isSceneHeadingLine('.東京'), true);
+  });
+
+  test('`..`, `...` and a `.` followed by punctuation or a space are still not headings', () => {
+    assert.equal(isSceneHeadingLine('.'), false);
+    assert.equal(isSceneHeadingLine('..'), false);
+    assert.equal(isSceneHeadingLine('...и потом'), false);
+    assert.equal(isSceneHeadingLine('. МОСКВА'), false);
+  });
+
+  test('a 3-scene Cyrillic/Armenian/CJK forced-heading script splits into 3 scenes', async () => {
+    const text = read('unicode-forced-headings.fountain');
+    // PRE-change: scenesFromFountain saw 0 (no ASCII-forced or INT./EXT.
+    // heading anywhere in the fixture) and the doctor's own sceneCount was 1
+    // (the whole document read as a single unheaded scene).
+    assert.equal(parserSceneCount(text), 3);
+    assert.equal(scenesFromFountain(text).length, 3);
+    const report = await runScriptDoctor(text);
+    assert.equal(report.sceneCount, 3);
+  });
+});
+
