@@ -30,6 +30,7 @@ import { consumeAiAttempt, isAiBudgetExceededError } from '../../lib/ai-budget.t
 import { getGenerativeProvider, modelForTask } from '../../engine/ai.ts';
 import { buildCraftPromptSection, looksLikeAnimationGenre } from '../generate/craft-spec.ts';
 import type { ApprovedSpan } from './passes/types.ts';
+import { normalizeLineEndings } from './approved-spans.ts';
 import {
   evaluateRewrite,
   registerLlmRewriter,
@@ -129,12 +130,12 @@ function countOccurrences(haystack: string, needle: string): number {
   }
 }
 
-/** Collapse CRLF/CR to LF so a provider that normalizes line endings on its
- *  way back doesn't register as having deleted the locked text. No other
- *  normalization (whitespace, case, …) — the promise is VERBATIM survival. */
-function normalizeLineEndings(text: string): string {
-  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-}
+// `normalizeLineEndings` (CRLF/CR → LF, and nothing else — the promise is
+// VERBATIM survival) lives in ./approved-spans.ts and is imported above.
+// It used to be a second copy here. ./approved-spans.ts's
+// `relocateApprovedSpans` has to decide whether a locked excerpt is present
+// in a document under exactly the same rule this file's survival check uses,
+// so the two share one implementation rather than two that can drift apart.
 
 /**
  * THE ENFORCEMENT (2026-09-19, locked-spans lane; SESSION_REPORT_2026-09-19.md
