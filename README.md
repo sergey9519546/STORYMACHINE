@@ -12,6 +12,29 @@ What-If Lab, Writers' Room, interview receipts) needs no API key at all; a
 key only unlocks optional generation features (see "Environment Variables"
 below).
 
+## Validity of the score
+
+The score has not been shown to discriminate on real writing. The only
+CI-run test against independent real writing — twelve screenplays written
+blind, six matched excellent/bad pairs — orders **1 of 6 pairs** correctly
+(mean health gap -0.0167; `tests/core/blind-pairs-discrimination.test.ts`,
+measured 2026-09-20 on commit `26d930dd`). The public benchmark's two
+measurement channels (32 committed screenplays, runs in CI with no corpus)
+read matched-pair AUC **0.5313** for shuffle-drop and **0.4063** for
+climax-relocate; both 95% confidence intervals contain 0.5, meaning on
+9-14-scene distributable prose the engine does not reliably prefer an
+intact script to a mechanically damaged copy of itself. A third channel,
+dialogue-flatten, reads 1.0000 — a positive control built to prove the
+instrument can register a manipulation the score is built to catch, not
+evidence that the score is valid on ordinary craft variation. A separately
+measured figure, AUC-24 = 0.731, is sometimes quoted for real-corpus
+discrimination; it was measured on a scene-segmentation recipe superseded
+2026-09-12/19, and no figure exists yet on the current recipe
+(`shuffle-drop/v3`). See `CLAUDE.md`'s Standing task section and
+`docs/CLAIMS_REGISTER.md` for the full accounting and reproduction commands
+(`npm run benchmark:public`, `node --experimental-strip-types --test
+tests/core/blind-pairs-discrimination.test.ts`).
+
 ## Licensing
 
 `LICENSE` currently grants no license, right, or permission to any person or

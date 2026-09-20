@@ -568,6 +568,22 @@ unnoticed for days because nothing ran them.
 **Not yet proven by default CI:** human agreement with scores, public
 multi-tenant security.
 
+Two things ARE proven by default CI, and read near chance: the blind-pair
+harness (`tests/core/blind-pairs-discrimination.test.ts`) orders **1 of 6**
+matched excellent/bad pairs on real, blind-written screenplays, mean health
+gap -0.0167, measured on HEAD `26d930dd`; and the public benchmark's two
+measurement channels (`tests/core/public-benchmark.test.ts`, 32 committed
+screenplays, no corpus needed) read matched-pair AUC **0.5313**
+(shuffle-drop) and **0.4063** (climax-relocate), both 95% confidence
+intervals containing 0.5. The public benchmark's positive control
+(dialogue-flatten, matched-pair AUC 1.0000) shows the instrument can
+register a manipulation the score is built to catch — it is evidence the
+harness works, not that the score is valid. A separately quoted figure,
+AUC-24 = 0.731, was measured on a scene-segmentation recipe superseded
+2026-09-12/19 (`shuffle-drop/v3`); no AUC-24 figure exists yet on the
+current recipe. See `docs/CLAIMS_REGISTER.md` row 124 and CLAUDE.md's
+Standing task section for the full accounting.
+
 ---
 
 ## 10. Change policy

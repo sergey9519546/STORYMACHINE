@@ -1,5 +1,15 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
+**Validity read, current as of 2026-09-20, `main` @ `26d930dd`.** The
+blind-pair harness orders **1 of 6** pairs (mean gap -0.0167); the public
+benchmark's matched-pair AUCs are **0.5313** (shuffle-drop) and **0.4063**
+(climax-relocate), both intervals containing 0.5; dialogue-flatten (the
+positive control) reads 1.0000. Where "The scoring branch" bullet below
+narrates a branch reading "one of six to four of six," that describes the
+unmerged `scoring/feature-length-defects` branch's own measurement, not
+`main`'s current state — see `docs/CLAIMS_REGISTER.md` row 121 and
+CLAUDE.md's Standing task section.
+
 **State as of 2026-09-19, main @ 28754489 (eleven session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
