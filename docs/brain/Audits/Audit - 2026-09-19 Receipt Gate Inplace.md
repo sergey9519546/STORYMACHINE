@@ -67,3 +67,11 @@ honest append re-validated a historical entry against today's field rules —
 false-failing the real 2026-09-12 entry's plural `**Commands (…)**` field.
 Fixed by trimming trailing separator lines the same way blank lines are
 trimmed; see "§ Rule-line separator fix" in the directory's README.
+
+**2026-09-20 (fix lane, `lane/receipt-gate-commands-label`):** the Command
+field pattern was widened to accept the plural `**Commands**` form (with an
+optional parenthetical qualifier) that three honest ledger entries already
+use, with the simulation-language claim scan widened in lockstep over the
+SAME pattern so a plural Command field can't carry unscanned simulation
+language; see "§ Command label widened in lockstep with the claim scan" in
+the directory's README.

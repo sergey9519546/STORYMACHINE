@@ -292,3 +292,143 @@ $(git merge-base origin/main HEAD)..HEAD` still reports the concurrent
 per-pass-diagnostics lane's own two scoring-path files with its own
 well-formed receipt — this fix again lives only in gate tooling, so no new
 `MEASUREMENT_RECEIPTS.md` entry is required for it.
+
+## § Command label widened in lockstep with the claim scan
+
+**Lane:** `lane/receipt-gate-commands-label`. **Scope:** point 2 of the
+owner's original task filing on `scripts/check-scoring-receipt.mjs` — a
+judgment call the orchestrator resolved as: widen the Command field pattern
+to accept the plural `**Commands**` form (and an optional parenthetical
+qualifier before the colon), and widen the simulation-language claim scan in
+lockstep, so the check's strength is unchanged. Point 1 (the `---`/`***`
+separator-span defect, directly above) is untouched by this section — it was
+already fixed in `2942fdb7`.
+
+**Why the plural form matters:** three honest entries already in the ledger
+(`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` lines ~1988, ~2056, ~2171) write
+`**Commands (all run in this worktree):**` because more than one command was
+actually run for that entry — that is a MORE precise claim than the singular
+template's `**Command:**`, not a less honest one. Before this fix,
+`REQUIRED_FIELDS`'s Command pattern
+(`/\*\*\s*Command\s*:?\s*\*\*/i`) matched only the singular, so a NEW entry
+honestly written in the plural form would fail with "missing required field
+**Command**" — the gate was punishing the more careful phrasing, which is
+exactly backwards for a check whose whole point is rewarding honest,
+specific receipts.
+
+**Why lockstep matters — the gap it would otherwise open:** `REQUIRED_FIELDS`
+(existence) and `CLAIM_FIELD_LABELS` (the simulation-language scan) are two
+independent lookups over the same field. If only `REQUIRED_FIELDS` had been
+widened, a `**Commands (…):** (simulated local execution)` field would have
+satisfied the required-field check — the field is *present* — while
+`CLAIM_FIELD_LABELS`'s old label-derived lookup (`fieldValue()`, which builds
+`\*\*\s*Command\s*:?\s*\*\*` from the literal string `'Command'`) still could
+not find it under the plural/parenthetical spelling, so the simulation scan
+would never see the field's text at all. A fabricated entry could then write
+its Command field in the plural, parenthetical form specifically to slip an
+admission of simulation past the ONE scan built to catch exactly that
+admission (the mechanism the 2026-08-08 fabrication's singular `**Command:**`
+field was originally caught by). Widening only one side of a field-presence
+check and a field-content check that are supposed to look at the same field
+is the general shape of that gap — not specific to this field — so the fix
+makes both sides share one pattern rather than widening them separately by
+hand.
+
+**The fix** (`scripts/check-scoring-receipt.mjs`):
+
+1. One shared pattern,
+   `COMMAND_FIELD_RE = /\*\*\s*Commands?(?:\s*\([^)]*\))?\s*:?\s*\*\*/i` — a
+   bold label starting with `Command` or `Commands`, an optional
+   parenthetical qualifier, an optional colon, then the closing `**`
+   immediately. Used as the Command entry's pattern in `REQUIRED_FIELDS`.
+2. `CLAIM_FIELD_LABELS` now carries `{ label, pattern? }` entries instead of
+   bare label strings. The `Command` entry carries an explicit
+   `pattern: COMMAND_FIELD_RE` — the SAME constant `REQUIRED_FIELDS` uses —
+   so a field that satisfies the required-field check is, by construction,
+   the same field the simulation scan reads. The other four labels (`Git
+   SHA`, `Baseline used`, `Runner attestation`, `Attestation`) carry no
+   explicit pattern and fall back to `fieldValue()`'s existing label-derived
+   regex, unchanged.
+3. The PENDING required-field scan (`pendingReason()`) already iterates
+   `REQUIRED_FIELDS`'s patterns via `fieldValueByPattern()`, so it inherited
+   the widened Command pattern with no code change — confirmed by a
+   dedicated test (case 4 below) rather than assumed.
+4. The closing `**` is required directly after the optional
+   parenthetical/colon, so a look-alike label — `**Commander:**` or
+   `**Command line:**` — does not match: after consuming `Command` (and
+   optionally a literal `s`), the pattern still needs `**` immediately, and
+   `er:**` / ` line:**` do not provide it. Confirmed by two negative tests
+   (case 5 below); nothing else the pattern matches was loosened.
+
+**New tests** (`tests/core/scoring-receipt-guard.test.ts`, describe block
+"measurement-receipt entry validation — Command label widening", added
+directly after the existing PENDING-entries block since it uses the same
+`validateEntry()`/`alwaysExists` harness):
+
+1. **ACCEPTS** a well-formed entry whose Command field is
+   `**Commands (all run in this worktree):**` — fail-first: before the fix,
+   `problems` was `["missing required field **Command** (see §3's entry
+   template)"]`; after the fix, `[]`.
+2. **ACCEPTS** the same with the plain plural `**Commands:**` (no
+   parenthetical) — same fail-first shape, same fix.
+3. **REJECTS** `**Commands (…):** (simulated local execution)` — the
+   lockstep guarantee. Before the fix this slipped past the field-content
+   scan entirely; the ONLY reason it failed at all was the unrelated,
+   whole-entry `ENTRY_SIMULATION_PATTERNS` catch-all (`"the entry says the
+   run was simulated (\"simulated local execution\")"`), stacked with a
+   spurious `"missing required field **Command**"` — i.e. before the fix the
+   entry was rejected, but for the WRONG reason (a missing field that in fact
+   exists) plus an accident of a second, broader scanner catching the same
+   phrase by coincidence, not because the Command-field scan itself saw it.
+   After the fix, `problems` is exactly
+   `["the **Command** field contains \"simulated\" — a receipt records what
+   was RUN. …"]` — attributed to the Command field specifically, and the
+   missing-field problem is gone. The test asserts both the positive match on
+   the Command-field message and the ABSENCE of the missing-field message.
+4. **REJECTS** `**Commands:** PENDING owner run` — before the fix this also
+   failed, but only because the fixture's heading happened to be checked
+   first in a version that had no field-level reach at all; the fix is
+   confirmed directly by asserting the reported reason names the **Command**
+   field specifically (`"the **Command** field contains \"PENDING\""`),
+   proving `pendingReason()`'s existing `REQUIRED_FIELDS`-driven loop reached
+   the widened pattern rather than merely relying on the entry failing for
+   some other reason.
+5. **Two negative tests**: an entry whose only Command-shaped field is
+   `**Commander:**` alone, and one whose only such field is
+   `**Command line:**` alone, each still report `"missing required field
+   **Command**"` — unchanged from before the fix in both cases (these two
+   already passed pre-fix, confirming the widening is additive, not a
+   general loosening).
+6. The full pre-existing suite in this file (28 tests before this block) was
+   re-run unchanged and passed identically before and after this fix — this
+   change touches only `REQUIRED_FIELDS`'s Command entry and
+   `CLAIM_FIELD_LABELS`'s Command entry, nothing else in the field or claim
+   tables.
+
+Fail-first summary: 4 of the 6 new subtests failed pre-fix (cases 1-4 above);
+the two negative guards (case 5) already passed pre-fix, as expected since
+they exercise the "do not loosen further" requirement rather than the
+widening itself. All 32 tests in the file (26 pre-existing + 6 new) pass
+post-fix.
+
+**Gates run:** `tests/core/scoring-receipt-guard.test.ts` (32/32),
+`tests/core/receipt-gate-inplace-rewrite.test.ts` (13/13, one comment
+updated to reflect the widened pattern — see that file's own note beside
+`oldFieldsPluralCommands`),
+`tests/core/check-scoring-receipt.test.ts` (8/8),
+`tests/scripts/receipt-conversion.test.ts` (43/43),
+`tests/scripts/owner-measure-e2e.test.ts` (56/56),
+`tests/scripts/owner-measure-plan.test.ts` (30/30),
+`tests/core/ci-gates-intact.test.ts` (64/64),
+`tests/core/honesty-audit-claims.test.ts` (15/15). `npm run lint` is clean.
+`node scripts/check-scoring-receipt.mjs 128e0ab7..HEAD` reports "no
+scoring-path files changed. OK." (this lane touches only gate tooling and
+tests, never the scoring path). `node scripts/check-scoring-receipt.mjs
+$(git merge-base origin/main HEAD)..HEAD` reports the concurrent lanes'
+scoring-path files (`doctor.ts`, `scene-split.ts`,
+`screenplay-normalizer.ts`, `approved-spans.ts`, `pipeline.ts`,
+`src/lib/fountain.ts`) alongside their own well-formed receipt entry and
+still exits 0 — no new `MEASUREMENT_RECEIPTS.md` entry is required for this
+lane's own change, since it never touches the scoring path itself.
+`tests/core/brain-coverage.test.ts` passed 8/8 with this section and its
+brain-note pointer line added.
