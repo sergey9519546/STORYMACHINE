@@ -1,11 +1,26 @@
-// StoryMachine V5.0 Benchmark Suite — Quick Reference
+// StoryMachine Benchmark Suite — Quick Reference
 //
 // This file provides a quick overview of all benchmarks and how to run them.
-// For detailed documentation, see benchmarks/README.md
+//
+// 2026-09-20: three of the four benchmarks this catalog described —
+// kernel/benchmarks/trinity-gate.bench.ts, quantum/benchmarks/
+// story-field.bench.ts and benchmarks/integration.bench.ts — were deleted with
+// the v5.0 "narrative OS" closure (Proposal B2 of
+// docs/proposals/DEAD_WEIGHT_REMOVAL_2026-08-24.md; audit in
+// docs/audits/2026-09-20-dead-weight-b1-b2/README.md). Their entries are
+// removed here rather than left pointing at files that no longer exist. Only
+// event-store.bench.ts, over the LIVE event store, survives.
+//
+// This module is itself unreachable from server.ts (see
+// scripts/verify-server-reachability.mjs group 5) and the `npm run bench:*`
+// scripts it names have never existed in package.json. It was kept, not
+// deleted, because its allowlist entry classifies it as "written, never
+// connected" rather than as part of the v5.0 closure — but it is a candidate
+// the next removal pass should settle.
 
 export const BENCHMARK_SUITE = {
   version: '1.0.0',
-  storymachineVersion: '5.0.0-alpha',
+  storymachineVersion: '1.0.0-rc.1',
   
   benchmarks: {
     eventStore: {
@@ -24,78 +39,15 @@ export const BENCHMARK_SUITE = {
         snapshot: '<100ms for 10K events',
       },
     },
-    
-    trinityGate: {
-      file: 'server/nvm/kernel/benchmarks/trinity-gate.bench.ts',
-      command: 'npm run bench:trinity-gate',
-      tests: [
-        'Single event verification (simple, medium, complex)',
-        'Quick verification (critical-only)',
-        'Batch verification (10 events)',
-        'Scalability tests (10-5000 event history)',
-        'Parallel three-layer execution',
-      ],
-      targets: {
-        simple: '<100ms per event',
-        complex: '<200ms per event',
-        batch: '<500ms for 10 events',
-        quick: '<50ms per event',
-      },
-    },
-    
-    quantumField: {
-      file: 'server/nvm/quantum/benchmarks/story-field.bench.ts',
-      command: 'npm run bench:quantum-field',
-      tests: [
-        'State creation & addition (10-1000 states)',
-        'Branch creation performance',
-        'Probability calculation & normalization',
-        'Wavefunction collapse',
-        'Entanglement propagation',
-        'State pruning',
-        'Query operations',
-      ],
-      targets: {
-        states100: '<10ms for 100 states',
-        states1000: '<100ms for 1000 states',
-        probability: '<5ms for 1000 states',
-        entanglement: '<50ms for propagation',
-        memory: '<100MB for 1000 states',
-      },
-    },
-    
-    integration: {
-      file: 'server/nvm/benchmarks/integration.bench.ts',
-      command: 'npm run bench:integration',
-      tests: [
-        'Linear story progression (100 events)',
-        'Branching narrative (10 branches × 50 events)',
-        'Setup/payoff validation (50+50 pairs)',
-        'Time-travel editing (retroactive modification)',
-        'Full story generation (200 events)',
-      ],
-      targets: {
-        lifecycle: '<150ms per event',
-        batch100: '<2s for 100 events',
-        speedup: '2-3x faster than V4',
-        fullStory: '<5s for 200 events',
-      },
-    },
   },
   
   quickStart: {
     runAll: 'npm run bench:all',
     runIndividual: [
       'npm run bench:event-store',
-      'npm run bench:trinity-gate',
-      'npm run bench:quantum-field',
-      'npm run bench:integration',
     ],
     directExecution: [
       'node --experimental-strip-types server/nvm/kernel/benchmarks/event-store.bench.ts',
-      'node --experimental-strip-types server/nvm/kernel/benchmarks/trinity-gate.bench.ts',
-      'node --experimental-strip-types server/nvm/quantum/benchmarks/story-field.bench.ts',
-      'node --experimental-strip-types server/nvm/benchmarks/integration.bench.ts',
     ],
   },
   
@@ -113,7 +65,6 @@ export const BENCHMARK_SUITE = {
     quality: [
       'Pass/fail vs targets',
       'Success rate percentage',
-      'V4 vs V5 speedup comparison',
     ],
   },
   
@@ -138,9 +89,6 @@ npm run bench:all
 
 // Run specific benchmark
 npm run bench:event-store
-
-// With increased memory
-node --max-old-space-size=4096 --experimental-strip-types server/nvm/benchmarks/integration.bench.ts
 
 // Using tsx instead
 tsx server/nvm/kernel/benchmarks/event-store.bench.ts

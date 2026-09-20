@@ -51,42 +51,21 @@ const TEST_FILES = [
 // "npm test passes", so the reason has to survive review.
 const NOT_RUN = [
   {
-    file: 'tests/apdl.test.ts',
-    reason:
-      'Imports @jest/globals, which is not a dependency of this repo (the suite is node:test), and '
-      + 'targets server/planning/**, which tsconfig.json quarantines. The file\'s own first line says '
-      + 'not to wire it into TEST_ROOTS. Running it fails with ERR_MODULE_NOT_FOUND, not an assertion.',
-  },
-  {
     file: 'tests/story-vector.test.ts',
     reason:
       'Intentionally emptied by the 2026-08-03 audit fix; its real assertions were moved into the '
       + 'suites that do run. tsconfig.json excludes it.',
   },
-  {
-    file: 'server/nvm/__tests__/compatibility.test.ts',
-    reason: 'v5.0 "narrative OS" experiment — quarantined in tsconfig.json, not wired into the server.',
-  },
-  {
-    file: 'server/nvm/__tests__/smoke.test.ts',
-    reason: 'v5.0 "narrative OS" experiment — quarantined in tsconfig.json, not wired into the server.',
-  },
-  {
-    file: 'server/nvm/__tests__/v5-integration.test.ts',
-    reason: 'v5.0 "narrative OS" experiment — quarantined in tsconfig.json, not wired into the server.',
-  },
-  {
-    file: 'server/nvm/kernel/__tests__/integration.test.ts',
-    reason: 'v5.0 kernel experiment — quarantined in tsconfig.json, not wired into the server.',
-  },
-  {
-    file: 'server/nvm/kernel/__tests__/trinity-gate-integration.test.ts',
-    reason: 'v5.0 kernel experiment — quarantined in tsconfig.json, not wired into the server.',
-  },
-  {
-    file: 'server/nvm/kernel/adapters/type-enrichment.test.ts',
-    reason: 'v5.0 kernel adapter experiment — quarantined in tsconfig.json, not wired into the server.',
-  },
+  // The other seven entries this list carried until 2026-09-20 named test
+  // files belonging to the v5.0 "narrative OS" experiment (server/nvm/
+  // __tests__/{compatibility,smoke,v5-integration}.test.ts, server/nvm/kernel/
+  // __tests__/{integration,trinity-gate-integration}.test.ts, server/nvm/
+  // kernel/adapters/type-enrichment.test.ts) plus tests/apdl.test.ts, which
+  // targeted the removed server/planning/**. All seven were deleted with the
+  // closure they tested — see docs/proposals/DEAD_WEIGHT_REMOVAL_2026-08-24.md
+  // Proposal B2 and docs/audits/2026-09-20-dead-weight-b1-b2/README.md. Their
+  // entries had to go with them: the staleUnrun check below fails the run on a
+  // NOT_RUN entry whose file no longer exists.
 ];
 
 // Directories the coverage sweep never descends into.

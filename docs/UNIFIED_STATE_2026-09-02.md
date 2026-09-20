@@ -190,7 +190,19 @@ either asserting it will be met or assuming it has been extended.
 tracked files) and `test-freeride.js` deleted on `lane/dead-weight-b3`; see
 `docs/proposals/DEAD_WEIGHT_REMOVAL_2026-08-24.md`'s B3 note and
 `docs/audits/2026-09-20-dead-weight-b3/README.md`. Proposal A, B1, B2, and the
-v5.0 test files are still awaiting the owner.
+v5.0 test files are still awaiting the owner. *(That last sentence was true
+when written and is superseded later the same day — see the B1/B2 entry
+below.)*
+
+**2026-09-20:** dead-weight proposals B1 and B2 acted on — B1 needed no
+change (already shipped in `a2448714`; its 34 orphan assertions re-verified),
+and B2 deleted the v5.0 "narrative OS" closure on `lane/dead-weight-b1-b2`:
+64 files, of which 42 non-test source files / 16,153 lines, taking the
+server-reachability gate from 78 unreachable files / 24,722 lines to 36 /
+8,517 and the `check-no-console` quarantine from 23 entries to 4. Proposal A
+is KEPT per its own recommendation. Everything is recoverable from git history
+at `bf4f3bff`; inventory, dependency map and gate counts in
+`docs/audits/2026-09-20-dead-weight-b1-b2/README.md`.
 
 **2026-09-20:** full per-branch triage of all seventeen non-`main` branches
 (the nine above plus `scoring/advice-rule-fixes`, `scoring/r5-verbosity-bias`,
