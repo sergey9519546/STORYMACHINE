@@ -12,8 +12,51 @@ import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 import { EventStore, createEventStore } from './event-store.ts';
 import type { NarrativeEvent, NarrativeEventInput } from './types.ts';
+import type { AtomicFact, StoryOp } from '../ops/StoryOp.ts';
+import type { EmotionState } from '../../engine/types.ts';
 
 // ── Test Fixtures ─────────────────────────────────────────────────────────────
+
+/**
+ * Build a fully-shaped AtomicFact from a short human-readable description.
+ * The description (what earlier fixtures called `content`) carries no
+ * assertion weight of its own here — every test that cares about a fact
+ * checks `factId` — so it is preserved verbatim in `predicate` rather than
+ * dropped, and `subject`/`object`/`validFrom`/`validTo` are filled with
+ * innocuous, type-satisfying values.
+ */
+function mkFact(factId: string, description: string, addedAtTurn: number): AtomicFact {
+  return {
+    factId,
+    subject: 'story',
+    predicate: description,
+    object: '',
+    addedAtTurn,
+    validFrom: addedAtTurn,
+    validTo: null,
+  };
+}
+
+/**
+ * Build a fully-shaped EmotionState with one dominant, elevated dimension.
+ * Only `dominant` and `intensity` are read by these tests; the remaining
+ * dimensions are filled at their at-rest value (0) so the fixture is a valid
+ * EmotionState rather than a partial stand-in.
+ */
+function mkEmotion(dominant: EmotionState['dominant'], intensity: number): EmotionState {
+  return {
+    joy: 0,
+    distress: 0,
+    anger: 0,
+    fear: 0,
+    pride: 0,
+    shame: 0,
+    [dominant]: intensity,
+    dominant,
+    intensity,
+    last_updated_at: 0,
+  } as EmotionState;
+}
 
 /**
  * Create a minimal valid event input
@@ -22,7 +65,7 @@ function createTestEvent(overrides: Partial<NarrativeEventInput> = {}): Narrativ
   return {
     storyTime: 100,
     presentationIndex: 0,
-    op: { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Test fact', addedAtTurn: 1 } },
+    op: { op: 'ADD_FACT', fact: mkFact('f1', 'Test fact', 1) },
     assertions: [],
     derivedFrom: [],
     createdBy: 'user_authored',
@@ -35,14 +78,19 @@ function createTestEvent(overrides: Partial<NarrativeEventInput> = {}): Narrativ
 /**
  * Create all 14 StoryOp types for comprehensive testing
  */
-function createAllStoryOps() {
+function createAllStoryOps(): StoryOp[] {
   return [
-    { op: 'ADD_FACT', fact: { factId: 'f1', content: 'John enters', addedAtTurn: 1 } },
-    { op: 'EXPIRE_FACT', factId: 'f1' },
-    { op: 'UPDATE_BELIEF', charId: 'john', belief: { content: 'Mary is trustworthy', confidence: 0.8 } },
-    { op: 'SHIFT_RELATIONSHIP', pair: ['john', 'mary'], delta: { dimension: 'trust', change: 0.2 } },
-    { op: 'APPRAISE_EMOTION', charId: 'john', emotion: { type: 'fear', intensity: 0.7 } },
-    { op: 'SEED_CLUE', clueId: 'clue1', carrier: 'photograph' },
+    { op: 'ADD_FACT', fact: mkFact('f1', 'John enters', 1) },
+    { op: 'EXPIRE_FACT', factId: 'f1', atTurn: 1 },
+    { op: 'UPDATE_BELIEF', charId: 'john', belief: {
+      id: 'belief1', proposition: 'Mary is trustworthy', confidence: 0.8,
+      source: 'witnessed', acquired_at: 1,
+    } },
+    { op: 'SHIFT_RELATIONSHIP', pair: ['john', 'mary'], delta: {
+      dimension: 'trust', amount: 0.2, reason: 'John saw Mary keep her word',
+    } },
+    { op: 'APPRAISE_EMOTION', charId: 'john', emotion: mkEmotion('fear', 0.7) },
+    { op: 'SEED_CLUE', clueId: 'clue1', carrier: 'object' },
     { op: 'PAYOFF_SETUP', setupId: 'setup1', payoffEventId: 'event5' },
     { op: 'RAISE_CLOCK', clockId: 'doomsday', amount: 1 },
     { op: 'ADVANCE_THEME_ARGUMENT', claimId: 'power-corrupts', move: 'support' },
@@ -223,7 +271,7 @@ describe('EventStore - Snapshot/State Reduction', () => {
     const store = createEventStore();
     
     store.append(createTestEvent({
-      op: { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Test', addedAtTurn: 1 } }
+      op: { op: 'ADD_FACT', fact: mkFact('f1', 'Test', 1) }
     }));
     
     const state = await store.snapshot();
@@ -253,7 +301,7 @@ describe('EventStore - Snapshot/State Reduction', () => {
     assert.strictEqual(state.objectiveReality.length, 0, 'Fact was added then expired');
     assert.ok(state.characterBeliefs['john'], 'Belief was added');
     assert.ok(state.relationships['john<->mary'], 'Relationship was shifted');
-    assert.strictEqual(state.characterEmotions['john'].type, 'fear', 'Emotion was appraised');
+    assert.strictEqual(state.characterEmotions['john'].dominant, 'fear', 'Emotion was appraised');
     assert.strictEqual(state.clues.length, 1, 'Clue was seeded');
     assert.strictEqual(state.payoffs.length, 1, 'Setup was paid off');
     assert.strictEqual(state.clocks['doomsday'], 1, 'Clock was raised');
@@ -269,11 +317,11 @@ describe('EventStore - Snapshot/State Reduction', () => {
     
     // Add two facts
     store.append(createTestEvent({
-      op: { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Fact 1', addedAtTurn: 1 } },
+      op: { op: 'ADD_FACT', fact: mkFact('f1', 'Fact 1', 1) },
       presentationIndex: 0
     }));
     store.append(createTestEvent({
-      op: { op: 'ADD_FACT', fact: { factId: 'f2', content: 'Fact 2', addedAtTurn: 2 } },
+      op: { op: 'ADD_FACT', fact: mkFact('f2', 'Fact 2', 2) },
       presentationIndex: 1
     }));
     
@@ -297,12 +345,12 @@ describe('EventStore - Snapshot/State Reduction', () => {
     const store = createEventStore();
     
     store.append(createTestEvent({
-      op: { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Early', addedAtTurn: 1 } },
+      op: { op: 'ADD_FACT', fact: mkFact('f1', 'Early', 1) },
       storyTime: 100,
       presentationIndex: 0
     }));
     store.append(createTestEvent({
-      op: { op: 'ADD_FACT', fact: { factId: 'f2', content: 'Late', addedAtTurn: 2 } },
+      op: { op: 'ADD_FACT', fact: mkFact('f2', 'Late', 2) },
       storyTime: 200,
       presentationIndex: 1
     }));
@@ -321,12 +369,12 @@ describe('EventStore - Snapshot/State Reduction', () => {
     const store = createEventStore();
     
     store.append(createTestEvent({
-      op: { op: 'ADD_FACT', fact: { factId: 'f1', content: 'Real', addedAtTurn: 1 } },
+      op: { op: 'ADD_FACT', fact: mkFact('f1', 'Real', 1) },
       realityLayer: 'diegetic',
       presentationIndex: 0
     }));
     store.append(createTestEvent({
-      op: { op: 'ADD_FACT', fact: { factId: 'f2', content: 'Dream', addedAtTurn: 2 } },
+      op: { op: 'ADD_FACT', fact: mkFact('f2', 'Dream', 2) },
       realityLayer: 'dream',
       presentationIndex: 1
     }));
@@ -587,7 +635,7 @@ describe('EventStore - Performance', () => {
     // Create 500 events with varied ops
     for (let i = 0; i < 500; i++) {
       store.append(createTestEvent({
-        op: { op: 'ADD_FACT', fact: { factId: `f${i}`, content: `Fact ${i}`, addedAtTurn: i } },
+        op: { op: 'ADD_FACT', fact: mkFact(`f${i}`, `Fact ${i}`, i) },
         presentationIndex: i,
         storyTime: 100 + i
       }));

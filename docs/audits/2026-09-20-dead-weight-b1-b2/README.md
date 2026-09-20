@@ -319,3 +319,72 @@ Everything removed is at **`bf4f3bff`**, the lane's base commit:
 git show bf4f3bff:server/nvm/quantum/story-field.ts
 git checkout bf4f3bff -- server/planning
 ```
+
+## § event-store.test.ts now type-checks
+
+The gap this README recorded above ("One B1-adjacent gap found, and
+deliberately NOT fixed here") is closed. `server/nvm/kernel/event-store.test.ts`
+is no longer in `tsconfig.json`'s `exclude`; only `**/*.bench.ts` and
+`tests/story-vector.test.ts` remain, each still carrying its own reason.
+Removing the entry surfaced exactly the **11 `tsc` errors** this README
+predicted, all of them fixture drift — the fixtures had fallen out of sync
+with `AtomicFact` (`server/nvm/state/NarrativeState.ts` re-exports it from
+`server/nvm/ops/StoryOp.ts`) and `EmotionState`
+(`server/engine/types.ts`) — never a defect in the live types `event-store.ts`
+reads, so no live type was touched.
+
+| # | Site (pre-fix line) | Error | Fix |
+|---|---|---|---|
+| 1 | `createTestEvent`'s default op, L25 | `TS2322`: the default `ADD_FACT` op's `fact` literal (`{ factId, content, addedAtTurn }`) is not assignable to `StoryOp`, because its `content` field does not exist on `AtomicFact` | replaced the inline literal with `mkFact('f1', 'Test fact', 1)`, a new helper that builds a complete `AtomicFact` (`subject`, `predicate`, `object`, `validFrom`, `validTo`) and carries the old description text in `predicate` rather than dropping it |
+| 2 | snapshot test's `ADD_FACT`, L226 | `TS2353`: `content` does not exist on `AtomicFact` | `fact: mkFact('f1', 'Test', 1)` |
+| 3 | `createAllStoryOps()`'s 14-op array, L244 | `TS2322`: the array has no return-type annotation, so each element's `op` literal (`'ADD_FACT'`, `'EXPIRE_FACT'`, …) widens to `string` before it is compared against the `StoryOp` union, and the whole array fails as one composite error that also masked every other mismatch inside it (see rows 5–11) | annotated `function createAllStoryOps(): StoryOp[]`, which keeps each `op` literal narrowed and forces every element to be checked individually against its matching `StoryOp` variant |
+| 4 | `state.characterEmotions['john'].type` assertion, L256 | `TS2339`: `EmotionState` has no `.type` — it has `dominant: EmotionType` | assertion now reads `.dominant`; the underlying fixture uses a new `mkEmotion(dominant, intensity)` helper that fills in the other five required dimensions (`joy`, `distress`, `anger`, `pride`, `shame`) at 0 so the object is a genuine `EmotionState`, not a partial stand-in |
+| 5 | `'State matches expected values…'`'s two `ADD_FACT`s, L272/276 | `TS2353` ×2: `content` on `AtomicFact` | `mkFact('f1', 'Fact 1', 1)` / `mkFact('f2', 'Fact 2', 2)` |
+| 6 | `'Temporal filtering…'`'s two `ADD_FACT`s, L300/305 | `TS2353` ×2: `content` on `AtomicFact` | `mkFact('f1', 'Early', 1)` / `mkFact('f2', 'Late', 2)` |
+| 7 | `'Reality layer filtering… in snapshots'`'s two `ADD_FACT`s, L324/329 | `TS2353` ×2: `content` on `AtomicFact` | `mkFact('f1', 'Real', 1)` / `mkFact('f2', 'Dream', 2)` |
+| 8 | `'Snapshot performance…'`'s loop-generated `ADD_FACT`, L590 | `TS2353`: `content` on `AtomicFact` | `mkFact(\`f${i}\`, \`Fact ${i}\`, i)` |
+
+Row 3's single reported error covered several further fixture-drift mismatches
+inside `createAllStoryOps()` that only became individually visible once the
+return type was annotated — each is the same class of drift as the rows
+above (a fixture shape that predates a field the live `StoryOp`/`Belief`/
+`RelationshipDelta`/`ClueCarrier` types now require), not a live-code defect,
+and all were fixed in place rather than deleted:
+
+- `EXPIRE_FACT` was missing the required `atTurn: number` — added `atTurn: 1`.
+- `UPDATE_BELIEF`'s `belief` literal (`{ content, confidence }`) does not match
+  `Belief` (`server/engine/types.ts`), which requires `id`, `proposition`,
+  `confidence`, `source`, `acquired_at` — rebuilt as
+  `{ id: 'belief1', proposition: 'Mary is trustworthy', confidence: 0.8, source: 'witnessed', acquired_at: 1 }`.
+- `SHIFT_RELATIONSHIP`'s `delta` used `change` instead of `RelationshipDelta`'s
+  `amount`, and was missing the required `reason: string` — rebuilt as
+  `{ dimension: 'trust', amount: 0.2, reason: 'John saw Mary keep her word' }`.
+- `APPRAISE_EMOTION`'s `emotion` literal (`{ type: 'fear', intensity: 0.7 }`)
+  is the same drift as row 4 — rebuilt with `mkEmotion('fear', 0.7)`.
+- `SEED_CLUE`'s `carrier: 'photograph'` is not a member of the 18-value
+  `ClueCarrier` union — changed to `carrier: 'object'` (a photograph is a
+  physical clue-carrying object), the closest existing carrier and not a
+  value any assertion in this file inspects.
+
+None of these fixes touch `event-store.ts`, `types.ts`,
+`commit-to-events.ts`, `NarrativeState.ts`, `StoryOp.ts` or
+`server/engine/types.ts` — every change is confined to the test file's own
+fixtures, and no assertion's intent changed: every fixture that fed an
+assertion still feeds it the same logical value (fact IDs, clock amounts,
+the dominant emotion, etc.), just through a type-correct literal.
+
+### Gates (re-run after the fix)
+
+| Gate | Result |
+|---|---|
+| `node --experimental-strip-types --test server/nvm/kernel/event-store.test.ts` | 32/32 pass, unchanged |
+| `npm run lint` (`tsc --noEmit`), exclude entry removed | clean, repo-wide |
+| `npm run check-no-console` | `312 file(s) under server/ checked, 3 tsconfig quarantine entr(ies) applied` — up from `311` files / `4` entries on this checkout (the file count rises by exactly one now that `event-store.test.ts` is scanned instead of quarantined; the entry count drops by one for the same reason). Note for anyone diffing this against the "5 → 4" figure floated when this gap was first scoped: this checkout has no `dist/` directory, so the `dist` exclude entry never resolves to a matcher and was never in the counted total either before or after — the observed drop is 4 → 3, not 5 → 4. |
+| `tests/core/ci-gates-intact.test.ts` | 64/64 pass |
+| `tests/scripts/run-tests-spawn.test.ts` | 17 pass, 1 skipped, 0 fail |
+| `tests/core/honesty-audit-claims.test.ts` | 15/15 pass |
+| `node scripts/check-scoring-receipt.mjs e79c64b4..HEAD` | "no scoring-path files changed. OK." — this lane touches only the test file, `tsconfig.json` and this README |
+
+`tsconfig.json`'s QUARANTINE comment block was updated to drop the
+now-resolved `event-store.test.ts` bullet, so the list of "real quarantine
+entries" it describes matches the two that remain.
