@@ -241,6 +241,12 @@
       "path": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md"
     },
     {
+      "id": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "type": "decision",
+      "title": "Decision #11 — Move the AUC-24 Table Deadline to 2026-11-01 (2026-09-20)",
+      "path": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md"
+    },
+    {
       "id": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md",
       "type": "decision",
       "title": "Decision #2 — Retire the P0 Hard-Gate (2026-08-11)",
@@ -1673,6 +1679,30 @@
       "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
     },
     {
+      "from": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "to": "docs/brain/Owner/Owner - Lock AUC24 Table.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "to": "docs/brain/Owner/Owner - Lock AUC24 Table.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
       "from": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md",
       "to": "docs/brain/Decisions/Decision 1 - User Validation First.md"
     },
@@ -1695,6 +1725,10 @@
     {
       "from": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md",
       "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md",
+      "to": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md"
     },
     {
       "from": "docs/brain/Decisions/Decision 6 - License the Repository.md",
@@ -1743,6 +1777,10 @@
     {
       "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "to": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md"
     },
     {
       "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
@@ -2423,6 +2461,10 @@
     {
       "from": "docs/brain/Owner/Owner - Lock AUC24 Table.md",
       "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Lock AUC24 Table.md",
+      "to": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md"
     },
     {
       "from": "docs/brain/Owner/Owner - Lock AUC24 Table.md",
