@@ -77,8 +77,17 @@ export interface ApprovedSpanRelocation {
  *
  *  Overlapping occurrences are all reported (the scan advances by one
  *  character, not by the needle's length): a locked range can legitimately sit
- *  inside repeated text, and the caller picks between candidates by position. */
-function lineAlignedOccurrences(haystack: string, needle: string): number[] {
+ *  inside repeated text, and the caller picks between candidates by position.
+ *
+ *  Exported (2026-09-21, PR #268 review finding F2) and imported by
+ *  ./rewrite-llm.ts's approvedSpansSurvive, which used to decide "present"
+ *  with a bare substring `includes`: a rewrite that embedded the locked lines
+ *  inside a modified line (a prefix on the first, a suffix on the last) was
+ *  accepted there and then could not be found here on the next pass, so the
+ *  lock was silently dropped. The survival check and this re-location are
+ *  now the SAME rule, by sharing this function — a rewrite survives exactly
+ *  when relocation can find it. Callers pass already-normalized text. */
+export function lineAlignedOccurrences(haystack: string, needle: string): number[] {
   const out: number[] = [];
   if (needle.length === 0) return out;
   // `at` is non-decreasing across iterations, so newlines are counted once

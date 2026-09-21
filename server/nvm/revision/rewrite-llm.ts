@@ -30,7 +30,7 @@ import { consumeAiAttempt, isAiBudgetExceededError } from '../../lib/ai-budget.t
 import { getGenerativeProvider, modelForTask } from '../../engine/ai.ts';
 import { buildCraftPromptSection, looksLikeAnimationGenre } from '../generate/craft-spec.ts';
 import type { ApprovedSpan } from './passes/types.ts';
-import { normalizeLineEndings } from './approved-spans.ts';
+import { normalizeLineEndings, lineAlignedOccurrences } from './approved-spans.ts';
 import {
   evaluateRewrite,
   registerLlmRewriter,
@@ -183,27 +183,18 @@ export interface ApprovedSpanSurvival {
   checked: number;
 }
 
-/** Non-overlapping substring occurrence count. Used only by the short-excerpt
- *  duplicate-detection check below (finding 4(iii)) — never on anything that
- *  gets logged, so there is no verbatim-text-in-logs concern here. */
-function countOccurrences(haystack: string, needle: string): number {
-  if (needle.length === 0) return 0;
-  let count = 0;
-  let from = 0;
-  for (;;) {
-    const at = haystack.indexOf(needle, from);
-    if (at === -1) return count;
-    count++;
-    from = at + needle.length;
-  }
-}
-
 // `normalizeLineEndings` (CRLF/CR → LF, and nothing else — the promise is
-// VERBATIM survival) lives in ./approved-spans.ts and is imported above.
-// It used to be a second copy here. ./approved-spans.ts's
+// VERBATIM survival) and `lineAlignedOccurrences` (every occurrence of an
+// excerpt that starts at a line start and ends at a line end) live in
+// ./approved-spans.ts and are imported above. ./approved-spans.ts's
 // `relocateApprovedSpans` has to decide whether a locked excerpt is present
 // in a document under exactly the same rule this file's survival check uses,
 // so the two share one implementation rather than two that can drift apart.
+// Until 2026-09-21 (PR #268 review finding F2) only the normalizer was
+// shared: this file decided "present" with a substring `includes` (and a
+// substring occurrence count for the single-line case), so a rewrite that
+// embedded the locked lines inside a modified line was accepted here and
+// then could not be relocated on the next pass, and the lock was dropped.
 
 /**
  * THE ENFORCEMENT (2026-09-19, locked-spans lane; SESSION_REPORT_2026-09-19.md
@@ -214,8 +205,9 @@ function countOccurrences(haystack: string, needle: string): number {
  * and padded elsewhere was ACCEPTED (probe p9 in the session: locked text
  * gone, `usedLLM: true`). This function is the missing check: for each
  * approved span, take the excerpt from the ORIGINAL fountain — the same
- * lines the prompt showed — and require it to appear, unchanged, as a
- * contiguous substring of the revised text.
+ * lines the prompt showed — and require it to appear, unchanged, as whole
+ * lines of the revised text (the same line-aligned rule
+ * ./approved-spans.ts's relocateApprovedSpans uses to find it again).
  *
  * Pure and exported so the excerpt/survival logic is unit-testable without a
  * provider (tests/core/approved-spans-enforced.test.ts). `llmRewrite` below
@@ -275,20 +267,22 @@ export function approvedSpansSurvive(
     }
     // Finding 4(iii): a single non-blank line (a slugline, a lone "CUT TO:")
     // may legitimately be RELOCATED elsewhere in the document — this function
-    // deliberately does not enforce position or order — but a bare `includes`
-    // also passes when the model deleted one of several identical
+    // deliberately does not enforce position or order — but a bare presence
+    // check also passes when the model deleted one of several identical
     // occurrences and left another one standing. For an excerpt this short,
     // additionally require that the revision contains at least as many
     // occurrences of it as the original did, so a net deletion is caught even
-    // though a same-text relocation still is not.
+    // though a same-text relocation still is not. Both counts are of
+    // WHOLE-LINE occurrences (finding F2): "CUT TO:" inside "SMASH CUT TO:"
+    // is not the locked line.
     const nonBlankLineCount = excerpt.split('\n').filter(l => l.trim().length > 0).length;
+    const revisedOccurrences = lineAlignedOccurrences(normalizedRevised, excerpt);
     if (nonBlankLineCount <= 1) {
-      const originalCount = countOccurrences(normalizedOriginal, excerpt);
-      const revisedCount = countOccurrences(normalizedRevised, excerpt);
-      if (revisedCount < originalCount) lost.push(index);
+      const originalCount = lineAlignedOccurrences(normalizedOriginal, excerpt).length;
+      if (revisedOccurrences.length < originalCount) lost.push(index);
       return;
     }
-    if (!normalizedRevised.includes(excerpt)) {
+    if (revisedOccurrences.length === 0) {
       lost.push(index);
     }
   });
