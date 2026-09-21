@@ -3612,3 +3612,116 @@ not: the private 761-script corpus is absent from this environment and
 `REAL_SCRIPT_CORPUS_DIR` is unset here. No AUC-24 value is claimed anywhere in
 this subsection. I also did not run `npm test` in full or `npm run brain`, both
 excluded by this lane's brief, and I pushed nothing.
+
+#### DISCLOSURE PASS, 2026-09-20 — only `plainSummary` prose moved, and no number did
+
+Added in place to this entry because the change belongs to this candidate and
+is not a new scoring result. The measurement that backs it is the standalone
+output-identity entry that follows this one.
+
+**What moved.** One string on the scoring path. `buildPlainSummary`'s
+disclosure sentence rendered the scene-count term as "adds the scene-count term
+— 12 point(s) at 231 scene(s)". Since this branch's own saturation the term is
+`140 / min(sceneCount, 12)`, a constant 11.667 points for every draft of 12 or
+more scenes, so that clause told a writer the term reads their scene count when
+it does not. Below the saturation point the clause is unchanged; at or above it
+it reads "adds the scene-count term, which sits at its floor of 12 point(s) for
+any draft of 12 or more scenes,". The threshold is derived from
+`scarcityPenalty` itself rather than restated. Two comment blocks were added to
+`doctor.ts` in the same pass (the 88.3 ceiling, at `SCARCITY_SATURATION_SCENES`
+and beside `gradeForHealth`/`verdictFor`); they are prose and change nothing.
+
+**The identity result, per fixture.** `scripts/check-doctor-output-identity.mjs`
+against `git archive 05faefcf`, `GIT_SHA=dev` on both sides: **45 reports, 11
+differ, and the same compare with `--ignore-keys plainSummary` reports
+`all 45 reports are byte-identical modulo the ignored key(s) [plainSummary]`.**
+The 11 are `p0/sample-script`, `screenplay/close-quarters`,
+`screenplay/code-blue`, `screenplay/dead-frequency`, `screenplay/soft-launch`,
+`screenplay/the-defense-rests`, `screenplay/two-lane`, `screenplay/undertow`,
+`synthetic/60-scenes`, `synthetic/120-scenes` and `synthetic/300-scenes` —
+exactly the reports that take the disclosure branch AND carry 12 or more
+scenes. The field that differs on each of the 11 is `plainSummary` and only
+`plainSummary`. No `health`, `verdict`, `grade`, `sceneCount`, severity count,
+issue list, dimension score or percentile moves on any of the 45, and not one
+of the 20 calibration samples differs in any field. The six public floors, the
+32-row public-corpus manifest and the blind-pair reading are untouched by this
+pass and were re-run unchanged (`public-benchmark` 33/33,
+`blind-pairs-discrimination` 4/4 at ordered 4 of 6, mean gap 0.3833).
+
+**One fixture re-locked, in one line.**
+`tests/fixtures/scene-grammar/plain-int-ext.report.json` is a 16-scene
+`runScriptDoctor` snapshot, so its `plainSummary` carries the new clause.
+`git diff` on it is a single changed line; `totalIssues`, every severity count,
+`health` and `sceneCount` are byte-identical.
+
+### 2026-09-20 — PLAIN SUMMARY STOPS ATTRIBUTING THE SATURATED SCENE-COUNT TERM TO A DOCUMENT'S SCENE COUNT — output-identity receipt (no score moved; the private corpus is absent from this environment and no real-corpus figure is claimed)
+
+**Date:** 2026-09-20. **Branch:** `lane/land-feature-length-defects`, the
+fix-and-disclosure pass on top of `05faefcf`.
+
+**What this entry is.** An output-identity receipt, in the shape the two
+2026-08-21 entries established: the change under it is a report STRING and two
+comment blocks, so there is no AUC to report and the honest evidence is a
+byte-level identity proof over every fixture this repository owns. The
+narrative half — what the string used to say and why it was wrong — is the
+`#### DISCLOSURE PASS, 2026-09-20` subsection of the entry immediately above,
+which this entry measures.
+
+**Git SHA:** measured at the tip of this pass on
+`lane/land-feature-length-defects`.
+
+**Baseline used:** `git archive 05faefcf` (this branch's own head before the
+pass), extracted to a sibling directory with `node_modules` symlinked. Both
+sides run with `GIT_SHA=dev` so the build stamp cannot differ.
+
+**Commands (all run in this worktree, in the foreground):**
+
+```
+GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree ../base-05faefcf --out ../probe/id-before
+GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree .               --out ../probe/id-after
+node scripts/check-doctor-output-identity.mjs --compare ../probe/id-before ../probe/id-after
+node scripts/check-doctor-output-identity.mjs --compare ../probe/id-before ../probe/id-after --ignore-keys plainSummary
+```
+
+**OUTPUT IDENTITY: PASS** — `all 45 reports are byte-identical modulo the
+ignored key(s) [plainSummary] (analyzedAt excluded)`. The unignored compare
+reports 11 of 45 differing and prints each one's before/after `plainSummary`;
+the ignored-key compare reports `"plainSummary": differs in 11/45 reports` and
+PASS. The 11 are listed by name in the subsection above. No numeric field moves
+on any fixture.
+
+**No AUC-24 was measured and none is claimed.** The private 761-script corpus
+is absent from this environment and `REAL_SCRIPT_CORPUS_DIR` is unset here.
+This entry claims output identity against a named baseline tree and nothing
+else. The owner's AUC-24 step for this candidate is unchanged and is in
+`docs/audits/2026-09-20-feature-length-defects-prep/README.md`.
+
+**Corpus fingerprint:** the 45-fixture deterministic set the identity harness
+owns — the 20 `data/screenplays/*.fountain` live-action fixtures, the 20
+calibration `REFERENCE_CORPUS` samples
+(`server/nvm/analyze/calibration/corpus.ts`), the P0 sample script
+(`src/lib/sample-script.ts`), and the synthetic scale and feature-length
+fixtures under `tests/fixtures/`. Every file is committed to this repository;
+the harness reads nothing else.
+
+**Supporting gates, all run here:** `npm run lint` 0 · `npm run check-no-console`
+0 (312 files under `server/`, every quarantine entry proven unreachable; the
+entry COUNT reads 3 or 4 depending on whether `dist/` exists in the worktree,
+which is why it is not quoted as a fixed number) · `npm run gates` 0
+(including the public-benchmark mutation self-check) · `npm run build` 0 ·
+`script-doctor` 90/90 · `calibration` 21/21 (band monotonicity untouched) ·
+`public-benchmark` 33/33 · `auc` 31/31 · `summary-honesty` 10/10 ·
+`scene-grammar` 16/16 · `clue-proper-noun-guard` 13 pass / 0 fail / 3 todo ·
+`voice-bound-derivation` 8/8 · `fountain-shape-guard-cue-parity` 681/681 ·
+`coverage-letter` 55/55 · `blind-pairs-discrimination` 4/4 ·
+`honesty-audit-claims` 15/15 · `claims-row-citations` 5/5 ·
+`documentation-truth` 8/8 · `brain-coverage` 8/8 ·
+`public-benchmark-limits` 7/7.
+
+**Runner attestation:** I ran every command in this entry myself, in this
+worktree, in the foreground, and read each one's output. Every figure here came
+out of one of those runs and none is transcribed from another document or from
+a prior measurement. I did not run `npm run measure-real`, and I could not: the
+private corpus is absent from this environment. I also did not run `npm test`
+in full or `npm run brain`, both excluded by this pass's brief, and I pushed
+nothing.

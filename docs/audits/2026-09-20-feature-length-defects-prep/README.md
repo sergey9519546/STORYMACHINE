@@ -1259,3 +1259,281 @@ Gate table for this decision (no code path changed; documentation only):
 | `tests/core/honesty-audit-claims.test.ts` | 0 (15) |
 | `tests/core/brain-coverage.test.ts` | 0 (8/8), no wikilinks added |
 | `node scripts/check-scoring-receipt.mjs a36ae76a..HEAD` | 0 — no scoring-path files changed |
+
+## § Fix-and-disclosure pass (2026-09-20)
+
+**Lane:** the same `lane/land-feature-length-defects`, continued from
+`05faefcf`. **Trigger:** an independent adversarial review of this branch
+against the session head `6ca3fcd0`, read-only, with its measurements
+reproduced on both trees.
+
+**Nothing in this pass moves a score.** One code change (`plainSummary`'s
+scene-count clause), three test changes, and the disclosures below. The doctor
+output-identity harness against `git archive 05faefcf`, `GIT_SHA=dev` both
+sides, reports **45 reports, 11 differ, and PASS under
+`--ignore-keys plainSummary`** — every other byte of every report is
+identical. The 11 are `p0/sample-script`, `close-quarters`, `code-blue`,
+`dead-frequency`, `soft-launch`, `the-defense-rests`, `two-lane`, `undertow`
+and `synthetic/60`, `/120`, `/300-scenes`: exactly the reports that both take
+the disclosure branch and carry 12 or more scenes.
+
+### D1. The 88.3 ceiling, and the owner decision it opens
+
+`SCARCITY_SATURATION_SCENES = 12` means the scene-count term never falls below
+`140/12 = 11.667`, so **for every script of 12 or more scenes,
+`health <= 88.3`** however clean the draft. Probed on a zero-issue document:
+
+| scenes | 12 | 15 | 60 | 120 | 231 | 300 | 400 |
+|---|---|---|---|---|---|---|---|
+| this branch | 88.3 | 88.3 | 88.3 | 88.3 | 88.3 | 88.3 | 88.3 |
+| session head `6ca3fcd0` | 88.3 | 90.7 | 97.7 | 98.8 | 99.4 | 99.5 | 99.6 |
+
+* `gradeForHealth` grades `excellent` at `>= 90` — **now unreachable for any
+  draft of 12 or more scenes**, i.e. for every feature.
+* `verdictFor` gives RECOMMEND at `>= 85`, which a feature can still reach, but
+  only holding density + deductions to `<= 3.33` points combined. This
+  repository's own 231-scene fixture carries **8.9 of density alone**.
+
+**No threshold is changed.** The three available answers — raise the
+thresholds, lower the saturation floor (reopening the staple pathology §1
+closed), or accept a retired top grade and say so in the product surface — are
+all scoring or product changes, and the choice is the owner's. The ceiling is
+now disclosed in all four places a reader meets it: the constant's comment in
+`doctor.ts`, one sentence beside `gradeForHealth`/`verdictFor`, §13 of
+`docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md`, and here.
+
+### D2. What the 0.8750 is made of
+
+§4's headline (shuffle-drop matched-pair 0.5313 → 0.8750) is not spread evenly
+over the 32 scripts. Re-measured here with `benchmark-public.ts --json` on both
+trees, matched-pair AUC recomputed per subgroup:
+
+| population | `6ca3fcd0` | this branch | ordered |
+|---|---|---|---|
+| 20 independent CC0 screenplays (9-14 scenes) | 0.7000 | **0.8000** | 14 → 16 |
+| 12 blind-pair fixtures (all 10 scenes) | 0.2500 | **1.0000** | 3 → 12 |
+| all 32 | 0.5313 | **0.8750** | 17 → 28 |
+
+**The honest headline is "0.70 → 0.80 on the 20 independent screenplays, plus a
+bloc un-pinning of 12 variants."** The twelve fixtures are six premises × an
+excellent/bad variant, all 10 scenes, written in one sitting; **nine of the
+twelve** sat pinned at exactly health 76.0 before (9 of the 10 scripts pinned
+there across all 32). They un-pinned as a bloc. Their post gaps are +0.5 to
++4.1 points and six of the twelve are under +1.5. Thirteen pairs newly order
+and two newly invert (net +11); **nine of the thirteen are these fixtures**.
+The table is also in `scripts/lib/auc.ts`'s narrative, beside the 0.8750.
+
+### D3. Feature-scale evidence, both directions — reproduced here
+
+§6's feature-scale table reports health and voice pairs but never ran the
+degradation. Run here, on
+`tests/fixtures/feature-length/assembled-feature.fountain` (231 scenes, 19,293
+words) under the AUC-24 recipe itself (`shuffleDropDegrade` from
+`scripts/lib/auc.ts` + `runScriptDoctor`, seed key = the manifest convention,
+the repo-relative path):
+
+| | `6ca3fcd0` | this branch |
+|---|---|---|
+| intact health | 84.4 (`strong`) | **74.4** (`solid`) |
+| degraded health | 69.1 | **58.1** |
+| gap | **+15.30** | **+16.30** |
+| degraded scene count | 154 | 154 |
+
+**The direction is seed-dependent and the magnitude is not.** The review
+reported +15.30 → +14.70 (a shrink); on the canonical seed key this
+reproduction reads +15.30 → **+16.30** (a growth). Swept over twelve seed keys
+on both trees, the gap delta ranges **−0.60 to +1.00, mean −0.08, negative in 9
+of 12** — against gaps of 14.8 to 20.4 points. So the honest statement is that
+**the gap is unchanged within seed noise**, and both the review's figure and
+this one sit inside that band.
+
+**What holds under every seed, and is the point:** intact falls 10.0 and degraded falls
+11.0, i.e. the saturation is a near-uniform LEVEL SHIFT at feature length
+(`140/231 − 140/12 = −11.06`; `140/154 − 140/12 = −10.76`). A level shift is
+rank-preserving inside a matched pair, so **AUC-24 cannot see it at all** — the
+statement §S5 step 1 makes, here with the fixture's own numbers behind it.
+
+**The fix is a short-script phenomenon.** Everything §4 and D2 measure happens
+on 9-14-scene documents. At 231 scenes the same change moves the LEVEL by ten
+points and the separation by less than one, inside noise. Nothing in this
+repository can tell the owner whether the private corpus behaves like the 20
+CC0 shorts or like the feature fixture; §S5 step 1 is still the only thing that
+can.
+
+*(The review also measured twenty synthetic ~135-scene stapled documents and
+reports both trees ordering 20/20 with the candidate adding +0.1 of gap. That
+is the review's measurement, not reproduced here; it agrees with the reading
+above.)*
+
+### D4. `plainSummary`'s disclosure branch fires on 13 of 21 — and already did
+
+`dimensionsSitAbove` (`shownWeakest − shownHealth >= 1`, `doctor.ts`) fires on
+**13 of the 21 committed screenplays** (20 CC0 + the feature fixture) on this
+branch. Those 13 lose the pointer sentence — *"X is the lowest-scoring
+diagnostic dimension, at N/100 — most of the trouble is around Y"*, 18 words —
+and gain the disclosure sentence, 108 words: a **net ~90 words** of disclaimer
+per report, and the coverage letter's page growth (§S2(d)) is a downstream
+symptom of the same swap.
+
+**One correction to the finding as filed.** The review reports "13 of 21 (0 of
+21 before)", which is true of the SENTENCE — the branch introduces it, so it
+appeared nowhere before. It is not true of the CONDITION. Measured directly at
+`6ca3fcd0` with the same displayed-rounding comparison, `lowest − health >= 1`
+already held on **13 of 21 there too**. The count is identical; the membership
+differs by four. Entering on this branch: `close-quarters`, `code-blue`,
+`quiet-season`, `assembled-feature`. Leaving: `mise`, `room-12`,
+`the-key-under-the-mat`, `transfer-window`. So the saturation did **not**
+increase how often the branch fires on this corpus — nineteen of these 21 are
+9-14-scene shorts where the saturation is identity or nearly so, and the one
+document where it is the whole story (the 231-scene feature) is among the four
+that entered.
+
+**The branch logic is not changed** — it is a design decision for the owner,
+and there are two options: raise the gate to a scarcity-ADJUSTED comparison (so
+the sentence fires only when the dimensions sit above the overall for a reason
+other than the constant term), or SHOW BOTH sentences (keep the pointer, add
+the disclosure) and accept the length.
+
+### D5. The voice-eligible-weight bound raise is a SECURITY decision
+
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` 675,000 → **1,500,000** and
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` 80 → **100** were taken inside a scoring
+branch, on a headroom argument checked against cost. **Labelled here as what it
+is: a security decision that needs its own sign-off, separate from the merge
+decision the AUC-24 run informs.** It widens what the DoS shape guard admits,
+and the most legible consequence is the accept/reject flip the re-anchored
+cue-parity tests record: a 60-cast fully-eligible ensemble that was **REJECTED
+at weight 909,000 > 675,000** is now **ACCEPTED at 916,200** under the raised
+pair. Every pinned DoS/bypass payload is still rejected (bypass B at 1,920,000
+is the nearest, 1.28× above the bound), and the runner's own worst admitted
+shape costs 1,210 ms against a 15,000 ms half-budget — but "no payload we
+already pinned gets through" is not the same claim as "this is the right
+bound", and only the owner can make the second.
+
+**The margin proof is now computed on the honest rate.**
+`tests/security/fountain-shape-guard-cue-parity.test.ts` asserted the cost
+margin only against `VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT = 0.173`, a
+2026-09-05 developer-box rate for a different shape taken before both hoists;
+at 0.173 that assertion cannot fail until the bound passes ~57,800,000, which
+is 30× the lightest pinned payload and therefore unreachable. A second named
+constant, `VOICE_ELIGIBLE_WEIGHT_RUNNER_WORST_US_PER_UNIT = 0.807` (sourced in
+its comment to run 35542413222's worst row — max-admitted N=50, weight exactly
+1,500,000, 1,210 ms loaded), now carries the same proof: **1,500,000 × 0.807 µs
+= 1,211 ms against the 10,000 ms target, 8.3× under**, and a future raise is
+caught at ~12,390,000 instead. 0.173 and its different-shape note are
+untouched, and a third assertion pins that the runner rate is the conservative
+one so an inversion fails loudly. 681/681.
+
+### D6. Short-script sensitivity — why the benchmark moved, and why it may not transfer
+
+`densityPenalty` normalises by `wordCount^0.7`, so one finding's effect on
+health scales as `W^-0.7`. Measured with `computeRawCraftScore` on this branch,
+one additional MAJOR finding costs:
+
+| document | words | cost of one more major |
+|---|---|---|
+| `scene-grammar` WITHOUT fixture | 57 | **0.8135 points** |
+| `assembled-feature.fountain` | 19,293 | **0.0143 points** |
+
+a ratio of **56.8×**, which is the word-count scaling almost exactly
+(`(19293/57)^0.7 = 59.0`). The review's own figures — ~0.97 and ~0.023 points,
+≈40× — are the same statement against an 11,412-word feature:
+`(11412/57)^0.7 = 40.8`.
+
+This is both **why the 32-script public benchmark moved so much** (every one of
+those documents is 400-900 words, where a single finding is worth ~a point) and
+**why it may not transfer** (on a real feature the same finding is worth ~a
+fortieth of a point, and the level shift dominates everything else). It is the
+same reading D3 arrives at from the other direction.
+
+Also fixed in this pass: `tests/core/scene-grammar.test.ts`'s ellipsis test was
+titled "health no longer moves when a writer types an ellipsis" while asserting
+a 2.0-point band and measuring 1.2 — false by 1.2 points against its own
+fixture. It is now titled "health moves by less than 2 points when a writer
+types an ellipsis". 16/16.
+
+### D7. The clue guard's location half — a corpus property and a recorded miss
+
+`buildProperNounGuard`'s `locationWords` excludes any clue whose words ALL
+appear in some scene heading's location segment. The half had no corpus-wide
+assertion — only four hand-built `riverside-motel` ids — so two were added to
+`tests/core/clue-proper-noun-guard.test.ts`, symmetric to the existing cue-name
+property, and **the guard is not changed**:
+
+* over the 20 CC0 scripts, no seeded clue id is made ENTIRELY of heading
+  location words (the `every` rule, at the corpus), and exactly **six** real
+  props legitimately SHARE one — `dead-frequency: radio-base-unit`,
+  `red-line: get-in-your-room`, `runoff: tidewall-group`,
+  `runoff: cloudy-water-at-mile-14-after-every-rain`, `same-page: office-party`,
+  `two-lane: tape-car` — pinned by name, so tightening `every` to `some` fails
+  there and prints the props it would delete;
+* a `{ todo: true }` fail-first case pins the known miss with the review's
+  input: a SAFE planted under `INT. SAFE HOUSE` seeds `[]` (openClues 0) while
+  the byte-identical body under `INT. MOTEL ROOM` seeds `["safe"]` (openClues
+  1). On the 20 CC0 scripts the location half costs exactly one real clue id
+  (`creek-mile`, itself a heading), so the corpus effect is precision and this
+  miss is recorded rather than traded for a regression.
+
+### D8. The split is spent twice, and `auc.ts` now says both halves
+
+`auc.ts` already disclosed that all six floors were locked from all 32 scripts,
+holdout included. It now also records that `SUB_DENSITY_STEEPNESS`'s admissible
+window is derived (`doctor.ts:503-517`) from those same 32 scripts, with
+`the-deposit-excellent` — one of the twelve blind-pair fixtures — binding. Same
+files, twice: once to set a scoring constant, once to measure the floors that
+constant moved.
+
+Reassuringly, the choice inside the window was **not** AUC-maximising.
+Re-measured here on a scratch copy of this tree with only that constant
+changed, shuffle-drop matched-pair: `k = 1` → 0.8750, `k = 2` (shipped) →
+0.8750, `k = 2.6335` → **0.8906**, `k = 3` → 0.8906. The shipped value leaves
+0.0156 of measured separation on the table, and `k = 2.6335` also LOWERS
+climax-relocate matched-pair (0.5938 → 0.5781) — the two channels disagree
+about the constant, which is another way of saying 32 short scripts cannot
+arbitrate it.
+
+### D9. The floor margin against the quantum
+
+Recorded in `auc.ts` beside `PUBLIC_FLOOR_MARGIN = 0.02`: matched-pair AUC on
+N = 32 moves in steps of `1/32 = 0.03125` when a pair flips sign, so **one pair
+flipping fails both primary floors by construction** — the margin is narrower
+than the smallest move the estimator can make. That is deliberate and it is
+also fragile, because **six of the twelve blind-pair gaps now sit under +1.5
+points** (smallest +0.5, `the-deposit-excellent`) and eight of the 32 do. Read
+the per-pair table before calling a failure there a regression, and do not
+answer one by widening the margin.
+
+### D10. Gate table, fix-and-disclosure pass
+
+| gate | result |
+|---|---|
+| `tests/core/summary-honesty.test.ts` | 0 (10) — was 9 |
+| `tests/core/scene-grammar.test.ts` | 0 (16) |
+| `tests/core/clue-proper-noun-guard.test.ts` | 0 (16: 13 pass, 0 fail, 3 todo) — was 12 |
+| `tests/core/voice-bound-derivation.test.ts` | 0 (8/8) |
+| `tests/security/fountain-shape-guard-cue-parity.test.ts` | 0 (681/681) |
+| `tests/core/script-doctor.test.ts` | 0 (90) |
+| `tests/core/calibration.test.ts` | 0 (21) |
+| `tests/core/public-benchmark.test.ts` | 0 (33) |
+| `tests/core/blind-pairs-discrimination.test.ts` | 0 (4) — ordered 4 of 6, mean gap 0.3833 |
+| `tests/core/coverage-letter.test.ts` | 0 (55) |
+| `tests/core/honesty-audit-claims.test.ts` | 0 (15) — after moving row 22's line anchor |
+| `tests/core/documentation-truth.test.ts` | 0 (8) |
+| `tests/core/brain-coverage.test.ts` | 0 (8/8), no wikilinks added |
+| `npm run lint` | 0 |
+| `npm run check-no-console` | 0 |
+| `npm run gates` | 0 |
+| `npm run build` | 0 |
+| `node scripts/check-scoring-receipt.mjs 05faefcf..HEAD` | 0 |
+| output identity vs `git archive 05faefcf` | 45 reports, 11 differ, PASS with `--ignore-keys plainSummary` |
+
+### D11. Not done, fix-and-disclosure pass
+
+* `npm run measure-real` and `npm run lock-auc24` — the private corpus is
+  absent from this environment; unchanged from §S6.
+* `npm run brain` / `npm run check-brain` and the full `npm test` — excluded by
+  this pass's brief. `tests/core/brain-coverage.test.ts` passes 8/8 and no
+  wikilink was added.
+* No threshold, floor, bound or scoring constant was changed. D1, D4 and D5
+  each name a decision that is the owner's.
+* No push. The orchestrator pushes `lane/land-feature-length-defects`.

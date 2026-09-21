@@ -285,6 +285,29 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * STRONGER manipulation and reads it better; the two figures are not a
  * disagreement, they are two different degradations.
  *
+ * WHAT THE 0.8750 IS MADE OF, because the headline number hides it
+ * (2026-09-20 disclosure pass, adversarial finding 2). The 32 scripts are two
+ * very different populations and the shuffle-drop gain is not spread evenly
+ * across them. Measured on both trees with `benchmark-public.ts --json`,
+ * matched-pair AUC recomputed per subgroup:
+ *
+ *   population                                6ca3fcd0  this tree  ordered
+ *   20 independent CC0 screenplays (9-14 sc)   0.7000    0.8000    14 -> 16
+ *   12 blind-pair fixtures (all 10 scenes)     0.2500    1.0000     3 -> 12
+ *   all 32                                     0.5313    0.8750    17 -> 28
+ *
+ * THE HONEST HEADLINE IS "0.70 -> 0.80 ON THE 20 INDEPENDENT SCREENPLAYS, PLUS
+ * A BLOC UN-PINNING OF 12 VARIANTS." The twelve fixtures are six premises x an
+ * excellent/bad variant, written in one sitting, all 10 scenes, and NINE OF THE
+ * TWELVE sat pinned at exactly health 76.0 before this change (9 of the 10
+ * scripts pinned there across all 32). They did not un-pin one at a time; they
+ * un-pinned as a bloc, and their post gaps are small — +0.5 to +4.1 points,
+ * with six of the twelve under +1.5. Thirteen pairs newly order and two newly
+ * invert, for the net +11, and nine of those thirteen are these fixtures. A
+ * reader who takes 0.5313 -> 0.8750 as "the engine got 34 points better at
+ * reading screenplays" is reading twelve near-identical short fixtures leaving
+ * a saturation cliff, plus two more of twenty real screenplays ordering.
+ *
  * RE-LOCKED 2026-09-20, SECOND PASS (lane/land-feature-length-defects after
  * the session head 6ca3fcd0 was merged in — the burrowsDelta corpus-statistics
  * hoist and five non-scoring fixes). The first pass deliberately left the
@@ -313,6 +336,31 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * from all 32 scripts, the five holdout files included, exactly as every
  * previous lock was. No held-out evaluation has happened on this branch either,
  * and raising a floor does not create one.
+ *
+ * AND THE SAME 32 SCRIPTS WERE SPENT A SECOND TIME, ON A CONSTANT (2026-09-20
+ * disclosure pass, adversarial finding 11). The floor half above is only half
+ * the double-spend. `SUB_DENSITY_STEEPNESS`'s admissible window is derived in
+ * doctor.ts:503-517 from "all 32 public-corpus scripts on this tree", with
+ * `the-deposit-excellent` — one of the twelve blind-pair fixtures — the BINDING
+ * script at slope 11.41. So the same files, holdout included, set a scoring
+ * constant AND then measured the floors that the constant moved. Neither use is
+ * hidden; what was not stated in one place is that they are the same files.
+ *
+ * Two readings that follow, and the second is the reassuring one:
+ *
+ *  - The choice within the window was NOT AUC-maximising, which is what a
+ *    constant fitted to this benchmark would look like. Measured here by
+ *    re-running `benchmark-public.ts --json` on a scratch copy of this tree
+ *    with only that constant changed — shuffle-drop matched-pair:
+ *      k = 1        0.8750     k = 2 (SHIPPED)  0.8750
+ *      k = 2.6335   0.8906     k = 3            0.8906
+ *    The shipped value is the largest INTEGER that satisfies the slope
+ *    constraint, and it leaves 0.0156 of measured separation on the table —
+ *    one pair, the 1/32 quantum, moving from inverted to tied. A value chosen
+ *    to maximise this benchmark would have been 2.6335, and it was not taken.
+ *  - k = 2.6335 also LOWERS climax-relocate matched-pair, 0.5938 -> 0.5781.
+ *    The two channels do not agree about the constant, which is another way of
+ *    saying 32 short scripts cannot arbitrate it.
  *
  * THE PREDICTION THIS REFUTED, kept because it is the useful part. The
  * scene-count-artifact argument (doctor.ts:2092-2093 — scarcity AUC 0.938,
@@ -396,6 +444,30 @@ export const PUBLIC_DIALOGUE_FLATTEN_FLOOR = 0.98;
  * deliberately.
  */
 export const PUBLIC_FLOOR_MARGIN = 0.02;
+
+/*
+ * WHAT 0.02 MEANS AGAINST THE QUANTUM THIS STATISTIC ACTUALLY MOVES IN
+ * (2026-09-20 disclosure pass, adversarial finding 10). Matched-pair AUC on
+ * N = 32 is `(ordered + 0.5 x tied) / 32`, so it moves in steps of
+ * 1/32 = 0.03125 when a pair flips sign and 1/64 = 0.015625 when one becomes
+ * or stops being a tie. 0.03125 > 0.02: ONE PAIR FLIPPING SIGN FAILS BOTH
+ * PRIMARY FLOORS BY CONSTRUCTION. The margin is not a tolerance for one pair
+ * of ordinary movement — it is narrower than the smallest move this estimator
+ * can make, so the paired floors are effectively "not one pair worse".
+ *
+ * That is deliberate and it is also fragile, because several pairs now sit
+ * very close to flipping: six of the twelve blind-pair fixtures have
+ * shuffle-drop gaps under +1.5 points (smallest +0.5, `the-deposit-excellent`)
+ * and eight of the 32 are under +1.5 overall. A scoring change that costs a
+ * 10-scene fixture half a point can therefore fail a primary floor without
+ * anything being wrong with it. Read the per-pair table in
+ * docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md before concluding a failure
+ * here is a regression — and do not answer it by widening this margin, which
+ * would make the ratchet coarser than the statistic.
+ *
+ * (The all-pairs floors are the fine-grained ones: 32 x 32 comparisons move in
+ * steps of 1/1024 = 0.00098, so 0.02 there is ~20 comparisons.)
+ */
 
 /**
  * Which floor guards which (degradation, statistic) pair — ONE mapping, so

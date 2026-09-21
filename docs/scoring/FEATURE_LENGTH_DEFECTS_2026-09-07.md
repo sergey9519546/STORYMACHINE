@@ -1198,3 +1198,60 @@ table), `runScriptDoctor` on both, and then
 `scarcity = 140/min(sceneCount, 12)` per document. The population filter is
 `density < 1` at BOTH ends. The max-slope column is the numerical maximum of the
 anchored sub-1 curve's derivative over [0, 1] at each steepness.
+
+## 13. 2026-09-20 — the 88.3 ceiling the saturation creates
+
+Added on `lane/land-feature-length-defects` during the fix-and-disclosure pass,
+from an independent adversarial review of this branch (finding 1). It changes
+no constant and no threshold. It states a consequence of §0's first change that
+none of the sections above states in one place, in the document a reader of that
+change will open.
+
+**The arithmetic.** `scarcityPenalty` is `140 / min(sceneCount, 12)`, so it
+never falls below `140 / 12 = 11.667`. Health is `100 − densityPenalty −
+scarcityPenalty − deductions`, so for **every** script of 12 or more scenes
+
+```
+health <= 100 - 11.667 = 88.3
+```
+
+however clean the draft is. Probed directly on a zero-issue document
+(`computeHealthScore({critical:0,major:0,minor:0}, n, 20000)`):
+
+| scenes | 12 | 15 | 60 | 120 | 231 | 300 | 400 |
+|---|---|---|---|---|---|---|---|
+| this tree | 88.3 | 88.3 | 88.3 | 88.3 | 88.3 | 88.3 | 88.3 |
+| session head `6ca3fcd0` | 88.3 | 90.7 | 97.7 | 98.8 | 99.4 | 99.5 | 99.6 |
+
+**What it does to the two published thresholds.**
+
+* `gradeForHealth` (`doctor.ts`) grades `excellent` at `health >= 90`. **That
+  grade is now unreachable for any draft of 12 or more scenes** — which is to
+  say, for every feature. The best a flawless 120-page screenplay can be told
+  it is, is `strong`.
+* `verdictFor` gives **RECOMMEND** at `health >= 85` (with `sceneCount >= 8`).
+  Still reachable, but only with `densityPenalty + deductions <= 3.33` points
+  combined. For scale: this repository's own 231-scene fixture
+  (`tests/fixtures/feature-length/assembled-feature.fountain`) carries **8.9
+  points of density alone**, before any deduction.
+
+**This is a real product consequence, not a rounding note.** A ceiling on the
+overall score is the kind of thing a writer discovers by hitting it, and a
+grade that cannot be earned is worse than one that is hard to earn.
+
+**NOTHING IS CHANGED HERE, AND THAT IS THE POINT.** Which of the three answers
+to take is the owner's decision, not a lane's:
+
+1. **Raise the thresholds** to the range the formula can now produce (e.g.
+   `excellent` at some value at or below 88.3, RECOMMEND correspondingly).
+2. **Lower the saturation floor** — a larger `SCARCITY_SATURATION_SCENES`
+   raises the ceiling but reopens, to the same degree, the staple pathology
+   §0 closed. §8.2 records why 12 and not 13 or 15.
+3. **Accept a retired top grade**, and say so in the product surface rather
+   than leaving `excellent` in the contract as a grade nothing can reach.
+
+Any of the three is a scoring or product change and needs its own measurement.
+Until one is taken, the ceiling is disclosed at the four places a reader meets
+it: the constant's own comment in `doctor.ts`, one sentence beside
+`gradeForHealth`/`verdictFor`, this section, and
+`docs/audits/2026-09-20-feature-length-defects-prep/README.md`.

@@ -648,6 +648,33 @@ function scarcityPenalty(sceneCount: number): number {
   // the alternative — it withholds a length bonus rather than granting one
   // unexamined — but it is a real decoupling of two constants that used to
   // be one, and it is recorded here rather than left for a reader to notice.
+  // ── THE CEILING THIS PUTS ON HEALTH, stated here because a reader of this
+  // constant is the reader who needs it (2026-09-20 disclosure pass,
+  // adversarial finding 1). The term never falls below 140/12 = 11.667, so
+  // for EVERY script of 12 or more scenes
+  //
+  //     health <= 100 - 11.667 = 88.3
+  //
+  // no matter how clean the draft is. Probed on a zero-issue document: 88.3 at
+  // 12, 15, 60, 120, 231, 300 and 400 scenes (the same probe before the
+  // saturation: 88.3, 90.7, 97.7, 98.8, 99.4, 99.5, 99.6). Two published
+  // thresholds sit above or right against that ceiling:
+  //
+  //   * `gradeForHealth` grades `excellent` at >= 90. That grade is now
+  //     UNREACHABLE for any draft of 12 or more scenes — i.e. for every
+  //     feature.
+  //   * `verdictFor` gives RECOMMEND at >= 85. Still reachable, but a feature
+  //     must hold density + document-scale deductions to <= 3.33 points
+  //     combined. For scale: this repository's own 231-scene fixture carries
+  //     8.9 points of density ALONE.
+  //
+  // NEITHER THRESHOLD IS CHANGED HERE, deliberately — which of the three
+  // available answers to take is the owner's decision, not a lane's: raise the
+  // thresholds to the new range, lower this saturation floor, or accept that
+  // the top grade is retired. It is disclosed at all four places a reader
+  // meets the number (here, beside the thresholds themselves,
+  // docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md's 2026-09-20 section,
+  // and the prep README) rather than settled by one of them.
   const SCARCITY_SATURATION_SCENES = 12;
   return SCARCITY_SCALE / Math.min(Math.max(sceneCount, 1), SCARCITY_SATURATION_SCENES);
 }
@@ -1028,7 +1055,14 @@ export function computeDimensionScore(
     : Math.round(clamped * 10) / 10;
 }
 
-/** health >= 90 excellent, >= 75 strong, >= 55 solid, >= 35 uneven, else troubled. */
+/** health >= 90 excellent, >= 75 strong, >= 55 solid, >= 35 uneven, else troubled.
+ *
+ *  READ THIS WITH `scarcityPenalty`'s saturation: since 2026-09-07 health
+ *  cannot exceed 88.3 for any draft of 12 or more scenes, so `excellent` is
+ *  unreachable at feature length and RECOMMEND (>= 85, `verdictFor` below)
+ *  requires density plus deductions to stay under 3.33 points — an owner
+ *  decision is open on whether to raise these thresholds, lower the
+ *  saturation floor, or accept a retired top grade (see that constant). */
 export function gradeForHealth(health: number): DoctorGrade {
   if (health >= 90) return 'excellent';
   if (health >= 75) return 'strong';
