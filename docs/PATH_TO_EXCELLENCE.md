@@ -105,7 +105,12 @@ sweep measured the saturation constant's trade on the candidate: the
 padding-resistance witness (`stapled_shorts`) passes only at a saturation
 point of 13 or below, the top grade (`excellent`) is reachable only at 14
 or above, and no setting gives both — the owner's call alongside the merge
-(`SESSION_REPORT_2026-09-19.md` §14).
+(`SESSION_REPORT_2026-09-19.md` §14). The candidate branch had in fact been
+red in CI on every push while §12 called it green — no lane's brief on the
+branch had included the full `npm test`. At `ea27b3cc` it passes an
+independent full suite with zero failures, with adversarial finding #5's
+fixture-driven reproduction moved to a builder-made variant fixture
+(`SESSION_REPORT_2026-09-19.md` §15).
 
 2026-09-20 closed the remaining §4 rows under owner authorization: row 3
 (per-pass diagnostics), rows 5 and 6 (the unified scene-heading grammar),

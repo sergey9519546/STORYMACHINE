@@ -899,3 +899,135 @@ That is stated plainly here, and nothing is recommended by adjective.
 The owner's steps are unchanged from §13: fetch, `measure-real`, manifest
 re-lock, `lock-auc24` on recipe `v4` — and now the saturation decision sits
 alongside the merge decision, not ahead of it.
+
+
+## 15. 2026-09-21 — the candidate was red in CI; what the full suite found, and what closed it
+
+§12 called the candidate "green." That was true of every targeted suite the
+lanes ran and false of CI: `.github/workflows/ci.yml` had failed on every
+push of `lane/land-feature-length-defects` (runs 2711, 2716, 2718, 2719,
+2721, 2722, 2724), and every lane's brief on the branch had excluded the
+full `npm test`. Nobody looked at the branch's CI until 2026-09-21.
+
+### 15.1 Reproduction
+
+An orchestrator-run full suite at `798b495d` (the candidate's tip when §14
+was written): 14,646 tests, 14,525 pass, 17 failing subtests in 9 describes
+across 8 files, 98 skipped, 6 todo, 418.8 s; plus the CI `browser` job's
+`verify:p0-flow` smoke ("report did not render health ~78"). None of the 8
+files had been edited by the candidate:
+
+| file | failing subtests |
+|---|---|
+| `tests/core/coverage-next-fix-jump-honesty.test.ts` | 3 |
+| `tests/core/p0-sample-drift.test.ts` | 1 |
+| `tests/core/priority-selection-one-list.test.ts` | 1 |
+| `tests/core/sample-coverage-facts.test.ts` | 2 |
+| `tests/core/unapplied-deduction-honesty.test.ts` | 1 |
+| `tests/routes/root-cause-parity.test.ts` | 1 + 3 (two describes) |
+| `tests/scripts/report-unverified-gates.test.ts` | 1 |
+| `tests/scripts/verify-report.test.ts` | 4 |
+
+### 15.2 Causes, three categories
+
+**Moved pins.** The built-in sample (`src/lib/sample-script.ts`) scores
+78.3 on the session branch and 81.8 on the candidate, so the smoke's EXPECT
+(78 -> 82), the committed P0 sample report and `src/lib/sample-coverage-facts.ts`
+(regenerated with `npm run generate-p0-sample`, counts 2·32·139 ->
+2·32·138, contentHash unchanged), and `SCENE_SPAN_DRIFT_MEASUREMENT` in
+`server/lib/root-cause-pipeline.ts` (899 -> 946 located issues, health
+84.4 -> 74.4, findings with/without spans 70/69 -> 73/73; bisected commit
+by commit to `e5e2b534`, the ORPHAN_CLUE guard — the formula commits move
+only health) all moved. The four `tests/fixtures/verify-report/` byte-copy
+fixtures no longer reproduced (pre-tier health 65.0 -> 62.8; known-limit
+health 76.3 -> 77.7, total issues 178 -> 129); only those compared numeric
+fields were patched, nothing re-rendered, logged in that directory's
+README.
+
+**Hard-coded value.** `report-unverified-gates.test.ts` asserted the
+literal `PUBLIC_SHUFFLE_DROP_FLOOR = 0.5386`, which the branch re-locked to
+0.8091; it now reads every untouched floor from `scripts/lib/auc.ts`.
+
+**Test shortcuts exposed by the new numbers.** `priority-selection-one-list`
+escaped only `&` where the renderer also escapes `'`. `unapplied-deduction-honesty`
+compared values where graphDeduction 12 == sceneCount 12 collided; it now
+runs a provenance check through `CLAIM_ROW_SPECS`.
+
+**Premise moved.** The feature fixture's top priority went from
+`NO_REVERSALS_LONG_STORY` at "Conflict layer" (document tier) to
+`REVELATION_WITHOUT_SETUP` at Scene 15 (line-anchored, lines 201–216), so
+adversarial finding #5's fixture-driven reproduction in
+`coverage-next-fix-jump-honesty.test.ts` and the `P2-featurelen` phase of
+`scripts/verify-p2-p3-surfaces.mjs` had nothing to reproduce.
+
+### 15.3 The reversion probe
+
+`root-cause-parity.test.ts`'s reversion probe asserted the with/without-spans
+lists differ in COUNT; they now tie at 73/73 by composition (65 ids shared,
+8 only with spans, 8 different ones only without). The probe now asserts
+that set difference instead, different scene sets on 27 of 65 shared ids,
+different signatures, and a different order at 24 of 73 positions, and
+keeps the range and "demonstrably worse" narrowing assertions; the drift
+block pins the 8. Fail-first was proven for it, for the floor check and for
+the provenance check.
+
+### 15.4 Finding #5, reproduced again on a builder-made variant
+
+Not a hand edit: `scripts/build-feature-length-fixture.mjs` gained
+`--order=lexicographic|reverse|seed:<n>` and `--variant=doc-tier`
+(= `seed:6`, a mulberry32-seeded Fisher–Yates over the twenty CC0 bodies).
+12 variants were searched (reverse, seeds 1–11): seeds 6, 8 and 9 give a
+document-tier top priority with a first-root-cause envelope over 80 %
+(95.1 / 93.3 / 93.7 %), seed 3 is document-tier at 21.9 %, the other 8 are
+line-anchored. `tests/fixtures/feature-length/assembled-feature-doc-tier.fountain`
+(114,279 B, 231 scenes) is committed; only the finding-#5 describe and the
+P2-featurelen finding-#5 assertions point at it. The default build is
+byte-identical to the primary fixture and `tests/core/feature-length-fixture.test.ts`
+now asserts both. `verify:surfaces` 250/250.
+
+### 15.5 What did not move
+
+No scoring-path file was touched (`node scripts/check-scoring-receipt.mjs
+6ca3fcd0..HEAD` OK, same five files, no receipt added); `npm run lint` 0;
+`check-no-console` 0; brain fresh; claims-register line anchors updated for
+`priority-selection-one-list.test.ts`.
+
+### 15.6 Commits and independent verification
+
+Commits on the candidate, oldest first:
+
+| SHA | commit |
+|---|---|
+| `0fc52f4f` | fix(p0-sample): regenerate the committed sample at the candidate's score — 78.3 -> 81.8, and every live pin follows |
+| `9c303488` | test(gates): the one-constant rewrite check reads the untouched floors from auc.ts, not from a literal |
+| `31805c0f` | test(root-cause): re-measure the scene-span drift table on the candidate, and the reversion probe asserts what still differs |
+| `eee69501` | test(verify-report): patch the compared numeric fields in the four byte-copy fixtures for the candidate's scoring — nothing re-rendered |
+| `a2db9f65` | test(core): two assertions that failed on the test's own shortcut, not on the property — HTML escaping and a value collision |
+| `8e328131` | fix(verify:surfaces): two battery steps that read a proxy — rounded health, and a hard-coded priority index |
+| `2e6b8f9c` | docs(audit): § 2026-09-21 — CI was red: what the full suite found, and what changed |
+| `ea27b3cc` | test(feature-length): a builder-made doc-tier variant reproduces finding #5 the primary order no longer produces |
+
+Orchestrator-run independent full suites: at `2e6b8f9c`, 14,646 tests /
+14,539 pass / 3 fail (the finding-#5 describe) / 98 skipped, 420.0 s,
+matching the lane's own count; at `ea27b3cc`, 14,653 tests / 14,549 pass /
+0 fail / 98 skipped / 6 todo, 409.8 s. Both fixtures were rebuilt by the
+orchestrator at `ea27b3cc` with `git diff --exit-code` clean.
+`origin/lane/land-feature-length-defects` is at `ea27b3cc`; CI on it had
+not completed when this section was written — that is stated, not
+predicted.
+
+The lane's own record is `docs/audits/2026-09-20-feature-length-defects-prep/README.md`
+§ "2026-09-21 — CI was red: what the full suite found, and what changed"
+(E1–E4) on the candidate.
+
+### 15.7 Branch heads
+
+| branch | head | note |
+|---|---|---|
+| session branch | `c9df0b26` (+ this commit) | this report |
+| `lane/land-feature-length-defects` (candidate) | `ea27b3cc` | CI-green locally on an independent full suite, awaiting CI on origin |
+| `lane/land-advice-rule-fixes` | `671b7cf2` | held, unchanged |
+
+The owner's steps are unchanged from §13/§14: fetch, `measure-real`,
+manifest re-lock, `lock-auc24` on recipe `v4`, then the saturation decision
+and the merge decision together.
