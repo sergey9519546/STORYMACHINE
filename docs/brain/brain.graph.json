@@ -217,6 +217,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-21 Prod Loader Guard",
+      "path": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
       "type": "branch",
       "title": "Branch — Adversarial 2026-09-12",
@@ -1724,6 +1730,14 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Burrows Delta Hoist.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md",
       "to": "docs/brain/Patterns.md"
     },
     {

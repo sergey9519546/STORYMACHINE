@@ -85,7 +85,16 @@ while the gate passes, but the rule it enforces is unchanged: no new
 - Formula constants in `server/nvm/analyze/doctor.ts` stay function-local:
   module-level consts hit a temporal dead zone through the doctor↔reference
   circular import and the failure is silently swallowed by a fallback
-  (documented at the site — it cost a real bug hunt).
+  (documented at the site — it cost a real bug hunt). Under the production
+  loader (`tsx`, esbuild `keepNames`) a NAMED nested function expression or
+  arrow (`const f = (x) => …`) anywhere reachable from `computeRawCraftScore`
+  compiles to a `__name(...)` call on a hoisted, uninitialised module var and
+  fails the same way, silently emptying the calibration layer (no
+  `healthPercentile`, no dimension percentiles, in production only — `npm
+  test` and the dev server run `--experimental-strip-types`, which injects no
+  helper); the guard is `tests/core/doctor-calibration-under-tsx.test.ts`,
+  which spawns the real tsx CLI, and since 2026-09-21 the fallback logs
+  through `server/lib/logger.ts` instead of swallowing.
 - The revision pipeline's 14-pass execution order is still live. The old
   wave-rotation order is retired history — never use it to choose new work.
 - The owner's checkout is no longer on OneDrive (moved 2026-09-18 to a local,
