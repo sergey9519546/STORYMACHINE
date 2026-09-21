@@ -1819,8 +1819,9 @@ Nothing was pushed.
 
 ### E5. dev-vs-prod: the doctor report differed at "dimensions" in production
 
-**Scratch note, committed first so the finding survives a cut-off session;
-the root cause, fix, test and gates follow below.**
+(The first commit of this lane, `ad2027c6`, carried only the diff and the
+stack trace below as a scratch note so the finding would survive a cut-off
+session; this is the full record.)
 
 CI run 35553131970 (`ea27b3cc`, `browser` job) failed `verify:production` at
 70/71: `[FAIL] dev-vs-prod :: the doctor report is byte-identical between dev
@@ -1874,5 +1875,127 @@ TypeError: __name is not a function
 loader injects at the top of every transformed module and calls around any
 named function expression, including `const sig = (x: number) => …` inside
 `subDensityCurve` (introduced by this candidate in `c5c18f96`). The base
-commit `6ca3fcd0` has percentiles under the same loader. Details, the
-loader asymmetry that makes only production see it, and the fix: below.
+commit `6ca3fcd0` has percentiles under the same loader.
+
+#### E5.1 Root cause, in two sentences
+
+`calibration/reference.ts` builds the reference distribution in a top-level
+`await` that scores the 20-sample corpus through `doctor.ts`'s
+`computeRawCraftScore`, and because `doctor.ts` imports `reference.ts` back
+(the doctor <-> reference cycle CLAUDE.md's TDZ gotcha describes), that call
+runs BEFORE `doctor.ts`'s own module body has evaluated whenever `doctor.ts`
+is the cycle's entry — which it is on every pool worker
+(`doctor-worker.ts` does `import('./doctor.ts')` first) and on the main
+thread of a `tsx server.ts` process. Under tsx, esbuild's `keepNames`
+compiles the candidate's `const sig = (x) => …` inside `subDensityCurve` to
+`__name((x) => …, "sig")`, where `__name` is a `var` esbuild injects at the
+top of `doctor.ts` — hoisted, so no ReferenceError, but `undefined` until the
+body runs — so the corpus build throws `TypeError: __name is not a function`,
+`reference.ts`'s `catch` turns that into the empty distribution, and every
+report the process ever produces carries no percentile field.
+
+#### E5.2 Why only production saw it
+
+The two servers `verify:production` §5 compares do not run the same
+JavaScript. `bootProduction()` spawns `tsx server.ts` with
+`NODE_ENV=production` — the Dockerfile CMD (`npx tsx server.ts`), `npm start`
+and `npm run dev` are all tsx. `bootKeylessServer()` spawns the dev server
+with `node --experimental-strip-types server.ts`, the same loader `npm test`
+uses. Native type stripping injects no helper, so nothing on the doctor's
+import graph reads an uninitialised binding there. Measured from inside
+`reference.ts` (a temporary, since-reverted write of `{thread, node,
+execArgv, health.length, error}` to a log file on each module load), one
+dev-vs-prod run on Node 24.21.0 with the candidate before the fix:
+
+| process | loader (`process.execArgv`) | thread | distribution | error |
+|---|---|---|---|---|
+| production server | `--require tsx/dist/preflight.cjs --import tsx/dist/loader.mjs` | main | **0 of 20** | `__name is not a function` |
+| production server | same | worker 2 | **0 of 20** | `__name is not a function` |
+| production server | same | worker 3 | **0 of 20** | `__name is not a function` |
+| dev server | `--experimental-strip-types` | main | 20 of 20 | — |
+| dev server | same | worker 1 | 20 of 20 | — |
+| dev server | same | worker 2 | 20 of 20 | — |
+
+The same probe run as a plain `tsx` process: Node 24.21.0 empties the
+distribution on the main thread and on the worker; Node 22.22.2 empties it
+on the main thread and builds it on the worker (the worker's report is what
+`/api/scriptide/doctor` returns, which is why the suite passed 71/71 on this
+box's Node 22 and failed on CI's Node 24 — a difference in when the two
+runtimes run the cycle's deferred body, not in the mechanism). `node
+--experimental-strip-types` builds it in every order tried (doctor first,
+reference first, pool first) on both versions. `node_modules/esbuild`'s own
+`transform` with tsx's options (`keepNames: true`) emits the `__name`
+wrapper for the arrow under `target: node22.22.2`, `node24.21.0` and `esnext`
+alike, and emits NO wrapper inside a function declaration's body.
+
+Two consequences worth stating plainly. First, this was a production defect,
+not a test artefact: every deployment running the candidate since `c5c18f96`
+answered every doctor request without `percentile`, `percentileDescriptor` or
+`healthPercentile`, and nothing logged it. Second, `verify:production`'s
+dev-vs-prod check is also, by construction, a strip-types-vs-tsx check — the
+only one in the repository — and that is exactly why it was the one gate
+that caught this.
+
+#### E5.3 The fix (`8a149bef`)
+
+`server/nvm/analyze/doctor.ts`: the logistic is now the hoisted function
+declaration `logistic(x)`; `subDensityCurve` calls it three times where it
+called `sig`. The arithmetic is unchanged term for term. A declaration is
+hoisted whole, and the `__name(logistic, "logistic")` esbuild emits for it is
+a separate top-level statement that runs with the body, so an early call is
+safe. `subDensityCurve`'s doc comment now states the rule for that path:
+nothing reachable from `computeRawCraftScore` may declare a named function
+expression or read a module-level binding of `doctor.ts`. Nothing else on
+the scoring path changed; `CLAUDE.md`, `reference.ts` and the loaders are
+untouched.
+
+Not taken, deliberately: moving the craft formula
+(`computeRawCraftScore`, `craftPenalty`, `densityPenalty`,
+`subDensityCurve`, `scarcityPenalty`) into a leaf module with no import of
+`doctor.ts`, which would remove the cycle from the corpus path and retire the
+TDZ gotcha with it. It is the structural answer and it is byte-identical by
+construction, but it is a move of scoring-path code that the brief's "fix at
+the root, minimally" does not cover; it is the right follow-up. Also not
+taken: a `logger.warn` in `reference.ts`'s `catch`, which would have surfaced
+this on the first production boot instead of at 70/71 of a browser battery
+— same reason.
+
+#### E5.4 The test that fails first: `tests/core/doctor-calibration-under-tsx.test.ts`
+
+The defect is invisible to a test that imports the doctor into the
+`--experimental-strip-types` test process, so the test spawns the real
+production loader as a child — `process.execPath` running
+`tsx/dist/cli.mjs` (the same resolution `verify-production-build.mjs` uses;
+no `.bin` shim, so it holds on Windows) with `NODE_ENV=production` — on a
+probe that loads `doctor.ts` FIRST, exactly as the worker does. The probe
+runs the 26-line script in-thread, calls `clearDoctorCache()` (the pool
+adopts worker results into `doctor.ts`'s cache, so an in-thread run AFTER
+the pool would read the worker's report back — a trap the first version of
+the probe fell into), then runs the same script through the pool. It asserts:
+the main thread's distribution holds all 20 corpus samples; the in-thread
+report and the pooled report each carry `healthPercentile` and a numeric
+`percentile` plus a `percentileDescriptor` on all five dimensions; the pool
+ran exactly one worker job and nothing in-process; and the two reports are
+`deepEqual` with `analyzedAt` excluded.
+
+| | Node 22.22.2 | Node 24.21.0 |
+|---|---|---|
+| before the fix | **fail** — `main thread: reference distribution holds 0 of 20 corpus samples` | **fail** — same assertion |
+| after the fix | 1/1 pass (~2.3 s) | 1/1 pass (~2.3 s) |
+
+#### E5.5 Gates
+
+| check | result |
+|---|---|
+| `node --experimental-strip-types --test tests/core/doctor-calibration-under-tsx.test.ts` | 1/1 on Node 22.22.2 and on Node 24.21.0 (fail-first shown above) |
+| direct dev-vs-prod harness (both servers as §5 boots them, recursive diff, Node 24.21.0) | before: 11 differing paths, all calibration fields; after: **IDENTICAL** on 2 of 2 requests |
+| `npm run verify:production` (Node 24.21.0, `PW_CHROMIUM_PATH` at the installed build 1194, no `playwright install`) | **71/71 assertions passed**, `dev-vs-prod :: the doctor report is byte-identical …` PASS |
+| `scripts/check-doctor-output-identity.mjs` vs `git archive 263420ac`, `GIT_SHA=dev` both sides | `OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded)`; `diff -rq` of the two output directories differs only in `_timings.json` |
+| `public-benchmark` · `blind-pairs-discrimination` · `calibration` · `script-doctor` (one run) | 148 tests, 148 pass, 0 fail — no floor moved, none re-locked |
+| `npm run lint` | 0 |
+| `npm run check-no-console` | 0 (312 files, 4 quarantine entries, all proven unreachable) |
+| `node scripts/check-scoring-receipt.mjs 263420ac..HEAD` | OK — the feature-length entry gained the `#### PRODUCTION-LOADER PASS, 2026-09-21` addendum and a standalone `### 2026-09-21` output-identity entry follows it (the gate does not count an in-place addendum alone as a receipt for a new range) |
+| `node scripts/check-scoring-receipt.mjs 6ca3fcd0..HEAD` | OK |
+| `honesty-audit-claims` · `brain-coverage` · `docs-gating-set` | see the hand-back; run after this section was written |
+
+Nothing was pushed. The full `npm test` is the orchestrator's run.
