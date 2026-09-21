@@ -136,16 +136,18 @@ const DLG_UNIFORM_32 = 'this is ordinary lowercase dialogue here for now';
  * action / cue scaffolding buildUniformCast emits (a heading every 40 cues).
  *
  * WHY A THIRD UNIFORM SHAPE. VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT
- * (server/lib/validation.ts, 0.173 us/unit) was fitted on 2026-09-05 to "n
- * uniform characters on the 32-word floor" (n = 97 -> weight 301,088), on a
- * developer box, against a generator that no longer exists. buildUniformCast
- * cannot reproduce that shape at any cast — it refuses a words-per-speaker
- * that is not a multiple of 6 — so the runner had never measured it, and the
- * constant could only be cross-checked against OTHER shapes' rates. This
- * generator gives the calibration script (`--uniform-32=`) and the workflow
- * (`uniform_32`) the shape by name, so the row that closes that constant can
- * come back with the runner's machine stamp like every other row. It is a
- * reconstruction from the constant's two recorded outputs (32 words per
+ * (server/lib/validation.ts) was first fitted on 2026-09-05, at 0.173
+ * us/unit, to "n uniform characters on the 32-word floor" (n = 97 -> weight
+ * 301,088), on a developer box, against a generator that no longer exists.
+ * buildUniformCast cannot reproduce that shape at any cast — it refuses a
+ * words-per-speaker that is not a multiple of 6 — so until 2026-09-21 the
+ * runner had never measured it, and the constant could only be cross-checked
+ * against OTHER shapes' rates. This generator gives the calibration script
+ * (`--uniform-32=`) and the workflow (`uniform_32`) the shape by name; run
+ * 35553883758 measured it (N=97: 299 ms loaded, 0.9931 us/unit), the table
+ * is committed at tests/fixtures/voice-bound-derivation.json, and the
+ * constant is now that row, asserted equal to it by the security suite. It
+ * is a reconstruction from the constant's two recorded outputs (32 words per
  * speaker; 97 speakers -> weight 301,088), not the lost generator's bytes.
  *
  * Weight at cast N is exactly N x (N x 32) = 32N².
@@ -164,7 +166,7 @@ export function buildUniform32(cast: number): string {
 
 /** The uniform-32 shape's voice-eligible weight at a given cast — the closed
  *  form (32N²) buildUniform32 produces, so callers never restate it
- *  (97 -> 301,088, the weight the 0.173 us/unit constant was fitted at). */
+ *  (97 -> 301,088, the weight the cost-rate constant is fitted at). */
 export function uniform32Weight(cast: number): number {
   return cast * (cast * 32);
 }

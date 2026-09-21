@@ -1096,7 +1096,8 @@ Processor @ 2.80GHz x4 (parallelism 4, 16 GiB), node v22.22.2, linux/x64
 tests with 5 failing). Every pinned DoS/bypass payload is still REJECTED,
 including bypass B, confirmed by the suite's own whole-file check.
 
-**One thing left OPEN, and it is recorded rather than quietly fixed.**
+**One thing left OPEN at this lock — CLOSED 2026-09-21, see "§ Cost-rate
+constant", Part 2 — and recorded here rather than quietly fixed.**
 `VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT = 0.173` is a 2026-09-05
 developer-box rate for the n-uniform-32-word-floor shape, taken BEFORE the
 hoists, and its "the small end is the conservative one" claim no longer holds:
@@ -1170,7 +1171,11 @@ REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real
 4. **Merge decision.** Unchanged from §S5 step 5, with one item removed from the
    "not in" column: the shape guard no longer blocks.
 
-## § Cost-rate constant left open, and how to close it
+## § Cost-rate constant — left open 2026-09-20, closed 2026-09-21
+
+*Section status: CLOSED. The first two parts below (the different-shape
+decision and Part 1) are the dated record of how it was left open and what
+was built to close it; Part 2 is the runner's row and the re-fit.*
 
 The "one thing left OPEN" item above (`VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT
 = 0.173`) asked a specific question: is the runner's `uniform-min` row from run
@@ -1298,6 +1303,66 @@ this constant's own shape. **`VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT` is
 unchanged at 0.173 until that row comes back**; Part 2 locks it from the
 printed row and rewrites the constant's comment to say which run and which
 shape the number is now fitted on.
+
+### Part 2 (2026-09-21) — closed: the runner's row and the re-fit
+
+Run **35553883758** (`calibrate-voice-bound.yml`, `workflow_dispatch` on
+`lane/land-feature-length-defects` @ `263420ac`, ubuntu-latest / AMD EPYC 7763
+64-Core x4 / 16 GiB / node v24.20.0, `uniform_32=97` plus every other input at
+its default, repeats 2, idle+loaded) completed 2026-09-21T02:23:23Z with 15
+rows per condition. Its `--json=-` line is committed verbatim at
+`tests/fixtures/voice-bound-derivation.json` and re-indented by
+`npm run measure-voice-bound -- --lock-from=…`, never by hand; it replaces run
+35542413222's table. The row this section was waiting for:
+
+| shape | N | distinct | pooled words | weight | guard | CPU idle ms (max) | CPU loaded ms (max) | us/unit idle | us/unit loaded |
+|---|---|---|---|---|---|---|---|---|---|
+| uniform-32 | 97 | 97 | 3,104 | 301,088 | ACCEPT | 179 / 185 (185) | 299 / 289 (299) | 0.6144 | 0.9931 |
+
+**The constant is re-fitted, by this section's own rule** (same shape -> re-fit;
+different shape -> leave). `VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT`
+**0.173 -> 0.9931** (`server/lib/validation.ts`): the loaded max over the row's
+weight, 299,000 / 301,088 = 0.99307, rounded up at the fourth decimal so the
+shipped value is never below the measurement. Loaded is the table's
+`primaryCondition` and the company the assertion keeps under `npm test`. That
+is **5.7x** the 2026-09-05 developer-box figure (3.6x idle). Part of the ratio
+is scope rather than machine: the 2026-09-05 timing covered
+`analyzeFountainText`, while the calibration script times the whole
+`runScriptDoctor` call a request pays for; the rest is the box, which the old
+record never named. Margin: 1,500,000 x 0.9931 us = **1,490 ms** against the
+10,000 ms target, **6.7x under** (it was 260 ms, 38x, on the old figure). The
+constant's comment now names the run, the shape, the row, the figure it
+replaced and the ratio.
+
+**What else moved with the table:**
+
+- `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` re-derives to **100, unchanged**
+  (max-admitted N=100 at 755 ms loaded against the 12,000 ms ceiling; 746 in the
+  previous run). max-admitted N=50, the document sitting exactly on the weight
+  bound, reads 1,193 ms (was 1,210). The loaded column still falls across the
+  grid — 1,193 -> 755 ms — with one adjacent rise of +0.2% (N=75 917 -> N=80
+  919), inside the 10% band; the worst row is 9.9% of the ceiling, inside the
+  25% grid-limited allowance. `guardEvaluatedAgainst` is `{1,500,000, 100}`.
+  `tests/core/voice-bound-derivation.test.ts` 8/8 on the new table.
+- The margin proof in `tests/security/fountain-shape-guard-cue-parity.test.ts`
+  no longer carries a typed runner rate. `VOICE_ELIGIBLE_WEIGHT_RUNNER_WORST_US_PER_UNIT
+  = 0.807` is deleted; the test reads `tests/fixtures/voice-bound-derivation.json`
+  and asserts three things from it: (1) the shipped constant equals the
+  uniform-32 N=97 loaded rate rounded up (so a re-lock that moves the row
+  without moving the constant fails by name); (2) the document at the bound
+  costs 1,193 ms measured directly, 8.4x under the target; (3) the worst rate
+  of ANY accepted row — probe-cast N=20, 663 ms / 303,840 = **2.18 us/unit**,
+  because the analyzer's per-document baseline dominates a light document —
+  times 1,500,000 is 3,273 ms, **3.1x under**, and that one is binding. The
+  "runner rate is the conservative one" inversion assertion is retired: both
+  numbers now come from one run. The suite is 682/682.
+- `server/lib/validation.ts`'s weight- and cast-bound histories now say the
+  committed table is run 35553883758's and keep run 35542413222's figures as
+  the record of the first lock; the dated comments in the derivation test say
+  the same.
+
+**Closed.** Shape, machine, run id and row are all named, and the constant
+cannot drift from the table without a suite failing by name.
 
 ## § Fix-and-disclosure pass (2026-09-20)
 
@@ -1483,7 +1548,10 @@ its comment to run 35542413222's worst row — max-admitted N=50, weight exactly
 = 1,211 ms against the 10,000 ms target, 8.3× under**, and a future raise is
 caught at ~12,390,000 instead. 0.173 and its different-shape note are
 untouched, and a third assertion pins that the runner rate is the conservative
-one so an inversion fails loudly. 681/681.
+one so an inversion fails loudly. 681/681. *(Superseded 2026-09-21: the literal
+0.807 is gone, the proof reads every rate from the committed table, and 0.173
+is re-fitted to 0.9931 from its own shape's runner row — "§ Cost-rate
+constant", Part 2.)*
 
 ### D6. Short-script sensitivity — why the benchmark moved, and why it may not transfer
 

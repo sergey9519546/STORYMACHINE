@@ -138,7 +138,8 @@ describe('MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is derived from a committed measu
   // WHY 0.25, and why a fraction rather than "always bracket". Run 35542413222
   // (the first sweep taken after the 2026-09-07/09-20 Burrows's-Delta hoists)
   // measured the derivation shape at 10.1% of the ceiling at its most expensive
-  // swept cast and 6.2% at its cheapest, on a bound of 1,500,000 — everything
+  // swept cast and 6.2% at its cheapest, on a bound of 1,500,000 (run
+  // 35553883758, the table committed 2026-09-21: 9.9% and 6.3%) — everything
   // the two bounds admit is an order of magnitude under the line. 0.25 is ~2.5x
   // the worst of those, so the 20% machine-to-machine spread
   // DERIVATION_MARGIN_FRACTION documents cannot trip it, while the pre-hoist
@@ -172,7 +173,8 @@ describe('MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is derived from a committed measu
     // LIGHTER as the cast grows, and since the hoists made the O(distinct²) pass
     // ~44-56x cheaper, document size — not pair count — now dominates. The
     // runner's own table is monotone the wrong way for bracketing (loaded
-    // cpuMsMax 1,210 ms at N=50 falling to 746 ms at N=100), and a local probe
+    // cpuMsMax 1,210 ms at N=50 falling to 746 ms at N=100 in run 35542413222;
+    // 1,193 -> 755 in run 35553883758, the committed table), and a local probe
     // across every cast the weight bound can admit at all (N=50…223, where
     // 30 x 223² = 1,491,870 is the last one under the bound) reads 810, 650,
     // 485, 451, 476, 510 ms — no cast anywhere near the 12,000 ms ceiling. There
@@ -228,8 +230,9 @@ describe('MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is derived from a committed measu
     // WHY A TOLERANCE AND WHY 10%. Repeat-to-repeat noise is real: run
     // 35542413222's own loaded column falls monotonically except for one step
     // (N=85 788ms -> N=90 821ms, +4.19%), and that step is noise, not a trend —
-    // the very next cast reads 746ms. 10% is ~2.4x the worst rise this table
-    // contains, and far tighter than the 20% machine-to-machine spread
+    // the very next cast reads 746ms. 10% is ~2.4x the worst rise that table
+    // contained (the re-lock from run 35553883758 has one rise of its own,
+    // N=75 917ms -> N=80 919ms, +0.2%), and far tighter than the 20% machine-to-machine spread
     // DERIVATION_MARGIN_FRACTION allows for. A genuine upward trend compounds:
     // eight consecutive steps at the limit would be 2.1x, which the
     // quarter-of-ceiling check below would then have to answer for as well.

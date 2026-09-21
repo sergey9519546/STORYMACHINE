@@ -252,7 +252,12 @@ open item there:** the `burrowsDelta` hoist named below landed, GitHub Actions
 run **35542413222** re-measured the whole family on the runner at 8% or less of
 the half-budget under load (worst 1,210 ms, against 11,810 ms pre-hoist), and
 1,500,000 was locked with `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` re-derived from
-that run's committed table at **100**. The calibrate step of that lane's runbook
+that run's committed table at **100**. Re-locked 2026-09-21 from run
+**35553883758** (same runner class, `uniform_32=97` added to the sweep): DISTINCT
+re-derives to 100 unchanged, and the "one thing left OPEN" of that lock — the
+cost-rate constant `VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT` — is closed,
+re-fitted 0.173 -> 0.9931 from its own shape's runner row (README "§ Cost-rate
+constant", Part 2). The calibrate step of that lane's runbook
 is DONE; see `docs/audits/2026-09-20-feature-length-defects-prep/README.md`
 `## Runner lock (run 35542413222)`, and its brain note
 `docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md`. What is still owed on that

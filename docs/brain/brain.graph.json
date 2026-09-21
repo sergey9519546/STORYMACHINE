@@ -1600,6 +1600,10 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
+      "to": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Feature Length Defects Prep.md",
       "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
     },
     {

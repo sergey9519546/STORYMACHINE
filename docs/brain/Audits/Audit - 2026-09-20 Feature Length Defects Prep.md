@@ -145,6 +145,27 @@ moment cost starts trending upward. Five cue-parity tests that pinned the old
 
 **Saturation sweep (2026-09-21).** `docs/audits/2026-09-20-feature-length-defects-prep/SATURATION_SWEEP.md` measures the D1 trade on scratch copies of `4a0ad86a` with only `SCARCITY_SATURATION_SCENES` varied (12 / 24 / 60 / 120 / none): the public benchmark, the blind pairs and all 21 calibration bands are identical at every setting, the `stapled_shorts` padding witness passes only at 12 and 13, and no setting both passes it and lifts a clean 100-scene feature to 90 — that feature reads 89.7 even with the saturation removed entirely.
 
+## Cost-rate constant closed, 2026-09-21
+
+The runner lock above left one item open by name:
+`VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT = 0.173`, a 2026-09-05 developer-box
+rate for a shape (every speaker on exactly 32 words) that the shared generator
+could not produce, so no runner row could re-fit it. The README's
+"§ Cost-rate constant — left open 2026-09-20, closed 2026-09-21" is the record.
+Part 1 added the shape by name (`buildUniform32`, `--uniform-32=`, workflow
+input `uniform_32`) without changing any existing generator's bytes; Part 2 is
+run **35553883758** (`uniform_32=97` plus the default sweep, same runner class)
+— its table replaces run 35542413222's at
+`tests/fixtures/voice-bound-derivation.json`, DISTINCT re-derives to **100**
+unchanged (755 ms against the 12,000 ms ceiling), and the constant is re-fitted
+**0.173 -> 0.9931** us/unit from the uniform-32 N=97 row (299 ms loaded on
+weight 301,088; 5.7x the old figure, part of it scope — `analyzeFountainText`
+then, the whole `runScriptDoctor` call now). Margin 1,500,000 x 0.9931 us =
+1,490 ms against the 10,000 ms target, 6.7x under. The margin proof in
+[[Gate - Fountain Shape Guard]]'s suite now reads every rate from the committed
+table — the typed 0.807 literal is gone — and asserts the constant equals its
+row, so the two cannot drift again without a named failure.
+
 ## What the owner still owes
 
 `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` against

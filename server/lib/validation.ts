@@ -783,8 +783,9 @@ const VOICE_ELIGIBLE_MIN_WORDS = 30;
 // rather than re-fitted.
 //
 // DERIVED AND LOCKED, not a candidate. The companion bound
-// MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT below is re-derived from run
-// 35542413222's committed table (tests/fixtures/voice-bound-derivation.json,
+// MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT below is re-derived from the committed
+// runner table (tests/fixtures/voice-bound-derivation.json — run 35542413222
+// on 2026-09-20, re-locked from run 35553883758 on 2026-09-21;
 // `guardEvaluatedAgainst: { weight: 1500000, distinct: 100 }`) by
 // tests/core/voice-bound-derivation.test.ts on every CI run, and that table was
 // swept against THIS value — every max-admitted row's pooled-word column is
@@ -960,6 +961,16 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 1_500_000;
 // derivedCast 100, derivedCpuMsMax 746 ms against a 12,000 ms ceiling — 5% of
 // the 15,000 ms half-budget target. 80 -> 100.
 //
+// RE-LOCKED 2026-09-21 FROM RUN 35553883758 (same workflow, same runner class
+// — ubuntu-latest / AMD EPYC 7763 x4 / node v24.20.0 — dispatched on this
+// branch @ 263420ac with `uniform_32=97` added to the default sweep, so that
+// VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT below could be fitted on its own
+// shape). The committed table is now that run's. It re-derives this constant
+// to 100 unchanged (derivedCpuMsMax 755 ms; max-admitted N=50 reads 1,193 ms;
+// loaded column 1,193 -> 755 ms across the grid, largest adjacent rise +0.2%),
+// and the run-35542413222 figures quoted in this block (746 / 1,210 ms) are
+// that run's, kept as the record of the first lock.
+//
 // THE DERIVATION IS NOW BOUNDED BY THE SWEEP, NOT BY COST, AND THAT IS SAID
 // HERE RATHER THAN LEFT TO BE NOTICED. 100 is also the LARGEST cast the run
 // swept. Nothing in the sweep crosses the ceiling, and no sweep could: on the
@@ -991,67 +1002,68 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 100;
 // derivation, not a cost one), and the reason 1,500,000 was rejected in the
 // first place — that it admits a 223-speaker x 30-word document costing 27-36 s
 // — stopped being true when the Burrows's-Delta hoists landed. Run 35542413222
-// measures that whole family at 746-1,210 ms of CPU on the runner under load.
+// measures that whole family at 746-1,210 ms of CPU on the runner under load
+// (run 35553883758, the table now committed: 755-1,193 ms).
 // What this block contributed and what SURVIVES it is the cost MODEL: the two
 // constants below, which make the bound and the measurement that justifies it
 // fail together instead of drifting apart.
-/** The measured worst-shape cost rate behind MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT,
- *  in MICROSECONDS of full `analyzeFountainText` per unit of eligible weight,
- *  at the SMALL end of the measured table (0.173 us/unit at weight 301,088).
- *  Exported so the bound and the measurement that justifies it cannot drift
- *  apart silently: the margin-proof test in
+/** The measured cost rate behind MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT, in
+ *  MICROSECONDS of full analysis (`runScriptDoctor`) per unit of eligible
+ *  weight, on the shape the rate was defined on: n uniform characters each on
+ *  the 32-word floor. Exported so the bound and the measurement that justifies
+ *  it cannot drift apart silently: the margin-proof test in
  *  tests/security/fountain-shape-guard-cue-parity.test.ts multiplies the two
- *  and fails if the product ever crosses the review's ~10 s target.
+ *  and fails if the product ever crosses the review's ~10 s target — and,
+ *  since 2026-09-21, ALSO asserts this constant equals the rate the committed
+ *  calibration table records for that shape, so it can no longer be quoted
+ *  from a machine the table does not name.
  *
- *  READ THIS BEFORE QUOTING THE RATE (2026-09-20). It is a 2026-09-05 figure,
- *  taken on a developer box, on the n-uniform-32-word-floor shape, BEFORE the
- *  voice-delta hoists — and its "the rate falls as the shape grows, so the
- *  small end is the conservative one" claim no longer holds against the runner.
- *  GitHub Actions run 35542413222 measured the heaviest shape this bound admits
- *  — max-admitted N=50, weight exactly 1,500,000 — at 1,210 ms of CPU loaded
- *  and 754 ms idle, i.e. **0.807 and 0.503 us/unit**, 4.7x and 2.9x ABOVE this
- *  constant. So the model is currently OPTIMISTIC rather than conservative, by
- *  about 5x on the runner. The value is left untouched because re-fitting it
- *  from a different shape's measurement is exactly the drift these two
- *  constants exist to prevent, and because the assertion clears on either
- *  number with room: 1,500,000 x 0.173 us = 260 ms and x 0.807 us = 1,211 ms,
- *  against a 10,000 ms target (38x and 8.3x under). Closing the gap honestly
- *  means re-measuring THIS shape — n uniform characters on the 32-word floor —
- *  on the runner, and moving the number to what that run says. Do not reuse
- *  any pre-hoist rate (this one, or the 0.0173-0.0187 and 0.022 ms/unit figures
- *  in the weight bound's round-1/round-2 derivations) as if it described this
- *  code.
+ *  SOURCE (2026-09-21): tests/fixtures/voice-bound-derivation.json, the
+ *  verbatim `--json=-` line of .github/workflows/calibrate-voice-bound.yml run
+ *  35553883758 (ubuntu-latest / AMD EPYC 7763 x4 / node v24.20.0,
+ *  workflow_dispatch on lane/land-feature-length-defects @ 263420ac,
+ *  `uniform_32=97` plus the default sweep, repeats 2, idle+loaded). Row
+ *  `uniform-32` N=97 (scripts/lib/voice-bound.ts, buildUniform32): 97 eligible
+ *  speakers, 3,104 pooled words, weight 301,088, ACCEPT; CPU 299 / 289 ms
+ *  loaded (max 299), 179 / 185 ms idle (max 185). 299,000 us / 301,088 =
+ *  0.99307 us/unit loaded — this value, rounded UP at the fourth decimal so it
+ *  is never optimistic — and 0.6144 idle. Loaded is the table's
+ *  primaryCondition and the company the assertion keeps under `npm test`, so
+ *  it is the one taken.
  *
- *  CONFIRMED NOT THE SAME SHAPE AS THE RUNNER'S `uniform-min` ROW (2026-09-20,
- *  land-feature-length-defects). It is tempting to read run 35542413222's
- *  `uniform-min` N=150 row (463 ms loaded / 675,000 weight = 0.686 us/unit) as
- *  a same-shape re-fit of this constant, because both are "every speaker
- *  uniform at the eligibility floor". They are not the same generator:
- *  `scripts/lib/voice-bound.ts`'s `buildUniformCast` — the single generator
- *  `uniform-min`, `max-admitted` and this bound's own security-suite fixtures
- *  all share — hard-rejects any words-per-speaker that is not a multiple of 6
- *  (`wordsPerSpeaker must be a multiple of 6`), so it CANNOT produce a 32-word
- *  speaker at all; `uniform-min` sits its speakers on 30 words, this
- *  constant's shape on 32. The 2026-09-07 review (`docs/audits/2026-09-07-
- *  innovation/scoring-review.md`) independently flagged the same gap from the
- *  other side: "the worst-shape grid uses 32 words per character where
- *  VOICE_ELIGIBLE_MIN_WORDS is 30, and 30 is the heavier shape at fixed weight
- *  (~3% more characters, ~7% more pairs)" — i.e. the two shapes do not even
- *  rank the same document the same way at a fixed weight bound, which is a
- *  real difference in what is being measured, not a rounding note. Re-fitting
- *  this constant from `uniform-min`'s row would therefore be exactly the
- *  cross-shape drift this comment already warns against, just with a
- *  same-looking label. The constant is left at 0.173 (still cross-checked
- *  against the runner's actual worst admitted shape above). Closing this
- *  honestly needs a purpose-built 32-word-per-speaker generator measured on
- *  the runner — not achievable by passing a different N to `uniform-min` or
- *  `max-admitted`, since neither's words-per-speaker is adjustable to 32 (the
- *  shared 6-word paragraph is the only unit `buildUniformCast` accepts, and 32
- *  is not a multiple of 6). See
- *  docs/audits/2026-09-20-feature-length-defects-prep/README.md, "Runner lock
- *  (run 35542413222)", for the full reasoning and what a closing sweep would
- *  require. */
-export const VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT = 0.173;
+ *  WHAT IT REPLACES. 0.173 us/unit, fitted 2026-09-05 on a developer box to
+ *  the same shape (97 -> 301,088, 4,656 pairs, 52 ms — the round-2 grid in the
+ *  weight bound's history above), BEFORE the voice-delta hoists, against a
+ *  generator that no longer exists. The runner reads 5.7x that for the same
+ *  document under load (3.6x idle). Part of the ratio is scope rather than
+ *  machine: the 2026-09-05 timing covered `analyzeFountainText`, while the
+ *  calibration script times the whole `runScriptDoctor` call a request pays
+ *  for; the rest is the box, which the old record never named. The value
+ *  stayed at 0.173 from 2026-09-05 to 2026-09-21 because every candidate
+ *  re-fit in between was a DIFFERENT shape — `uniform-min` sits its speakers
+ *  on 30 words, `max-admitted` carries whatever the bound allows — and a
+ *  cross-shape re-fit is the drift this pair of constants exists to prevent
+ *  (the 2026-09-20 decision is recorded in docs/audits/2026-09-20-feature-
+ *  length-defects-prep/README.md, "§ Cost-rate constant"). buildUniform32 gave
+ *  the runner the shape by name, and this is its row.
+ *
+ *  THE MARGIN. 1,500,000 x 0.9931 us = 1,490 ms against the 10,000 ms target,
+ *  6.7x under (it was 260 ms, 38x, on the old figure). Two further readings
+ *  from the same table are asserted in the same test: the document sitting
+ *  exactly ON the weight bound (max-admitted N=50, 30,000 pooled words) costs
+ *  1,193 ms loaded, measured directly with no rate arithmetic in between, 8.4x
+ *  under; and the largest rate ANY admitted row shows is probe-cast N=20 at
+ *  2.18 us/unit (663 ms on a 303,840-weight document — the analyzer's
+ *  per-document baseline dominates a light document, so the LIGHTEST admitted
+ *  weight shows the HIGHEST rate), and 1,500,000 x 2.18 us = 3,273 ms is still
+ *  3.1x under. A rate only bounds cost when it is the worst one, which is why
+ *  the test multiplies by that reading as well as by this constant.
+ *
+ *  Do not reuse any pre-hoist rate (0.173, or the 0.0173-0.0187 and 0.022
+ *  ms/unit figures in the weight bound's round-1/round-2 derivations) as if it
+ *  described this code. To move this number: re-run the workflow with
+ *  `uniform_32=97`, lock the table, and set it to what that row says. */
+export const VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT = 0.9931;
 /** The cost target the two constants above are held to (microseconds) — the
  *  2026-09-05 review's own ~10 s ceiling for an accepted request. */
 export const VOICE_ELIGIBLE_WEIGHT_COST_TARGET_US = 10_000_000;

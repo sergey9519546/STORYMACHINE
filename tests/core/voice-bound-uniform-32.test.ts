@@ -3,16 +3,18 @@
 // on — and this file proves that with the production counters, not by reading
 // the generator.
 //
-// WHY THIS FILE EXISTS. The 0.173 us/unit constant (server/lib/validation.ts)
-// was fitted on 2026-09-05 to "n uniform characters on the 32-word floor"
-// (n = 97 -> weight 301,088) against a generator that no longer exists, and
-// buildUniformCast — the generator every other uniform shape shares — refuses
-// 32 words per speaker (not a multiple of 6). So until buildUniform32 the
-// calibration runner (.github/workflows/calibrate-voice-bound.yml) had never
-// measured the constant's own shape. A shape that is asked for by name in a
-// runner sweep has to be the shape it claims to be BEFORE its row is locked,
-// or the row's rate is fitted to something else again — which is the exact
-// drift the constant's comment warns against. Everything here is asserted
+// WHY THIS FILE EXISTS. The constant (server/lib/validation.ts) was first
+// fitted on 2026-09-05, at 0.173 us/unit, to "n uniform characters on the
+// 32-word floor" (n = 97 -> weight 301,088) against a generator that no longer
+// exists, and buildUniformCast — the generator every other uniform shape
+// shares — refuses 32 words per speaker (not a multiple of 6). So until
+// buildUniform32 the calibration runner (.github/workflows/calibrate-voice-
+// bound.yml) had never measured the constant's own shape; run 35553883758 did
+// (2026-09-21), and the constant is now that row's rate, asserted equal to the
+// committed table by tests/security/fountain-shape-guard-cue-parity.test.ts.
+// A shape that is asked for by name in a runner sweep has to be the shape it
+// claims to be, or the row's rate is fitted to something else again — which
+// is the exact drift the constant's comment warns against. Everything here is asserted
 // through the guard's own production walk (realVoiceWordCountsForMeasurement,
 // whose voiceTokenCount mirrors voice-delta.ts's tokenize verbatim) and the
 // real analyzer's analyzeVoices eligibility (analyzeFountainText), so a
