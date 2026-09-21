@@ -16,7 +16,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { percentileRank, percentileDescriptor } from '../../server/nvm/analyze/calibration/percentile.ts';
-import { getReferenceDistribution } from '../../server/nvm/analyze/calibration/reference.ts';
+import { getReferenceDistribution, settleDistribution, CALIBRATION_UNAVAILABLE_LOG_MSG } from '../../server/nvm/analyze/calibration/reference.ts';
+import type { ReferenceDistribution } from '../../server/nvm/analyze/calibration/reference.ts';
 import { REFERENCE_CORPUS } from '../../server/nvm/analyze/calibration/corpus.ts';
 import type { CorpusBand, CorpusSample } from '../../server/nvm/analyze/calibration/corpus.ts';
 import { runScriptDoctor, computeRawCraftScore, computeHealthScore } from '../../server/nvm/analyze/doctor.ts';
@@ -193,6 +194,95 @@ describe('getReferenceDistribution', () => {
     for (const key of DIMENSION_KEYS) {
       assert.ok(dist.dimensions[key].length > 0, `dimension ${key} must be non-empty on the real-build branch`);
     }
+  });
+});
+
+// ── The fallback is loud (2026-09-21) ──────────────────────────────────────
+// reference.ts's module-load build is wrapped so a throwing corpus score can
+// never take the doctor down. Until 2026-09-21 that wrap was a bare `catch {}`,
+// and it hid a production defect for weeks: under tsx (the production loader)
+// a named function expression on the computeRawCraftScore path threw
+// `TypeError: __name is not a function` mid-cycle, the catch emptied the
+// distribution, and every report shipped without percentiles — nothing
+// logged. settleDistribution() is the wrap, extracted and exported so this
+// suite can drive its catch with a throwing builder and a spy sink. The
+// production-loader half of the guard is tests/core/
+// doctor-calibration-under-tsx.test.ts, which spawns the real tsx CLI.
+describe('settleDistribution — the empty-distribution fallback logs, never throws', () => {
+  type Sink = { error: (msg: string, data?: Record<string, unknown>) => void };
+  function spySink(): { sink: Sink; calls: Array<{ msg: string; data?: Record<string, unknown> }> } {
+    const calls: Array<{ msg: string; data?: Record<string, unknown> }> = [];
+    return { sink: { error: (msg, data) => { calls.push({ msg, data }); } }, calls };
+  }
+
+  it('returns the builder\'s distribution untouched and logs nothing when the build succeeds', async () => {
+    const { sink, calls } = spySink();
+    const built: ReferenceDistribution = {
+      health: [1, 2, 3],
+      dimensions: { 'structure-pacing': [1], character: [2], 'dialogue-voice': [3], 'plot-logic': [4], 'theme-originality': [5] },
+    };
+    const out = await settleDistribution(async () => built, sink);
+    assert.equal(out, built, 'the built distribution is returned by identity, not copied or re-shaped');
+    assert.equal(calls.length, 0, 'a successful build must not log');
+  });
+
+  it('when the corpus build throws: yields the well-formed EMPTY distribution and logs the error through the sink, naming the consequence', async () => {
+    const { sink, calls } = spySink();
+    const out = await settleDistribution(async () => { throw new TypeError('__name is not a function'); }, sink);
+
+    // The fallback behaviour itself is unchanged — well-formed and empty, so
+    // doctor.ts's `health.length > 0` guard reads "calibration unavailable".
+    assert.deepEqual(out.health, []);
+    for (const key of DIMENSION_KEYS) assert.deepEqual(out.dimensions[key], [], `dimension ${key} is empty`);
+
+    // And it is loud: exactly one error line, carrying the message the tsx
+    // guard greps a production child's stderr for, the thrown error's name
+    // and text, and the fact that percentile fields will be absent.
+    assert.equal(calls.length, 1, 'exactly one log line');
+    assert.equal(calls[0].msg, CALIBRATION_UNAVAILABLE_LOG_MSG);
+    assert.match(CALIBRATION_UNAVAILABLE_LOG_MSG, /healthPercentile/, 'the message names the field readers will find missing');
+    assert.match(CALIBRATION_UNAVAILABLE_LOG_MSG, /percentile/i);
+    const data = calls[0].data ?? {};
+    assert.equal(data.error, 'TypeError: __name is not a function', 'the thrown error is quoted, name and message');
+    assert.equal(data.percentileFieldsAbsent, true);
+    assert.equal(data.corpusSize, REFERENCE_CORPUS.length);
+    assert.match(String(data.thread), /^(main|worker \d+)$/, 'the thread that lost calibration is named');
+  });
+
+  it('quotes a non-Error throw as a string rather than losing it', async () => {
+    const { sink, calls } = spySink();
+    const out = await settleDistribution(async () => { throw 'corpus sample 7 is malformed'; }, sink);
+    assert.deepEqual(out.health, []);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].data?.error, 'corpus sample 7 is malformed');
+  });
+
+  it('defaults to the real server/lib/logger.ts sink and writes the line to stderr, not stdout', async () => {
+    // The default sink is the structured JSON logger: `error` goes to
+    // process.stderr (server/lib/logger.ts). Intercept both streams so the
+    // assertion is about WHERE the line lands, which is what the tsx guard
+    // depends on when it reads a production child's stderr.
+    const errWrites: string[] = [];
+    const outWrites: string[] = [];
+    const origErr = process.stderr.write;
+    const origOut = process.stdout.write;
+    (process.stderr as unknown as { write: (chunk: unknown) => boolean }).write = (chunk: unknown) => { errWrites.push(String(chunk)); return true; };
+    (process.stdout as unknown as { write: (chunk: unknown) => boolean }).write = (chunk: unknown) => { outWrites.push(String(chunk)); return true; };
+    let out: ReferenceDistribution;
+    try {
+      out = await settleDistribution(async () => { throw new Error('boom'); });
+    } finally {
+      process.stderr.write = origErr;
+      process.stdout.write = origOut;
+    }
+    assert.deepEqual(out.health, []);
+    const line = errWrites.find(w => w.includes(CALIBRATION_UNAVAILABLE_LOG_MSG));
+    assert.ok(line, `the log line reached stderr; stderr writes were: ${JSON.stringify(errWrites)}`);
+    assert.ok(!outWrites.some(w => w.includes(CALIBRATION_UNAVAILABLE_LOG_MSG)), 'and not stdout');
+    const parsed = JSON.parse(line.trim()) as Record<string, unknown>;
+    assert.equal(parsed.level, 'error');
+    assert.equal(parsed.error, 'Error: boom');
+    assert.equal(parsed.percentileFieldsAbsent, true);
   });
 });
 

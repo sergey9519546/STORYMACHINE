@@ -146,6 +146,8 @@ import type { CompiledScreenplay } from '../../screenplay/compile-types.ts';
 import type { PassName } from '../../revision/passes/types.ts';
 import { runRevisionPipeline } from '../../revision/pipeline.ts';
 import { runDiagnoseOnly } from '../../revision/rewrite.ts';
+import { isMainThread, threadId } from 'node:worker_threads';
+import { logger } from '../../../lib/logger.ts';
 import { analyzeFountainText } from '../fountain-analyzer.ts';
 import { computeRawCraftScore } from '../doctor.ts';
 import type { DimensionKey } from '../types.ts';
@@ -315,12 +317,57 @@ function emptyDistribution(): ReferenceDistribution {
 // corpus edit produces malformed Fountain or a pipeline pass throws while
 // scoring it, this falls back to an empty distribution instead of failing
 // this module's (and therefore doctor.ts's) load.
-let distribution: ReferenceDistribution;
-try {
-  distribution = await buildDistribution();
-} catch {
-  distribution = emptyDistribution();
+//
+// THE CATCH IS LOUD (2026-09-21). Until then it was `catch {}` — a bare
+// swallow — and on 2026-09-21 that swallow hid a production defect: under
+// the production loader (tsx, esbuild `keepNames`), a NAMED function
+// expression added inside `subDensityCurve` on the feature-length candidate
+// compiled to a call on esbuild's `__name` helper, a module-level `var` in
+// doctor.ts that is hoisted but still uninitialised when this file's
+// top-level await runs mid-cycle (doctor.ts is the cycle's entry on every
+// pool worker and on a `tsx server.ts` main thread). `computeRawCraftScore`
+// threw `TypeError: __name is not a function`, the catch below turned that
+// into the empty distribution, and every report the deployment produced
+// shipped with no `healthPercentile` and no dimension `percentile` — for
+// weeks, with nothing logged, because `npm test` and the dev server run
+// `node --experimental-strip-types`, which injects no helper. It was found
+// at 70/71 of a browser battery (`verify:production`'s dev-vs-prod check),
+// not by a log line, because there was no log line. Now there is one, on
+// stderr, through server/lib/logger.ts (never the global console object:
+// `npm run check-no-console` is CI-blocking), naming the thread, the error
+// and the consequence. The fallback itself is unchanged: the server still boots
+// analysis-only with calibration absent. `settleDistribution` is exported
+// so `tests/core/calibration.test.ts` can drive the catch with a throwing
+// builder and a spy sink without touching the scoring path;
+// `tests/core/doctor-calibration-under-tsx.test.ts` spawns the real tsx
+// loader and asserts the message never appears in a production child.
+export const CALIBRATION_UNAVAILABLE_LOG_MSG =
+  'calibration reference distribution unavailable: scoring the reference corpus threw and was swallowed into an empty distribution — every report this process produces will carry no healthPercentile and no dimension percentile';
+
+/** Build the distribution, or fall back to the empty one — loudly. Takes
+ *  the builder and the log sink as parameters purely so the fallback branch
+ *  is unit-testable (a throwing builder, a spy sink); the module's own
+ *  top-level await below passes the real `buildDistribution` and the real
+ *  logger. Never throws: that is the contract the top-level await depends
+ *  on (see the comment above). */
+export async function settleDistribution(
+  build: () => Promise<ReferenceDistribution>,
+  log: Pick<typeof logger, 'error'> = logger,
+): Promise<ReferenceDistribution> {
+  try {
+    return await build();
+  } catch (err) {
+    log.error(CALIBRATION_UNAVAILABLE_LOG_MSG, {
+      error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+      thread: isMainThread ? 'main' : `worker ${threadId}`,
+      corpusSize: REFERENCE_CORPUS.length,
+      percentileFieldsAbsent: true,
+    });
+    return emptyDistribution();
+  }
 }
+
+const distribution: ReferenceDistribution = await settleDistribution(buildDistribution);
 
 /**
  * The calibration reference distribution: sorted-ascending health scores and
