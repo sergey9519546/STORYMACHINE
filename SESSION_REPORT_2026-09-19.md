@@ -813,3 +813,89 @@ brief) supplies both, and fixed three things it found along the way.
 | session branch | `c48ca439` (+ this commit) | this report |
 | `lane/land-feature-length-defects` (candidate) | `4a0ad86a` | reviewed above; awaits the owner's decision |
 | `lane/land-advice-rule-fixes` | `671b7cf2` | held, unchanged this pass |
+
+## 14. 2026-09-21 — the saturation trade, measured
+
+§13 disclosed the 88.3 health ceiling that `scarcityPenalty = 140 /
+min(max(n, 1), 12)` puts on every script of 12 or more scenes, and left the
+owner three unmeasured alternatives to the shipped `12`: raise the
+saturation point, remove it, or keep it. A measurement-only lane
+(`docs/audits/2026-09-20-feature-length-defects-prep/SATURATION_SWEEP.md`,
+commit `798b495d` on `origin/lane/land-feature-length-defects`, verified
+against this session's base `4a0ad86a` — `git log --oneline
+4a0ad86a..origin/lane/land-feature-length-defects` shows exactly that one
+commit) answers it. No file on the scoring path is touched: every number
+comes from five scratch trees built outside the worktree by `git archive`
+plus one changed line each (`SCARCITY_SATURATION_SCENES` set to 12
+(shipped), 24, 60, 120, or removed to `Number.POSITIVE_INFINITY`, i.e. the
+pre-branch `140/n`), run against the candidate's other changes unmodified.
+
+### 14.1 What was measured
+
+Seven measures per setting: the zero-issue ceiling by scene count; whether
+`excellent` (>=90) and `RECOMMEND` are reachable for a clean 100-scene
+feature at the repository's measured density penalty, 8.8965; the six
+committed public-benchmark numbers; the blind-pair harness; the
+`npm run test:metamorphic` `scene_dup_padding` and `stapled_shorts`
+witnesses plus a direct duplicate-scene padding probe on `undertow`; the
+231-scene feature fixture's intact health and its AUC-24 shuffle-drop gap;
+`tests/core/calibration.test.ts`; and how many of 45 output-identity
+fixtures move.
+
+The table below keeps only the rows that move (health, one decimal place):
+
+| measure | S12 (shipped) | S24 | S60 | S120 | NONE (`140/n`) |
+|---|---|---|---|---|---|
+| zero-issue ceiling, 300 scenes | 88.3 | 94.2 | 97.7 | 98.8 | 99.5 |
+| clean 100-scene feature (density 8.8965) | 79.4 CONSIDER | 85.3 RECOMMEND | 88.8 RECOMMEND | 89.7 RECOMMEND | 89.7 RECOMMEND |
+| `stapled_shorts` (best-part margin) | -1.6 PASS | +4.2 HARD FAIL | +7.7 HARD FAIL | +8.9 HARD FAIL | +9.0 HARD FAIL |
+| `undertow` padded to 300 scenes | 57.9 | 63.8 | 67.3 | 68.4 | 69.1 |
+| — padding gain over shipped | — | +5.9 | +9.4 | +10.5 | +11.2 |
+| feature fixture (231 scenes) intact | 74.4 solid CONSIDER | 80.3 strong CONSIDER | 83.8 strong CONSIDER | 84.9 strong CONSIDER | 85.5 strong RECOMMEND |
+| — its shuffle-drop gap | +16.30 | +16.30 | +16.30 | +16.30 | +16.60 |
+
+Flat everywhere else: all three matched-pair AUCs (shuffle-drop 0.8750,
+climax-relocate 0.5938, dialogue-flatten control 1.0000), blind pairs 4 of
+6 (mean gap 0.3833), all 21 calibration bands, and all six committed
+floors clear at every setting. Only the two secondary all-pairs statistics
+move at all, and by less than the 1/32 = 0.03125 quantum one pair flip is
+worth (shuffle-drop all-pairs 0.8291 at S12 vs 0.8306 at S24 and above;
+climax-relocate all-pairs 0.5269 at S12 vs 0.5176 at S24 and above — S12
+reads worse on one and better on the other).
+
+### 14.2 The boundary
+
+Three extra scratch trees, S13/S14/S15, place the boundary exactly.
+`stapled_shorts` passes at 12 and 13 scenes (-1.6, -0.7 below its own best
+part) and fails at 14 and 15 (+0.1, +0.7 above it); a zero-issue draft
+reaches health 90.0 only once `min(n, S) >= 14` (`140/14 = 10`). The
+witness passes iff `S <= 13`; the top grade is reachable iff `S >= 14`. No
+value of this constant gives both.
+
+### 14.3 What this means for the decision
+
+The trade is one-dimensional: `140/min(n, S)` is read from two ends — the
+health a long script cannot earn, and the health a padded script cannot
+buy — so ceiling and padding resistance move in exact lockstep and every
+other measured axis (public benchmark, blind pairs, calibration,
+feature-scale separation) is flat and cannot arbitrate between settings.
+And even with the saturation removed entirely, a clean 100-scene feature
+carrying this repository's measured density penalty tops out at 89.7 —
+this constant alone is not the lever that restores `excellent` at feature
+length. The owner is choosing between padding resistance (the shipped
+S12) and a reachable top grade; the honest middle paths lie outside this
+constant — for instance raising the `excellent`/`RECOMMEND` thresholds'
+relation to the floor, or a padding guard that is not a scene-count term.
+That is stated plainly here, and nothing is recommended by adjective.
+
+### 14.4 Branch heads
+
+| branch | head | note |
+|---|---|---|
+| session branch | `75764fa6` (+ this commit) | this report |
+| `lane/land-feature-length-defects` (candidate) | `798b495d` | saturation sweep; measurement only, no scoring-path change |
+| `lane/land-advice-rule-fixes` | `671b7cf2` | held, unchanged this pass |
+
+The owner's steps are unchanged from §13: fetch, `measure-real`, manifest
+re-lock, `lock-auc24` on recipe `v4` — and now the saturation decision sits
+alongside the merge decision, not ahead of it.

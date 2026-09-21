@@ -100,7 +100,12 @@ candidate's own review (`SESSION_REPORT_2026-09-19.md` §13) found the
 un-pinning as a bloc, with the 20 independent screenplays alone moving
 0.70 → 0.80, no measured benefit at feature length, and an 88.3 health
 ceiling above 12 scenes; all of this is now disclosed on the branch. The
-merge remains the owner's decision after the real-corpus run.
+merge remains the owner's decision after the real-corpus run. A 2026-09-21
+sweep measured the saturation constant's trade on the candidate: the
+padding-resistance witness (`stapled_shorts`) passes only at a saturation
+point of 13 or below, the top grade (`excellent`) is reachable only at 14
+or above, and no setting gives both — the owner's call alongside the merge
+(`SESSION_REPORT_2026-09-19.md` §14).
 
 2026-09-20 closed the remaining §4 rows under owner authorization: row 3
 (per-pass diagnostics), rows 5 and 6 (the unified scene-heading grammar),
