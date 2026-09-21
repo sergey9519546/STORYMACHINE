@@ -3064,3 +3064,112 @@ that nobody mistakes one for the other.
 - **Public benchmark before/after:** all six floors' measured values reproduce unchanged from the committed 32 distributable screenplays, matching both `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first (PRIMARY), all-pairs second: shuffle-drop **0.5313 / 0.5586**; climax-relocate **0.4063 / 0.4443**; DIALOGUE_FLATTEN (the positive control) **1.0000 / 0.9473**, 32 of 32 ordered, zero ties. Ordered/inverted/tied counts are also unchanged — shuffle-drop 17/15/0, climax-relocate 8/14/10. The suite is 28/28. **No floor constant in `scripts/lib/auc.ts` was touched, no floor rose, no floor fell, and no re-lock was performed;** that file is not in this lane's diff.
 - **Runner attestation:** run in the lane worktree (`lane/prod-loader-guard`, branched from `3fde3f1d`) on 2026-09-21 by the lane agent, on an Intel(R) Xeon(R) Processor @ 2.80GHz x4 sandbox (parallelism 4, 15 GiB) under node v22.22.2, linux/x64, with `tsx` resolved from the checkout's `node_modules` (the version the Dockerfile CMD installs); no API key was present and no private corpus was read. I extracted the `3fde3f1d` baseline myself with `git archive`, symlinked `node_modules` in from the real checkout, ran every command in the block above here, and read each one's exit code and output directly. The fail-first probe described above was run twice on this tree (once with the guard's stderr assertions first, once with them last, to confirm which assertion names the failure), and `doctor.ts` was restored from a pristine byte copy after each; the committed tree contains no probe. This is an output-identity receipt, not a discrimination-statistic measurement: the private real-script corpus is not present in this environment, `REAL_SCRIPT_CORPUS_DIR` is unset here, and no real-corpus figure is claimed for this range.
 - **What a reader should NOT take from this entry.** It is a defensive-change output-identity receipt. It shows the score did not move — by byte identity on all 45 doctor reports and by six unchanged public-benchmark statistics — and that this branch does not carry the candidate's loader defect today. It says nothing about whether the score discriminates, none of its numbers is comparable to AUC-24 or to the P1 baseline, and the guard test proves the calibration layer SURVIVES the production loader, not that the percentiles it produces mean anything: the reference set is still the 20-sample hand-authored corpus `reference.ts`'s header describes.
+
+### 2026-09-21 — craft formula moved to a leaf module (code motion; no formula change) — output-identity receipt (bit-identical, no score moved; the private corpus is not present in this environment and no real-corpus figure is claimed)
+
+- **What changed on the scoring path:** three files. `server/nvm/analyze/doctor.ts`
+  (always-scoring) LOST four functions and the design comment above them —
+  `densityPenalty`, `scarcityPenalty`, `craftPenalty`, `computeRawCraftScore`,
+  every constant they read still declared inside the function that reads it —
+  and gained one import plus a re-export (`export { computeRawCraftScore }`) so
+  every existing import site still resolves. `server/nvm/analyze/craft-formula.ts`
+  is NEW and reachable from doctor.ts (tier 2): it holds those functions with
+  bodies byte-identical to the text removed from doctor.ts (verified by
+  `diff` of the extracted 209 + 47 lines against the leaf minus its header:
+  the only differences are four `export` keywords and three doc-comment
+  sentences that described the cycle in the present tense), and it imports
+  NOTHING. `server/nvm/analyze/calibration/reference.ts` (always-scoring,
+  `calibration/**`) changed ONE import specifier — `computeRawCraftScore`
+  from `'../craft-formula.ts'` instead of `'../doctor.ts'` — plus header
+  comments. No constant, weight, threshold, deduction, segmenter or pass
+  changed; the code that runs for every report is the same code, reached
+  through one more module boundary.
+- **Why this range exists:** `reference.ts` scores its 20-sample corpus in a
+  top-level `await` at module load through `computeRawCraftScore`, and until
+  this range it imported that function from `doctor.ts` while `doctor.ts`
+  imported `reference.ts` back. Whenever `doctor.ts` was the cycle's entry
+  (every pool worker; a `tsx server.ts` main thread) the corpus build ran
+  code from a module whose body had not evaluated, and two hazards lived
+  there, each swallowed by the calibration fallback into an empty
+  distribution: a module-level formula const in its temporal dead zone
+  (CLAUDE.md's long-standing gotcha) and, under the production loader, a named
+  nested function expression compiling to a call on esbuild's uninitialised
+  `__name` var (the 2026-09-21 production-loader-guard finding). Both were
+  guarded by tests; both remained live hazards for the next editor. With the
+  formula in an import-free leaf that `reference.ts` imports directly, the
+  cycle is gone from the corpus-scoring path by construction: the static walk
+  (`scripts/lib/import-graph.mjs`, the receipt gate's own walker) reports
+  `reference.ts`'s closure at 60 files WITHOUT `doctor.ts` (it was 68 files
+  WITH it), `craft-formula.ts`'s closure as exactly itself, and `doctor.ts`
+  reaching both one-directionally. `tests/core/craft-formula-leaf.test.ts`
+  (new, 3/3) pins those three facts and asserts doctor.ts's re-export is the
+  leaf's binding by identity.
+- **The two probes, and the control:** each probe was applied to the leaf,
+  measured, and reverted from a byte copy (`git status` clean afterwards).
+  (a) A module-level `const PROBE_MODULE_LEVEL_SCARCITY_SCALE = 140` in the
+  leaf, read by `scarcityPenalty` in place of its local — previously the TDZ
+  failure: `tests/core/doctor-calibration-under-tsx.test.ts` **1/1 PASS**,
+  `tests/core/calibration.test.ts` **25/25 PASS**. (b) A named nested arrow
+  `const sig = (x: number) => x` inside `densityPenalty`, wrapping
+  `weightedIssues` (this tree has no `subDensityCurve` — that function exists
+  only on the feature-length candidate — so the arrow went where the prior
+  lane's fail-first probe put it) — previously the `__name` failure under tsx:
+  tsx guard **1/1 PASS**, calibration **25/25 PASS**. CONTROL: probe (a)'s
+  exact edit applied to `doctor.ts` in the `bafffb69` baseline tree (the
+  pre-move layout): the tsx guard **FAILS by name** — `main thread: reference
+  distribution holds 0 of 20 corpus samples` — and a direct probe importing
+  `doctor.ts` first prints `"error":"ReferenceError: Cannot access
+  'PROBE_MODULE_LEVEL_SCARCITY_SCALE' before initialization"` and
+  `distribution=0` under BOTH `tsx` and `node --experimental-strip-types`
+  (the TDZ is a language mechanism; only the `__name` twin is loader-specific).
+  `calibration.test.ts` passed 25/25 on that same control tree, because it
+  imports `reference.ts` before `doctor.ts` and so never enters the cycle
+  from the failing side — the tsx guard is the instrument that sees these
+  hazards, and it stays. The baseline tree's `doctor.ts` was restored from a
+  pristine byte copy and `cmp`-verified after each control run.
+- **Why no number can move:** the formula's bodies are byte-identical and the
+  constants they read are the same function-local values; the leaf has no
+  module state; `reference.ts` calls the same function through a different
+  specifier; `doctor.ts` calls it through an import instead of a local
+  declaration. Comments and the module boundary are the only differences. The
+  output-identity harness below confirms it on all 45 fixtures and all six
+  public-benchmark statistics reproduce to four decimals with identical
+  ordered/inverted/tied counts.
+- **Date:** 2026-09-21
+- **Git SHA:** `e2e8a5d9` — `refactor(doctor): move the craft formula into craft-formula.ts, a leaf, so reference.ts no longer imports doctor.ts`, the first commit on `lane/craft-formula-leaf`, branched from `bafffb69` (this entry is written in a later commit on the same lane; `git log bafffb69..lane/craft-formula-leaf` lists all of them).
+- **Baseline used:** `bafffb69` — the session branch head this lane branched from and the tree the change is measured against, as a `git archive bafffb69` export unpacked to a scratch directory with `node_modules` symlinked in from the real checkout. Both sides of the identity comparison ran with `GIT_SHA=dev`, because the archive export has no `.git` and `provenance.engineCommit` would otherwise differ for a reason unrelated to this change.
+- **Command:** every command below was run in this lane's worktree (or, where stated, in the `bafffb69` baseline tree), and each one's exit code and output was read directly from its own log —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types --test tests/core/doctor-calibration-under-tsx.test.ts   # clean, probe (a), probe (b), clean; and the control in the baseline tree
+  node --experimental-strip-types --test tests/core/calibration.test.ts                    # same five runs
+  node --experimental-strip-types --test tests/core/craft-formula-leaf.test.ts
+  node --experimental-strip-types --test tests/core/pure-core-boundary.test.ts
+  node --experimental-strip-types --test tests/core/public-benchmark.test.ts
+  node --experimental-strip-types --test tests/core/blind-pairs-discrimination.test.ts
+  node --experimental-strip-types --test tests/core/script-doctor.test.ts
+  node --experimental-strip-types --test tests/core/doctor-worker-pool.test.ts
+  node --experimental-strip-types --test tests/core/doctor-history-identity.test.ts
+  node --experimental-strip-types --test tests/core/discrimination.test.ts
+  node --experimental-strip-types --test tests/core/rebuild-experiment.test.ts
+  node --experimental-strip-types --test tests/core/honesty-audit-claims.test.ts tests/core/docs-gating-set.test.ts tests/core/brain-coverage.test.ts
+  git archive bafffb69 | tar -x -C <scratch>/leaf-base
+  ln -s <checkout>/node_modules <scratch>/leaf-base/node_modules
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/leaf-base --out <scratch>/leaf-before
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/wt-leaf   --out <scratch>/leaf-after
+  node scripts/check-doctor-output-identity.mjs --compare <scratch>/leaf-before <scratch>/leaf-after
+  npm run brain && npm run check-brain
+  node scripts/check-scoring-receipt.mjs bafffb69..HEAD
+  ```
+  Every one exited 0 except the control run of the tsx guard in the baseline tree, which was REQUIRED to exit 1 and did (see the probes field). This is not `npm run measure-real`: the private real-script corpus is not present in this environment, no AUC-24 value is claimed anywhere in this entry, and no real-corpus figure is claimed for this range. The full `npm test` is the orchestrator's run, not this lane's.
+- **Output identity:** the compare run's own line, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+  **0 of 45 fixtures differ.** The after-snapshot was taken from the worktree at `e2e8a5d9` with `git status --short` empty (the probes above had been reverted from a byte copy before the snapshot; later commits on this lane touch documentation only, and comments do not reach the harness's output).
+- **Corpus fingerprint:** committed input sets only, no private text read. (1) The 45 in-repo identity fixtures the harness scores — 20 `data/screenplays/*.fountain` live-action fixtures, 20 calibration `REFERENCE_CORPUS` samples, the P0 sample script, and 4 synthetic concatenations at 60/120/240/300 scenes. (2) The public benchmark's 32-script manifest, `tests/fixtures/public-corpus-manifest.json`, unchanged by this range, sha256 `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e` (`tests/fixtures/public-benchmark-split.json`, also unchanged: `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`). Every one of the 32 manifest rows — `sceneCount`, `words`, `health`, `verdict` — came back byte-identical, so no manifest re-lock was needed and none was run. **The PRIVATE AUC-24 corpus was not available in this environment** (`REAL_SCRIPT_CORPUS_DIR` is unset here and the corpus is local-only by copyright), so no real-corpus figure is claimed for this range. `AUC24_FLOOR` is untouched at 0.622 and `AUC24_DEGRADATION_ID` remains `shuffle-drop/v4`.
+- **Public benchmark before/after:** all six floors' measured values reproduce unchanged from the committed 32 distributable screenplays, matching both `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first (PRIMARY), all-pairs second: shuffle-drop **0.5313 / 0.5586**; climax-relocate **0.4063 / 0.4443**; DIALOGUE_FLATTEN (the positive control) **1.0000 / 0.9473**, 32 of 32 ordered, zero ties. Ordered/inverted/tied counts are also unchanged — shuffle-drop 17/15/0, climax-relocate 8/14/10. The suite is 28/28. **No floor constant in `scripts/lib/auc.ts` was touched, no floor rose, no floor fell, and no re-lock was performed;** that file is not in this lane's diff.
+- **Other gates on this range:** `calibration` 25/25; `pure-core-boundary` 6/6 (the leaf sits inside `server/nvm/analyze/`, so `CORE_ALLOWLIST` needed no entry); `script-doctor` 86/86; `blind-pairs-discrimination` 4/4; `doctor-worker-pool` 9/9; `doctor-history-identity` 35/35; `discrimination` 14/14; `rebuild-experiment` 41/41; `honesty-audit-claims` 15/15 after `docs/CLAIMS_REGISTER.md` row 22's `doctor.ts` pointer moved 2092-2093 -> 1862-1863 (every `doctor.ts` citation after the moved blocks shifts by exactly -230 lines, each verified to land on identical text); `docs-gating-set` 8/8; `npm run lint` 0; `npm run check-no-console` 0 (313 files, 3 quarantine entries, all proven unreachable).
+- **Runner attestation:** run in the lane worktree (`lane/craft-formula-leaf`, branched from `bafffb69`) on 2026-09-21 by the lane agent, on an Intel(R) Xeon(R) Processor @ 2.80GHz x4 sandbox (parallelism 4, 15 GiB) under node v22.22.2, linux/x64, with `tsx` resolved from the checkout's `node_modules` (the version the Dockerfile CMD installs); no API key was present and no private corpus was read. I extracted the `bafffb69` baseline myself with `git archive`, symlinked `node_modules` in from the real checkout, ran every command in the block above here, and read each one's exit code and output directly. Each probe and the control were applied by a scripted exact-match replacement, run, and reverted from a byte copy (`cmp`-verified for the baseline tree; `git status --short` empty for the worktree) before any snapshot or commit; the committed tree contains no probe. This is an output-identity receipt, not a discrimination-statistic measurement: the private real-script corpus is not present in this environment, `REAL_SCRIPT_CORPUS_DIR` is unset here, and no real-corpus figure is claimed for this range.
+- **What a reader should NOT take from this entry.** It is a code-motion output-identity receipt. It shows the score did not move — by byte identity on all 45 doctor reports and by six unchanged public-benchmark statistics — and that the two silent failure modes of the doctor<->reference cycle can no longer fire on the corpus-scoring path. It says nothing about whether the score discriminates, none of its numbers is comparable to AUC-24 or to the P1 baseline, and the formula it moved is the same formula with the same known limits: the reference set is still the 20-sample hand-authored corpus `reference.ts`'s header describes.
