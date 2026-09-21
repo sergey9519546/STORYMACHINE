@@ -44,6 +44,10 @@ on:
         description: "uniform-min casts to sweep (comma-separated) — the worst-case shape the bound is derived from"
         required: false
         default: "150"
+      uniform_32:
+        description: "uniform-32 casts to sweep (comma-separated) — every speaker at exactly 32 words, the shape VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT was fitted on (97 reproduces its fitted weight, 301,088); empty adds no rows"
+        required: false
+        default: ""
       max_admitted:
         description: "max-admitted casts to sweep (comma-separated) — the heaviest document the weight bound admits at each cast; the cast cap is derived from these"
         required: false
@@ -107,6 +111,10 @@ jobs:
           # `inputs` is empty on a push event, so each falls back to the same
           # default the dispatch form declares.
           UNIFORM_MIN: ${{ inputs.uniform_min || '150' }}
+          # Empty by default and on a push event: the script's list parser
+          # turns "" into no rows, so this shape is measured only when asked
+          # for by name.
+          UNIFORM_32: ${{ inputs.uniform_32 || '' }}
           MAX_ADMITTED: ${{ inputs.max_admitted || '50,60,65,70,75,80,85,90,100' }}
           PROBE_CAST: ${{ inputs.probe_cast || '20,30,40,44' }}
           REPEATS: ${{ inputs.repeats || '2' }}
@@ -115,6 +123,7 @@ jobs:
           node --experimental-strip-types --no-warnings \
             scripts/measure-voice-bound-cost.mjs \
             "--uniform-min=$UNIFORM_MIN" \
+            "--uniform-32=$UNIFORM_32" \
             "--max-admitted=$MAX_ADMITTED" \
             "--probe-cast=$PROBE_CAST" \
             "--repeats=$REPEATS" \

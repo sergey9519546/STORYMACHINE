@@ -59,6 +59,10 @@
 //   node --experimental-strip-types scripts/measure-voice-bound-cost.mjs \
 //        --uniform-min=150 --max-admitted=60,80 --probe-cast=20,40 --repeats=3 \
 //        --conditions=idle,loaded --json=tests/fixtures/voice-bound-derivation.json
+//   --uniform-32=97  adds the n-uniform-32-word-floor shape
+//                    VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT was fitted on
+//                    (server/lib/validation.ts). Not in the default sweep, and
+//                    an omitted or empty flag adds no rows.
 //   --json=-  prints the lock file to stdout instead of writing it (how the
 //             runner's table gets out of a CI log and into the repository).
 //
@@ -82,12 +86,16 @@ const REPO_ROOT = path.resolve(path.dirname(HERE), '..');
  *  largest few-big cast the 2026-09-12 bound admitted at 44, and the 60 it
  *  newly rejected). */
 const DEFAULT_UNIFORM_MIN = [150];
+/** Empty on purpose: the uniform-32 shape is measured only when asked for by
+ *  name, so the default sweep (and every table locked from it) is unchanged. */
+const DEFAULT_UNIFORM_32 = [];
 const DEFAULT_MAX_ADMITTED = [50, 60, 65, 70, 75, 80, 85, 90, 100];
 const DEFAULT_PROBE_CAST = [20, 30, 40, 44];
 
 function parseArgs(argv) {
   const opts = {
     uniformMin: DEFAULT_UNIFORM_MIN,
+    uniform32: DEFAULT_UNIFORM_32,
     maxAdmitted: DEFAULT_MAX_ADMITTED,
     probeCast: DEFAULT_PROBE_CAST,
     repeats: 2,
@@ -101,6 +109,7 @@ function parseArgs(argv) {
     const list = () => (rawValue ?? '').split(',').map((v) => Number(v.trim())).filter((n) => Number.isFinite(n) && n > 0);
     switch (key) {
       case 'uniform-min': opts.uniformMin = list(); break;
+      case 'uniform-32': opts.uniform32 = list(); break;
       case 'max-admitted': opts.maxAdmitted = list(); break;
       case 'probe-cast': opts.probeCast = list(); break;
       case 'repeats': opts.repeats = Math.max(1, Number(rawValue) || 1); break;
@@ -211,6 +220,7 @@ async function sweep(opts, condition, log) {
     const specs = [
       ...opts.maxAdmitted.map((n) => `max-admitted:${n}`),
       ...opts.uniformMin.map((n) => `uniform-min:${n}`),
+      ...opts.uniform32.map((n) => `uniform-32:${n}`),
       ...opts.probeCast.map((n) => `probe-cast:${n}`),
     ];
     const rows = [];

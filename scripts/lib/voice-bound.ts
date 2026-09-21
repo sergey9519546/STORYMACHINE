@@ -1,4 +1,4 @@
-// The two Fountain document shapes MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT
+// The Fountain document shapes MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT
 // (server/lib/validation.ts) is derived against, and the rule that turns a
 // table of their measured costs into the bound — ONE implementation of each,
 // imported by every place that measures, asserts, or re-checks them. The same
@@ -120,6 +120,55 @@ export function uniformMinWeight(cast: number): number {
   return cast * (cast * 30);
 }
 
+/** The dialogue paragraph the UNIFORM-32 shape is built from. Exactly EIGHT
+ *  real words by voice-delta.ts's tokenizer (`[a-z']+`, filtered to tokens
+ *  containing a letter — so no digits or punctuation could pad the count), so
+ *  four double-spaced paragraphs land a speaker on exactly 32. A dedicated
+ *  unit rather than a change to DLG_UNIFORM's six-word rule: 32 is not a
+ *  multiple of 6, and bending buildUniformCast to accept it would alter a
+ *  generator three suites depend on for byte-stable timings. This constant
+ *  is read by buildUniform32 and nothing else. */
+const DLG_UNIFORM_32 = 'this is ordinary lowercase dialogue here for now';
+
+/**
+ * The UNIFORM-32 shape: `cast` distinct speakers, each at EXACTLY 32 real
+ * words — four double-spaced eight-word paragraphs — with the same scene /
+ * action / cue scaffolding buildUniformCast emits (a heading every 40 cues).
+ *
+ * WHY A THIRD UNIFORM SHAPE. VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT
+ * (server/lib/validation.ts, 0.173 us/unit) was fitted on 2026-09-05 to "n
+ * uniform characters on the 32-word floor" (n = 97 -> weight 301,088), on a
+ * developer box, against a generator that no longer exists. buildUniformCast
+ * cannot reproduce that shape at any cast — it refuses a words-per-speaker
+ * that is not a multiple of 6 — so the runner had never measured it, and the
+ * constant could only be cross-checked against OTHER shapes' rates. This
+ * generator gives the calibration script (`--uniform-32=`) and the workflow
+ * (`uniform_32`) the shape by name, so the row that closes that constant can
+ * come back with the runner's machine stamp like every other row. It is a
+ * reconstruction from the constant's two recorded outputs (32 words per
+ * speaker; 97 speakers -> weight 301,088), not the lost generator's bytes.
+ *
+ * Weight at cast N is exactly N x (N x 32) = 32N².
+ */
+export function buildUniform32(cast: number): string {
+  let t = '', occ = 0, scene = 0;
+  while (occ < cast) {
+    t += `INT. LOCATION ${scene++} - DAY\n\nSomething happens in the room.\n\n`;
+    for (let i = 0; i < 40 && occ < cast; i++, occ++) {
+      t += `CHARACTER${occ}\n\n`;
+      for (let p = 0; p < 4; p++) t += `${DLG_UNIFORM_32}\n\n`;
+    }
+  }
+  return t;
+}
+
+/** The uniform-32 shape's voice-eligible weight at a given cast — the closed
+ *  form (32N²) buildUniform32 produces, so callers never restate it
+ *  (97 -> 301,088, the weight the 0.173 us/unit constant was fitted at). */
+export function uniform32Weight(cast: number): number {
+  return cast * (cast * 32);
+}
+
 /**
  * The FEW-BIG (probe-cast) shape: a realistic feature-scale ensemble —
  * Zipf-distributed speech with a 35-word floor, ~15,150 pooled dialogue words
@@ -157,12 +206,16 @@ export function buildProbeCastFeature(cast: number, totalDialogueWords = 15_150)
   return text;
 }
 
-/** The two shapes by name, so a calibration run, a workflow argument and a
+/** The shapes by name, so a calibration run, a workflow argument and a
  *  fixture row all spell them the same way. */
 export const VOICE_BOUND_SHAPES = {
   /** Every speaker at the 30-word eligibility floor — the shape the 2026-09-12
    *  derivation used, kept so its numbers stay comparable. */
   'uniform-min': (cast: number, _weightBound: number) => buildUniformMin(cast),
+  /** Every speaker at exactly 32 words — the shape
+   *  VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT was fitted on. Not swept by
+   *  default; asked for by name (`--uniform-32=` / `uniform_32`). */
+  'uniform-32': (cast: number, _weightBound: number) => buildUniform32(cast),
   /** Every speaker at the 30-word floor, padded to the heaviest document the
    *  weight bound still admits at this cast — the real worst case. */
   'max-admitted': (cast: number, weightBound: number) => buildMaxAdmitted(cast, weightBound),

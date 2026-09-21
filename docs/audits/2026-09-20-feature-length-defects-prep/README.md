@@ -1260,6 +1260,45 @@ Gate table for this decision (no code path changed; documentation only):
 | `tests/core/brain-coverage.test.ts` | 0 (8/8), no wikilinks added |
 | `node scripts/check-scoring-receipt.mjs a36ae76a..HEAD` | 0 — no scoring-path files changed |
 
+### Part 1 (2026-09-21) — the shape now exists; the constant waits for its row
+
+The generator gap named above is closed; the measurement is not yet taken.
+`scripts/lib/voice-bound.ts` gains `buildUniform32(cast)` — `cast` distinct
+speakers, each at exactly 32 real words (four double-spaced paragraphs of a
+dedicated eight-word unit, `DLG_UNIFORM_32`, alongside the untouched
+`DLG_UNIFORM`/`DLG_PROBE`), registered as `uniform-32` in `VOICE_BOUND_SHAPES`
+with `uniform32Weight(cast) = 32 x cast²`, so `97 -> 301,088`, the weight the
+0.173 constant was fitted at. No existing generator changed: a 48-hash probe
+(`uniform-min`, `max-admitted`, `probe-cast`, `buildUniformCast(n, 36)` at
+twelve casts from 1 to 223) reads byte-identical before and after, and the
+two byte-stability suites hold at 8/8 and 682/682.
+`tests/core/voice-bound-uniform-32.test.ts` proves the shape through the
+production counters rather than the generator: the guard's own walk
+(`realVoiceWordCountsForMeasurement`) reads exactly 32 per speaker and
+`distinct === cast` at N = 2, 40, 97, 100 and 101; the real analyzer's
+`analyzeVoices` admits every speaker at N = 97 and scores 4,656 pairs — the
+pair count the 2026-09-05 fit table itself records for that row; and the guard
+verdict is what the arithmetic predicts (ACCEPT at 97 and at the cast bound
+100, REJECT by `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` at 101, REJECT by
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` at 217, the first cast where 32N² crosses
+1,500,000). `scripts/measure-voice-bound-cost.mjs` takes `--uniform-32=<list>`
+exactly as it takes `--uniform-min=`; the default sweep is unchanged, and an
+omitted or empty flag adds no rows (confirmed locally: a run with every list
+empty produces an empty table). `.github/workflows/calibrate-voice-bound.yml`
+gains the `uniform_32` dispatch input, default `""`, passed through env like
+the others.
+
+**The dispatch that produces the row:** `calibrate-voice-bound.yml` on
+`lane/land-feature-length-defects` with `uniform_32=97` and every other input
+at its default (`uniform_min=150`, `max_admitted=50,60,65,70,75,80,85,90,100`,
+`probe_cast=20,30,40,44`, `repeats=2`, `conditions=idle,loaded`). The
+`uniform-32 | 97 | 97 | 3,104 | 301,088 | ACCEPT` row in the loaded table,
+with its `machine.ci`/`machine.runId` stamp, is the first runner measurement of
+this constant's own shape. **`VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT` is
+unchanged at 0.173 until that row comes back**; Part 2 locks it from the
+printed row and rewrites the constant's comment to say which run and which
+shape the number is now fitted on.
+
 ## § Fix-and-disclosure pass (2026-09-20)
 
 **Lane:** the same `lane/land-feature-length-defects`, continued from
