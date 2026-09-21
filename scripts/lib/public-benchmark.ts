@@ -253,7 +253,7 @@ export const PUBLIC_LOCK_COMMAND = 'npm run benchmark:public -- --lock';
  * craft-formula.ts:254-257 is `scarcityPenalty(sceneCount) = 140 / max(sceneCount,1)`,
  * summed into craftPenalty at craft-formula.ts:286. The AUC-24 recipe drops every
  * third scene, so it moves that term directly — and doctor.ts's own comment at
- * :2092-2093 records what that means: "the doctor's shuffle-drop 'structural
+ * :1862-1863 records what that means: "the doctor's shuffle-drop 'structural
  * discrimination' is almost entirely a scene-COUNT artifact (scarcity term AUC
  * 0.938; the weightedIssues rule channel AUC is 0.076)".
  *
@@ -278,7 +278,7 @@ export const PUBLIC_LOCK_COMMAND = 'npm run benchmark:public -- --lock';
  * else: the scene COUNT is identical, so the scarcity term cancels exactly
  * (verified — mean scarcity delta 0.000 over all 32 scripts) and what is left
  * is order-sensitivity. It is expected to be near chance, and is:
- * doctor.ts:2100 records act-swap AUC 0.48 -> 0.62 on the private corpus, the
+ * doctor.ts:1873 records act-swap AUC 0.48 -> 0.62 on the private corpus, the
  * P1 baseline reports CLIMAX_RELOCATE 0.523 on its 153-script test partition,
  * and this corpus gives 0.4443.
  *
@@ -822,11 +822,11 @@ export const PUBLIC_BENCHMARK_LIMITS = [
   '    (1 of 6 ordered, tests/core/blind-pairs-discrimination.test.ts) is the craft question,',
   '    and it is a different, failing measurement.',
   '  * That any number here transfers to feature-length real writing. N=32, 9-14 scenes each.',
-  '    ARC_DED_MIN_SCENES is 15 (doctor.ts:2104), so THE one feature-scale deduction that is',
+  '    ARC_DED_MIN_SCENES is 15 (doctor.ts:1874), so THE one feature-scale deduction that is',
   '    wired into health never fires on this corpus at all — this benchmark measures a strictly',
   '    smaller engine than the AUC-24 ratchet does. (This line named CLIMAX_DED_MIN_SCENES too,',
   '    until 2026-09-12. That constant gates climaxZoneDecayDeduction, which is EXPORTED and',
-  '    wired into nothing — doctor.ts:2127-2131 records the revert: it over-fired on real scripts',
+  '    wired into nothing — doctor.ts:1897-1901 records the revert: it over-fired on real scripts',
   '    with naturally flat climaxes. Saying it "never fires at this length" implied it fires at',
   '    some length. It fires at no length.)',
   '  * Anything about the AUC-24 >= 0.622 ratchet. Different corpus, different denominator,',

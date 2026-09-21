@@ -144,7 +144,7 @@ turn, or whether anyone would keep reading. The reading packet
 
 Scene-count scarcity carries AUC ~0.938 of the doctor's discrimination against
 ~0.076 for the entire weighted-rule channel
-(`server/nvm/analyze/doctor.ts:2092-2093`). On a generated script that means
+(`server/nvm/analyze/doctor.ts:1862-1863`). On a generated script that means
 health and verdict are very largely a restatement of how many scenes committed —
 which is why the v1-to-v2 comparison is roughly two movements, not nine, and why
 the reading packet heads each script with the COMMITTED scene count and names

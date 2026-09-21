@@ -844,7 +844,7 @@ describe('measurement-receipt guard — push-event range', () => {
       run('git', ['config', 'commit.gpgsign', 'false'], dir);
 
       // doctor.ts reaches straight out of server/nvm/ into src/lib/ — the
-      // same relative-import shape as the real doctor.ts:67 import of
+      // same relative-import shape as the real doctor.ts:80 import of
       // src/lib/screenplay-layout.ts.
       writeFile(
         dir,

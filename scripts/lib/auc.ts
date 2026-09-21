@@ -207,7 +207,7 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md §11.
  *
  * THE PREDICTION THIS REFUTED, kept because it is the useful part. The
- * scene-count-artifact argument (doctor.ts:2092-2093 — scarcity AUC 0.938,
+ * scene-count-artifact argument (doctor.ts:1862-1863 — scarcity AUC 0.938,
  * rule channel 0.076) predicts that dropping every third scene of a 10-scene
  * script adds 140/7 - 140/10 = 6.00 points of scarcity penalty, against 0.58
  * points at the private corpus's median 118 scenes, and therefore that a

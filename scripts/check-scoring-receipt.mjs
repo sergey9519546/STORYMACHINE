@@ -131,13 +131,13 @@
 //    change." THAT THEORY WAS FALSE FOR THE ACTUAL FILES INVOLVED (2026-09-02
 //    retrospective, finding #3) and the restriction is now removed:
 //      - doctor.ts imports `layoutScreenplay` from src/lib/screenplay-layout.ts
-//        DIRECTLY (doctor.ts:67) and uses its return value to compute `pages`
-//        (doctor.ts:864) — not rendering, an input to a number the report
+//        DIRECTLY (doctor.ts:80) and uses its return value to compute `pages`
+//        (doctor.ts:666) — not rendering, an input to a number the report
 //        emits.
 //      - fountain-analyzer.ts (tier 1, always-scoring) imports
 //        src/lib/fountain.ts, which decides what counts as a scene heading —
 //        i.e. it produces `sceneCount`, the single highest-AUC term the
-//        doctor emits (~0.938, doctor.ts:2092-2093). The old prefix filter
+//        doctor emits (~0.938, doctor.ts:1862-1863). The old prefix filter
 //        discarded it unconditionally.
 //      - Proven on commit c9023b8f ("multi-language scene headings"): the old
 //        gate named only screenplay-normalizer.ts in that range while the

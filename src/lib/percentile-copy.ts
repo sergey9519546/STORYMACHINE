@@ -320,7 +320,7 @@ export function slatePercentileCaption(): string {
 //   undid it.
 //
 // AND THE BADGE IS RANKED ON A DIFFERENT STATISTIC FROM THE NUMBER BESIDE IT.
-// `doctor.ts:2257` ranks `build.rawScore` — the UNCLAMPED craft statistic, with
+// `doctor.ts:2027` ranks `build.rawScore` — the UNCLAMPED craft statistic, with
 // the scene-count scarcity term in it — while the badge sits next to the CLAMPED
 // display score. That is why the badge is anti-correlated with it: on a coherent
 // 5-scene short every dimension scores 96.5–100 and every badge read "bottom
@@ -374,7 +374,7 @@ export function dimensionPercentileBadgeFor(
  *  is false precision twice over (`exactRankTooltipFor`'s rule).
  *
  *  IN BOUNDS — the exact rank, plus the fact that it ranks the unclamped craft
- *  statistic rather than the 0–100 score printed beside it (`doctor.ts:2257`).
+ *  statistic rather than the 0–100 score printed beside it (`doctor.ts:2027`).
  *  Without that clause the two numbers on one row look like two readings of the
  *  same thing, which is what made a 100/100 beside "bottom 10%" unreadable
  *  instead of merely surprising. */

@@ -204,3 +204,37 @@ string, test regex, notes, graph regen), not the moved-code repoint this lane
 was scoped to.
 
 Nothing was pushed. The full `npm test` is the orchestrator's run.
+
+**2026-09-21 (`lane/doctor-line-refs`):** the "still stale after this lane"
+citations above were moved: `scripts/lib/auc.ts:210`,
+`scripts/lib/public-benchmark.ts:256/281/825/829` (source comments and the
+PRINTED limits text), `tests/core/public-benchmark-limits.test.ts:13,16,85,95`
+(prose and the regex pinning the printed text), `scripts/check-scoring-receipt.mjs:134,135,140`,
+and the brain notes `00 Home.md:33`, `Generation - Story Bench.md:147`,
+`Gate - Public Benchmark.md:89` all repointed `:2092-2093` -> `:1862-1863`,
+`:2104` -> `:1874`, `:2127-2131` -> `:1897-1901`, `:2100` -> `:1873`, `:67`/`:864` ->
+`:80`/`:666`, `:860` -> `:630`. A wider grep sweep (same commit) found and fixed
+six more pre-existing stale citations the import-grep step also couldn't
+see, none newly broken by this move: `server/lib/coverage-letter.ts:38` and
+`tests/core/coverage-letter.test.ts:758` (`:1920` -> `:1690`, the topPriorities
+cap), `server/lib/page-refs.ts:39` and `tests/core/scoring-receipt-guard.test.ts:847`
+(`:68`/`:67` -> `:80`, the layoutScreenplay import), `src/lib/percentile-copy.ts:323,377`
+and `tests/core/dimension-percentile-badge.test.ts:26` (`:2257` -> `:2027`, the
+rawScore percentile ranking), `server/routes/scriptide.ts:432` (`:2092-2093` ->
+`:1862-1863`), `docs/STORYTELLING_COVERAGE_MAP.md:14` (same), and
+`docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md:64`
+(`doctor.ts:447-449` -> `craft-formula.ts:237-238` — that logistic's constants
+moved entirely out of `doctor.ts`). `tests/core/public-benchmark-limits.test.ts:13`
+was also stale by a different, unrelated amount (`:617` -> `:419`,
+`climaxZoneDecayDeduction`'s own export line) and was fixed alongside it.
+Historical/dated documents that describe a past citation state as history
+(`docs/CLAIMS_REGISTER.md:29-31`, `docs/brain/Gates/Gate - Claims Register Lane.md`,
+`docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md`, `scripts/honesty-audit.mjs`'s
+worked examples, `docs/proposals/DEAD_WEIGHT_REMOVAL_2026-08-24.md`, and the
+already-excluded dated audits/measurement docs) were left as written, per the
+project's standing convention for dated snapshots.
+`node scripts/check-scoring-receipt.mjs b9a1c60b..HEAD` — no scoring-path file
+changed. `npm run brain && npm run check-brain` clean; `npm run lint` 0;
+`public-benchmark-limits` 7/7, `public-benchmark` 28/28, `honesty-audit-claims`
+15/15, `brain-coverage` 8/8, `docs-gating-set` 8/8, `documentation-truth` 8/8.
+Nothing pushed.

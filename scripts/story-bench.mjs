@@ -794,7 +794,7 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
   writeFileSync(path.join(outDir, `${premise.id}.doctor.json`), JSON.stringify({
     health: report?.health ?? null,
     // PASS is the REJECTION verdict, not an endorsement: verdictFor
-    // (server/nvm/analyze/doctor.ts:860) is `health >= 85 && sceneCount >= 8 ->
+    // (server/nvm/analyze/doctor.ts:630) is `health >= 85 && sceneCount >= 8 ->
     // RECOMMEND; health < 60 -> PASS; else CONSIDER`, and PASS is a reader
     // passing ON the script. Recorded here so nobody reads this file the way
     // this bench's own first report read it.

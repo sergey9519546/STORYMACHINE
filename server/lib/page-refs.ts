@@ -36,7 +36,7 @@
 //
 // NOT on the scoring path: this module is imported by the report renderers
 // only, and it imports layoutScreenplay read-only. layoutScreenplay itself IS
-// scoring-path (doctor.ts:68 imports it for ScriptDoctorReport.pageEstimate),
+// scoring-path (doctor.ts:80 imports it for ScriptDoctorReport.pageEstimate),
 // which is exactly why nothing here modifies it — see the needle comment in
 // sceneHeadingNeedles() for the one consequence of that constraint.
 

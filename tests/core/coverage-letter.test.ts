@@ -755,7 +755,7 @@ describe('renderCoverageLetter — honesty (no number outruns the report)', () =
 // The promise is now the measurement, and this is the measurement. The range is
 // three to four pages and it HOLDS for a 231-scene feature as well as a 9-scene
 // short, because the length is bounded by the engine rather than by the
-// renderer: server/nvm/analyze/doctor.ts:1920 caps `topPriorities` at ten.
+// renderer: server/nvm/analyze/doctor.ts:1690 caps `topPriorities` at ten.
 //
 // ROUND 3 (review round 2, non-blocking 1): the measurement below is taken on
 // the report a CALLER builds, not on a bare `runScriptDoctor` one. The first

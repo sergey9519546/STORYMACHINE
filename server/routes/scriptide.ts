@@ -429,7 +429,7 @@ router.get('/api/scriptide/load', gameLimiter, asyncHandler(async (req, res) => 
 // imported rather than mirrored since 2026-09-20. It was a hand-copy, kept
 // separate because src/lib/fountain.ts sits on the scoring path (it feeds
 // fountain-analyzer.ts's sceneCount, the highest-AUC term the doctor emits —
-// doctor.ts:2092-2093) and this route's lane was under a no-scoring-path-touch
+// doctor.ts:1862-1863) and this route's lane was under a no-scoring-path-touch
 // constraint. Importing a pure predicate from it cannot move the score; drift could.
 // tests/routes/format-unrecognized.test.ts asserts this mirror agrees with
 // the real parser's scene_heading classification on all 20 calibration
