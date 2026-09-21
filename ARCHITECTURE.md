@@ -607,6 +607,7 @@ Before expanding scope:
 | `server/app.ts` | Express app, security headers, routers |
 | `server/nvm/analyze/fountain-analyzer.ts` | Text → records |
 | `server/nvm/analyze/doctor.ts` | Aggregate Script Doctor report |
+| `server/nvm/analyze/craft-formula.ts` | The craft formula (`densityPenalty`/`scarcityPenalty`/`craftPenalty`/`computeRawCraftScore`) as an import-free leaf, so `calibration/reference.ts` scores its corpus without importing `doctor.ts` (2026-09-21) |
 | `server/nvm/analyze/doctor-pool.ts` | Worker-thread pool + coordinator cache + in-process fallback |
 | `server/nvm/revision/pipeline.ts` | 14-pass diagnose/rewrite |
 | `server/lib/backup.ts` | SQLite online backup, retention pruning, `restoreSession()` |

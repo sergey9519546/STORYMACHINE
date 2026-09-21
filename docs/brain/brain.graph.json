@@ -217,6 +217,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-21 Craft Formula Leaf",
+      "path": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md",
       "type": "audit",
       "title": "Audit — 2026-09-21 Prod Loader Guard",
@@ -1730,6 +1736,26 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
+      "to": "docs/brain/Glossary.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
       "to": "docs/brain/Patterns.md"
     },
     {

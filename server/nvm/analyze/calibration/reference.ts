@@ -41,16 +41,24 @@
 // private aggregateReport(). The corpus-scoring path below and the
 // user-report path in doctor.ts therefore never call each other — there is
 // no cycle to guard against, by construction, rather than by a boolean latch
-// that could be forgotten or bypassed. (This file does import doctor.ts's
-// `computeRawCraftScore` — a pure, parameter-only function with no
-// dependency on any of doctor.ts's own module-level state — so reusing the
-// exact published craft-score formula here creates no re-entrancy risk:
-// nothing in this module's build path ever calls back into doctor.ts's
-// aggregateReport or runScriptDoctor. This is the UNCLAMPED variant of
-// computeHealthScore — see computeRawCraftScore's own comment in doctor.ts
-// and the "raw, not clamped" note on scoreSample() below for why the
-// distribution built here is deliberately not built from the displayed
-// 0-100 health score.)
+// that could be forgotten or bypassed. (This file imports
+// `computeRawCraftScore` — a pure, parameter-only function — from
+// ../craft-formula.ts, a LEAF module with no imports of its own; it does NOT
+// import doctor.ts. Until 2026-09-21 it imported that function from
+// doctor.ts, which made this file one half of a doctor.ts <-> reference.ts
+// import cycle: the top-level await below then ran doctor.ts code before
+// doctor.ts's module body had evaluated, which is why formula constants had
+// to be function-local (module-level consts sat in their temporal dead
+// zone) and why, under the production loader, a named nested function
+// expression on that path threw `__name is not a function` — both swallowed
+// by the fallback below. Moving the formula to the leaf removes the cycle
+// from this build path entirely; the two hazards can no longer fire here
+// (verified by probe — docs/audits/2026-09-21-craft-formula-leaf/README.md).
+// doctor.ts still imports THIS file, one-directionally. This is the
+// UNCLAMPED variant of computeHealthScore — see computeRawCraftScore's own
+// comment in craft-formula.ts and the "raw, not clamped" note on
+// scoreSample() below for why the distribution built here is deliberately
+// not built from the displayed 0-100 health score.)
 //
 // Regeneration: there is nothing to regenerate by hand — getReferenceDistribution()
 // recomputes from corpus.ts on first call in every process, memoized after
@@ -149,7 +157,7 @@ import { runDiagnoseOnly } from '../../revision/rewrite.ts';
 import { isMainThread, threadId } from 'node:worker_threads';
 import { logger } from '../../../lib/logger.ts';
 import { analyzeFountainText } from '../fountain-analyzer.ts';
-import { computeRawCraftScore } from '../doctor.ts';
+import { computeRawCraftScore } from '../craft-formula.ts';
 import type { DimensionKey } from '../types.ts';
 import { REFERENCE_CORPUS } from './corpus.ts';
 
@@ -303,9 +311,11 @@ function emptyDistribution(): ReferenceDistribution {
 // lifetime of the process (buildDistribution() runs at most once — see the
 // "lazy compute + cache" note above). Top-level await is safe here because
 // the build path (scoreSample -> analyzeFountainText/runRevisionPipeline/
-// runDiagnoseOnly, and doctor.ts's computeRawCraftScore) never calls back into
-// this module or into doctor.ts's aggregateReport/runScriptDoctor, so there
-// is no cycle for module-evaluation order to trip over. Per ES module
+// runDiagnoseOnly, and craft-formula.ts's computeRawCraftScore) never calls
+// back into this module or into doctor.ts at all — since 2026-09-21 this file
+// does not import doctor.ts, so there is no cycle for module-evaluation
+// order to trip over on this path (the paragraph below records what the
+// cycle did while it existed). Per ES module
 // semantics, Node resolves this await (and everything it's transitively
 // waiting on) before any module that imports this one — including
 // doctor.ts — finishes its own load, so getReferenceDistribution() can stay
@@ -323,9 +333,11 @@ function emptyDistribution(): ReferenceDistribution {
 // the production loader (tsx, esbuild `keepNames`), a NAMED function
 // expression added inside `subDensityCurve` on the feature-length candidate
 // compiled to a call on esbuild's `__name` helper, a module-level `var` in
-// doctor.ts that is hoisted but still uninitialised when this file's
-// top-level await runs mid-cycle (doctor.ts is the cycle's entry on every
-// pool worker and on a `tsx server.ts` main thread). `computeRawCraftScore`
+// doctor.ts that was hoisted but still uninitialised when this file's
+// top-level await ran mid-cycle (doctor.ts was the cycle's entry on every
+// pool worker and on a `tsx server.ts` main thread; the cycle is gone from
+// this path since the formula moved to craft-formula.ts later the same
+// day, but the catch stays loud for any OTHER throw). `computeRawCraftScore`
 // threw `TypeError: __name is not a function`, the catch below turned that
 // into the empty distribution, and every report the deployment produced
 // shipped with no `healthPercentile` and no dimension `percentile` — for

@@ -14,11 +14,11 @@ computes for a screenplay. The base term is
 renormalization, unmerged). The **displayed, final** score subtracts three
 more bounded deduction terms on top of that base:
 `health = baseHealth − structuralDeduction − arcIncoherenceDeduction − dialogueDeduction`
-(`doctor.ts:2144`) — `structuralDeduction` is the bounded feature-scale
+(`doctor.ts:1914`) — `structuralDeduction` is the bounded feature-scale
 structural-finding deduction (see the CLAUDE.md gotcha: structural findings
 at feature scale must go through this path, never raw issue-count density);
 `arcIncoherenceDeduction` fires only at feature scale (≥15 scenes,
-`ARC_DED_MIN_SCENES`, `doctor.ts:2104`) off the emotional-arc trajectory;
+`ARC_DED_MIN_SCENES`, `doctor.ts:1874`) off the emotional-arc trajectory;
 `dialogueDeduction` is the 2026-07-29 dialogue-diversity term that took
 DIALOGUE_FLATTEN from AUC 0.54 (chance) to 0.990 — see
 [[Measurement - DISCRIMINATION_BASELINE_2026-07-29]]. Fully LLM-free — see
@@ -103,6 +103,8 @@ configured key actually round-trips against a live provider.
 ## Sources
 
 - `CLAUDE.md`; `ROADMAP.md`; `NORTH_STAR.md`; `docs/CLAIMS_REGISTER.md`
-- `server/nvm/analyze/doctor.ts:2144` (final health formula), `:679-692`
-  (baseHealth/craftPenalty), `:2104` (arcIncoherenceDeduction feature-scale
-  gate)
+- `server/nvm/analyze/doctor.ts:1914` (final health formula), `:447-462`
+  (baseHealth/computeHealthScore), `:1874` (arcIncoherenceDeduction
+  feature-scale gate); `server/nvm/analyze/craft-formula.ts`
+  (craftPenalty/computeRawCraftScore — the import-free leaf the formula moved
+  to on 2026-09-21)
