@@ -2973,3 +2973,94 @@ that nobody mistakes one for the other.
 - **Public benchmark before/after:** all six floors' measured values reproduce unchanged from the committed 32 distributable screenplays, matching both `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first (PRIMARY), all-pairs second: shuffle-drop **0.5313 / 0.5586**; climax-relocate **0.4063 / 0.4443**; DIALOGUE_FLATTEN (the positive control) **1.0000 / 0.9473**, 32 of 32 ordered, zero ties. Ordered/inverted/tied counts are also unchanged — shuffle-drop 17/15/0, climax-relocate 8/14/10. **No floor constant in `scripts/lib/auc.ts` was touched, no floor rose, no floor fell, and no re-lock was performed;** that file is not in this lane's diff.
 - **Runner attestation:** run in the session worktree (`lane/burrows-delta-hoist`, branched from `925164dc`) on 2026-09-20 by the lane agent, on an Intel(R) Xeon(R) Processor @ 2.10GHz x4 sandbox (parallelism 4, 16 GiB) under node v22.22.2, linux/x64; no API key was present and no private corpus was read. I extracted the `925164dc` baseline myself with `git archive` and with `git worktree add --detach`, symlinked `node_modules` in from the real checkout, ran every command in the block above here, and read each one's exit code and output directly. The before-timings and after-timings come from the same script run once per tree, back to back, on that machine. A fail-first run is not meaningful for an identity pin the ordinary way round — copied into the `925164dc` checkout the new test passes 3/3, because there the frozen copy and the shipped function are literally the same code — so the test was falsified the other way instead, by breaking the hoist on purpose in this tree. Replacing the unrolled variance sum with the mathematically equal `E[x^2] - mean^2` makes it fail immediately and by name: `GEN_0 x GEN_1: old 1.2380952380952381 !== new 1.2380952380954005 (bit-identity required, not tolerance)`, and again on the feature fixture, `NELL x DELGADO: old 0.7936507936507936 !== new 0.7936507936510317`. The file was restored from a byte copy taken before that probe and re-run 3/3. That is the evidence that the 3,706 passing comparisons are a real constraint and not a formality. This is an output-identity receipt, not a discrimination-statistic measurement: the private real-script corpus is not present in this environment, `REAL_SCRIPT_CORPUS_DIR` is unset here, and no real-corpus figure is claimed for this range.
 - **What a reader should NOT take from this entry.** It is a pure-performance output-identity receipt. It shows the score did not move — by byte identity on all 45 doctor reports, by `Object.is` on 3,706 Burrows's-Delta pairs, and by six unchanged public-benchmark statistics. It says nothing about whether the score discriminates, none of its numbers is comparable to AUC-24 or to the P1 baseline, and it does NOT raise either voice-eligibility bound: it only makes the cost those bounds are derived against far smaller than the derivation charged it.
+
+### 2026-09-21 — production-loader guard (calibration catch made loud; no formula change) — output-identity receipt (bit-identical, no score moved; the private corpus is not present in this environment and no real-corpus figure is claimed)
+
+- **What changed on the scoring path:** one file,
+  `server/nvm/analyze/calibration/reference.ts`. It is scoring-path because
+  `calibration/**` is on `doctor.ts`'s import graph and this file's top-level
+  `await` scores the 20-sample reference corpus through `computeRawCraftScore`
+  at module load. The change is to the FALLBACK, not the formula: the
+  module-load build was wrapped in a bare `catch {}` that turned any throw into
+  the empty distribution silently; it now runs through an exported
+  `settleDistribution(build, log)` whose catch logs
+  `CALIBRATION_UNAVAILABLE_LOG_MSG` at error level through
+  `server/lib/logger.ts` (stderr, structured JSON, carrying the thrown error's
+  name and message, the thread — `main` or `worker N` — the corpus size and
+  `percentileFieldsAbsent: true`) and then returns the SAME empty distribution
+  it always did. `buildDistribution`, `scoreSample`, `DIMENSION_PASS_MAP`,
+  `MIN_CORPUS_SIZE`, `emptyDistribution` and `getReferenceDistribution` are
+  untouched; `doctor.ts` is not in this range's diff. Two new imports:
+  `node:worker_threads` (for the thread name) and the logger, which
+  `tests/core/pure-core-boundary.test.ts` already allows on the doctor's graph
+  (it was already reachable through `revision/pipeline.ts`).
+- **Why this range exists:** on 2026-09-21 the feature-length candidate branch
+  (`lane/land-feature-length-defects`) was found shipping every production
+  doctor report without `healthPercentile`, `dimensions[].percentile` or
+  `dimensions[].percentileDescriptor`. Mechanism, verified there and
+  reproduced here by probe: the production loader (`tsx server.ts` — the
+  Dockerfile CMD, `npm start`, `npm run dev`) transforms through esbuild with
+  `keepNames: true`, which injects a module-level `var __name` helper and
+  wraps every NAMED function expression in a call to it; inside the
+  doctor.ts <-> reference.ts import cycle that `var` is hoisted but
+  uninitialised when reference.ts's top-level await scores the corpus, so a
+  `const sig = (x) => …` the candidate had added inside `subDensityCurve`
+  threw `TypeError: __name is not a function`, and the bare catch emptied the
+  distribution. `npm test` and the dev server run
+  `node --experimental-strip-types`, which injects no helper, so no test saw
+  it; only `verify:production`'s dev-vs-prod check did, at 70/71 of a browser
+  battery. THIS branch has no named function expression on the
+  `computeRawCraftScore` path, and the new guard test confirms it: under the
+  real tsx CLI with `NODE_ENV=production`, the main-thread distribution holds
+  20 of 20 samples, the in-thread and pooled reports both carry every
+  percentile field, the pool served exactly one worker run and zero
+  in-process runs, and the two reports are `deepEqual` with `analyzedAt`
+  excluded. What the branch DID share with the candidate were the two
+  structural weaknesses — the swallowing catch and no test that exercises the
+  production loader — and both are closed in this range.
+- **Why no number can move:** the only scoring-path edit is inside a `catch`
+  branch that, on this tree, never executes: the corpus build succeeds in
+  every thread under both loaders. The success path is `return await
+  build()` — the same `buildDistribution()` promise the old code awaited,
+  returned by identity — so the distribution the doctor ranks against is the
+  same twenty sorted raw craft scores and the same five sorted dimension
+  arrays as before. No constant, weight, threshold, deduction, segmenter or
+  pass changed. The output-identity harness below confirms it on all 45
+  fixtures, and all six public-benchmark statistics reproduce to four
+  decimals.
+- **Date:** 2026-09-21
+- **Git SHA:** `ed07e688` — `test(calibration): guard the production loader; make the empty-distribution fallback loud`, the first commit on `lane/prod-loader-guard`, branched from `3fde3f1d` (this entry is written in a later commit on the same lane; `git log 3fde3f1d..lane/prod-loader-guard` lists all of them).
+- **Baseline used:** `3fde3f1d` — the session branch head this lane branched from and the tree the change is measured against, as a `git archive 3fde3f1d` export unpacked to a scratch directory with `node_modules` symlinked in from the real checkout. Both sides of the identity comparison ran with `GIT_SHA=dev`, because the archive export has no `.git` and `provenance.engineCommit` differs for a reason unrelated to this change otherwise.
+- **Command:** every command below was run in this lane's worktree (or, where stated, in the `3fde3f1d` baseline tree), and each one's exit code and output was read directly from its own log —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types --test tests/core/doctor-calibration-under-tsx.test.ts   # 3 runs: clean, fail-first probe, clean
+  node --experimental-strip-types --test tests/core/calibration.test.ts
+  node --experimental-strip-types --test tests/core/pure-core-boundary.test.ts
+  node --experimental-strip-types --test tests/core/public-benchmark.test.ts
+  node --experimental-strip-types --test tests/core/blind-pairs-discrimination.test.ts
+  node --experimental-strip-types --test tests/core/script-doctor.test.ts
+  node --experimental-strip-types --test tests/core/doctor-worker-pool.test.ts
+  node --experimental-strip-types --test tests/core/doctor-history-identity.test.ts
+  node --experimental-strip-types --test tests/core/honesty-audit-claims.test.ts tests/core/brain-coverage.test.ts tests/core/docs-gating-set.test.ts
+  git archive 3fde3f1d | tar -x -C <scratch>/loader-base
+  ln -s <checkout>/node_modules <scratch>/loader-base/node_modules
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/loader-base --out <scratch>/loader-before
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/wt-loader  --out <scratch>/loader-after
+  node scripts/check-doctor-output-identity.mjs --compare <scratch>/loader-before <scratch>/loader-after
+  npm run brain && npm run check-brain
+  node scripts/check-scoring-receipt.mjs 3fde3f1d..HEAD
+  ```
+  Every one exited 0 except the fail-first probe run of the guard test, which was REQUIRED to exit 1 and did (see the attestation). This is not `npm run measure-real`: the private real-script corpus is not present in this environment, no AUC-24 value is claimed anywhere in this entry, and no real-corpus figure is claimed for this range. The full `npm test` is the orchestrator's run, not this lane's.
+- **Output identity:** the compare run's own line, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+  **0 of 45 fixtures differ.** The after-snapshot was taken from the tree at `ed07e688` with the same `reference.ts` bytes this range ships (a later commit reworded one comment in that file; comments do not reach the harness's output).
+- **The guard, and its fail-first probe:** `tests/core/doctor-calibration-under-tsx.test.ts` spawns `process.execPath` running `tsx/dist/cli.mjs` (the same resolution `scripts/verify-production-build.mjs` uses — no `.bin` shim, so it holds on Windows) with `NODE_ENV=production` and `DOCTOR_POOL_PREWARM=0`, on a probe that imports `doctor.ts` FIRST (the cycle entry every pool worker uses), runs a 3-scene script in-thread, calls `clearDoctorCache()`, runs the same script through the real pool, shuts the pool down and prints both reports plus the main thread's distribution size and the pool counters. On this tree it passes 1/1 in **4.64 s and 4.11 s wall** (the test itself ~3.2 s; the rest is the runner). Falsified on purpose: `const sig = (x: number) => x;` was inserted inside `densityPenalty` (on the `computeRawCraftScore` path) and `weightedIssues` wrapped in it, and the test failed by name — `main thread: reference distribution holds 0 of 20 corpus samples — buildDistribution() threw and was swallowed into emptyDistribution()` — while the production child's stderr carried the new log line, `{"level":"error","msg":"calibration reference distribution unavailable: …","error":"TypeError: __name is not a function","thread":"main","corpusSize":20,"percentileFieldsAbsent":true}`. Under this box's Node 22.22.2 only the main thread emptied (the candidate's audit measured Node 24.21.0 emptying the workers too); the guard asserts both threads, so either version fails it. `doctor.ts` was restored from a byte copy taken before the probe (`git status` clean on that file) and the test re-run 1/1.
+- **The catch is unit-tested:** `tests/core/calibration.test.ts` gained four `settleDistribution` cases — a succeeding builder is returned by identity and logs nothing; a throwing builder yields the well-formed empty distribution and exactly one log line carrying `CALIBRATION_UNAVAILABLE_LOG_MSG`, `error: "TypeError: __name is not a function"`, `percentileFieldsAbsent: true`, `corpusSize: 20` and a thread name; a non-`Error` throw is quoted as a string; and with the default sink the line lands on `process.stderr` as JSON at level `error`, and not on stdout. The suite is 25/25 (was 21).
+- **Corpus fingerprint:** committed input sets only, no private text read. (1) The 45 in-repo identity fixtures the harness scores — 20 `data/screenplays/*.fountain` live-action fixtures, 20 calibration `REFERENCE_CORPUS` samples, the P0 sample script, and 4 synthetic concatenations at 60/120/240/300 scenes. (2) The public benchmark's 32-script manifest, `tests/fixtures/public-corpus-manifest.json`, unchanged by this range, sha256 `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e` (`tests/fixtures/public-benchmark-split.json`, also unchanged: `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`). Every one of the 32 manifest rows — `sceneCount`, `words`, `health`, `verdict` — came back byte-identical, so no manifest re-lock was needed and none was run. **The PRIVATE AUC-24 corpus was not available in this environment** (`REAL_SCRIPT_CORPUS_DIR` is unset here and the corpus is local-only by copyright), so no real-corpus figure is claimed for this range. `AUC24_FLOOR` is untouched at 0.622 and `AUC24_DEGRADATION_ID` remains `shuffle-drop/v4`.
+- **Public benchmark before/after:** all six floors' measured values reproduce unchanged from the committed 32 distributable screenplays, matching both `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first (PRIMARY), all-pairs second: shuffle-drop **0.5313 / 0.5586**; climax-relocate **0.4063 / 0.4443**; DIALOGUE_FLATTEN (the positive control) **1.0000 / 0.9473**, 32 of 32 ordered, zero ties. Ordered/inverted/tied counts are also unchanged — shuffle-drop 17/15/0, climax-relocate 8/14/10. The suite is 28/28. **No floor constant in `scripts/lib/auc.ts` was touched, no floor rose, no floor fell, and no re-lock was performed;** that file is not in this lane's diff.
+- **Runner attestation:** run in the lane worktree (`lane/prod-loader-guard`, branched from `3fde3f1d`) on 2026-09-21 by the lane agent, on an Intel(R) Xeon(R) Processor @ 2.80GHz x4 sandbox (parallelism 4, 15 GiB) under node v22.22.2, linux/x64, with `tsx` resolved from the checkout's `node_modules` (the version the Dockerfile CMD installs); no API key was present and no private corpus was read. I extracted the `3fde3f1d` baseline myself with `git archive`, symlinked `node_modules` in from the real checkout, ran every command in the block above here, and read each one's exit code and output directly. The fail-first probe described above was run twice on this tree (once with the guard's stderr assertions first, once with them last, to confirm which assertion names the failure), and `doctor.ts` was restored from a pristine byte copy after each; the committed tree contains no probe. This is an output-identity receipt, not a discrimination-statistic measurement: the private real-script corpus is not present in this environment, `REAL_SCRIPT_CORPUS_DIR` is unset here, and no real-corpus figure is claimed for this range.
+- **What a reader should NOT take from this entry.** It is a defensive-change output-identity receipt. It shows the score did not move — by byte identity on all 45 doctor reports and by six unchanged public-benchmark statistics — and that this branch does not carry the candidate's loader defect today. It says nothing about whether the score discriminates, none of its numbers is comparable to AUC-24 or to the P1 baseline, and the guard test proves the calibration layer SURVIVES the production loader, not that the percentiles it produces mean anything: the reference set is still the 20-sample hand-authored corpus `reference.ts`'s header describes.
