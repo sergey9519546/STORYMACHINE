@@ -219,6 +219,28 @@ and already-merged findings at the patch/ancestor level; adds that
 (LAND, pending `npm run owner:measure`) and that
 `wip/phase-w-ui-checkpoint` is ABANDON, not merely stale.
 
+### 2026-09-21 addendum
+
+Branch state as of the session branch's head `23879294`
+(`git log --oneline bafffb69..23879294`, oldest first: `e2e8a5d9`,
+`36433b75`, `d35315b6`, `77df28ab`, the merge `846b8bf7`, `b9a1c60b`,
+`23879294`; full account in `SESSION_REPORT_2026-09-19.md` §17).
+
+| branch | head | state |
+|---|---|---|
+| session branch (`claude/fable-5-1-orchestrator-yil0xr`) | `23879294` (+ this commit) | main's lineage; CI green at `bafffb69` (run 35560887467), red at `846b8bf7` (the `owner-measure-e2e.test.ts` fixture the move missed — §17.2), in progress at `b9a1c60b` and `23879294` when written |
+| `lane/craft-formula-leaf` | `77df28ab` | merged `--no-ff` into the session branch as `846b8bf7`; left on origin |
+| `lane/prod-loader-guard` | `284ba5de` | merged into the session branch; left on origin |
+| `lane/land-feature-length-defects` (candidate) | `f1843253` | not merged; CI green (run 35559777779); owner's decision unchanged; still carries the craft formula inside its own `doctor.ts`, so merging it now conflicts mechanically with the leaf on three edits (the steepness constant, the saturation term, the hoisted logistic) |
+| `lane/land-advice-rule-fixes` | `671b7cf2` | held, unchanged |
+
+Merged lane branches left on origin for the owner to delete (this
+session's credential cannot delete remote branches): `lane/prod-loader-guard`,
+`lane/craft-formula-leaf`, `calibrate/voice-bound-2026-09-13`, `-13b`,
+`-13c`, `-13d`, `claude/advice-rule-fixes-pending-measurement`,
+`claude/r5-verbosity-bias-pending-measurement`, `lane/healthcheck-ipv4`,
+`lane/node-24`, `lane/per-pass-diagnostics`.
+
 ### Pull requests (15 reviewed, all states)
 
 Zero open. Merged and present in main: **#257** (INVERSE_CHEKHOV_GUN, the

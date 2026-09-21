@@ -1170,3 +1170,136 @@ had since it was created.
 
 Candidate commits since `84d44e94`, oldest first: `0f5a35ba`, `c19bb0c8`,
 `04b47fa4`, `6157fc49`, `f1843253`.
+
+## 17. 2026-09-21 — the craft formula is a leaf module; what the move broke, and what it cost
+
+### 17.1 The move
+
+`lane/craft-formula-leaf` (four commits — `e2e8a5d9`, `36433b75`,
+`d35315b6`, `77df28ab`, oldest first — merged `--no-ff` as `846b8bf7`)
+moved `craftPenalty`, `densityPenalty`, `scarcityPenalty` and
+`computeRawCraftScore`, with their function-local constants, from
+`server/nvm/analyze/doctor.ts` into `server/nvm/analyze/craft-formula.ts`,
+a leaf whose import closure is itself alone:
+
+| constant | value |
+|---|---|
+| `WORD_COUNT_EXPONENT` | 0.7 |
+| `DENSITY_POWER` | 3.75 |
+| `DENSITY_SCALE` | 2.5 |
+| `SUB_DENSITY_SCALE` | 10 |
+| `SUB_DENSITY_MIDPOINT` | 0.52 |
+| `SUB_DENSITY_STEEPNESS` | 50 |
+| `SCARCITY_SCALE` | 140 |
+
+Bodies byte-identical — extracted by line range, and the diff of that text
+against the leaf minus its header is four `export` keywords and three
+doc-comment sentences. `doctor.ts` re-exports `computeRawCraftScore`;
+`calibration/reference.ts` imports it from the leaf instead, so the
+corpus build no longer runs code from a half-evaluated module:
+
+| tree | `reference.ts` reaches | `doctor.ts` reaches | cycle |
+|---|---|---|---|
+| before (`bafffb69`) | 68 files, including `doctor.ts` | 68 files | `doctor.ts` -> `reference.ts` -> `doctor.ts` |
+| after (`e2e8a5d9`) | 60 files, excluding `doctor.ts` | 69 files, one-directionally | none |
+
+Pinned by `tests/core/craft-formula-leaf.test.ts` (3/3). Two probes, each
+reverted: a module-level `const` in the leaf read by `scarcityPenalty`,
+and a named nested arrow inside `densityPenalty` — both PASS the tsx guard
+(1/1) and calibration (25/25) on the lane, while the same
+module-level-const probe applied to the `bafffb69` baseline fails the tsx
+guard by name ("holds 0 of 20"). The function-local constant style is
+kept in the leaf as convention, not as a structural requirement.
+
+Output identity: 45/45 byte-identical against `bafffb69` (orchestrator
+re-ran it). Public benchmark:
+
+| channel | matched-pair | all-pairs |
+|---|---|---|
+| shuffle-drop | 0.5313 | 0.5586 |
+| climax-relocate | 0.4063 | 0.4443 |
+| dialogue-flatten (control) | 1.0000 | 0.9473 |
+
+No floor moved. Receipt entry: "craft formula moved to a leaf module (code
+motion; no formula change)". Every `doctor.ts:NNNN` citation of unmoved
+code below the moved block shifts by −230 (CLAUDE.md, NORTH_STAR,
+ROADMAP, the Glossary brain note, `docs/CLAIMS_REGISTER.md` rows 22 and
+115 re-anchored in `36433b75`); CLAUDE.md's TDZ gotcha rewritten to what
+is now true. Side finding recorded in the lane's audit: `calibration.test.ts`
+imports `reference.ts` before `doctor.ts`, so only the tsx guard ever saw
+either hazard.
+
+### 17.2 What the move broke
+
+The orchestrator pushed `846b8bf7` as a checkpoint after the lane's twelve
+suites, the identity harness and its own 96-test spot check, then started
+the full `RUN_E2E=1` suite: 14,609 tests, 0 failed, 23 CANCELLED, exit 1.
+`tests/scripts/owner-measure-e2e.test.ts`'s `before` hook patches
+`const SCARCITY_SCALE = 140;` in `doctor.ts`'s source text at three sites
+to fabricate a scoring-path change — a patcher no import-grep can find —
+and its existence assertion cancelled all 23 subtests of the first
+`describe`. CI on `846b8bf7` failed (run 35561986909) on exactly that.
+
+Fix `b9a1c60b`: one `bumpScarcityScale(tree, to)` helper patches the leaf
+at all three sites with the assertion at each; the leaf is in `doctor.ts`'s
+reachable set (69 files), so the fixture's edit is still a tier-2
+scoring-path change and the test still drives the receipt gate; 56/56,
+0 cancelled; fourteen "lives in doctor.ts" sentences corrected in place
+with line counts unchanged.
+
+Full `RUN_E2E=1` suite on `b9a1c60b`:
+
+| metric | value |
+|---|---|
+| tests | 14,609 |
+| pass | 14,510 |
+| fail | 0 |
+| cancelled | 0 |
+| skipped | 98 |
+| wall time | 411.1 s |
+
+Process note: the checkpoint push preceded the full suite, and CI caught
+the miss eleven minutes later. The durability rule (push at checkpoints)
+and the verification rule (full suite before a final push) pulled in
+opposite directions here; the record above shows which one the
+orchestrator followed.
+
+### 17.3 The citations
+
+`23879294` (18 files): the same −230 shift the move lane had already
+corrected in five documents remained in `scripts/lib/auc.ts`,
+`scripts/lib/public-benchmark.ts` (including its printed limits text) and
+the regex in `tests/core/public-benchmark-limits.test.ts` that pins that
+text, `scripts/check-scoring-receipt.mjs`, three brain notes,
+`server/lib/coverage-letter.ts` and `page-refs.ts` comments with the tests
+that quote them, `src/lib/percentile-copy.ts`, `server/routes/scriptide.ts`,
+`docs/STORYTELLING_COVERAGE_MAP.md`, `scripts/story-bench.mjs`, and one
+brain measurement note whose citation moved into the leaf
+(`craft-formula.ts:237-238`); one pre-existing, unrelated drift
+(`:617` -> `:419`, `climaxZoneDecayDeduction`) was fixed in passing. Every
+new number was verified by reading the cited lines.
+
+Left as written: dated audits, measurement docs, worked examples of prior
+incidents, and `tests/core/story-graph-corpus-auc.README.md:49`, an older
+unrelated drift that was flagged, not fixed. 186 pinning tests green
+after the merge.
+
+### 17.4 Heads
+
+CI on the session branch: green at `bafffb69` (run 35560887467), red at
+`846b8bf7` (the fixture in §17.2), in progress at `b9a1c60b` and
+`23879294` when this section was written.
+
+| branch | head | note |
+|---|---|---|
+| session branch | `23879294` (+ this commit) | this report |
+| `lane/land-feature-length-defects` (candidate) | `f1843253` | CI green (run 35559777779); owner's decision unchanged; still carries the formula inside its own `doctor.ts`, so a future merge of it conflicts mechanically with the leaf on three edits (the steepness constant, the saturation term, the hoisted logistic) |
+| `lane/land-advice-rule-fixes` | `671b7cf2` | held, unchanged |
+
+Merged lane branches left on origin for the owner to delete (this
+session's credential cannot delete remote branches): `lane/prod-loader-guard`,
+`lane/craft-formula-leaf`, plus the nine listed in §13/§15
+(`calibrate/voice-bound-2026-09-13`, `-13b`, `-13c`, `-13d`,
+`claude/advice-rule-fixes-pending-measurement`,
+`claude/r5-verbosity-bias-pending-measurement`, `lane/healthcheck-ipv4`,
+`lane/node-24`, `lane/per-pass-diagnostics`).

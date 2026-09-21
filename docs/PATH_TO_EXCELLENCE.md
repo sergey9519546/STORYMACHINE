@@ -120,7 +120,11 @@ structural weaknesses; it now tests the production loader and logs the
 calibration fallback instead of swallowing it silently (`284ba5de`), and
 the voice cost-rate constant is re-fitted from the GitHub Actions
 runner's own measurement of its own shape rather than a stale
-developer-box figure (`SESSION_REPORT_2026-09-19.md` §16).
+developer-box figure (`SESSION_REPORT_2026-09-19.md` §16). The craft
+formula now lives in a leaf module (`846b8bf7`, byte-identical), so the
+doctor↔reference cycle no longer runs it; the move broke one source-text
+test fixture, fixed at `b9a1c60b`, and the shifted line citations were
+repointed at `23879294` (`SESSION_REPORT_2026-09-19.md` §17).
 
 2026-09-20 closed the remaining §4 rows under owner authorization: row 3
 (per-pass diagnostics), rows 5 and 6 (the unified scene-heading grammar),
