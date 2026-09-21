@@ -2,11 +2,11 @@
 
 **Verdict: CONSIDER**
 
-Health 65.0/100 (Solid) · 4 scenes · 152 words · ~2 pages / ~2 min (est.)
+Health 62.8/100 (Solid) · 4 scenes · 152 words · ~2 pages / ~2 min (est.)
 
 ## Summary
 
-CONSIDER — scored in the middle band, above the decline line but short of what the recommend line requires; overall score 65/100. This is the engine's deterministic, threshold-based verdict, not a human read. Structure & Pacing is the highest-scoring diagnostic dimension, with nothing flagged. Plot Logic & Payoff is the lowest-scoring diagnostic dimension, at 97/100 — most of the trouble is around revelation without reaction. Start with the highest-priority fix: A revelation scene delivers new information but no prior misinformation/deception makes it land as a reversal.
+CONSIDER — scored in the middle band, above the decline line but short of what the recommend line requires; overall score 63/100. This is the engine's deterministic, threshold-based verdict, not a human read. Structure & Pacing is the highest-scoring diagnostic dimension, with nothing flagged. Plot Logic & Payoff is the lowest-scoring diagnostic dimension, at 97/100 — most of the trouble is around revelation without reaction. Start with the highest-priority fix: A revelation scene delivers new information but no prior misinformation/deception makes it land as a reversal.
 
 *This reads like an excerpt (4 scenes analyzed): scores and verdicts are computed the same way as for a full script, but with this little material they should be read as feedback on the pages, not coverage of a feature.*
 

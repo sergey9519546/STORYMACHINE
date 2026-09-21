@@ -8,7 +8,7 @@
 
 **Size.** 9,999 scenes · 999,999 words · ~500 pages / ~500 min (est.)
 
-**Rating.** CONSIDER · Health 76.3/100
+**Rating.** CONSIDER · Health 77.7/100
 
 Health percentile: top 5%
 
@@ -22,11 +22,11 @@ Health percentile: top 5%
 
 **Verdict: CONSIDER**
 
-Health 76.3/100 (Strong) · 13 scenes · 824 words · ~4 pages / ~4 min (est.)
+Health 77.7/100 (Strong) · 13 scenes · 824 words · ~4 pages / ~4 min (est.)
 
 ## Summary
 
-CONSIDER — scored in the middle band, above the decline line but short of what the recommend line requires; overall score 76/100. This is the engine's deterministic, threshold-based verdict, not a human read. Theme & Originality is the highest-scoring diagnostic dimension, at 99/100. Character is the lowest-scoring diagnostic dimension, at 75/100 — most of the trouble is around zero entropy scene. Start with the highest-priority fix: An 8+ scene story with zero suspense-dip reversals detected — this reads only for a sharp scene-level drop in the engine's danger/tension language (suspenseDelta < -1), not for a betrayal, broken deal, or backfire conveyed without that tension-language signature. Reread before treating this as "no conflict texture.".
+CONSIDER — scored in the middle band, above the decline line but short of what the recommend line requires; overall score 78/100. This is the engine's deterministic, threshold-based verdict, not a human read. Theme & Originality is the highest-scoring diagnostic dimension, at 99/100. Character is the lowest-scoring diagnostic dimension, at 75/100 — most of the trouble is around zero entropy scene. Start with the highest-priority fix: An 8+ scene story with zero suspense-dip reversals detected — this reads only for a sharp scene-level drop in the engine's danger/tension language (suspenseDelta < -1), not for a betrayal, broken deal, or backfire conveyed without that tension-language signature. Reread before treating this as "no conflict texture.".
 
 ## Root Causes
 
@@ -50,7 +50,7 @@ It does not read for market fit, casting, or budget — those require a human re
 ---
 Script-text hash (SHA-256): 96f529970a75577d4431dc7aa2000d6daa6f7ec3cd5bfd364ae0495f57407fcc
 To verify this letter, run the identical script text through Story Machine’s Script Doctor again: on your own machine with npm run verify-report -- letter.md script.fountain (the script never leaves your computer), or through a hosted instance (the app’s #verify page, or POST /api/export/verify). Every value listed below must match.
-Health: 76.3
-Total issues: 178
+Health: 77.7
+Total issues: 129
 Engine commit: dev · Rulebook: 3,217 rule concepts.
 Generated September 12, 2026 at 05:02:25 AM UTC

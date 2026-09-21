@@ -17,8 +17,10 @@ correctly refused, and therefore no evidence about a real pre-tier report.
 **Never regenerate these from the current tree.** Re-rendering them would make
 them post-tier artifacts and the test would stop testing anything. Both were
 rendered from the `MULTI_SCENE_FOUNTAIN` fixture in
-`tests/scripts/verify-report.test.ts` (health 65.0, CONSIDER, 7 issues), which is
-the script the test verifies them against.
+`tests/scripts/verify-report.test.ts` (health 65.0, CONSIDER, 7 issues as
+rendered by 318493c9; health 62.8 under the feature-length scoring candidate —
+see "Numeric fields patched on 2026-09-21" below), which is the script the test
+verifies them against.
 
 ## Known-limit artifacts — these VERIFY, and that is the point
 
@@ -29,7 +31,9 @@ fail-first target for whoever closes this limit, and as the evidence behind the
 sentence the shipped docs now carry.
 
 Both are built from a genuine export of `data/screenplays/chain-of-custody.fountain`
-(13 scenes, 824 words, ~4 pages, health 76.3, CONSIDER, one tier finding at p. 2).
+(13 scenes, 824 words, ~4 pages, health 76.3, CONSIDER, one tier finding at p. 2
+as exported; health 77.7 and 129 issues under the feature-length scoring
+candidate — see "Numeric fields patched on 2026-09-21" below).
 The HTML took **14 mechanical edits**, the letter **17**:
 
 - every `reader-tier` / `tier-*` markup class renamed to `rs-*` — AND the matching
@@ -60,3 +64,35 @@ verifies it on the claims it does publish.
 known limit rather than as a guard. **When a future lane closes this, those two
 assertions flip to exit 1 and this section is deleted** — do not "fix" the
 fixtures by regenerating them.
+
+## Numeric fields patched on 2026-09-21 — the feature-length scoring candidate
+
+`scripts/verify-report.mjs` re-runs the engine on the script text and compares
+three claims the artifact publishes — health, verdict, totalIssues — and checks
+that the rendered body agrees with the verify block. The feature-length scoring
+candidate (`lane/land-feature-length-defects`: scarcity saturation at 12 scenes,
+sub-1 density steepness 50 -> 2, the ORPHAN_CLUE name/title guard) changes what
+the engine returns for both scripts, so all four copies stopped verifying at
+exit 0 on numbers alone. The README's rule above stands: **none of the four was
+re-rendered.** Only the fields the verifier named as mismatched were edited, in
+place, at their line, with every structural byte (markup, classes, stylesheet,
+captions, scope sentence, claim-row set, the four false statements) untouched.
+The verifier's mismatch lines before the patch, and the edits:
+
+| file | field | from | to | where |
+|---|---|---|---|---|
+| `pre-tier-coverage.html` | health | 65.0 | 62.8 | `.health-number` div, the verify block's `Health` row, and the plain-summary's "overall score 65/100" -> "63/100" (the rounded rendering of the same value) |
+| `pre-tier-letter.md` | health | 65.0 | 62.8 | the "Health 65.0/100 (Solid)" line and the summary's "overall score 65/100" -> "63/100"; the grade stays "Solid" because the engine still grades 62.8 as solid |
+| `known-limit-relabelled-coverage.html` | health | 76.3 | 77.7 | the header "Health 76.3 / 100", `.health-number`, the verify block's `Health` row, and "overall score 76/100" -> "78/100" |
+| `known-limit-relabelled-coverage.html` | totalIssues | 178 | 129 | the verify block's `Total issues` row (the only place the value is printed) |
+| `known-limit-relabelled-letter.md` | health | 76.3 | 77.7 | "**Rating.** CONSIDER · Health 76.3/100", the "Health 76.3/100 (Strong)" line (grade unchanged: 77.7 still grades strong), "overall score 76/100" -> "78/100", and the `Health:` block row |
+| `known-limit-relabelled-letter.md` | totalIssues | 178 | 129 | the `Total issues:` block row |
+
+Verdict (CONSIDER) did not move on either script, and neither pre-tier copy
+claims totalIssues beyond the HTML's 7, which the engine still returns. After
+the patch all four copies print `VERIFIED` at exit 0 with the same
+`not claimed by this … report, so not checked: … sceneCount …` line as before,
+and the two known-limit copies still state `9,999 scenes`,
+`Health percentile: top 5%`, `The 9 things to fix first` and `p. 999` — their
+exit 0 remains the documented limit, not a guard. If the engine's numbers move
+again, patch these same fields again; do not regenerate the files.
