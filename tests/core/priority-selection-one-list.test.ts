@@ -137,6 +137,23 @@ async function renderAll(fountain: string, title: string): Promise<Rendered> {
   };
 }
 
+/** The renderer's own escaping (server/lib/coverage-html.ts's escapeHtml, not
+ *  exported), reproduced substitution for substitution so a location scraped
+ *  out of the HTML can be compared with the report's own string. Until
+ *  2026-09-21 this comparison escaped only `&`: no location in the top list
+ *  of any case contained a quote, so the gap never showed. The feature-length
+ *  scoring candidate moved "ST. AGATHA'S HOSPITAL" scenes into the feature
+ *  fixture's priorities, the HTML rendered `&#39;`, and the case failed on
+ *  the test's escaping rather than on the property it asserts. */
+function escapeHtml(value: string): string {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /** Every `SEVERITY — location` heading under a priorities heading, in order.
  *  Read out of the RENDERED markdown rather than out of the data, because the
  *  defect was a rendering that disagreed with another rendering. */
@@ -227,7 +244,7 @@ describe('the coverage letter prints ONE priorities list', () => {
 
       assert.deepEqual(
         htmlLocations,
-        all.map(i => i.location.replace(/&/g, '&amp;')),
+        all.map(i => escapeHtml(i.location)),
         'the HTML export renders the same findings in the same order',
       );
       assert.equal(bodyList.length, htmlLocations.length,

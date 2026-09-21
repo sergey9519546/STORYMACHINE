@@ -46,7 +46,7 @@ import {
 } from '../../src/lib/diagnostic-copy.ts';
 import { renderCoverageHtml } from '../../server/lib/coverage-html.ts';
 import { renderCoverageLetter } from '../../server/lib/coverage-letter.ts';
-import { buildArtifactClaims, claimRowsFor } from '../../server/lib/artifact-claims.ts';
+import { buildArtifactClaims, claimRowsFor, CLAIM_ROW_SPECS } from '../../server/lib/artifact-claims.ts';
 import { runScriptDoctor } from '../../server/nvm/analyze/doctor.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -154,10 +154,25 @@ describe('the claim set does not treat the graph diagnostic as a health componen
     for (const key of Object.keys(claims)) {
       assert.ok(!/graph/i.test(key), `the claim set publishes a graph field: ${key}`);
     }
+    // A row may print the same integer as the deduction only when that integer
+    // is a report fact of its own, printed under its own label. Until
+    // 2026-09-21 this loop asserted `row.value !== String(graphDeduction)` for
+    // every row, which is a value comparison, not a provenance one: on the
+    // feature-length scoring candidate this script's graphDeduction is 12 and
+    // so is its sceneCount, so the "Scenes" row read "12" and the assertion
+    // reported a leak that was a coincidence. The check now follows each
+    // colliding row back to the report field CLAIM_ROW_SPECS says it prints:
+    // the row passes only if that non-graph field has exactly this value.
     for (const row of claimRowsFor(claims)) {
       assert.ok(!/graph/i.test(row.label), `a claim row names the graph diagnostic: ${row.label}`);
-      assert.notEqual(row.value, String(gh.graphDeduction),
+      if (row.value !== String(gh.graphDeduction)) continue;
+      const spec = CLAIM_ROW_SPECS.find(s => s.label === row.label);
+      assert.ok(spec && !/graph/i.test(spec.field),
         `a claim row publishes the unapplied deduction as a value: ${row.label}`);
+      const own = (report as unknown as Record<string, unknown>)[spec!.field];
+      assert.equal(String(own), row.value,
+        `a claim row publishes the unapplied deduction as a value: ${row.label} `
+        + `("${row.value}" is not report.${spec!.field}, which is ${String(own)})`);
     }
   });
 });
