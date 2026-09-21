@@ -110,7 +110,17 @@ red in CI on every push while §12 called it green — no lane's brief on the
 branch had included the full `npm test`. At `ea27b3cc` it passes an
 independent full suite with zero failures, with adversarial finding #5's
 fixture-driven reproduction moved to a builder-made variant fixture
-(`SESSION_REPORT_2026-09-19.md` §15).
+(`SESSION_REPORT_2026-09-19.md` §15). The candidate carried a
+production-only defect since `c5c18f96`: the calibration layer emptied
+under the production loader, so every production doctor report shipped
+without `healthPercentile` or any dimension `percentile`; CI's
+dev-vs-prod check caught it on 2026-09-21, and it was fixed at
+`f1843253`. Main's lineage did not have the defect but shared its two
+structural weaknesses; it now tests the production loader and logs the
+calibration fallback instead of swallowing it silently (`284ba5de`), and
+the voice cost-rate constant is re-fitted from the GitHub Actions
+runner's own measurement of its own shape rather than a stale
+developer-box figure (`SESSION_REPORT_2026-09-19.md` §16).
 
 2026-09-20 closed the remaining §4 rows under owner authorization: row 3
 (per-pass diagnostics), rows 5 and 6 (the unified scene-heading grammar),

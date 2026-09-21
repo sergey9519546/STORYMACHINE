@@ -1031,3 +1031,142 @@ The lane's own record is `docs/audits/2026-09-20-feature-length-defects-prep/REA
 The owner's steps are unchanged from §13/§14: fetch, `measure-real`,
 manifest re-lock, `lock-auc24` on recipe `v4`, then the saturation decision
 and the merge decision together.
+
+## 16. 2026-09-21 — three closures: the cost-rate constant, a production-only defect on the candidate, and the loader guard on main's lineage
+
+### 16.1 The cost-rate constant, closed
+
+`VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT` in `server/lib/validation.ts`
+was a 2026-09-05 developer-box figure, 0.173 us/unit, fitted on an "n
+uniform speakers at 32 words" shape the shared generator could not
+produce — `buildUniformCast` requires words-per-speaker to be a multiple
+of 6, and 32 is not. Commit `263420ac` adds a dedicated `uniform-32` shape
+to `scripts/lib/voice-bound.ts` (an 8-word unit x 4, so 97 speakers weighs
+301,088, the weight the 0.173 figure was fitted at); every existing
+generator reads byte-identical before and after (48-hash probe), and
+`voice-bound-derivation` (8/8) and the cue-parity suite (682/682) hold
+before and after. `--uniform-32=` is wired into
+`scripts/measure-voice-bound-cost.mjs` and a `uniform_32` dispatch input
+into `.github/workflows/calibrate-voice-bound.yml`.
+
+The orchestrator dispatched that workflow on the candidate — run
+**35553883758**, `ubuntu-latest`, AMD EPYC 7763 x4, node v24.20.0, the
+default sweep plus `uniform_32=97`, repeats 2, idle and loaded conditions,
+2 min 20 s. The row:
+
+| shape | N | weight | guard | CPU idle max | CPU loaded max | us/unit idle | us/unit loaded |
+|---|---|---|---|---|---|---|---|
+| uniform-32 | 97 | 301,088 | ACCEPT | 185 ms | 299 ms | 0.6144 | 0.9931 |
+
+0.9931 us/unit loaded is 5.7x the developer-box figure (0.6144 idle is
+3.6x). Commit `84d44e94` locks that table into
+`tests/fixtures/voice-bound-derivation.json` (15 rows per condition;
+`MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` re-derives to 100 at 755 ms against
+the 12,000 ms ceiling, unchanged), sets the constant to 0.9931 with its
+source named in the comment, and deletes the typed literal
+`VOICE_ELIGIBLE_WEIGHT_RUNNER_WORST_US_PER_UNIT = 0.807` in favour of a
+value the test derives from the table at run time (the at-bound row now
+reads 1,193 ms / 1,500,000 = 0.795). The margin proof is now three
+readings, all from the table: the bound itself, 1,500,000 x 0.9931 =
+1,490 ms, 6.7x under the 10,000 ms target; the document sitting at the
+bound, measured directly at 1,193 ms, 8.4x under; and the worst rate of
+any accepted loaded row — probe-cast N=20, 663 ms / 303,840 = 2.182
+us/unit, because a light document carries the analyzer's per-document
+baseline — which is the binding reading at 3,273 ms, 3.1x under. The
+register's own decision rule (re-fit only when the runner has measured
+the same shape) is what was applied; see
+`docs/audits/2026-09-20-feature-length-defects-prep/README.md` § "Cost-rate
+constant — left open 2026-09-20, closed 2026-09-21".
+
+### 16.2 A production-only defect on the candidate, found and fixed
+
+CI at `ea27b3cc` had the test job green and the browser battery's
+`verify:production` at 70/71: "the doctor report is byte-identical between
+dev and production (excluding analyzedAt) — first differing top-level key:
+dimensions". A lane reproduced it with a direct harness on Node 24:
+production lacked `healthPercentile` and every `dimensions[].percentile` /
+`percentileDescriptor` (11 differing paths); everything else was
+byte-identical.
+
+Root cause: `calibration/reference.ts` builds the reference distribution
+in a top-level `await` through `doctor.ts`'s `computeRawCraftScore` inside
+the doctor<->reference import cycle, and that call runs before
+`doctor.ts`'s own body has evaluated whenever `doctor.ts` is the cycle's
+entry — every pool worker, and a `tsx server.ts` main thread, which is the
+Dockerfile CMD. Under tsx (esbuild `keepNames: true`) the candidate's
+nested arrow inside `subDensityCurve` (`c5c18f96`) compiled to a
+`__name(...)` call on a hoisted, uninitialised module var; the corpus
+build threw `TypeError: __name is not a function`; the `catch` swallowed
+it into an empty distribution; every production report from that process
+shipped without percentiles. `node --experimental-strip-types` (what
+`npm test` and the dev server use) injects no such helper, so no test saw
+it; on Node 22 only the main thread emptied, on Node 24 main and workers
+both did, which is why it passed locally and failed on CI. The defect
+existed on the candidate since `c5c18f96` and never existed on the session
+branch.
+
+Fix `c19bb0c8` (rebased): the logistic is now a hoisted function
+declaration, arithmetic unchanged term for term. Output identity is 45/45
+byte-identical against the pre-fix tip; `verify:production` is 71/71 on
+Node 24; a new test,
+`tests/core/doctor-calibration-under-tsx.test.ts`, spawns the real tsx CLI
+with `NODE_ENV=production`, asserts the 20/20 distribution and percentile
+fields on both the in-thread and pooled report paths and their equality,
+and failed before the fix on both Node 22 and Node 24. The receipt is an
+addendum to the feature-length entry plus a standalone 2026-09-21
+output-identity entry; no floor was re-locked, and the public benchmark is
+unchanged. Claims-register row 22's line anchor moved 2454-2455 ->
+2487-2488. Record: candidate README § E5.
+
+### 16.3 The guard on main's lineage
+
+The session branch does not carry the defect — verified under tsx: 20/20,
+percentiles present on both report paths — but shared the two structural
+weaknesses that let the candidate acquire it: a silent `catch {}` around
+the corpus build, and no test anywhere that ran the doctor under the
+loader production actually uses. `lane/prod-loader-guard` (four commits,
+merged as `284ba5de`) closes both.
+
+The guard test was ported (4.0-4.6 s wall) and proven fail-first by a
+probe arrow placed in `densityPenalty`, whose failure names the exact
+mechanism: "main thread: reference distribution holds 0 of 20 corpus
+samples — buildDistribution() threw and was swallowed into
+emptyDistribution()". `reference.ts`'s bare `catch {}` is now
+`settleDistribution`, which logs `CALIBRATION_UNAVAILABLE_LOG_MSG` through
+`server/lib/logger.ts` with the error, thread, corpus size and
+`percentileFieldsAbsent: true`, then returns the same empty distribution
+as before — four new unit cases in `tests/core/calibration.test.ts`,
+25/25. CLAUDE.md's TDZ gotcha now names the function-expression twin under
+tsx. A receipt entry records output identity 45/45 against `3fde3f1d` and
+the public benchmark unmoved (0.5313/0.5586, 0.4063/0.4443, 1.0000/0.9473,
+no floor moved). The lane record is
+`docs/audits/2026-09-21-prod-loader-guard/` with its brain note.
+
+Not done, on purpose: moving the craft formula into a leaf module with no
+import of `doctor.ts`, which would retire both gotchas structurally —
+scoring-path code motion needing its own receipt.
+
+### 16.4 Verification and heads
+
+Orchestrator-run independent full suite on the candidate at `f1843253`:
+14,659 tests, 14,555 pass, 0 fail, 98 skipped, 422.7 s. Session-branch
+gates at `284ba5de` (lint, check-no-console, receipt gate `3fde3f1d..HEAD`,
+brain fresh, the six touched/guard suites 63/63) passed; the full suite
+with `RUN_E2E=1` was still running when this section was written — that is
+stated, not predicted.
+
+CI on `lane/land-feature-length-defects` at `f1843253` has completed:
+run **35559777779** (`.github/workflows/ci.yml`, run number 2731, started
+2026-09-21 04:06 UTC, finished 04:13 UTC), all three jobs green, including
+the browser battery whose `verify:production` dev-vs-prod check had been
+the last red step. It is the first green CI run the candidate branch has
+had since it was created.
+
+| branch | head | note |
+|---|---|---|
+| session branch | `284ba5de` (+ this commit) | this report |
+| `lane/land-feature-length-defects` (candidate) | `f1843253` | full suite 0 failures locally; CI green (run 35559777779); the owner's decision unchanged — real-corpus run, manifest re-lock, lock-auc24 on v4, the saturation trade, the security-bound sign-off, and now the merge decision on a branch that carried a production-only defect for eleven days |
+| `lane/land-advice-rule-fixes` | `671b7cf2` | held, unchanged |
+
+Candidate commits since `84d44e94`, oldest first: `0f5a35ba`, `c19bb0c8`,
+`04b47fa4`, `6157fc49`, `f1843253`.
