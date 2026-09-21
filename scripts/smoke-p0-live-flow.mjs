@@ -106,11 +106,16 @@ const BASE = `http://127.0.0.1:${ISOLATED_PORT}`;
 // Expected deterministic facts for "Dead Frequency" (regenerate-verified;
 // must match docs/user-validation/P0_QUICK_START.md provenance). Re-locked
 // 2026-08-04 for the stimulus swap ("The Second Key" -> "Dead Frequency",
-// see src/lib/sample-script.ts's header) — measured health is 78.3, and the
-// live-flow UI rounds it to an integer for display, hence 78 here (the same
-// rounding relationship the prior EXPECT.health: 69 had to the old exported
-// 68.9).
-const EXPECT = { verdict: 'CONSIDER', health: 78, minScenes: 12 };
+// see src/lib/sample-script.ts's header) at measured health 78.3, and
+// re-locked again 2026-09-21 on the feature-length scoring candidate
+// (lane/land-feature-length-defects: scarcity saturation at 12 scenes and
+// sub-1 density steepness 50 -> 2 moved the sample from 78.3 to 81.8 —
+// docs/audits/2026-09-20-feature-length-defects-prep/README.md). The
+// live-flow UI rounds health to an integer for display, hence 82 here (the
+// same rounding relationship the prior EXPECT.health: 78 had to 78.3, and 69
+// before that to the old exported 68.9). `npm run generate-p0-sample` prints
+// the current value; src/lib/sample-coverage-facts.ts carries it as data.
+const EXPECT = { verdict: 'CONSIDER', health: 82, minScenes: 12 };
 
 // The honest draft-rank line the panel must render for the built-in sample
 // instead of ranking a demo among the writer's own drafts (B-6, 2026-09-05).

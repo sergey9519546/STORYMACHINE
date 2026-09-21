@@ -19,7 +19,10 @@ The "Most important after a draft / Coverage" panel sits beside a button reading
 **"See it on the sample"** and renders a report card in the product's own report
 styling. Every number in it was a hardcoded literal — `VERDICT Consider ·
 HEALTH 76 · NEXT Climax engagement · COUNTS 3 · 38 · 159 · LLM JUDGE None` —
-and none of them was what the sample produces (**78**, **2 · 32 · 139**).
+and none of them was what the sample produces (**78**, **2 · 32 · 139** at the
+time; **82**, **2 · 32 · 138** since the feature-length scoring candidate was
+regenerated on 2026-09-21 — the card reads the generated file, so it moved
+with the score).
 Nothing labelled the panel as illustrative. For a product whose whole pitch is
 reproducible, inspectable numbers, the first four numbers on the front door were
 stale fiction, and a visitor discovered that by clicking the button next to them.

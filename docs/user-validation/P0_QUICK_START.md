@@ -114,6 +114,22 @@ render path, so for **live-flow** sessions the operating kit's pre-session
 > stop matching what the generator produces, with the clock masked and nothing
 > else, so this cannot silently go stale again.
 
+> **Current artifact provenance (2026-09-21) — the feature-length scoring
+> candidate.** Regenerated with `npm run generate-p0-sample` on
+> `lane/land-feature-length-defects`: health **81.8**, verdict **CONSIDER**,
+> sceneCount **12**, contentHash
+> `09e8b0381f1fc862619630b5684458bbec6f2c7910d4c0aee7a77ec2c1ec7cb0` (unchanged —
+> the sample's text did not move), `sample-coverage-report.html` **232,284
+> bytes**, start-card counts **2 · 32 · 138** (was 2 · 32 · 139). The health
+> moved because the scoring formula moved, not the sample: the candidate's
+> scarcity saturation (`SCARCITY_SATURATION_SCENES = 12`) and sub-1 density
+> steepness (50 -> 2) lift every 12-scene script by a similar amount
+> (`docs/audits/2026-09-20-feature-length-defects-prep/README.md` records
+> 78.3 -> 81.8 for this script alongside the rest of the corpus). Nothing in
+> the P0 protocol changes; there are still zero valid human sessions and no
+> outcome verdict. `scripts/smoke-p0-live-flow.mjs` now expects the rounded
+> **82**.
+
 **Exposure caveat:** the static HTML is the *report artifact only*. If your
 session shows only this file (not the live StartScreen → Doctor → export flow),
 record exposure as **static report, not live flow** per the operating kit's

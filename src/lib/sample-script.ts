@@ -30,7 +30,12 @@
 // earned reconciliation)." Its measured report (HEAD at swap time, commit
 // 0cf12c9) is health 78.3, verdict CONSIDER, sceneCount 12 — mid-band, not
 // suspiciously perfect and not a wall of red, matching this module's
-// original design intent below. data/screenplays/dead-frequency.fountain
+// original design intent below. (Re-measured 2026-09-21 on the feature-length
+// scoring candidate, lane/land-feature-length-defects: health 81.8, verdict
+// CONSIDER, sceneCount 12, counts 2 · 32 · 138 — the scarcity-saturation and
+// steepness changes lifted every 12-scene script by about the same amount;
+// src/lib/sample-coverage-facts.ts is the generated record of the current
+// value, and tests/core/sample-coverage-facts.test.ts fails when it drifts.) data/screenplays/dead-frequency.fountain
 // therefore now plays a DUAL ROLE: P1 discrimination-corpus member AND P0
 // sample stimulus — it stays in the corpus (nothing was removed from
 // data/screenplays/), and LICENSE-live-action.md's own entry for this file

@@ -568,7 +568,7 @@ try {
   // regex too eager instead of a response too early. "Try sample coverage"
   // always loads the one locked sample (src/lib/sample-script.ts, "Dead
   // Frequency") that smoke-p0-live-flow.mjs already pins to verdict CONSIDER
-  // / health 78 — reusing that exact literal needle here sidesteps the
+  // / health 82 — reusing that exact literal needle here sidesteps the
   // false-positive entirely instead of trying to out-clever the regex.
   const reportBody = await waitForRenderedText(page, 'CONSIDER', { timeoutMs: 45000 });
   record('journey', 'land -> "Try sample coverage" -> analyze -> the verdict renders (CONSIDER, the locked sample\'s known verdict)', reportBody.includes('CONSIDER'), reportBody.slice(0, 200));
