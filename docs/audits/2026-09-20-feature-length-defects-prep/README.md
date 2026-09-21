@@ -1559,3 +1559,108 @@ answer one by widening the margin.
 * No threshold, floor, bound or scoring constant was changed. D1, D4 and D5
   each name a decision that is the owner's.
 * No push. The orchestrator pushes `lane/land-feature-length-defects`.
+
+## § 2026-09-21 — CI was red: what the full suite found, and what changed
+
+Every lane on this branch ran targeted suites; the full `npm test` was outside
+their briefs, and `.github/workflows/ci.yml` had been red on every push.
+Reproduced on `798b495d` by the orchestrator's full run: **14,646 tests, 17
+subtests failing** across nine describes, plus the `browser` job's
+`verify:p0-flow`. Every failure is in a suite the candidate never edited: each
+pins a number the scoring change legitimately moved, hard-codes a value the
+branch re-locked, or rests on a premise the new score no longer satisfies on
+its fixture. This pass fixes the first two kinds without loosening anything,
+records the third, and touches nothing on the scoring path
+(`node scripts/check-scoring-receipt.mjs 6ca3fcd0..HEAD` still lists the same
+five files and says OK; no receipt entry was added).
+
+### E1. The table
+
+| failing suite (describe) | category | what changed | before -> after |
+|---|---|---|---|
+| `scripts/smoke-p0-live-flow.mjs` (CI `browser` job, `verify:p0-flow`) | moved pin | `EXPECT.health` re-locked from the live run, reason recorded beside it; `scripts/verify-production-build.mjs`'s cross-reference, `src/lib/sample-script.ts`'s header, `docs/user-validation/P0_QUICK_START.md` (new dated provenance block), `docs/CLAIMS_REGISTER.md` row 100's evidence column and the Start Screen brain note carry the re-measured value beside the historical one | health 78 (78.3) -> 82 (81.8); verdict CONSIDER and 12 scenes unchanged; contentHash `09e8b038…` unchanged |
+| `tests/core/sample-coverage-facts.test.ts:39` (2 subtests) | moved pin | `src/lib/sample-coverage-facts.ts` rewritten by `npm run generate-p0-sample` (the repo's generator, never by hand) | health 78 / 78.3 -> 82 / 81.8; minor 139 -> 138; critical 2, major 32, next fix "Scene 9 (climax peak)" / PROTAGONIST_PASSIVITY_CLIMAX unchanged |
+| `tests/core/p0-sample-drift.test.ts:78` | moved pin | `docs/user-validation/sample-coverage-report.html` rewritten by the same generator run | 226,783 -> 232,284 bytes; health 78.3 -> 81.8; graph diagnostic (not part of health) 37/100 "up to 9 pts" -> 21/100 "up to 12 pts" |
+| `tests/scripts/report-unverified-gates.test.ts:440` ("the hook rewrites exactly one constant") | hard-coded value | the assertion read `PUBLIC_SHUFFLE_DROP_FLOOR = 0\.5386` as a literal; it now checks that every PUBLIC_* floor other than the raised one survives byte-for-byte, against the `declared` list already in scope and the source's own lines. Fail-first: with `raiseFloorInSource` temporarily rewriting two constants the test fails naming `PUBLIC_SHUFFLE_DROP_FLOOR`; restored (byte-identical), 42/42 | literal 0.5386 -> read from `scripts/lib/auc.ts` (currently 0.8091, re-locked by `e7b8f8a1`) |
+| `tests/routes/root-cause-parity.test.ts:401` ("re-measured, not re-typed", 3 subtests) | moved pin | `SCENE_SPAN_DRIFT_MEASUREMENT` in `server/lib/root-cause-pipeline.ts` re-pinned from the live run; the 2026-09-11 row is preserved in the header's two-column table and in `docs/brain/Surfaces/Surface - Root Cause Pipeline.md` (which the test requires to quote the current strings) | issueCount 899 -> 946; health 84.4 -> 74.4; with spans 70 -> 73, top `Scenes 2–12` -> `Scenes 12–26`, third `Scenes 1–58` -> `Scenes 41–55`; without spans 69 -> 73, top `Scenes 2–4, 6–9` -> `Scenes 13–17, 26`, third `Scene 1` -> `Scenes 41–44, 46, 47` |
+| `tests/routes/root-cause-parity.test.ts:340` (REVERSION PROBE) | premise partly gone, re-anchored to what still holds | the probe asserted the with- and without-spans lists differ in COUNT; they no longer do. Bisected commit by commit (probe in §E2): `e5e2b534`, the ORPHAN_CLUE name/title guard, moves the fixture from 899 to 946 located issues and the counts from 70/69 to 73/73. The tie is compositional, not a split that stopped reading the spans: 65 ids are shared, 8 findings exist only with spans and 8 different ones only without (the over-cap "zero entropy scene" group splits differently). The probe now asserts that SET difference, keeps the scene-range, signature and "demonstrably WORSE" narrowing assertions, and adds an ORDER assertion (24 of 73 positions differ, first at index 16); the drift block pins the 8-only-without count. Fail-first: building `reverted` with spans makes the probe fail by name | count assertion (70 ≠ 69) -> set / scene-set / order assertions (8 + 8 ids; 27 of 65 shared findings narrower; 24 of 73 positions) |
+| `tests/scripts/verify-report.test.ts:500` (BUG-1, 4 subtests) | moved pin (inside byte-copy fixtures) | the verifier re-runs the engine; only the fields it named as mismatched were patched in place, line-addressed, in the four copies — nothing re-rendered, per the fixtures README, which gains a table of every field | pre-tier copies: health 65.0 -> 62.8 (grade solid unchanged, totalIssues 7 unchanged); known-limit copies: health 76.3 -> 77.7, totalIssues 178 -> 129 (grade strong unchanged); verdict CONSIDER on both. All four print VERIFIED at exit 0 with the same `not claimed … sceneCount` line; the forgeries still state their four false statements |
+| `tests/core/priority-selection-one-list.test.ts:165` ("the letter and the coverage HTML print the same list") | hard-coded assumption in the test | the comparison escaped only `&`; the candidate moves two `ST. AGATHA'S HOSPITAL` scenes into the feature fixture's priorities and the renderer prints `&#39;`. The test now reproduces `coverage-html.ts`'s `escapeHtml` (not exported) substitution for substitution | `&`-only -> the renderer's five entities |
+| `tests/core/unapplied-deduction-honesty.test.ts:139` | value collision in the test | the loop asserted no claim row's VALUE equals the graph deduction; on the candidate dead-frequency's graphDeduction is 12 and so is its sceneCount, so the "Scenes" row read "12". Each colliding row is now followed through `CLAIM_ROW_SPECS` to the non-graph report field it prints and must equal it exactly. Fail-first: a synthetic "Words" row carrying the deduction value fails by name | value check -> provenance check (graphDeduction 9 -> 12 on this script) |
+| `scripts/verify-p2-p3-surfaces.mjs` P2-rerun "the verdict the panel shows is recomputed for the edited draft (the number moves)" (CI `browser` job, `verify:surfaces`) | proxy read rounding, not the property | the step appends a scene to `runoff.fountain` and asserted the panel's rounded HEALTH moved; on the candidate the edit moves health 78.6 -> 78.9, both rendered as 79, while the report was recomputed (9 -> 10 scenes, 136 -> 178 issues). The assertion now reads the compact panel's three severity tiles (integer counts rendered for every complete report), which the edit moves and a stale report cannot show; health stays in the detail | rounded health 79 -> 79 (fails) -> severity tiles 1/24/111 -> 1/23/154 (passes) |
+| `scripts/verify-p2-p3-surfaces.mjs` P2-featurelen "top priority #3 carries a jump control" | hard-coded index | the step drove priority #3 because #1 and #2 were document-tier on this fixture; the candidate's ordering puts two line-anchored REVELATION_WITHOUT_SETUP rows first and the document-tier "Conflict layer" third, so #3 correctly has no jump. The driven row is now the first rendered card whose location is in the SERVER's own anchored set for these bytes (`featureAnchoredLocations`), with a preceding assertion that such a row exists and the index in the detail | index 2 (Conflict layer, no jump — fails) -> first server-anchored row, index 0 on the candidate (passes) |
+| `tests/core/coverage-next-fix-jump-honesty.test.ts:44` (3 of 5 subtests) | **premise gone on this fixture — left failing** | see §E3 | top priority NO_REVERSALS_LONG_STORY @ "Conflict layer" (document tier) -> REVELATION_WITHOUT_SETUP @ "Scene 15 (INT. KANE APARTMENT - BEDROOM - NIGHT)" (line-anchored, lines 201–216) |
+
+### E2. The bisect behind the root-cause rows
+
+Same probe, same fixture (`tests/fixtures/feature-length/assembled-feature.fountain`,
+contentHash `6c27c869…` throughout), run at each commit of the pre-merge
+candidate in a detached worktree:
+
+| commit | health | located issues | with spans | without | top priority |
+|---|---|---|---|---|---|
+| `ad3f6fa7` (candidate base) and `6ca3fcd0` (session head) | 84.4 | 899 | 70 | 69 | NO_REVERSALS_LONG_STORY @ Conflict layer |
+| `96c23aee` metamorphic witness | 84.4 | 899 | 70 | 69 | same |
+| `abde72b9` voice abstains per character | 84.4 | 899 | 70 | 69 | same |
+| **`e5e2b534` a name is not a clue** | 84.4 | **946** | **73** | **73** | **REVELATION_WITHOUT_SETUP @ Scene 15** |
+| `6e914dea` scarcity saturation | 75.7 | 946 | 73 | 73 | same |
+| `c5c18f96` steepness 50 -> 2 | 76.8 | 946 | 73 | 73 | same |
+| `8c08c933` dialogue-share signal | 76.8 | 946 | 73 | 73 | same |
+| `5e509394` clue guard narrowed | 74.3 | 967 | 77 | 77 | same |
+| `e4a172a2` narrowing reverted | 74.4 | 946 | 73 | 73 | same |
+| `4229a22a` merge, and `798b495d` tip | 74.4 | 946 | 73 | 73 | same |
+
+So the ORPHAN_CLUE guard, not the formula change, is what moved the
+cluster-level numbers and the fixture's top priority; the two formula commits
+move only health.
+
+### E3. Left failing: `tests/core/coverage-next-fix-jump-honesty.test.ts`
+
+The describe "the feature fixture's top priority is honestly whole-draft"
+reproduces adversarial finding #5 (2026-09-12) on the real fixture: its top
+priority was `NO_REVERSALS_LONG_STORY` at "Conflict layer", which resolves to
+the document tier, and the card used to borrow the first root cause's
+line envelope (lines 137–2709, 87.9 % of the file) as if it were the priority's.
+On the candidate the fixture's top priority is `REVELATION_WITHOUT_SETUP` at
+"Scene 15 (INT. KANE APARTMENT - BEDROOM - NIGHT)", a line-anchored finding
+(the `e5e2b534` row above), so `computeTopPriorityJumpSpan` correctly returns
+lines 201–216, `documentTierLocations` correctly does not contain the location,
+and the first root cause's span now covers 5.1 % of the file (lines 169–317).
+Three of the five subtests fail — not because the card lies, but because the
+fixture no longer contains the situation the test was written to catch. The
+document-tier finding still exists in the report (it is now priority #3), but
+the card only ever renders the top priority, so there is no honest way to
+point the fixture-driven test at it without rewriting what it measures. Only
+one feature-length fixture is committed. The pure boundary cases in
+`tests/core/jump-span.test.ts` still guard the resolver; what is lost is the
+fixture-driven reproduction. Options for the owner: (a) accept the loss and
+retire the describe with a note; (b) commit a second feature-length fixture
+whose top priority is document-tier under the candidate's scoring; (c) rewrite
+the describe to assert the property on whichever priority is document-tier via
+a synthetic top-priority swap, which the test's own header rejects
+("measures the actual report rather than a hand-built shape"). This pass did
+none of them.
+
+The same premise is driven in the browser by
+`scripts/verify-p2-p3-surfaces.mjs`'s `P2-featurelen` phase (its two
+"finding #5" assertions expect the honest "no location" note for the top
+priority and a stray "Jump to line 137" count of zero), so the CI `browser`
+job's `verify:surfaces` step is affected in the same way. Driven here: those two assertions fail (`noLocationNotes=0 strayLine137Jumps=0`; no attributed "A located note from …" row) for exactly the reason above, and no other assertion in the battery does once the two proxy steps in the table were corrected.
+
+### E4. Counts and gates
+
+| check | result |
+|---|---|
+| full `npm test` before (orchestrator, `798b495d`) | 14,646 tests, 17 subtests failing (9 describes), 98 skipped, 6 todo |
+| full `npm test` after (this worktree, `8e328131`) | 14,646 tests, 14,539 pass, **3 subtests failing** (all in `tests/core/coverage-next-fix-jump-honesty.test.ts:44`, E3), 98 skipped, 6 todo, 414.9 s — every other describe from the before row is green |
+| every touched test file individually | `sample-coverage-facts` 3/3 · `p0-sample-drift` 4/4 · `start-screen-sample-card` 5/5 · `report-unverified-gates` 42/42 · `root-cause-parity` 18/18 · `verify-report` 155/155 · `priority-selection-one-list` 14/14 · `unapplied-deduction-honesty` 9/9 · `honesty-audit-claims` 15/15 · `coverage-next-fix-jump-honesty` 5 pass / 3 fail (E3) |
+| `npm run verify:p0-flow` | PASS — "report rendered: verdict=CONSIDER, health~82", keyless, zero genuine console errors. The environment's Playwright 1.63 expects build 1243 of the Chromium headless shell and `/opt/pw-browsers` holds build 1194; the run used the launcher's own `PW_CHROMIUM_PATH` override pointed at the installed build (no `playwright install` was run) |
+| `npm run verify:surfaces` | 246/248 — the two finding-#5 assertions in E3 fail; the P2-rerun and priority-jump steps in the table pass on the corrected reads (`severity tiles 1/24/111 -> 1/23/154`; driven row = priority #1, "Jump to scene 15", flashed 10). An earlier run of the same battery, taken while the full suite was running on the same 4-core box, also recorded two timeout failures on the feature-length coverage run (`HEALTH` never rendered on pageC); they did not recur on the uncontended run and are not in the table |
+| `npm run lint` | 0 |
+| `npm run check-no-console` | 0 (312 files, 4 quarantine entries) |
+| `node scripts/check-scoring-receipt.mjs 6ca3fcd0..HEAD` | OK — the same five scoring-path files as before this pass, no new receipt entry |
+| `npm run honesty-audit` | clean (427 files, 125 register rows) |
+| `npm run brain && npm run check-brain` | 150 notes, 668 links, fresh |
+| `brain-coverage` · `honesty-audit-claims` · `docs-gating-set` | 8/8 · 15/15 · 8/8 |
+
+Nothing was pushed.
