@@ -250,8 +250,8 @@ export const PUBLIC_LOCK_COMMAND = 'npm run benchmark:public -- --lock';
 /**
  * (b) is the reason this benchmark reports two numbers instead of one.
  *
- * doctor.ts:465-467 is `scarcityPenalty(sceneCount) = 140 / max(sceneCount,1)`,
- * summed into craftPenalty at doctor.ts:657. The AUC-24 recipe drops every
+ * craft-formula.ts:254-257 is `scarcityPenalty(sceneCount) = 140 / max(sceneCount,1)`,
+ * summed into craftPenalty at craft-formula.ts:286. The AUC-24 recipe drops every
  * third scene, so it moves that term directly — and doctor.ts's own comment at
  * :2092-2093 records what that means: "the doctor's shuffle-drop 'structural
  * discrimination' is almost entirely a scene-COUNT artifact (scarcity term AUC

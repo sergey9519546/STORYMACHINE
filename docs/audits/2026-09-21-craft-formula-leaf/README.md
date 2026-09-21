@@ -162,4 +162,45 @@ The baseline tree's `doctor.ts` was restored from a pristine byte copy and
 | `node scripts/check-scoring-receipt.mjs bafffb69..HEAD` | see the lane's receipt commit |
 | `npm run brain && npm run check-brain` · `tests/core/brain-coverage.test.ts` | see the lane's final commit |
 
+### Missed by the move (`lane/owner-measure-leaf-path`, 2026-09-21)
+
+The move's import-grep found every importer of the moved functions and missed
+one SOURCE-TEXT patcher: `tests/scripts/owner-measure-e2e.test.ts` builds its
+three fixture branches by rewriting `const SCARCITY_SCALE = 140;` (-> 152 /
+133 / 161) in `server/nvm/analyze/doctor.ts`, and its `before` hook asserted
+that line still existed — it no longer did — cancelling all 23 subtests of the
+first `describe` (the full suite's only failure at `846b8bf7`: 14,609 tests,
+23 cancelled). Repointed at `server/nvm/analyze/craft-formula.ts` through one
+`bumpScarcityScale(tree, to)` helper, so all three sites now carry the
+existence assertion (only the first did before). The leaf is in `doctor.ts`'s
+reachable set (`computeReachableSet` from `doctor.ts`: 69 files, the leaf
+among them), so the fixture's edit is still a tier-2 scoring-path change and
+the test still exercises the receipt gate it is about. Result:
+`owner-measure-e2e.test.ts` 56/56, 0 cancelled.
+
+The same grep could not see prose either. Fourteen "this lives in doctor.ts"
+sentences were corrected in place, line counts preserved because
+`docs/CLAIMS_REGISTER.md` anchors line numbers in three of the files:
+`tests/core/script-doctor.test.ts` (5 comment lines), `tests/core/calibration.test.ts`
+(6), `tests/core/discrimination.test.ts` (2), `tests/core/public-benchmark.test.ts:352`,
+`scripts/lib/auc.ts:163` and `scripts/lib/public-benchmark.ts:253-254`
+(`doctor.ts:465-467` / `:657` -> `craft-formula.ts:254-257` / `:286`).
+Verified after: `honesty-audit-claims` 15/15, `script-doctor` 86/86,
+`calibration` 25/25, `discrimination` 14/14, `public-benchmark` 28/28,
+`craft-formula-leaf` 3/3, `npm run lint` 0,
+`node scripts/check-scoring-receipt.mjs 846b8bf7..HEAD` — no scoring-path
+file changed. Dated audits and measurement docs that cite the old
+`doctor.ts` lines were left as written.
+
+Still stale after this lane, deliberately: commit `36433b75` corrected the
+-230 shift of UNMOVED `doctor.ts` code in CLAUDE.md (`:2092-2093` ->
+`:1862-1863`, `:2127-2131` -> `:1897-1901`) but the old numbers remain in
+`scripts/lib/auc.ts:210`, `scripts/lib/public-benchmark.ts:256` and its
+PRINTED limits text at `:829`, `tests/core/public-benchmark-limits.test.ts:16,85,95`
+(whose regex pins that printed text), `scripts/check-scoring-receipt.mjs:140`,
+and the brain notes `00 Home.md:33`, `Generation - Story Bench.md:147`,
+`Gate - Public Benchmark.md:89`. That is one coordinated change (printed
+string, test regex, notes, graph regen), not the moved-code repoint this lane
+was scoped to.
+
 Nothing was pushed. The full `npm test` is the orchestrator's run.

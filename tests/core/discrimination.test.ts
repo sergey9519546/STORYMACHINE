@@ -22,10 +22,10 @@
 // ── Honest ledger: measured against the CURRENT formula ───────────────────
 // UPDATED by the health-formula sensitivity wave (W1): three pairs
 // (subtext, active-protagonist, dramatized-exposition) were previously
-// EXACTLY TIED at displayed health 79.8 — doctor.ts's craftPenalty density
+// EXACTLY TIED at displayed health 79.8 — craft-formula.ts's craftPenalty density
 // term (density^3.75) was tuned entirely against the reference corpus's
 // density >= 1.4 regime, and crushed the sub-1.0 densities these 7-scene,
-// ~400-470-word pairs land at to <0.05-point differences. doctor.ts's
+// ~400-470-word pairs land at to <0.05-point differences. craft-formula.ts's
 // densityPenalty now carries a second, independently-tuned curve for
 // density < 1.0 (see that function's own comment for the full measurement
 // and the curve chosen) — the corpus's own density >= 1.4 regime, and every

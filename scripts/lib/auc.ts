@@ -160,7 +160,7 @@ export const AUC24_FLOOR_MARGIN = 0.05;
  * WHY THREE DEGRADATIONS.
  *
  *  - SHUFFLE_DROP is the AUC-24 recipe: it drops every third scene and so
- *    moves `scarcityPenalty = 140/sceneCount` (doctor.ts:465-467) directly.
+ *    moves `scarcityPenalty = 140/sceneCount` (craft-formula.ts:254-257) directly.
  *  - CLIMAX_RELOCATE preserves scene count exactly (measured: mean scarcity
  *    delta 0.000 over all 32 scripts), so that term cancels and what is left
  *    is order-sensitivity alone. Since 2026-09-12 it moves the final scene to

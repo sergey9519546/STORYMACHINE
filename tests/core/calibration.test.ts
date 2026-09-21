@@ -288,7 +288,7 @@ describe('settleDistribution — the empty-distribution fallback logs, never thr
 
 describe('computeRawCraftScore vs computeHealthScore', () => {
   // Post-fix signature: both functions now also take wordCount, since
-  // craftPenalty (doctor.ts) blends a word-density term with a scene-based
+  // craftPenalty (craft-formula.ts) blends a word-density term with a scene-based
   // scarcity term instead of normalizing by scene count alone.
   it('equals computeHealthScore (up to 0.1 rounding) when unsaturated', () => {
     const bySeverity = { critical: 1, major: 1, minor: 1 };
@@ -303,7 +303,7 @@ describe('computeRawCraftScore vs computeHealthScore', () => {
   it('goes negative (not 0) once the penalty exceeds 100', () => {
     // A small wordCount (dense issue rate relative to the script's own size)
     // is what drives the density term high enough to saturate now — see
-    // doctor.ts's craftPenalty comment for why density is word-based.
+    // craft-formula.ts's craftPenalty comment for why density is word-based.
     const bySeverity = { critical: 20, major: 0, minor: 0 };
     const sceneCount = 5;
     const wordCount = 50;
@@ -347,7 +347,7 @@ describe('computeRawCraftScore vs computeHealthScore', () => {
  *  private scoring path — this exercises the real end-to-end pipeline
  *  (analyzeFountainText -> runRevisionPipeline -> aggregateReport) the way an
  *  actual Script Doctor request does, instead of re-deriving reference.ts's
- *  internal build. computeRawCraftScore itself is doctor.ts's published,
+ *  internal build. computeRawCraftScore itself is craft-formula.ts's published (doctor.ts re-exports it),
  *  parameter-only formula — reusing it here (rather than reading
  *  report.health, which is CLAMPED) is exactly the saturation-safe ranking
  *  statistic this whole calibration layer is built on; see doctor.ts's
@@ -355,7 +355,7 @@ describe('computeRawCraftScore vs computeHealthScore', () => {
  *  the one that must be used for any cross-sample ranking. wordCount is
  *  passed alongside sceneCount because the opportunity-based craftPenalty
  *  (the saturation fix) blends a word-density term with a scene-scarcity
- *  term — see craftPenalty's own comment in doctor.ts.
+ *  term — see craftPenalty's own comment in craft-formula.ts.
  */
 async function rawCraftScoreFor(sample: CorpusSample): Promise<number> {
   const report = await runScriptDoctor(sample.fountain);
@@ -459,7 +459,7 @@ describe('band ordering through the real runScriptDoctor pipeline', () => {
 });
 
 // ── Saturation fix regression coverage ────────────────────────────────────
-// doctor.ts's craftPenalty replaced a scene-count-only normalization with an
+// craft-formula.ts's craftPenalty (in doctor.ts until 2026-09-21) replaced a scene-count-only normalization with an
 // opportunity-based one (a word-density term + a scene-scarcity term) so
 // that every realistic multi-scene script no longer clamps to displayed
 // health 0. These two tests encode that fix as real, running-pipeline
@@ -489,7 +489,7 @@ describe('no-saturation & length-invariance (opportunity-based craftPenalty fix)
     // regression test for the saturation defect: before this fix, a longer
     // script of matched quality scored MUCH worse (more accumulated issues,
     // same scene-count-only divisor); after the fix, word-based density
-    // normalization (doctor.ts's craftPenalty) should keep it close to flat.
+    // normalization (craft-formula.ts's craftPenalty) should keep it close to flat.
     const zeroDay = REFERENCE_CORPUS.find(s => s.label === 'Zero Day');
     assert.ok(zeroDay, "pinned sample 'Zero Day' must exist in the corpus");
 
