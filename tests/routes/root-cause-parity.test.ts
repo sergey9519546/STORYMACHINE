@@ -13,7 +13,8 @@
 // `sceneSpans` is not decoration. clusterIssues (server/nvm/analyze/cluster.ts)
 // uses it for sceneIdxsOf — which scenes a finding names — AND for
 // cohesionKey/splitOversizedGroup — how an over-cap group is split into
-// separate findings. Measured on the fixture this file loads:
+// separate findings. Measured on the fixture this file loads (2026-09-11, at
+// 899 located issues):
 //
 //                          with spans   without spans
 //   root causes                   70             69
@@ -22,6 +23,17 @@
 // So the producer read "Scene 1" where the writer read "Scenes 1–58", and the
 // two documents disagreed about how many problems the draft had and which one
 // to fix first — with no error anywhere, from the same script text.
+//
+// Re-measured 2026-09-21 on the feature-length scoring candidate (946 located
+// issues after e5e2b534's ORPHAN_CLUE guard): 73 findings in BOTH columns — the
+// count difference is gone — but only 65 ids are shared (8 findings exist only
+// with spans, 8 different ones only without: the over-cap "zero entropy scene"
+// group splits differently), the third finding still reads Scenes 41–55 with
+// spans and Scenes 41–44, 46, 47 without, 27 of the 65 shared findings name
+// fewer scenes without spans, and the order differs at 24 of 73 positions.
+// SCENE_SPAN_DRIFT_MEASUREMENT in server/lib/root-cause-pipeline.ts carries
+// both rows; the reversion probe below asserts the differences that still
+// exist and no longer asserts the one that does not.
 //
 // ── What this test asserts ──────────────────────────────────────────────────
 //
@@ -40,8 +52,9 @@
 //
 // The last case in this file is the REVERSION PROBE: it re-derives the findings
 // the way each broken call site used to — `clusterIssues(located)` with no
-// spans — and asserts that doing so produces DIFFERENT scene ranges and a
-// DIFFERENT finding count from what the live routes now return. If someone
+// spans — and asserts that doing so produces DIFFERENT scene sets, in a
+// DIFFERENT order, from what the live routes now return (until 2026-09-21 it
+// also asserted a different finding COUNT; see the probe). If someone
 // reverts any call site to hand assembly, the parity cases above fail; if
 // someone "fixes" those cases by weakening them, the probe fails because it
 // would mean spans no longer matter. Both directions are pinned.
@@ -342,15 +355,54 @@ describe('root-cause parity — REVERSION PROBE (this test must be able to fail)
     // Exactly what server/routes/export.ts, server/routes/coverage-letter.ts and
     // scripts/generate-p0-sample-report.ts used to do: clusterIssues(located)
     // with the spans argument omitted. `locatedIssues` comes off the doctor
-    // route's own JSON, so this is the same 899 located issues every surface
-    // above saw — not a synthetic stand-in.
+    // route's own JSON, so this is the same 946 located issues every surface
+    // above saw (899 until the feature-length candidate) — not a synthetic
+    // stand-in.
     const reverted = clusterIssues(s.locatedIssues);
     const live = s.doctorRootCauses;
 
-    assert.notEqual(
-      reverted.length, live.length,
-      'clusterIssues with and without scene spans produced the same NUMBER of findings — '
+    // Until 2026-09-21 this probe asserted `reverted.length !== live.length`
+    // (70 vs 69). On the feature-length scoring candidate the doctor's
+    // ORPHAN_CLUE guard (e5e2b534) moved the fixture from 899 to 946 located
+    // issues, and at 946 splitOversizedGroup splits the over-cap "zero entropy
+    // scene" group into EIGHT findings with spans and eight DIFFERENT findings
+    // without: 65 ids are shared, 8 exist only with spans, 8 only without, and
+    // the two lists tie at 73 by coincidence of composition (bisected commit by
+    // commit; the row before e5e2b534 still reads 70/69). A count assertion
+    // would now be asserting a property the fixture does not have. What
+    // omitting spans still does — and what the parity claims above therefore
+    // still guard — is asserted directly: the lists are a DIFFERENT SET of
+    // findings (8 + 8, measured), the shared ids name DIFFERENT scene sets (27
+    // of 65, measured), and they come out in a DIFFERENT order (24 of 73
+    // positions, first at index 16). The drift-measurement block below pins
+    // the counts and scene strings, so a cluster.ts change that moves them
+    // fails there by name.
+    const sig = (f: RootCauseFinding) => `${f.id}|${f.severity}|${f.memberCount}|${f.sceneIdxs.join(',')}`;
+    const liveById = new Map(live.map(f => [f.id, f]));
+    const onlyReverted = reverted.filter(f => !liveById.has(f.id)).length;
+    assert.ok(
+      onlyReverted > 0,
+      'clusterIssues with and without scene spans produced the same SET of findings — '
+      + 'the over-cap split no longer depends on the spans, and the parity assertions above '
+      + 'would still pass with every call site reverted',
+    );
+    const sceneSetsDiffer = reverted.filter(f => {
+      const was = liveById.get(f.id);
+      return was !== undefined && was.sceneIdxs.join(',') !== f.sceneIdxs.join(',');
+    }).length;
+    assert.ok(
+      sceneSetsDiffer > 0,
+      'every finding names the same scenes with and without spans — '
       + 'the parity assertions above would still pass with every call site reverted',
+    );
+    assert.notDeepEqual(
+      reverted.map(sig), live.map(sig),
+      'the finding signatures are identical with and without spans — spans no longer matter',
+    );
+    assert.notDeepEqual(
+      reverted.map(f => f.id), live.map(f => f.id),
+      'the findings come out in the same ORDER with and without spans — the "fix this first" '
+      + 'ordering the writer sees would survive every call site being reverted',
     );
 
     const liveRanges = rootCauseStatements(live).map(st => st.sceneList).join(' | ');
@@ -377,8 +429,9 @@ describe('root-cause parity — REVERSION PROBE (this test must be able to fail)
     }
     assert.ok(
       narrowed > 0,
-      'no finding named fewer scenes without spans — the measured defect (a 58-scene finding '
-      + 'reported as "Scene 1" in the producer\'s export) is not reproduced by this probe',
+      'no finding named fewer scenes without spans — the measured defect (a 15-scene finding '
+      + 'reported as six scenes in the producer\'s export; 58 reported as "Scene 1" before the '
+      + 'feature-length candidate) is not reproduced by this probe',
     );
   });
 });
@@ -429,6 +482,18 @@ describe('the scene-span drift measurement is re-measured, not re-typed', () => 
   it('the WITHOUT-spans column matches a live run, gaps included', () => {
     const withoutSpans = clusterIssues(s.locatedIssues);
     assert.equal(withoutSpans.length, M.withoutSpans.rootCauses);
+    // 2026-09-21: the two columns' counts are EQUAL on this fixture (73/73) by
+    // coincidence of composition — 8 findings exist only with spans and 8
+    // different ones only without. The reversion probe above asserts that the
+    // sets differ; here, pin that the tie really is compositional rather than a
+    // list that stopped depending on the spans, so the day the composition
+    // changes it is re-measured rather than passing under a length check.
+    const withSpans = clusterIssues(s.locatedIssues, sceneLineSpans(FEATURE));
+    const withIds = new Set(withSpans.map(f => f.id));
+    assert.equal(
+      withoutSpans.filter(f => !withIds.has(f.id)).length, 8,
+      'the number of findings that exist only WITHOUT spans moved — re-measure SCENE_SPAN_DRIFT_MEASUREMENT',
+    );
     assert.equal(formatSceneList(withoutSpans[0].sceneIdxs), M.withoutSpans.topFindingScenes);
     assert.equal(formatSceneList(withoutSpans[2].sceneIdxs), M.withoutSpans.thirdFindingScenes);
     // The row that was wrong: the without-spans top finding is SCATTERED. If this

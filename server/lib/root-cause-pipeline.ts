@@ -41,10 +41,40 @@
 // table that only a human re-types is a claim with no gate under it; this one now
 // has one.
 //
-// The headline it records: the producer's report named ONE scene where the
-// writer's screen named fifty-eight, and the two documents carried a different
-// number of findings in a different order — from one hash, one engine, one
-// script.
+// The headline it recorded on 2026-09-11: the producer's report named ONE scene
+// where the writer's screen named fifty-eight, and the two documents carried a
+// different number of findings in a different order — from one hash, one
+// engine, one script.
+//
+// Re-measured 2026-09-21 on the feature-length scoring candidate
+// (lane/land-feature-length-defects). Nothing in this module or in cluster.ts
+// changed; the DOCTOR did — commit e5e2b534 ("a name is not a clue, and neither
+// is the title of the script", the ORPHAN_CLUE proper-noun/location guard in
+// fountain-analyzer.ts) moved the fixture's located-issue count from 899 to
+// 946 and, with it, every row below (bisected commit by commit with the
+// probe in docs/audits/2026-09-20-feature-length-defects-prep/README.md §
+// 2026-09-21; the row before e5e2b534 still reads 899 / 70 / 69):
+//
+//                                 2026-09-11 (899 issues)      2026-09-21 (946 issues)
+//                                 with spans  without          with spans  without
+//   root causes                          70        69                  73        73
+//   top finding's scenes        Scenes 2–12  Scenes 2–4, 6–9   Scenes 12–26  Scenes 13–17, 26
+//   3rd finding's scenes        Scenes 1–58  Scene 1           Scenes 41–55  Scenes 41–44, 46, 47
+//   health                             84.4                            74.4
+//
+// What survived the re-measurement is the finding itself: without spans the
+// top finding still names a GAPPY set of scenes rather than a narrower span,
+// the third finding still collapses (15 scenes to 6), 27 of the 65 findings
+// common to both lists name fewer scenes, and the order differs at 24 of 73
+// positions (first at index 16). What did NOT survive is the COUNT difference,
+// and the reason is worth stating exactly: at 946 issues splitOversizedGroup
+// splits the over-cap "zero entropy scene" group into EIGHT findings with the
+// spans and eight DIFFERENT findings without them (65 ids are common, 8 exist
+// only with spans, 8 only without), so the two lists tie at 73 by coincidence
+// of composition — not because the split stopped depending on the spans. The
+// reversion probe in tests/routes/root-cause-parity.test.ts therefore asserts
+// the composition, scene-set and order differences directly and no longer
+// asserts a count difference (see its comment for the measurement).
 //
 // Every call site now goes through buildRootCausePipeline(). There is no
 // `sceneSpans` argument to forget: the function derives the spans from the
@@ -140,7 +170,7 @@ export const TOP_ROOT_CAUSE_COUNT = 3;
  *  said "Subsumes 15 issues — Scene 1, Scene 2, Scene 3", and the letter said
  *  "Subsumes 15 issues." with "(Scenes 1, 2, 3)" welded onto the heading.
  *  Both now come from here. `sceneList` is '' for a finding with no scene
- *  anchor (27 of the 70 on the feature fixture) — see formatSceneList on why
+ *  anchor (27 of the 73 on the feature fixture as of 2026-09-21; 27 of 70 before) — see formatSceneList on why
  *  the empty case is the caller's to punctuate. */
 export interface RootCauseStatement {
   id: string;
@@ -208,28 +238,33 @@ export function topRootCauses(
  *
  * `topFindingScenes` / `thirdFindingScenes` are `formatSceneList` renderings of
  * findings [0] and [2] in canonical order. Two things in them are the finding:
- * index 2 names 58 scenes with the spans and ONE without, and index 0's
+ * index 2 names 15 scenes with the spans and SIX without (58 and ONE on the
+ * 2026-09-11 measurement — see the header's two-column table), and index 0's
  * without-spans value is a GAPPY list — the producer's document was naming a
  * different SET of scenes, not a narrower span of them.
+ *
+ * Re-measured 2026-09-21 on the feature-length scoring candidate; the previous
+ * row (899 issues, health 84.4, 70/69, 'Scenes 2–12' / 'Scenes 2–4, 6–9',
+ * 'Scenes 1–58' / 'Scene 1') is preserved in the header table above.
  */
 export const SCENE_SPAN_DRIFT_MEASUREMENT = {
   fixture: 'tests/fixtures/feature-length/assembled-feature.fountain',
   sceneCount: 231,
   wordCount: 19293,
-  issueCount: 899,
+  issueCount: 946,
   /** First 12 hex of the report's contentHash — the whole point is that BOTH
    *  columns below come from this one hash. */
   contentHash12: '6c27c8693c40',
-  health: 84.4,
+  health: 74.4,
   verdict: 'CONSIDER',
   withSpans: {
-    rootCauses: 70,
-    topFindingScenes: 'Scenes 2–12',
-    thirdFindingScenes: 'Scenes 1–58',
+    rootCauses: 73,
+    topFindingScenes: 'Scenes 12–26',
+    thirdFindingScenes: 'Scenes 41–55',
   },
   withoutSpans: {
-    rootCauses: 69,
-    topFindingScenes: 'Scenes 2–4, 6–9',
-    thirdFindingScenes: 'Scene 1',
+    rootCauses: 73,
+    topFindingScenes: 'Scenes 13–17, 26',
+    thirdFindingScenes: 'Scenes 41–44, 46, 47',
   },
 } as const;
