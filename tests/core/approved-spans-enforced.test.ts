@@ -26,6 +26,7 @@ import assert from 'node:assert/strict';
 
 import type { ApprovedSpan, RevisionIssue } from '../../server/nvm/revision/passes/types.ts';
 import { approvedSpansSurvive } from '../../server/nvm/revision/rewrite-llm.ts';
+import { relocateApprovedSpans } from '../../server/nvm/revision/approved-spans.ts';
 
 // Side effect: registers llmRewrite() with rewrite.ts (same as the
 // sanitization test file).
@@ -203,6 +204,59 @@ describe('approvedSpansSurvive (pure)', () => {
     const revisedRelocated = ['INT. HALLWAY - DAY', '', 'Maya walks.', '', 'CUT TO:'].join('\n');
     const result = approvedSpansSurvive(original, revisedRelocated, [cutToSpan]);
     assert.equal(result.ok, true);
+  });
+
+  // 2026-09-21 review of PR #268, finding F2. Survival used to be a substring
+  // check (`revised.includes(excerpt)`) while ./approved-spans.ts's
+  // relocateApprovedSpans requires the excerpt as WHOLE LINES. A rewrite that
+  // embedded the locked lines inside modified lines — a prefix on the first
+  // locked line, or a suffix on the last — was ACCEPTED here, and on the next
+  // pass the relocation could not find the excerpt and the lock was dropped.
+  // The two functions must apply the same rule; this pins that they do.
+  describe('F2: survival and relocation apply the same line-aligned rule', () => {
+    const revisedWithPrefix = [
+      'INT. APARTMENT - DAY',
+      '',
+      'Maya reads by the window, calmer now.',
+      '',
+      'XX MAYA',                   // the locked first line, with a prefix
+      'A calm morning, finally.',
+    ].join('\n');
+    const revisedWithSuffix = [
+      'INT. APARTMENT - DAY',
+      '',
+      'Maya reads by the window, calmer now.',
+      '',
+      'MAYA',
+      'A calm morning, finally. YY',  // the locked last line, with a suffix
+    ].join('\n');
+
+    for (const [label, revised] of [['a prefix on the first locked line', revisedWithPrefix], ['a suffix on the last locked line', revisedWithSuffix]] as const) {
+      it(`${label}: the rewrite is REJECTED (lost=[0]), not accepted on a substring match`, () => {
+        assert.ok(revised.includes('MAYA\nA calm morning, finally.'), 'premise: the excerpt IS a substring of the rewrite');
+        const survival = approvedSpansSurvive(ORIGINAL, revised, [LOCKED_SPAN]);
+        assert.equal(survival.ok, false, `a locked excerpt embedded in a modified line is not verbatim survival (${label})`);
+        assert.deepEqual(survival.lost, [0]);
+        assert.deepEqual(survival.skipped, []);
+      });
+
+      it(`${label}: relocateApprovedSpans reaches the same verdict on the same input`, () => {
+        const relocation = relocateApprovedSpans(ORIGINAL, revised, [LOCKED_SPAN]);
+        const survival = approvedSpansSurvive(ORIGINAL, revised, [LOCKED_SPAN]);
+        assert.deepEqual(relocation.lost, survival.lost, 'one rule, two callers: what survival rejects, relocation cannot find, and vice versa');
+      });
+    }
+
+    it('a single-line excerpt is counted as whole lines too — an occurrence embedded in a longer line does not count', () => {
+      const original = ['CUT TO:', '', 'INT. HALLWAY - DAY', '', 'Maya walks.'].join('\n');
+      const cutToSpan: ApprovedSpan = { startLine: 1, endLine: 1, reason: 'scene transition' };
+      const embedded = ['SMASH CUT TO:', '', 'INT. HALLWAY - DAY', '', 'Maya walks.'].join('\n');
+      assert.ok(embedded.includes('CUT TO:'), 'premise: substring present');
+      const survival = approvedSpansSurvive(original, embedded, [cutToSpan]);
+      assert.equal(survival.ok, false);
+      assert.deepEqual(survival.lost, [0]);
+      assert.deepEqual(relocateApprovedSpans(original, embedded, [cutToSpan]).lost, [0]);
+    });
   });
 });
 

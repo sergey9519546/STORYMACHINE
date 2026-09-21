@@ -305,12 +305,72 @@ describe('TypeSafe System One adapter', () => {
       () => systemOne({ state: STATE, questions: QUESTIONS }),
       (err: unknown) => {
         assert.ok(err instanceof TypeSafeUnavailableError);
-        assert.ok(!err.message.includes(FAKE_KEY), 'the thrown message must be redacted');
-        assert.match(err.message, /\[redacted\]/);
+        // Since 2026-09-21 (PR #268 review finding F4) the body is not in the
+        // message AT ALL — redacted or otherwise. The message is the status
+        // and a fixed category, which is strictly stronger than redaction:
+        // redactSecrets only removes the patterns it knows how to recognise,
+        // and an upstream that echoes the REQUEST back carries text no
+        // redactor can be expected to match.
+        assert.equal(err.message, 'typesafe_http_401');
+        assert.ok(!err.message.includes(FAKE_KEY), 'the thrown message must not carry the key');
         return true;
       },
     );
+    // redactSecrets is still the guard on the transport and malformed paths,
+    // where the message comes from a local exception rather than the upstream.
     assert.equal(redactSecrets(`prefix ${FAKE_KEY} suffix`), 'prefix [redacted] suffix');
+  });
+
+  // ── (j) the upstream's own reply text never rides the error out ─────────
+  // 2026-09-21 review of PR #268, finding F4. The non-2xx branch used to put
+  // `redactSecrets(raw).slice(0, 300)` into the thrown message. `raw` is the
+  // UPSTREAM's bytes, and an upstream that validates a request by echoing it
+  // (a 400 quoting the offending field is the ordinary shape) hands back the
+  // submitted state — which for this adapter's only caller is the candidate
+  // scene text and the scene's theme hint. From there it reaches
+  // CastAlignment.error, skip()'s logger.warn, and the converge response's
+  // history. The adapter's no-state-in-logs contract (property 3 in this
+  // file's header) has to cover the reply as well as the request.
+
+  it("(F4) a non-2xx body is never echoed into the thrown message — only the status and a fixed category", async () => {
+    const MARK = 'ZZSTATEMARKF4';
+    const { transport } = recordingTransport(
+      400,
+      JSON.stringify({ error: 'rejected', echo: { state: { note: MARK, scene: STATE_SECRET_PHRASE } } }),
+    );
+    setTypeSafeTransport(transport);
+    await assert.rejects(
+      () => systemOne({ state: { ...STATE, note: MARK }, questions: QUESTIONS }),
+      (err: unknown) => {
+        assert.ok(err instanceof TypeSafeUnavailableError);
+        assert.equal(err.reason, 'http_error');
+        assert.equal(err.status, 400, 'the status is still carried, typed');
+        assert.equal(err.message, 'typesafe_http_400', 'the message is a fixed category plus the status');
+        assert.ok(!err.message.includes(MARK), 'the submitted marker must not ride the message out');
+        assert.ok(!err.message.includes(STATE_SECRET_PHRASE), 'nor the state text');
+        return true;
+      },
+    );
+  });
+
+  it('(F4) a malformed 2xx body cannot ride the message out either, via an upstream-chosen answer id', async () => {
+    const MARK = 'ZZANSWERIDMARKF4';
+    clearTypeSafeCache();
+    const { transport } = recordingTransport(
+      200,
+      JSON.stringify({ model: TYPESAFE_DEFAULT_MODEL, answers: { [MARK]: 'not an answer object' } }),
+    );
+    setTypeSafeTransport(transport);
+    await assert.rejects(
+      () => systemOne({ state: STATE, questions: QUESTIONS }),
+      (err: unknown) => {
+        assert.ok(err instanceof TypeSafeUnavailableError);
+        assert.equal(err.reason, 'malformed');
+        assert.equal(err.message, 'typesafe_bad_response');
+        assert.ok(!err.message.includes(MARK), 'an answer id is upstream-chosen text, not a safe label');
+        return true;
+      },
+    );
   });
 
   it('a failed call is NOT cached — the next attempt really tries again', async () => {

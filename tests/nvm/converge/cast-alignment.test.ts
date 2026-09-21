@@ -33,6 +33,7 @@ import {
 import type { NarrativeState } from '../../../server/nvm/state/NarrativeState.ts';
 import type { NarrativeTransitionIR } from '../../../server/nvm/ir/NarrativeTransitionIR.ts';
 import type { SceneTarget } from '../../../server/nvm/generate/proof-spec.ts';
+import { logger } from '../../../server/lib/logger.ts';
 
 const FAKE_KEY = 'ts-test-not-a-real-key-0000';
 
@@ -266,6 +267,64 @@ describe('cast alignment (TYPESAFE_CAST_ALIGNMENT)', () => {
     assert.match(out.alignment.error ?? '', /429/);
   });
 
+  // 2026-09-21 review of PR #268, finding F4. What this step submits IS the
+  // writer's material: `stateDoc.candidate` is the rendered candidate ops and
+  // `stateDoc.scene.theme` is the target's theme hint. An upstream that
+  // rejects a request by quoting it back — the ordinary shape of a validation
+  // 400 — therefore hands this deployment its own writer content inside an
+  // error body, and that body used to be spliced into the thrown message, from
+  // there into CastAlignment.error, into skip()'s logger.warn, and into the
+  // converge response's history, which is exactly the escape route the
+  // adapter's no-state-in-logs contract exists to close.
+  it("(F4) an upstream error body that echoes the submitted candidate reaches neither the recorded error nor a log line", async () => {
+    process.env.TYPESAFE_CAST_ALIGNMENT = '1';
+    const CANDIDATE_MARK = 'ZZCANDIDATEMARKF4';
+    const THEME_MARK = 'ZZTHEMEMARKF4';
+
+    const ir = candidateWithInventedName();
+    const shift = ir.ops[1];
+    if (shift.op !== 'SHIFT_RELATIONSHIP') throw new Error('fixture changed: ops[1] is no longer SHIFT_RELATIONSHIP');
+    shift.delta = { dimension: 'trust', amount: -0.3, reason: `the vault opens once ${CANDIDATE_MARK}` };
+    const target: SceneTarget = { ...TARGET, themeHint: `trust costs ${THEME_MARK}` };
+
+    // The upstream rejects the request and quotes it back verbatim.
+    let sentBody = '';
+    setTypeSafeTransport(async (_url, init) => {
+      sentBody = init.body;
+      return { status: 400, text: async () => JSON.stringify({ error: 'invalid request', echo: JSON.parse(init.body) }) };
+    });
+
+    const lines: Array<{ msg: string; data: unknown }> = [];
+    const real = { debug: logger.debug, info: logger.info, warn: logger.warn, error: logger.error };
+    logger.debug = (msg, data) => { lines.push({ msg, data }); };
+    logger.info = (msg, data) => { lines.push({ msg, data }); };
+    logger.warn = (msg, data) => { lines.push({ msg, data }); };
+    logger.error = (msg, data) => { lines.push({ msg, data }); };
+    let out;
+    try {
+      out = await alignCandidateCast(ir, stateWithCast(), { target });
+    } finally {
+      logger.debug = real.debug; logger.info = real.info; logger.warn = real.warn; logger.error = real.error;
+    }
+
+    // The fixture is only meaningful if both markers really were submitted.
+    assert.ok(sentBody.includes(CANDIDATE_MARK), 'fixture: the candidate text must reach the wire');
+    assert.ok(sentBody.includes(THEME_MARK), 'fixture: the theme hint must reach the wire');
+
+    assert.equal(out.alignment.applied, false);
+    assert.equal(out.alignment.reason, 'error');
+    // Status kept, category fixed, nothing else.
+    assert.equal(out.alignment.error, 'typesafe_http_400');
+    assert.ok(!out.alignment.error!.includes(CANDIDATE_MARK), 'the candidate text must not be recorded in the alignment error');
+    assert.ok(!out.alignment.error!.includes(THEME_MARK), 'nor the theme hint');
+
+    const logged = JSON.stringify(lines);
+    assert.ok(lines.some(l => l.msg === 'typesafe_cast_alignment_skipped'), 'the failure is still logged as an event');
+    assert.ok(!logged.includes(CANDIDATE_MARK), 'no log line may carry the submitted candidate text');
+    assert.ok(!logged.includes(THEME_MARK), 'no log line may carry the theme hint');
+    assert.ok(logged.includes('typesafe_http_400'), 'the log line carries the status and the category instead');
+  });
+
   // ── the cheap skips, and what actually goes on the wire ───────────────────
 
   it('a candidate whose characters are all grounded never spends a call', async () => {
@@ -404,5 +463,43 @@ describe('cast alignment (TYPESAFE_CAST_ALIGNMENT)', () => {
     const record = result.candidates[0];
     assert.ok(record.ir.ops.some(op => op.op === 'APPRAISE_EMOTION' && op.charId === 'ILKA'),
       'the candidate RECORD carries the aligned IR, so a commit would commit what was proved');
+  });
+
+  // 2026-09-21 review of PR #268, finding F1. `candidate = castAlignmentOutcome.ir`
+  // used to replace only the loop-local variable; `candidates[ci]` — the array
+  // `lastCandidates` aliases — still held the UNALIGNED IR. When the aligned
+  // candidate then failed a different Tier-1 proof, `best` stayed null and the
+  // budget-exhausted path returned `lastCandidates[last]`: the invented name
+  // came back out of the loop, and /api/nvm/converge-arc applied it to
+  // rollingState even though every step and record said it had been aligned.
+  it('F1: an aligned candidate that still fails another Tier-1 proof is returned ALIGNED by the budget-exhausted fallback', async () => {
+    process.env.TYPESAFE_CAST_ALIGNMENT = '1';
+    const { transport } = answeringTransport(2, 'ILKA', 0.9);
+    setTypeSafeTransport(transport);
+
+    const state = stateWithCast();
+    // sceneIdx 3 with ops and NO declared preconditions fails CausalProof
+    // unconditionally (server/nvm/proof/tier1/causal.ts; the same fixture
+    // tests/core/converge-loop-contract.test.ts uses) — so alignment fixes the
+    // IntentionalProof block and the candidate is still rejected.
+    const unaligned = { ...candidateWithInventedName(), preconditions: [] };
+    const generate = async () => [unaligned];
+    const result = await convergeScene(state, TARGET, generate, { maxIterations: 1, candidatesPerIteration: 1 }, 7);
+
+    const step = result.history[0];
+    assert.equal(step.castAlignment?.applied, true, 'premise: alignment was applied');
+    assert.equal(step.tier1Results.find(r => r.proof === 'IntentionalProof')?.pass, true, 'premise: the name block is gone');
+    assert.equal(step.passed, false, 'premise: another Tier-1 proof still blocks the candidate');
+    assert.equal(result.tier1Passed, false);
+    assert.equal(result.winner, null);
+
+    const names = result.ir.ops.flatMap(op =>
+      op.op === 'APPRAISE_EMOTION' ? [op.charId] : op.op === 'SHIFT_RELATIONSHIP' ? [...op.pair] : []);
+    assert.ok(!names.includes('PROTAGONIST'),
+      `the fallback IR must carry the ALIGNED cast, not the invented name (ops reference: ${names.join(', ')})`);
+    assert.ok(names.includes('ILKA'), 'the fallback IR is the aligned candidate');
+    assert.deepEqual(result.ir, result.candidates[0].ir,
+      'the returned IR and the candidate record describe the same (aligned) candidate');
+    assert.deepEqual(result.ghosts[0]?.ir, result.ir, 'the ghost entry agrees too');
   });
 });

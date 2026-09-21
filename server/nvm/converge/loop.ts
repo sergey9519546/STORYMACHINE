@@ -390,6 +390,15 @@ export async function convergeScene(
       // the set alignment offers as options is the set the proof accepts.
       const castAlignmentOutcome = await alignCandidateCast(candidate, state, { target, grounding });
       candidate = castAlignmentOutcome.ir;
+      // Write the aligned IR back into the array (2026-09-21, PR #268 review
+      // finding F1). `lastCandidates` aliases `candidates`, and the
+      // budget-exhausted path below returns `lastCandidates[last]` when
+      // nothing passed Tier 1 — so an aligned candidate that still failed a
+      // DIFFERENT proof used to leave the loop with its invented names
+      // restored, while every step and record said they had been aligned,
+      // and /api/nvm/converge-arc applied those ids to rollingState. With the
+      // flag off `ir` is the same object reference, so this is a no-op there.
+      candidates[ci] = candidate;
       const tier1Results = runTier1(candidate, state, grounding);
       const passed = tier1Passes(tier1Results);
       // Apply candidate ops to get post-transition state before valuing — otherwise

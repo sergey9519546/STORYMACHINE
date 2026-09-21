@@ -217,6 +217,12 @@
       "path": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-21 Codex Review 268.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-21 Codex Review 268",
+      "path": "docs/brain/Audits/Audit - 2026-09-21 Codex Review 268.md"
+    },
+    {
       "id": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
       "type": "audit",
       "title": "Audit — 2026-09-21 Craft Formula Leaf",
@@ -1736,6 +1742,22 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Codex Review 268.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Codex Review 268.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Codex Review 268.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Codex Review 268.md",
       "to": "docs/brain/Patterns.md"
     },
     {

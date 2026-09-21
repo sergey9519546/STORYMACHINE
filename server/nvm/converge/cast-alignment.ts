@@ -50,7 +50,7 @@ import {
 import { sanitizeForPrompt } from '../../lib/prompt-utils.ts';
 import { logger } from '../../lib/logger.ts';
 import {
-  systemOne, typeSafeConfigured, redactSecrets,
+  systemOne, typeSafeConfigured, TypeSafeUnavailableError,
   type TypeSafeQuestion, type TypeSafeAnswer,
 } from '../../lib/ai-providers/typesafe.ts';
 
@@ -77,7 +77,11 @@ export interface CastAlignment {
   aligned: CastAlignmentRename[];
   /** Unknown names deliberately left alone — the proof will block them as before. */
   unresolved: string[];
-  /** Redacted failure text when `reason === 'error'`. */
+  /** A fixed failure CATEGORY when `reason === 'error'` — `typesafe_http_429`,
+   *  `typesafe_timeout`, `typesafe_transport` and so on. Never text from the
+   *  request or from the upstream's reply: this field is logged and is
+   *  serialized into the converge response's history (2026-09-21, PR #268
+   *  review finding F4). See failureCategory() below. */
   error?: string;
 }
 
@@ -197,6 +201,31 @@ function rewriteOps(ops: StoryOp[], renames: Map<string, string>): { ops: StoryO
   return { ops: out, changed };
 }
 
+/** A fixed, content-free label for a failed System One call.
+ *
+ *  This string is the value of `CastAlignment.error`: skip() logs it, and the
+ *  converge route serializes it into the response's history. Everything this
+ *  step submits is the writer's own material — `stateDoc.candidate` is the
+ *  rendered candidate ops, `stateDoc.scene.theme` the target's theme hint —
+ *  so an error string built from an upstream reply is a route out of the
+ *  process for exactly that text. It used to be
+ *  `redactSecrets(err.message).slice(0, 300)`, and the adapter's non-2xx
+ *  branch put up to 300 characters of the upstream's body in that message; an
+ *  upstream that rejects a request by quoting it therefore wrote the
+ *  candidate's text into this deployment's logs (2026-09-21, PR #268 review
+ *  finding F4).
+ *
+ *  The label is derived from the error's TYPED fields, not from its message.
+ *  The adapter now throws category-only messages, so reading the message
+ *  would be safe today; reading `reason`/`status` keeps this safe whatever
+ *  message a future error arrives with, and an error that is not the
+ *  adapter's typed one gets one fixed word rather than its own text. */
+function failureCategory(err: unknown): string {
+  if (!(err instanceof TypeSafeUnavailableError)) return 'typesafe_unavailable';
+  if (err.reason === 'http_error' && typeof err.status === 'number') return `typesafe_http_${err.status}`;
+  return `typesafe_${err.reason}`;
+}
+
 function skip(ir: NarrativeTransitionIR, reason: CastAlignmentReason, unresolved: string[], error?: string): CastAlignmentOutcome {
   // 'disabled' is a configuration state, not an event: logging it would put one
   // line per candidate into the server's structured stream on every deployment
@@ -278,7 +307,7 @@ export async function alignCandidateCast(
     const result = await systemOne({ state: stateDoc, questions, signal: ctx.signal });
     answers = result.answers;
   } catch (err) {
-    return skip(ir, 'error', unknown, redactSecrets((err as Error).message ?? String(err)).slice(0, 300));
+    return skip(ir, 'error', unknown, failureCategory(err));
   }
 
   const renames = new Map<string, string>();

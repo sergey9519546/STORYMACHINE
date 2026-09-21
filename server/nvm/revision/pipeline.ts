@@ -75,6 +75,19 @@ export interface RevisionResult {
    *  every run where nothing was lost, which is every diagnose-only run and
    *  every run with no approved spans. */
   lostApprovedSpans: number[];
+  /** Indices into the CALLER'S `approvedSpans` array for every span that was
+   *  re-pointed by a GUESS rather than by its identity (2026-09-21, PR #268
+   *  review finding F3). It means the span's locked text occurs more than
+   *  once in the draft and the number of copies changed part-way through the
+   *  run, so the ordinal that said WHICH copy the author locked ("the 2nd of
+   *  2") no longer has a counterpart, and the span was placed on the copy
+   *  nearest its previous position instead. The lock is still enforced — it
+   *  may simply now be enforced on the wrong copy of identical text. A span
+   *  can appear here and in `lostApprovedSpans`; it is reported the moment
+   *  it is guessed, and may be lost on a later pass. Empty on every run where
+   *  every locked excerpt was either unique or kept its occurrence count,
+   *  which is every diagnose-only run and every run with no approved spans. */
+  ambiguousApprovedSpans: number[];
   /** ISO timestamp */
   completedAt: number;
 }
@@ -182,7 +195,11 @@ async function runDiagnosePass(
  * the NEW document at the OLD line numbers and lock whatever happens to live
  * there now. Preservation itself is enforced at the rewrite seam
  * (approvedSpansSurvive rejects any rewrite that drops a locked excerpt); in
- * stub mode nothing changes anyway.
+ * stub mode nothing changes anyway. A span whose text is still present but
+ * no longer identifiable — several identical copies, and the number of
+ * them changed, so the copy the author picked can no longer be told from
+ * the others — is kept, re-pointed at the nearest copy, and reported in
+ * `ambiguousApprovedSpans` (2026-09-21, review finding F3).
  *
  * The RESULT's `originalFountain` is untouched by all of this: it is the draft
  * as submitted, and remains the baseline a caller diffs against.
@@ -230,7 +247,7 @@ export async function runRevisionPipeline(
       passResults: [], finalFountain: originalFountain ?? '',
       originalFountain: originalFountain ?? '',
       totalIssuesFound: 0, passesWithChanges: 0, failedPasses: [],
-      lostApprovedSpans: [],
+      lostApprovedSpans: [], ambiguousApprovedSpans: [],
       completedAt: Date.now(),
     };
   }
@@ -259,6 +276,9 @@ export async function runRevisionPipeline(
   const failedPasses: PassName[] = [];
   /** Indices into the CALLER'S `approvedSpans`, accumulated across the run. */
   const lostApprovedSpans: number[] = [];
+  /** Same indexing, for spans re-pointed by the nearest-occurrence guess
+   *  because their excerpt's occurrence count changed (finding F3). */
+  const ambiguousApprovedSpans: number[] = [];
   let currentFountain = originalFountain;
 
   if (isDiagnoseOnly() && !forceSequentialForTest) {
@@ -415,6 +435,26 @@ export async function runRevisionPipeline(
             remainingApprovedSpans: passSpans.length - lostOriginalIndices.length,
           });
         }
+        if (relocation.ambiguous.length > 0) {
+          // NOT a loss and NOT a reason to drop the span: the locked text is
+          // still in the draft, there is simply more than one copy of it and
+          // the count changed, so "the 2nd of 2" no longer names a copy and
+          // the nearest one was taken. Recorded exactly the way a loss is —
+          // caller-facing indices, and a warning carrying counts only, never
+          // the span's text or reason — so a guess is as visible to the
+          // author as a drop is (2026-09-21, review finding F3).
+          const ambiguousOriginalIndices = relocation.ambiguous.map(position => passSpanOrigins[position]);
+          for (const originalIndex of ambiguousOriginalIndices) {
+            if (!ambiguousApprovedSpans.includes(originalIndex)) ambiguousApprovedSpans.push(originalIndex);
+          }
+          logger.warn('revision_locked_span_ambiguous_between_passes', {
+            passIndex: i,
+            passName: name,
+            ambiguousSpanIndices: ambiguousOriginalIndices,
+            ambiguousSpanCount: ambiguousOriginalIndices.length,
+            totalApprovedSpans: approvedSpans.length,
+          });
+        }
         const lostPositions = new Set(relocation.lost);
         const kept = relocation.spans
           .map((span, position) => ({ span, position }))
@@ -466,6 +506,7 @@ export async function runRevisionPipeline(
     passesWithChanges,
     failedPasses,
     lostApprovedSpans: [...lostApprovedSpans].sort((a, b) => a - b),
+    ambiguousApprovedSpans: [...ambiguousApprovedSpans].sort((a, b) => a - b),
     completedAt: Date.now(),
   };
 }

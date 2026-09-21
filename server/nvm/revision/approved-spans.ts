@@ -57,12 +57,23 @@ export function normalizeLineEndings(text: string): string {
  *    are kept unchanged. This mirrors approvedSpansSurvive's own `skipped`
  *    bucket: `approvedSpans` reaches the pipeline as `z.array(z.unknown())`,
  *    force-cast at the route, so malformed spans are an ordinary input here,
- *    not a reason to throw. */
+ *    not a reason to throw.
+ *  - `ambiguous`: the span's excerpt occurs more than once in the new
+ *    document AND the number of occurrences is not the same as in the
+ *    previous one, so the ordinal that identified WHICH copy the author
+ *    locked no longer has a counterpart. The span is still re-pointed — by
+ *    the nearest-occurrence rule, which is the best guess available — but
+ *    the guess is reported so a caller can say the lock may have landed on
+ *    the wrong copy. An ambiguous span is NOT lost and NOT skipped: it
+ *    appears in `moved` too whenever its line numbers changed. A span with a
+ *    single candidate in the new document is never ambiguous; there is
+ *    nothing to choose between. Indices only, like every other field. */
 export interface ApprovedSpanRelocation {
   spans: ApprovedSpan[];
   moved: number[];
   lost: number[];
   skipped: number[];
+  ambiguous: number[];
 }
 
 /** 1-based start line of every occurrence of `needle` in `haystack` that
@@ -77,8 +88,17 @@ export interface ApprovedSpanRelocation {
  *
  *  Overlapping occurrences are all reported (the scan advances by one
  *  character, not by the needle's length): a locked range can legitimately sit
- *  inside repeated text, and the caller picks between candidates by position. */
-function lineAlignedOccurrences(haystack: string, needle: string): number[] {
+ *  inside repeated text, and the caller picks between candidates by position.
+ *
+ *  Exported (2026-09-21, PR #268 review finding F2) and imported by
+ *  ./rewrite-llm.ts's approvedSpansSurvive, which used to decide "present"
+ *  with a bare substring `includes`: a rewrite that embedded the locked lines
+ *  inside a modified line (a prefix on the first, a suffix on the last) was
+ *  accepted there and then could not be found here on the next pass, so the
+ *  lock was silently dropped. The survival check and this re-location are
+ *  now the SAME rule, by sharing this function — a rewrite survives exactly
+ *  when relocation can find it. Callers pass already-normalized text. */
+export function lineAlignedOccurrences(haystack: string, needle: string): number[] {
   const out: number[] = [];
   if (needle.length === 0) return out;
   // `at` is non-decreasing across iterations, so newlines are counted once
@@ -109,10 +129,24 @@ function lineAlignedOccurrences(haystack: string, needle: string): number[] {
  * (1-based inclusive, endLine clamped to the document exactly as
  * approvedSpansSurvive clamps it), find that excerpt in `nextDoc` as whole
  * lines after CRLF/CR → LF normalization on both sides, and rewrite
- * startLine/endLine to the occurrence CLOSEST to where the span used to be —
- * ties going to the earlier one. Nearest-by-previous-position is what keeps a
- * lock on the second of two identical blocks from jumping to the first
- * because a pass edited something above them.
+ * startLine/endLine to the copy of that text the span was actually on.
+ *
+ * WHICH COPY, when the excerpt is not unique, is decided by ORDINAL first
+ * (2026-09-21, PR #268 review finding F3). The span's identity among
+ * identical blocks is "the k-th occurrence", not "the one near line n": with
+ * identical blocks at lines 10 and 20 and the SECOND locked, a pass that
+ * inserts 15 lines at the top moves them to 25 and 35, and the occurrence
+ * nearest the old line 20 is 25 — the FIRST copy, the one the author did not
+ * lock. So when `nextDoc` contains the same NUMBER of occurrences as
+ * `prevDoc` did, the span keeps its ordinal (2nd of 2 stays 2nd of 2) however
+ * far the text has slid, which is exactly the case where the ordinal still
+ * means something.
+ *
+ * When the count CHANGED — a pass added or deleted a copy — no ordinal
+ * survives the change, so the previous rule stands: the occurrence CLOSEST to
+ * where the span used to be, ties going to the earlier one. That is a guess,
+ * and it is reported as one in `ambiguous` whenever more than one copy could
+ * have been chosen.
  *
  * Every other field of the span (its `reason`, and anything a future caller
  * adds) is carried through untouched, and the input array and its objects are
@@ -140,7 +174,8 @@ export function relocateApprovedSpans(
   const moved: number[] = [];
   const lost: number[] = [];
   const skipped: number[] = [];
-  if (spans.length === 0) return { spans: [], moved, lost, skipped };
+  const ambiguous: number[] = [];
+  if (spans.length === 0) return { spans: [], moved, lost, skipped, ambiguous };
 
   const prev = normalizeLineEndings(prevDoc);
   const next = normalizeLineEndings(nextDoc);
@@ -174,23 +209,47 @@ export function relocateApprovedSpans(
       return span;
     }
 
-    // "Earlier wins" on a tie needs no tie-break clause: lineAlignedOccurrences
-    // returns candidates in ASCENDING line order (it scans left to right), so
-    // the first candidate at the minimum distance is already the earliest one
-    // and a strict `<` never replaces it with an equidistant later match. This
-    // loop used to carry an `|| (distance === bestDistance && candidates[i] <
-    // bestStart)` arm for that case; it could not fire for any input and is
-    // gone (2026-09-20, review finding 5). The behaviour is unchanged, and
-    // `ties between equidistant occurrences go to the earlier one` in
-    // tests/core/revision-per-pass-diagnostics.test.ts still pins it.
-    let bestStart = candidates[0];
-    let bestDistance = Math.abs(bestStart - startLine);
-    for (let i = 1; i < candidates.length; i++) {
-      const distance = Math.abs(candidates[i] - startLine);
-      if (distance < bestDistance) {
-        bestStart = candidates[i];
-        bestDistance = distance;
+    // Where the span sat among the identical copies of its own text in the
+    // document it was last valid for. `startLine` is always one of these —
+    // the excerpt was cut out of `prev` at startLine..clampedEnd, so it
+    // occurs there, line-aligned on both sides, by construction — but
+    // `indexOf` is read defensively rather than assumed, and a -1 simply
+    // falls through to the positional rule below.
+    const priorCandidates = lineAlignedOccurrences(prev, excerpt);
+    const ordinal = priorCandidates.indexOf(startLine);
+
+    let bestStart: number;
+    if (ordinal >= 0 && candidates.length === priorCandidates.length) {
+      // Same number of copies on both sides: the k-th is still the k-th, and
+      // position is irrelevant — this is what survives a large insertion or
+      // deletion elsewhere in the draft (finding F3).
+      bestStart = candidates[ordinal];
+    } else {
+      // The occurrence count changed, so the ordinal identifies nothing.
+      // Fall back to nearest-to-the-old-position.
+      //
+      // "Earlier wins" on a tie needs no tie-break clause:
+      // lineAlignedOccurrences returns candidates in ASCENDING line order (it
+      // scans left to right), so the first candidate at the minimum distance
+      // is already the earliest one and a strict `<` never replaces it with an
+      // equidistant later match. This loop used to carry an `|| (distance ===
+      // bestDistance && candidates[i] < bestStart)` arm for that case; it
+      // could not fire for any input and is gone (2026-09-20, review finding
+      // 5). The behaviour is unchanged, and `ties between equidistant
+      // occurrences go to the earlier one` in
+      // tests/core/revision-per-pass-diagnostics.test.ts still pins it.
+      bestStart = candidates[0];
+      let bestDistance = Math.abs(bestStart - startLine);
+      for (let i = 1; i < candidates.length; i++) {
+        const distance = Math.abs(candidates[i] - startLine);
+        if (distance < bestDistance) {
+          bestStart = candidates[i];
+          bestDistance = distance;
+        }
       }
+      // Only a genuine choice is reported. With one candidate there is
+      // nowhere else the span could have gone, whatever the counts were.
+      if (candidates.length > 1) ambiguous.push(index);
     }
 
     const newEnd = bestStart + (clampedEnd - startLine);
@@ -199,5 +258,5 @@ export function relocateApprovedSpans(
     return { ...span, startLine: bestStart, endLine: newEnd };
   });
 
-  return { spans: relocated, moved, lost, skipped };
+  return { spans: relocated, moved, lost, skipped, ambiguous };
 }

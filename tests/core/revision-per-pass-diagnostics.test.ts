@@ -334,6 +334,55 @@ describe('relocateApprovedSpans (pure)', () => {
     assert.notEqual(result.spans[0].startLine, 2);
   });
 
+  // 2026-09-21 review of PR #268, finding F3. "Nearest to the old position"
+  // alone loses occurrence identity across a large insertion: with identical
+  // blocks at 10 and 20 and the SECOND one locked, 15 lines inserted at the
+  // top move them to 25 and 35, and nearest-to-20 picks 25 — the wrong copy.
+  // The span's ordinal among identical excerpts (it was the 2nd of 2) is
+  // what identifies it, and it is preserved whenever the occurrence count is
+  // unchanged.
+  it('F3: with identical blocks at 10 and 20, the second locked, 15 lines inserted at the top relocate it to 35 (not 25)', () => {
+    const block = 'LEA\nYou came back.';
+    const filler = (n: number, tag: string) => Array.from({ length: n }, (_, i) => `${tag} ${i + 1}`);
+    const prevLines = [...filler(9, 'before'), ...block.split('\n'), ...filler(8, 'between'), ...block.split('\n'), 'after'];
+    const prev = prevLines.join('\n');
+    assert.equal(lineNumberOf(prev, 'LEA'), 10);
+    assert.equal(prevLines.lastIndexOf('LEA') + 1, 20);
+    const second: ApprovedSpan = { startLine: 20, endLine: 21, reason: 'the second one' };
+    assert.equal(excerptAt(prev, second), block);
+    const next = [...filler(15, 'inserted'), ...prevLines].join('\n');   // copies now at 25 and 35
+
+    const result = relocateApprovedSpans(prev, next, [second]);
+    assert.deepEqual(result.spans, [{ startLine: 35, endLine: 36, reason: 'the second one' }],
+      'the lock must follow the 2nd occurrence, not the copy that happens to be nearest the old line number');
+    assert.deepEqual(result.moved, [0]);
+    assert.deepEqual(result.ambiguous, [], 'same occurrence count on both sides: the ordinal is trusted, nothing is ambiguous');
+    assert.equal(excerptAt(next, result.spans[0]), block);
+  });
+
+  it('F3: when the occurrence count changed, the nearest rule applies and the span is reported ambiguous', () => {
+    const block = 'LEA\nYou came back.';
+    // Three copies at 1, 6 and 11; the middle one is locked (2nd of 3).
+    const tripled = `${block}\n\nfiller one\n\n${block}\n\nfiller two\n\n${block}`;
+    const middle: ApprovedSpan = { startLine: 6, endLine: 7, reason: 'the middle one' };
+    assert.equal(excerptAt(tripled, middle), block);
+    // A pass deletes the FIRST copy and its filler: copies now at 1 and 6.
+    const next = `${block}\n\nfiller two\n\n${block}`;
+
+    const result = relocateApprovedSpans(tripled, next, [middle]);
+    assert.deepEqual(result.spans, [{ startLine: 6, endLine: 7, reason: 'the middle one' }], 'nearest to 6 is 6');
+    assert.deepEqual(result.moved, [], 'its line numbers did not change');
+    assert.deepEqual(result.lost, []);
+    assert.deepEqual(result.ambiguous, [0], '3 copies became 2: which one the author locked cannot be known from the text');
+  });
+
+  it('F3: a unique excerpt is never ambiguous, whatever moved around it', () => {
+    const span: ApprovedSpan = { startLine: 9, endLine: 10, reason: 'keep the reunion' };
+    const result = relocateApprovedSpans(DOC, `FADE IN:\n\n${DOC}`, [span]);
+    assert.deepEqual(result.ambiguous, []);
+    assert.deepEqual(result.moved, [0]);
+  });
+
   it('ties between equidistant occurrences go to the earlier one', () => {
     const block = 'LEA\nYou came back.';
     const doc = `x\n\n\n\n${block}`;                  // the span sits at line 5
@@ -414,7 +463,7 @@ describe('relocateApprovedSpans (pure)', () => {
     const before = { ...span };
     relocateApprovedSpans(DOC, `FADE IN:\n\n${DOC}`, [span]);
     assert.deepEqual(span, before);
-    assert.deepEqual(relocateApprovedSpans(DOC, DOC, []), { spans: [], moved: [], lost: [], skipped: [] });
+    assert.deepEqual(relocateApprovedSpans(DOC, DOC, []), { spans: [], moved: [], lost: [], skipped: [], ambiguous: [] });
   });
 });
 
@@ -568,6 +617,63 @@ describe('revision pipeline: approved spans follow the text between passes', () 
       registerLlmRewriter(null);
     }
     assert.deepEqual(result.lostApprovedSpans, []);
+    assert.deepEqual(result.ambiguousApprovedSpans, []);
+  });
+
+  // 2026-09-21 review of PR #268, finding F3. A lock on one of many identical
+  // lines is only identifiable by WHICH copy it is. When a pass changes how
+  // many copies there are, that identity is gone: the span is still enforced
+  // — its text is in the draft — but the copy it now points at is a guess,
+  // and the run says so instead of presenting it as certain.
+  it('(F3) a lock on one of many identical lines whose count changes is kept, re-pointed, and reported ambiguous', async () => {
+    const full = compiledFor(FULL_DRAFT);
+    const ACTION = 'Ada crosses to the window and studies the street below. Nothing moves.';
+    const copies = FULL_DRAFT.split('\n').flatMap((line, i) => (line === ACTION ? [i + 1] : []));
+    assert.equal(copies.length, 18, 'the fixture repeats one action line once per scene — 18 identical copies');
+    // The FIFTH copy. Nothing but its ordinal distinguishes it.
+    const locked: ApprovedSpan = { startLine: copies[4], endLine: copies[4], reason: 'the fifth beat is hers' };
+    assert.equal(excerptAt(FULL_DRAFT, locked), ACTION);
+
+    const seen: Array<{ passName: string; fountain: string; spans: ApprovedSpan[] }> = [];
+    const capture = captureLogger();
+    registerLlmRewriter(async (input: RewriteInput) => {
+      seen.push({ passName: input.passName, fountain: input.fountain, spans: input.approvedSpans });
+      // Pass 1 rewrites the FIRST copy and only that one: 18 copies become
+      // 17, and because a line is replaced rather than removed every
+      // surviving copy keeps its line number. So the nearest-occurrence rule
+      // still lands on the right line here — what the test pins is that the
+      // pipeline no longer claims to KNOW that.
+      if (input.passName === 'structure') {
+        return { revised: input.fountain.replace(ACTION, 'Ada waits by the door.'), usedLLM: true };
+      }
+      return { revised: input.fountain, usedLLM: false };
+    });
+    let result;
+    try {
+      result = await runRevisionPipeline(full.compiled, full.analysis.records, full.analysis.structure, [locked]);
+    } finally {
+      registerLlmRewriter(null);
+      capture.restore();
+    }
+
+    const second = seen.find(s => s.passName === 'causality');
+    assert.ok(second, 'pass 2 must have reached the rewriter');
+    // Still locked, on the same line, holding the same text.
+    assert.deepEqual(second.spans, [locked]);
+    assert.equal(excerptAt(second.fountain, second.spans[0]), ACTION);
+    // Not lost — the text is still in the draft. Reported as a guess instead.
+    assert.deepEqual(result.lostApprovedSpans, []);
+    assert.deepEqual(result.ambiguousApprovedSpans, [0]);
+
+    const warnings = capture.calls.filter(c => c.msg === 'revision_locked_span_ambiguous_between_passes');
+    assert.equal(warnings.length, 1, 'one document change, one warning');
+    assert.deepEqual(warnings[0].data?.ambiguousSpanIndices, [0]);
+    assert.equal(warnings[0].data?.ambiguousSpanCount, 1);
+    assert.equal(warnings[0].data?.totalApprovedSpans, 1);
+    assert.equal(warnings[0].data?.passName, 'causality');
+    const serialized = JSON.stringify(warnings[0]);
+    assert.ok(!serialized.includes('Ada'), 'an ambiguity warning must never carry screenplay text');
+    assert.ok(!serialized.includes('the fifth beat'), 'an ambiguity warning must never carry the span reason');
   });
 });
 
