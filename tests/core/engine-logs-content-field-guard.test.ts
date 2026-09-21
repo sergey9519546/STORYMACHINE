@@ -38,7 +38,18 @@ import { fileURLToPath } from 'node:url';
 // and found nothing to scan.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
-const SCAN_DIR = 'server/engine';
+// server/engine is where the finding that created this guard lived. The other
+// two were added on 2026-09-21 (PR #268 review finding F4): the TypeSafe
+// System One adapter and its one caller, the converge cast-alignment step,
+// are the second place in this tree where writer text meets a logger behind
+// an API key — the keyless route-level test
+// (tests/routes/no-writer-content-in-logs.test.ts) cannot reach either of
+// them, for the same reason it cannot reach server/engine. F4 itself was a
+// leak through an `error:` field rather than one of the names below, and is
+// pinned behaviourally in tests/core/typesafe-adapter.test.ts and
+// tests/nvm/converge/cast-alignment.test.ts; what this guard adds is that the
+// raw-text field shapes cannot appear on that surface either.
+const SCAN_DIRS = ['server/engine', 'server/lib/ai-providers', 'server/nvm/converge'];
 
 // The exact field names named in the finding this test exists to enforce.
 // Not "agent" — character-name-as-identifier is handled at each site by
@@ -140,11 +151,15 @@ function scanFile(relPath: string, source: string): Violation[] {
   return violations;
 }
 
-describe('server/engine/** logger calls never carry a content-bearing field unredacted', () => {
+describe('engine, AI-provider and converge logger calls never carry a content-bearing field unredacted', () => {
   it('every preview/raw/text/proposition/content/output field goes through describeContent()', () => {
     const files: string[] = [];
-    collectTsFiles(path.join(REPO_ROOT, SCAN_DIR), SCAN_DIR, files);
-    assert.ok(files.length > 10, `sanity: expected many files under ${SCAN_DIR}, found ${files.length}`);
+    for (const dir of SCAN_DIRS) {
+      const before = files.length;
+      collectTsFiles(path.join(REPO_ROOT, dir), dir, files);
+      assert.ok(files.length > before, `sanity: expected files under ${dir}, found none`);
+    }
+    assert.ok(files.length > 10, `sanity: expected many files across ${SCAN_DIRS.join(', ')}, found ${files.length}`);
 
     const violations: Violation[] = [];
     for (const rel of files.sort()) {
@@ -155,7 +170,7 @@ describe('server/engine/** logger calls never carry a content-bearing field unre
     assert.deepEqual(
       violations,
       [],
-      'A logger call under server/engine/** passes a content-bearing field '
+      `A logger call under ${SCAN_DIRS.join('/**, ')}/** passes a content-bearing field `
       + '(preview/raw/text/proposition/content/output) whose value does not call '
       + "describeContent(...) from server/lib/log-redact.ts. That field can carry the "
       + 'writer\'s own story text (a raw LLM response, a parsed proposition, an outline '

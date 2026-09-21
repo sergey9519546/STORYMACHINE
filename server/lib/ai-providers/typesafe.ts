@@ -283,7 +283,11 @@ function parseBody(raw: string, requestedModel: string): Omit<SystemOneResult, '
   const answers: Record<string, TypeSafeAnswer> = {};
   for (const [id, value] of Object.entries(answersRaw)) {
     if (!isRecord(value) || typeof value['type'] !== 'string') {
-      throw new TypeSafeUnavailableError('malformed', `TypeSafe answer "${id}" is not an answer object`);
+      // Deliberately NOT `TypeSafe answer "${id}" ...`: `id` is a key of the
+      // UPSTREAM's own JSON, so it is upstream-controlled text and carries
+      // the same leak as the non-2xx body above (finding F4). The other
+      // malformed messages in this function are fixed strings and stay.
+      throw new TypeSafeUnavailableError('malformed', 'typesafe_bad_response');
     }
     answers[id] = {
       type: value['type'],
@@ -378,11 +382,19 @@ export async function systemOne(req: SystemOneRequest): Promise<SystemOneResult>
     logger.warn('typesafe_system_one_failed', {
       reason: 'http_error', status: response.status, ms: Date.now() - startedAt,
     });
-    throw new TypeSafeUnavailableError(
-      'http_error',
-      `TypeSafe returned HTTP ${response.status}: ${redactSecrets(raw).slice(0, 300)}`,
-      response.status,
-    );
+    // CATEGORY AND STATUS ONLY — NEVER THE BODY (2026-09-21, PR #268 review
+    // finding F4). This message is not an operator's private string: the only
+    // caller (../../nvm/converge/cast-alignment.ts) records it in
+    // CastAlignment.error, logs it, and the converge route serializes it into
+    // the response's history. `raw` is the UPSTREAM's bytes, and an upstream
+    // that rejects a request by quoting it — the ordinary shape of a
+    // validation 400 — hands back the `state` this adapter just sent, which
+    // for that caller is the candidate's rendered ops and the scene's theme
+    // hint. Slicing it to 300 characters bounded the SIZE of the leak, not the
+    // leak; redactSecrets only removes the patterns it can recognise, and a
+    // writer's own prose is not one of them. The status is preserved as a
+    // typed field, which is what callers branch on anyway.
+    throw new TypeSafeUnavailableError('http_error', `typesafe_http_${response.status}`, response.status);
   }
 
   let parsed: Omit<SystemOneResult, 'cacheHit'>;

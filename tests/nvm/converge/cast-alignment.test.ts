@@ -33,6 +33,7 @@ import {
 import type { NarrativeState } from '../../../server/nvm/state/NarrativeState.ts';
 import type { NarrativeTransitionIR } from '../../../server/nvm/ir/NarrativeTransitionIR.ts';
 import type { SceneTarget } from '../../../server/nvm/generate/proof-spec.ts';
+import { logger } from '../../../server/lib/logger.ts';
 
 const FAKE_KEY = 'ts-test-not-a-real-key-0000';
 
@@ -264,6 +265,64 @@ describe('cast alignment (TYPESAFE_CAST_ALIGNMENT)', () => {
     assert.equal(out.alignment.applied, false);
     assert.equal(out.alignment.reason, 'error');
     assert.match(out.alignment.error ?? '', /429/);
+  });
+
+  // 2026-09-21 review of PR #268, finding F4. What this step submits IS the
+  // writer's material: `stateDoc.candidate` is the rendered candidate ops and
+  // `stateDoc.scene.theme` is the target's theme hint. An upstream that
+  // rejects a request by quoting it back — the ordinary shape of a validation
+  // 400 — therefore hands this deployment its own writer content inside an
+  // error body, and that body used to be spliced into the thrown message, from
+  // there into CastAlignment.error, into skip()'s logger.warn, and into the
+  // converge response's history, which is exactly the escape route the
+  // adapter's no-state-in-logs contract exists to close.
+  it("(F4) an upstream error body that echoes the submitted candidate reaches neither the recorded error nor a log line", async () => {
+    process.env.TYPESAFE_CAST_ALIGNMENT = '1';
+    const CANDIDATE_MARK = 'ZZCANDIDATEMARKF4';
+    const THEME_MARK = 'ZZTHEMEMARKF4';
+
+    const ir = candidateWithInventedName();
+    const shift = ir.ops[1];
+    if (shift.op !== 'SHIFT_RELATIONSHIP') throw new Error('fixture changed: ops[1] is no longer SHIFT_RELATIONSHIP');
+    shift.delta = { dimension: 'trust', amount: -0.3, reason: `the vault opens once ${CANDIDATE_MARK}` };
+    const target: SceneTarget = { ...TARGET, themeHint: `trust costs ${THEME_MARK}` };
+
+    // The upstream rejects the request and quotes it back verbatim.
+    let sentBody = '';
+    setTypeSafeTransport(async (_url, init) => {
+      sentBody = init.body;
+      return { status: 400, text: async () => JSON.stringify({ error: 'invalid request', echo: JSON.parse(init.body) }) };
+    });
+
+    const lines: Array<{ msg: string; data: unknown }> = [];
+    const real = { debug: logger.debug, info: logger.info, warn: logger.warn, error: logger.error };
+    logger.debug = (msg, data) => { lines.push({ msg, data }); };
+    logger.info = (msg, data) => { lines.push({ msg, data }); };
+    logger.warn = (msg, data) => { lines.push({ msg, data }); };
+    logger.error = (msg, data) => { lines.push({ msg, data }); };
+    let out;
+    try {
+      out = await alignCandidateCast(ir, stateWithCast(), { target });
+    } finally {
+      logger.debug = real.debug; logger.info = real.info; logger.warn = real.warn; logger.error = real.error;
+    }
+
+    // The fixture is only meaningful if both markers really were submitted.
+    assert.ok(sentBody.includes(CANDIDATE_MARK), 'fixture: the candidate text must reach the wire');
+    assert.ok(sentBody.includes(THEME_MARK), 'fixture: the theme hint must reach the wire');
+
+    assert.equal(out.alignment.applied, false);
+    assert.equal(out.alignment.reason, 'error');
+    // Status kept, category fixed, nothing else.
+    assert.equal(out.alignment.error, 'typesafe_http_400');
+    assert.ok(!out.alignment.error!.includes(CANDIDATE_MARK), 'the candidate text must not be recorded in the alignment error');
+    assert.ok(!out.alignment.error!.includes(THEME_MARK), 'nor the theme hint');
+
+    const logged = JSON.stringify(lines);
+    assert.ok(lines.some(l => l.msg === 'typesafe_cast_alignment_skipped'), 'the failure is still logged as an event');
+    assert.ok(!logged.includes(CANDIDATE_MARK), 'no log line may carry the submitted candidate text');
+    assert.ok(!logged.includes(THEME_MARK), 'no log line may carry the theme hint');
+    assert.ok(logged.includes('typesafe_http_400'), 'the log line carries the status and the category instead');
   });
 
   // ── the cheap skips, and what actually goes on the wire ───────────────────
