@@ -405,4 +405,42 @@ describe('cast alignment (TYPESAFE_CAST_ALIGNMENT)', () => {
     assert.ok(record.ir.ops.some(op => op.op === 'APPRAISE_EMOTION' && op.charId === 'ILKA'),
       'the candidate RECORD carries the aligned IR, so a commit would commit what was proved');
   });
+
+  // 2026-09-21 review of PR #268, finding F1. `candidate = castAlignmentOutcome.ir`
+  // used to replace only the loop-local variable; `candidates[ci]` — the array
+  // `lastCandidates` aliases — still held the UNALIGNED IR. When the aligned
+  // candidate then failed a different Tier-1 proof, `best` stayed null and the
+  // budget-exhausted path returned `lastCandidates[last]`: the invented name
+  // came back out of the loop, and /api/nvm/converge-arc applied it to
+  // rollingState even though every step and record said it had been aligned.
+  it('F1: an aligned candidate that still fails another Tier-1 proof is returned ALIGNED by the budget-exhausted fallback', async () => {
+    process.env.TYPESAFE_CAST_ALIGNMENT = '1';
+    const { transport } = answeringTransport(2, 'ILKA', 0.9);
+    setTypeSafeTransport(transport);
+
+    const state = stateWithCast();
+    // sceneIdx 3 with ops and NO declared preconditions fails CausalProof
+    // unconditionally (server/nvm/proof/tier1/causal.ts; the same fixture
+    // tests/core/converge-loop-contract.test.ts uses) — so alignment fixes the
+    // IntentionalProof block and the candidate is still rejected.
+    const unaligned = { ...candidateWithInventedName(), preconditions: [] };
+    const generate = async () => [unaligned];
+    const result = await convergeScene(state, TARGET, generate, { maxIterations: 1, candidatesPerIteration: 1 }, 7);
+
+    const step = result.history[0];
+    assert.equal(step.castAlignment?.applied, true, 'premise: alignment was applied');
+    assert.equal(step.tier1Results.find(r => r.proof === 'IntentionalProof')?.pass, true, 'premise: the name block is gone');
+    assert.equal(step.passed, false, 'premise: another Tier-1 proof still blocks the candidate');
+    assert.equal(result.tier1Passed, false);
+    assert.equal(result.winner, null);
+
+    const names = result.ir.ops.flatMap(op =>
+      op.op === 'APPRAISE_EMOTION' ? [op.charId] : op.op === 'SHIFT_RELATIONSHIP' ? [...op.pair] : []);
+    assert.ok(!names.includes('PROTAGONIST'),
+      `the fallback IR must carry the ALIGNED cast, not the invented name (ops reference: ${names.join(', ')})`);
+    assert.ok(names.includes('ILKA'), 'the fallback IR is the aligned candidate');
+    assert.deepEqual(result.ir, result.candidates[0].ir,
+      'the returned IR and the candidate record describe the same (aligned) candidate');
+    assert.deepEqual(result.ghosts[0]?.ir, result.ir, 'the ghost entry agrees too');
+  });
 });
