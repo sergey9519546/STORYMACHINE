@@ -124,7 +124,11 @@ developer-box figure (`SESSION_REPORT_2026-09-19.md` §16). The craft
 formula now lives in a leaf module (`846b8bf7`, byte-identical), so the
 doctor↔reference cycle no longer runs it; the move broke one source-text
 test fixture, fixed at `b9a1c60b`, and the shifted line citations were
-repointed at `23879294` (`SESSION_REPORT_2026-09-19.md` §17).
+repointed at `23879294` (`SESSION_REPORT_2026-09-19.md` §17). PR #268
+carries the session's work to `main`, its four automated-review findings
+were each reproduced and fixed (`15daf904`), and its one red check is a
+repository setting, Dependency graph, not a code change
+(`SESSION_REPORT_2026-09-19.md` §18).
 
 2026-09-20 closed the remaining §4 rows under owner authorization: row 3
 (per-pass diagnostics), rows 5 and 6 (the unified scene-heading grammar),

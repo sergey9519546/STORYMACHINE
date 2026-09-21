@@ -1303,3 +1303,132 @@ session's credential cannot delete remote branches): `lane/prod-loader-guard`,
 `claude/advice-rule-fixes-pending-measurement`,
 `claude/r5-verbosity-bias-pending-measurement`, `lane/healthcheck-ipv4`,
 `lane/node-24`, `lane/per-pass-diagnostics`).
+
+## 18. 2026-09-21 — the pull request, and four review findings that were all real
+
+### 18.1 The pull request
+
+PR #268 (https://github.com/sergey9519546/STORYMACHINE/pull/268) was opened
+from the Claude Code UI against `main` at head `bed7535d`: 126 commits, 267
+files, `main` unmoved since the branch point. Its auto-generated description
+did not follow `.github/PULL_REQUEST_TEMPLATE.md` and misdescribed two
+changes — it attributed `server/nvm/analyze/craft-formula.ts` to a hoisted
+`burrowsDelta` computation, and called the tsx calibration work a
+doctor-pool health check — so the orchestrator rewrote the title and body
+against the template, from the diff.
+
+One check is red and stays red: `Security / dependency-review` fails before
+inspecting any dependency, with "Dependency review is not supported on this
+repository. Please ensure that Dependency graph is enabled" — the same
+failure the two previous pull requests from other branches recorded
+(Security runs 400 and 402), with `.github/workflows/security.yml`
+byte-identical to `main`'s. It is a repository setting, not a code change; a
+standing-down comment on the PR says so and no re-run was spent. Every other
+check passed on `bed7535d`: classify, test, browser, CodeQL, npm-audit,
+GitGuardian.
+
+### 18.2 Four findings, all confirmed
+
+An automated reviewer posted four findings against PR #268. None was argued
+away; each was reproduced by a test that failed on the `bed7535d` tree and
+passes now. For the two findings already fixed before
+`docs/audits/2026-09-21-codex-review-268/README.md` was written, the tree
+was re-extracted with `git archive`, the current test files were copied over
+it, and the suites were run there — a real fail-first measurement, not a
+re-description.
+
+| finding | severity | file | verdict | commit |
+|---|---|---|---|---|
+| F1 | P1 | `server/nvm/converge/loop.ts` | CONFIRMED | `d2cda09b` |
+| F2 | P1 | `server/nvm/revision/rewrite-llm.ts` | CONFIRMED | `fa0c7719` |
+| F3 | P2 | `server/nvm/revision/approved-spans.ts` | CONFIRMED | `c02bf3c9` |
+| F4 | P2 | `server/lib/ai-providers/typesafe.ts` | CONFIRMED | `b2dca60d` |
+
+**F1.** In `loop.ts`, `candidate = castAlignmentOutcome.ir` rebound only the
+loop-local variable — `candidates[ci]`, the array `lastCandidates` aliases,
+kept the unaligned IR. When the aligned candidate then failed a different
+Tier-1 proof, the budget-exhausted fallback returned that unaligned
+candidate, so a model's invented character ids left the loop while every
+record said they had been aligned. Fix: `d2cda09b`, one line plus a comment
+(`candidates[ci] = candidate;`); with the flag off, `alignCandidateCast`
+returns the same object reference, so the write-back is a provable no-op on
+every deployment that never enabled the feature.
+
+**F2.** `approvedSpansSurvive` (`rewrite-llm.ts`) decided a locked excerpt
+was "present" with a bare substring match, while the next pass's
+`relocateApprovedSpans` (`approved-spans.ts`) required the excerpt as whole
+lines — so a rewrite that embedded a locked excerpt inside modified lines
+passed survival and then lost the lock with no warning. Fix: `fa0c7719`,
+one exported line-aligned matcher (`lineAlignedOccurrences`) used by both
+functions, so a rewrite survives exactly when relocation can find it, by
+construction.
+
+**F3.** Nearest-occurrence relocation lost occurrence identity for
+duplicate excerpts — the reviewer's own worked example became the test:
+identical blocks at lines 10 and 20 with the second one locked, 15 lines
+inserted at the top, and relocation picked line 25 (the first copy) instead
+of 35 (the locked copy). Fix: `c02bf3c9` — the ordinal is preserved when the
+occurrence count is unchanged; when the count changed, the span is reported
+in a new `ambiguousApprovedSpans` field rather than silently guessed. An
+ambiguous span stays enforced, never dropped; one
+`revision_locked_span_ambiguous_between_passes` warning carries counts only.
+
+**F4.** A non-2xx TypeSafe reply had its body echoed into the thrown
+message, from there into `CastAlignment.error`, the logs, and converge
+history — including, in the reviewer's reproduction, the target's theme
+hint and the start of the rendered candidate. Fix: `b2dca60d` — the error
+now carries a typed status and a fixed category
+(`typesafe_http_<status>`, `typesafe_bad_response`), and the caller derives
+its label from the typed reason rather than reading the message.
+
+### 18.3 What the fixes cost
+
+Two of the four touched scoring-path files — `approved-spans.ts` (reachable
+from `doctor.ts`'s import graph) and `pipeline.ts` — so the receipt gate
+applied and was discharged with an output-identity receipt, not an AUC
+claim: 45 of 45 doctor reports byte-identical against `bed7535d` on a full
+compare with no ignored keys, re-run independently by the orchestrator; all
+six public-benchmark floors reproduce unchanged (0.5313/0.5586,
+0.4063/0.4443, 1.0000/0.9473); and `git diff bed7535d..HEAD --
+tests/fixtures/ scripts/lib/auc.ts` is empty, so nothing was re-locked. No
+real-corpus figure is claimed for this range — the private corpus is not
+present in this sandbox.
+
+One pre-existing test changed rather than weakened: the 401 key-echo case in
+`tests/core/typesafe-adapter.test.ts` now pins the stronger property that
+the upstream body is absent from the thrown message entirely, not merely
+truncated or redacted. The guard
+`tests/core/engine-logs-content-field-guard.test.ts` was widened from
+`server/engine` alone to also scan `server/lib/ai-providers` and
+`server/nvm/converge`; the audit states plainly that F4 travelled through an
+`error:` field rather than a field name that scanner looked for, so the
+widening is defence against the same class on the same surface, while the
+behavioural tests (§18.2) remain the proof of the fix itself.
+
+### 18.4 Verification and heads
+
+Orchestrator-run full suite with `RUN_E2E=1` on the merge `15daf904`:
+
+| metric | value |
+|---|---|
+| tests | 14,622 |
+| pass | 14,523 |
+| fail | 0 |
+| cancelled | 0 |
+| skipped | 98 |
+| wall time | 509.8 s |
+
+Gates at that head: `npm run lint` 0; `npm run check-no-console` OK (313
+files); `npm run brain` fresh (151 notes, 647 links); the receipt gate OK.
+Each of the four review threads got a reply naming the fix commit and
+quoting the failing assertion, and was resolved.
+
+| branch | head | note |
+|---|---|---|
+| session branch | `15daf904` (+ this commit) | this report |
+| PR #268 | open against `main` at `28754489` | one red check, `Security / dependency-review`, a repository setting (§18.1) |
+| `lane/land-feature-length-defects` (candidate) | `f1843253` | CI green (run 35559777779); owner's decision unchanged |
+| `lane/land-advice-rule-fixes` | `671b7cf2` | held, unchanged |
+
+Merged lane branches left on origin for the owner to delete now also
+include `lane/codex-review-268`.
