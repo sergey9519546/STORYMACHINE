@@ -157,7 +157,12 @@ describe('scene grammar — (b) `..` and `...` lines are not scene headings', ()
       'the continuation line belongs to INT. HALL - NIGHT, not to a scene of its own');
   });
 
-  test('health no longer moves when a writer types an ellipsis', async () => {
+  // RETITLED 2026-09-20 (disclosure pass, adversarial finding 9). The title
+  // read "health no longer moves when a writer types an ellipsis" while the
+  // assertion beneath it allows a move of up to 2.0 points and this tree
+  // measures 1.2 — so the title was false by 1.2 points against its own
+  // fixture. It now says what the assertion says.
+  test('health moves by less than 2 points when a writer types an ellipsis', async () => {
     // WHAT THIS GUARDS, AND WHY IT IS NOT AN EQUALITY ANY MORE.
     //
     // PRE-change (tree `26d930dd`), the `...and then nothing.` line opened a
@@ -254,6 +259,14 @@ describe('scene grammar — (d) a plain INT./EXT. script is byte-identical', () 
     // `sceneCount` unchanged at 16 and `health` unchanged at 0. The bytes that
     // are the evidence for the 2026-09-20 scene-grammar receipt are this
     // file's parent commit's, and they stay readable there.
+    //
+    // RE-LOCKED AGAIN 2026-09-20 (disclosure pass). One line moved:
+    // `plainSummary`, because this fixture is 16 scenes and the scene-count
+    // clause now states the saturated term as a floor rather than as
+    // "12 point(s) at 16 scene(s)". Nothing numeric moved — `totalIssues`,
+    // every severity count, `health` and `sceneCount` are byte-identical, and
+    // the doctor output-identity harness over all 45 fixtures reports PASS
+    // with `--ignore-keys plainSummary`.
     const text = read('plain-int-ext.fountain');
     const report = await runScriptDoctor(text);
     const { analyzedAt: _ignored, ...stable } = report as unknown as Record<string, unknown>;

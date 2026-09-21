@@ -1029,6 +1029,39 @@ describe('ROUND 2: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT — the three reviewer pay
   // the lightest pinned payload (round-3 bypass B, real-parse weight
   // 1,920,000), which is asserted below: a bound at or past that number would
   // start accepting a payload this file exists to reject.
+  /**
+   * The worst us/unit this bound has ever actually been MEASURED at, on the
+   * machine that enforces it.
+   *
+   * SOURCE: `.github/workflows/calibrate-voice-bound.yml` run **35542413222**
+   * (ubuntu-latest, AMD EPYC 7763 x4, node v24.20.0, completed
+   * 2026-09-20T22:43:06Z) — the same run
+   * `tests/fixtures/voice-bound-derivation.json` is locked from. Its worst row
+   * is `max-admitted` N=50, whose document weighs exactly
+   * 1,500,000 = MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT and cost **1,210 ms** under
+   * the `loaded` condition: 1,210,000 us / 1,500,000 units = 0.8067 us/unit,
+   * rounded here to 0.807.
+   *
+   * WHY IT IS HERE AND WHY 0.173 STAYS WHERE IT IS (2026-09-20 disclosure
+   * pass, adversarial finding 7). `VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT`
+   * is a 2026-09-05 developer-box rate for a DIFFERENT shape (n uniform
+   * speakers on the 32-word floor), taken before both Burrows's-Delta hoists;
+   * validation.ts's comment records in full why re-fitting it from a
+   * different shape's run would be the exact drift the pair of constants
+   * exists to prevent, so it is deliberately left alone. But a margin proof
+   * computed ONLY on 0.173 is not a margin proof of anything the runner has
+   * seen: at that rate the assertion below cannot fail until the bound passes
+   * ~57,800,000, which is 30x the lightest pinned DoS payload and therefore
+   * unreachable — the assertion would be decorative. Computing it on BOTH
+   * rates makes the HONEST one binding: 1,500,000 x 0.807 us = 1,211 ms
+   * against the 10,000 ms target, 8.3x under, and a future bound raise is
+   * caught at ~12,390,000 instead.
+   *
+   * It is a cross-shape cross-check, not a re-fit: it is asserted here, in the
+   * test, and the constant it cross-checks is untouched.
+   */
+  const VOICE_ELIGIBLE_WEIGHT_RUNNER_WORST_US_PER_UNIT = 0.807;
+
   it('the bound x its measured worst-shape rate stays under the review cost target', () => {
     const predictedUs = MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT * VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT;
     assert.ok(
@@ -1037,6 +1070,35 @@ describe('ROUND 2: MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT — the three reviewer pay
       + `${VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT} us/unit predicts ${(predictedUs / 1000).toFixed(0)} ms, `
       + `over the ${(VOICE_ELIGIBLE_WEIGHT_COST_TARGET_US / 1000).toFixed(0)} ms target — re-measure the rate `
       + 'with the n-uniform-32-word-floor shape before raising the bound',
+    );
+
+    // THE BINDING HALF. Same proof, on the rate the RUNNER measured for the
+    // heaviest shape this bound admits. This is the number that can actually
+    // fail, and it is the one a reader should read.
+    const runnerPredictedUs = MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT * VOICE_ELIGIBLE_WEIGHT_RUNNER_WORST_US_PER_UNIT;
+    assert.ok(
+      runnerPredictedUs < VOICE_ELIGIBLE_WEIGHT_COST_TARGET_US,
+      `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT=${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} x the RUNNER's worst measured `
+      + `${VOICE_ELIGIBLE_WEIGHT_RUNNER_WORST_US_PER_UNIT} us/unit (run 35542413222, max-admitted N=50, loaded) `
+      + `predicts ${(runnerPredictedUs / 1000).toFixed(0)} ms, over the `
+      + `${(VOICE_ELIGIBLE_WEIGHT_COST_TARGET_US / 1000).toFixed(0)} ms target — re-measure on the runner before `
+      + 'raising the bound',
+    );
+    // And the reason the second assertion exists at all, asserted rather than
+    // asserted-in-prose: the runner's rate is the stricter of the two, so it
+    // is the one that binds. If a future re-measurement ever inverts that,
+    // this line fails and the comment above has to be rewritten.
+    assert.ok(
+      VOICE_ELIGIBLE_WEIGHT_RUNNER_WORST_US_PER_UNIT > VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT,
+      `the runner rate (${VOICE_ELIGIBLE_WEIGHT_RUNNER_WORST_US_PER_UNIT}) is supposed to be the conservative one; `
+      + `the developer-box rate is now ${VOICE_ELIGIBLE_WEIGHT_MEASURED_US_PER_UNIT} — re-read both comments`,
+    );
+    console.log(
+      `voice-bound margin proof: bound ${MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT} -> `
+      + `${(predictedUs / 1000).toFixed(0)} ms at the 2026-09-05 32-word-shape rate `
+      + `(${(VOICE_ELIGIBLE_WEIGHT_COST_TARGET_US / predictedUs).toFixed(1)}x under target), `
+      + `${(runnerPredictedUs / 1000).toFixed(0)} ms at run 35542413222's worst admitted shape `
+      + `(${(VOICE_ELIGIBLE_WEIGHT_COST_TARGET_US / runnerPredictedUs).toFixed(1)}x under) — the second is binding`,
     );
     // And the other direction: a bound so small that the heaviest fixture the
     // repository ships cannot clear it is the defect this round fixed, so pin

@@ -147,7 +147,18 @@ describe('MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is derived from a committed measu
   // and would demand a bracketing sweep, as it should.
   const GRID_LIMITED_MAX_FRACTION_OF_CEILING = 0.25;
 
-  it('the derivation is not silently GRID-LIMITED: the sweep BRACKETS the boundary, or the shape provably cannot reach the ceiling', () => {
+  // The most any ADJACENT step of the sweep may rise before "cost does not
+  // rise across the grid" stops being true. See the loop that uses it for why
+  // it is 10% and why endpoints alone were not enough.
+  const GRID_LIMITED_MAX_ADJACENT_RISE = 0.10;
+
+  // RETITLED 2026-09-20 (disclosure pass, adversarial finding 8). The old
+  // title promised "the shape provably cannot reach the ceiling", which is
+  // more than a finite grid can establish: what the grid-limited branch
+  // actually checks is that every swept row is far under the ceiling and that
+  // cost does not rise across the grid. The title now says that, so a reader
+  // does not take a bounded observation for a proof.
+  it('the derivation is not silently GRID-LIMITED: the sweep BRACKETS the boundary, or every swept row is under a quarter of the ceiling and cost does not rise from the smallest to the largest cast', () => {
     // Without this, "largest swept cast that clears the ceiling" could just mean
     // "the top of the grid" — a derivation bounded by how far somebody bothered
     // to sweep rather than by cost. The 2026-09-12 round-1 derivation failed in
@@ -208,6 +219,33 @@ describe('MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is derived from a committed measu
       + `${derived.ceilingMs}ms ceiling, so this derivation is bounded by the grid rather than by cost. `
       + 'Re-run the calibration with a higher --max-admitted',
     );
+    // STRENGTHENED 2026-09-20 (finding 8). Comparing only the two ENDPOINTS
+    // lets an upward trend hide inside the grid: a sweep that fell steeply at
+    // the bottom and climbed steadily from the middle up would satisfy
+    // `cheapestAtTop <= costAtBottom` while the cast the derivation stops at
+    // is the most expensive one measured. So every ADJACENT pair is checked.
+    //
+    // WHY A TOLERANCE AND WHY 10%. Repeat-to-repeat noise is real: run
+    // 35542413222's own loaded column falls monotonically except for one step
+    // (N=85 788ms -> N=90 821ms, +4.19%), and that step is noise, not a trend —
+    // the very next cast reads 746ms. 10% is ~2.4x the worst rise this table
+    // contains, and far tighter than the 20% machine-to-machine spread
+    // DERIVATION_MARGIN_FRACTION allows for. A genuine upward trend compounds:
+    // eight consecutive steps at the limit would be 2.1x, which the
+    // quarter-of-ceiling check below would then have to answer for as well.
+    for (let i = 1; i < swept.length; i++) {
+      const prev = swept[i - 1]!;
+      const next = swept[i]!;
+      const rise = next.cpuMsMax / Math.max(prev.cpuMsMax, 1) - 1;
+      assert.ok(
+        rise <= GRID_LIMITED_MAX_ADJACENT_RISE,
+        `the sweep stopped at ${derived.derivedCast} with nothing above it measured, and cost rises `
+        + `${(rise * 100).toFixed(1)}% from N=${prev.n} (${prev.cpuMsMax}ms) to N=${next.n} (${next.cpuMsMax}ms) — `
+        + `past the ${(GRID_LIMITED_MAX_ADJACENT_RISE * 100).toFixed(0)}% adjacent-step band. Cost is trending UP inside `
+        + `the grid, so the top of the grid is not a safe stopping point for a derivation against the `
+        + `${derived.ceilingMs}ms ceiling. Re-run the calibration with a higher --max-admitted so the boundary is BRACKETED`,
+      );
+    }
     const worst = swept.reduce((a, b) => (b.cpuMsMax > a.cpuMsMax ? b : a));
     const allowed = derived.ceilingMs * GRID_LIMITED_MAX_FRACTION_OF_CEILING;
     assert.ok(

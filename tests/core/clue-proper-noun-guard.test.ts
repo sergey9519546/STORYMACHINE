@@ -165,6 +165,81 @@ const CUE_ADJACENT_PROP = `Title: THE LONG WAY DOWN\nAuthor: A Writer\n\n${PROP_
 const CUE_ADJACENT_PROP_CONTROL = `Title: THE LONG WAY DOWN\nAuthor: A Writer\n\n${
   PROP_BODY.replace('MARA REVOLVER sits on the nightstand.', 'A heavy REVOLVER sits on the nightstand.')}`;
 
+/** Shape (iv), 2026-09-20 disclosure pass (adversarial finding 6). The
+ *  LOCATION half of the guard, which no fixture here covered: `locationWords`
+ *  is every word of every scene heading's location segment, and a clue whose
+ *  words are ALL in that set is excluded. So a prop that happens to be named
+ *  after the place it sits in can never be a clue, however plainly it is
+ *  planted. The two documents below differ in NOTHING but the heading's
+ *  location, and the prop line is byte-identical in both.
+ *
+ *  MEASURED on this tree: `INT. SAFE HOUSE` seeds [] (openClues 0), and the
+ *  same body under `INT. MOTEL ROOM` seeds ["safe"] (openClues 1). The
+ *  reviewer's own fixture read openClues 2 -> 0 on the same mechanism. */
+const PROP_NAMED_AFTER_ITS_LOCATION = (location: string) => `Title: THE LONG WAY DOWN
+Author: A Writer
+
+INT. ${location} - NIGHT
+
+MARA VOSS, 30s, unlatches the door. A heavy SAFE stands against the wall.
+
+MARA
+Somebody was here before me.
+
+DESK CLERK
+Checkout is at eleven.
+
+INT. ${location} - CONTINUOUS
+
+Mara sets her bag down. The room smells of bleach.
+
+MARA
+Who had this room last week?
+
+DESK CLERK
+Nobody I remember.
+
+EXT. PARKING LOT - MORNING
+
+DETECTIVE RAY BELLWEATHER, 50s, waits by the ice machine.
+
+RAY
+You called it in.
+
+MARA
+I called it in.
+
+INT. DINER - DAY
+
+Mara pushes a plate around.
+
+MARA
+He knew the room number.
+
+RAY
+Or he guessed it.
+
+INT. ${location} - LATER
+
+Mara checks behind the mirror. Nothing.
+
+MARA
+Nothing here either.
+
+RAY
+Then we look somewhere else.
+
+EXT. PARKING LOT - NIGHT
+
+Ray waits in the car. Mara gets in.
+
+MARA
+Drive.
+
+RAY
+Where?
+`;
+
 describe('ORPHAN_CLUE proper-noun / title / location guard', () => {
   it('the fixture genuinely contains the shapes this guard is about (or the test is vacuous)', () => {
     assert.match(WITH_TITLE, /Title: THE LONG WAY DOWN/);
@@ -388,6 +463,124 @@ describe('ORPHAN_CLUE proper-noun / title / location guard', () => {
       + 'Measured leak this assertion was written for: the-defense-rests seeded "jordy-lane" from '
       + '"two fellow associates, JORDY LANE and FEN ABIODUN, growing more animated", where the '
       + 'comma follows the LAST name of the list and not the first.',
+    );
+  });
+
+  // ── The LOCATION list's corpus property (2026-09-20 disclosure pass,
+  // adversarial finding 6) ────────────────────────────────────────────────
+  // Symmetric to the cue-name property above, and it exists because the
+  // location half of `buildProperNounGuard` had no corpus-wide assertion at
+  // all — only the four hand-built `riverside-motel` ids in the unit case.
+  //
+  // The two halves are NOT the same rule and the property states each one's
+  // real shape:
+  //
+  //   * names   — no multi-word seeded clue may even SHARE a word with a cue
+  //               name, because on this corpus every such caps run is an
+  //               introduction (asserted above).
+  //   * location — sharing is LEGITIMATE and common: six real props on these
+  //               20 scripts carry a word that also appears in some heading's
+  //               location segment. The guard is an `every`, not a `some`,
+  //               and the six are pinned by name so that tightening it to
+  //               `some` fails here and prints exactly which real props it
+  //               would delete.
+  //
+  // The guard is NOT changed by this test. It records what the guard does.
+  it('the location list excludes only clues whose EVERY word is a heading location — the six that merely share one are real props', () => {
+    const dir = path.join(REPO, 'data/screenplays');
+    const names = ['chain-of-custody', 'close-quarters', 'code-blue', 'counter-offer', 'dead-frequency',
+      'high-voltage', 'mise', 'off-season', 'quiet-season', 'red-line', 'room-12', 'runoff',
+      'same-page', 'soft-launch', 'the-defense-rests', 'the-detour', 'the-key-under-the-mat',
+      'transfer-window', 'two-lane', 'undertow'];
+
+    /** The guard's own location vocabulary, rebuilt from the headings the same
+     *  way `buildProperNounGuard` builds it (prefix stripped, time-of-day tail
+     *  stripped, words of 3+ characters). */
+    const locationWordsOf = (text: string): Set<string> => {
+      const out = new Set<string>();
+      for (const line of text.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!/^(INT\.?\/EXT\.?|I\/E|INT\.?|EXT\.?|EST\.?)\s/i.test(trimmed)) continue;
+        const withoutPrefix = trimmed.replace(/^\s*(INT\.?\/EXT\.?|I\/E|INT\.?|EXT\.?|EST\.?)\s*/i, '');
+        const withoutTail = withoutPrefix.replace(/\s+[-–—]\s+[^-–—]*$/, '');
+        for (const w of withoutTail.toLowerCase().split(/[^a-z0-9']+/)) if (w.length >= 3) out.add(w);
+      }
+      return out;
+    };
+
+    const fullyLocation: string[] = [];
+    const sharesOne: string[] = [];
+    let totalSeeded = 0;
+    for (const name of names) {
+      const text = readFileSync(path.join(dir, `${name}.fountain`), 'utf8');
+      const analysis = analyzeFountainText(text);
+      const locationWords = locationWordsOf(text);
+      for (const record of analysis.records) {
+        for (const id of record.seededClueIds ?? []) {
+          totalSeeded++;
+          const words = id.split('-').filter(Boolean);
+          if (words.length > 0 && words.every(w => locationWords.has(w))) fullyLocation.push(`${name}: "${id}"`);
+          else if (words.some(w => locationWords.has(w))) sharesOne.push(`${name}: ${id}`);
+        }
+      }
+    }
+
+    assert.ok(totalSeeded >= 10, `the corpus must still seed clues, or this property is vacuous; got ${totalSeeded}`);
+    assert.deepEqual(
+      fullyLocation,
+      [],
+      `these seeded clue ids are entirely made of scene-heading location words, which the guard is supposed `
+      + `to exclude: ${fullyLocation.join(', ')}`,
+    );
+    // The half that is NOT by construction, and the reason this test is worth
+    // having: these six are measured, they are real props, and every one of
+    // them is deleted the moment the location rule is loosened from `every` to
+    // `some`. If the list changes, read it before re-locking it.
+    assert.deepEqual(
+      sharesOne.sort(),
+      [
+        'dead-frequency: radio-base-unit',
+        'red-line: get-in-your-room',
+        'runoff: cloudy-water-at-mile-14-after-every-rain',
+        'runoff: tidewall-group',
+        'same-page: office-party',
+        'two-lane: tape-car',
+      ],
+      'the six real props that share a word with a heading location (measured 2026-09-20). A change here '
+      + 'means either the corpus moved or the location rule stopped being an `every` — in the second case '
+      + 'these are the props it just deleted.',
+    );
+  });
+
+  // `todo`, with the measured pair, because this is a REAL MISS the guard
+  // cannot see and the lane that found it was not allowed to change the
+  // guard. `locationWords` is a flat bag of every word of every heading's
+  // location segment, so a single-word prop whose name is one of those words
+  // is excluded unconditionally — and the two documents below differ in
+  // nothing but the heading. There is no lexical signal separating "the SAFE
+  // in the SAFE HOUSE" (a prop) from "the MOTEL in INT. MOTEL" (a place);
+  // closing it needs information this pass does not have — a positional test
+  // (the token appears in ACTION, not only in headings), measured before it
+  // is added rather than after. On the 20 CC0 scripts the guard's location
+  // half currently costs exactly one real clue id (`creek-mile`, itself a
+  // heading), so the corpus effect is PRECISION and this miss is recorded
+  // rather than traded for a regression.
+  it('FIRES: a prop named after the place it sits in is still a clue',
+    { todo: 'KNOWN MISS, not a regression: measured seededClueIds [] under `INT. SAFE HOUSE` against ["safe"] for the byte-identical body under `INT. MOTEL ROOM` (openClues 0 vs 1). locationWords is a flat bag of heading words with no positional test. Do not close this by loosening the guard: on the 20 CC0 scripts its location half costs one real id.' },
+    () => {
+    const inSafeHouse = seededClueIds(PROP_NAMED_AFTER_ITS_LOCATION('SAFE HOUSE'));
+    const inMotelRoom = seededClueIds(PROP_NAMED_AFTER_ITS_LOCATION('MOTEL ROOM'));
+    // The control, so the pair proves something: with a heading that shares no
+    // word with the prop, the SAME body plants the SAME prop.
+    assert.ok(
+      inMotelRoom.includes('safe'),
+      `the control must seed the prop, or this pair proves nothing; got ${JSON.stringify(inMotelRoom)}`,
+    );
+    assert.ok(
+      inSafeHouse.includes('safe'),
+      `a SAFE standing against the wall is a planted prop whatever the room is called. Measured [] under `
+      + `"INT. SAFE HOUSE" against ${JSON.stringify(inMotelRoom)} for the byte-identical body under `
+      + `"INT. MOTEL ROOM"; got ${JSON.stringify(inSafeHouse)}`,
     );
   });
 
