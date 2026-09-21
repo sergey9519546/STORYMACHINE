@@ -82,19 +82,31 @@ while the gate passes, but the rule it enforces is unchanged: no new
   is the only variable. Changing one band's richness without matching every
   other band reintroduces the measured confound and the calibration tests
   will (correctly) fail. See `reference.ts`'s header.
-- Formula constants in `server/nvm/analyze/doctor.ts` stay function-local:
-  module-level consts hit a temporal dead zone through the doctor↔reference
-  circular import and the failure is silently swallowed by a fallback
-  (documented at the site — it cost a real bug hunt). Under the production
-  loader (`tsx`, esbuild `keepNames`) a NAMED nested function expression or
-  arrow (`const f = (x) => …`) anywhere reachable from `computeRawCraftScore`
-  compiles to a `__name(...)` call on a hoisted, uninitialised module var and
-  fails the same way, silently emptying the calibration layer (no
-  `healthPercentile`, no dimension percentiles, in production only — `npm
-  test` and the dev server run `--experimental-strip-types`, which injects no
-  helper); the guard is `tests/core/doctor-calibration-under-tsx.test.ts`,
-  which spawns the real tsx CLI, and since 2026-09-21 the fallback logs
-  through `server/lib/logger.ts` instead of swallowing.
+- The craft formula (`densityPenalty`, `scarcityPenalty`, `craftPenalty`,
+  `computeRawCraftScore`) lives in `server/nvm/analyze/craft-formula.ts`, a
+  LEAF that imports nothing; `doctor.ts` re-exports `computeRawCraftScore`
+  and `calibration/reference.ts` imports it from the leaf, so since
+  2026-09-21 the doctor↔reference import cycle no longer runs the formula
+  (`reference.ts` does not import `doctor.ts` at all;
+  `tests/core/craft-formula-leaf.test.ts` pins both graph facts). Until then
+  two things failed silently on that path, each swallowed by the calibration
+  fallback: a module-level formula const sat in its temporal dead zone
+  (`ReferenceError: Cannot access … before initialization`, under BOTH
+  loaders — it cost a real bug hunt), and under the production loader (`tsx`,
+  esbuild `keepNames`) a NAMED nested function expression or arrow
+  (`const f = (x) => …`) reachable from `computeRawCraftScore` compiled to a
+  `__name(...)` call on a hoisted, uninitialised module var (production only
+  — `npm test` and the dev server run `--experimental-strip-types`, which
+  injects no helper). Both were re-probed against the leaf and PASS
+  (`docs/audits/2026-09-21-craft-formula-leaf/README.md`). What remains:
+  formula constants stay function-local and the path stays free of named
+  function expressions AS CONVENTION (belt and braces — the leaf must stay
+  import-free for the structural fix to hold); the guard
+  `tests/core/doctor-calibration-under-tsx.test.ts` still spawns the real tsx
+  CLI on every `npm test`, and the fallback logs through
+  `server/lib/logger.ts` instead of swallowing. `calibration.test.ts` alone
+  cannot see either hazard: it imports `reference.ts` before `doctor.ts`, so
+  it passed 25/25 on a tree where the tsx guard failed 0 of 20.
 - The revision pipeline's 14-pass execution order is still live. The old
   wave-rotation order is retired history — never use it to choose new work.
 - The owner's checkout is no longer on OneDrive (moved 2026-09-18 to a local,
@@ -145,7 +157,7 @@ INVERSE_CHEKHOV_GUN in `33a2ee48`; `docs/rulebook/README.md` is the
 machine-counted authority — the earlier "~8,917 rules, ~5,701
 from a bulk Wave 1191" story was shown to be inaccurate by the 2026-07-14
 audit — `docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md`
-R2-C01), and by the doctor's own measurement (`doctor.ts:2092-2093`) the
+R2-C01), and by the doctor's own measurement (`doctor.ts:1862-1863`) the
 entire weighted-rule channel contributes AUC ~0.076 to discrimination while
 scene-count scarcity carries AUC ~0.938. More rules stopped adding signal a
 long time ago; they add maintenance cost and undercut the trust story. Do not
@@ -305,11 +317,11 @@ before the score.
 
 None of these six is comparable to AUC-24 or to the P1 baseline — 32 short
 scripts vs feature-length, and the one feature-scale deduction that is WIRED
-INTO HEALTH (`ARC_DED_MIN_SCENES` = 15, `doctor.ts:2104`) never fires at this
+INTO HEALTH (`ARC_DED_MIN_SCENES` = 15, `doctor.ts:1874`) never fires at this
 length, so the public benchmark measures a strictly smaller engine. *(This
 sentence also named `CLIMAX_DED_MIN_SCENES` until 2026-09-12. That constant
 gates `climaxZoneDecayDeduction`, which is exported and wired into NOTHING —
-`doctor.ts:2127-2131` records the revert, "it over-fired on real scripts with
+`doctor.ts:1897-1901` records the revert, "it over-fired on real scripts with
 naturally flat climaxes" — so "never fires at this length" implied it fires at
 some length. It fires at no length. Adversarial finding 6.)* What
 distinguishes the two measurement channels from each other is scene count:

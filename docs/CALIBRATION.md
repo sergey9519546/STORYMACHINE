@@ -76,7 +76,11 @@ side).
 
 The raw craft score is `100 - craftPenalty(...)`, computed by
 `computeRawCraftScore` and displayed (clamped to `[0, 100]`, rounded to one
-decimal) by `computeHealthScore` — both in `server/nvm/analyze/doctor.ts`.
+decimal) by `computeHealthScore`. `craftPenalty` and `computeRawCraftScore`
+live in `server/nvm/analyze/craft-formula.ts` — an import-free LEAF since
+2026-09-21, so `reference.ts` can score the corpus through it without
+importing `doctor.ts` (which re-exports `computeRawCraftScore`);
+`computeHealthScore` stays in `server/nvm/analyze/doctor.ts`.
 `craftPenalty`'s shape (constants omitted deliberately; see the file for the
 current tuned values, which are expected to drift as the rule count grows):
 
@@ -98,7 +102,7 @@ scene-count-only divisor never discounts. Measured against the 20 richness-
 matched corpus samples, that produced a *raw* score around -180 to -330 for
 every one of them — every realistic script saturated the `[0, 100]` clamp at
 the same value, so displayed health, grade, and verdict carried no
-information for exactly the scripts that matter (doctor.ts's "Opportunity-
+information for exactly the scripts that matter (craft-formula.ts's "Opportunity-
 based craft penalty" comment; reference.ts's "saturation defect" section).
 
 **Two independent, additive terms, both with a measured rationale:**
@@ -112,7 +116,7 @@ based craft penalty" comment; reference.ts's "saturation defect" section).
    per-repetition) — 100.5 weighted issues at 290 words became 165.5 at 590
    and 230.0 at 890. Raising word count to a fractional power before
    dividing tracks that same sub-linear growth, which is what makes the
-   penalty length-invariant for scripts of matched quality (doctor.ts's
+   penalty length-invariant for scripts of matched quality (craft-formula.ts's
    `craftPenalty` comment; the length-invariance regression test lives in
    `tests/core/script-doctor.test.ts`). The exponent amplifying the density
    ratio exists because the corpus's own band-to-band density spread is
@@ -128,7 +132,7 @@ based craft penalty" comment; reference.ts's "saturation defect" section).
    defect. It fades to near-nothing for realistic scene counts and dominates
    for a 3-4 scene fragment, which is the intended effect: a tiny script can
    no longer read as "clean" purely by being too short to accumulate issues
-   (doctor.ts's `craftPenalty` comment).
+   (craft-formula.ts's `craftPenalty` comment).
 
 **Length-invariance is the guarantee, and it is explicitly bounded.** The
 formula is tuned so two scripts of matched authored quality score similarly
