@@ -1302,6 +1302,28 @@ now disclosed in all four places a reader meets it: the constant's comment in
 `doctor.ts`, one sentence beside `gradeForHealth`/`verdictFor`, §13 of
 `docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md`, and here.
 
+**The trade behind that decision is now measured, not argued:
+`SATURATION_SWEEP.md` in this directory.** Five settings of
+`SCARCITY_SATURATION_SCENES` — 12 (shipped), 24, 60, 120 and none (`140/n`) —
+were run on scratch copies of `4a0ad86a` with that one line changed and nothing
+else, over the zero-issue ceiling, the public benchmark's six statistics, the
+blind pairs, both metamorphic padding witnesses plus a direct probe that pads
+`undertow.fountain` to 24/60/120/300 scenes, the 231-scene feature fixture and
+its shuffle-drop gap, calibration, and the 45 identity fixtures. The short
+version: the public channel cannot arbitrate the constant at all (every
+matched-pair AUC, every blind pair and all 21 calibration bands are identical
+at all five settings, because all 32 public scripts are 9-14 scenes), the
+feature-scale shuffle-drop gap is +16.30 at four of the five settings, and the
+ceiling and the padding resistance are the same number read from two ends. The
+sweep also closes the question this section leaves open: **no setting keeps the
+`stapled_shorts` witness passing while lifting the top grade back into reach.**
+The witness passes exactly at `S <= 13` (measured: −1.6 at 12, −0.7 at 13, +0.1
+at 14, +4.2 at 24, +9.0 with no saturation) and a zero-issue draft needs
+`S >= 14` to reach 90.0 — and a clean 100-scene feature carrying this
+repository's measured 8.8965 density penalty tops out at 89.7 even with the
+saturation removed entirely, so this constant is not on its own the lever that
+restores `excellent` at feature length.
+
 ### D2. What the 0.8750 is made of
 
 §4's headline (shuffle-drop matched-pair 0.5313 → 0.8750) is not spread evenly

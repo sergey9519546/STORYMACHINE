@@ -1,6 +1,6 @@
 ---
 type: audit
-updated: 2026-09-20
+updated: 2026-09-21
 sources: [docs/audits/2026-09-20-feature-length-defects-prep/README.md, docs/audits/2026-09-20-parked-branches/README.md, docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md, docs/scoring/FEATURE_LENGTH_DEFECTS_2026-09-07.md, scripts/lib/auc.ts, server/nvm/analyze/doctor.ts, server/lib/validation.ts, src/lib/voice-separation-copy.ts, tests/security/fountain-shape-guard-cue-parity.test.ts]
 status: active
 ---
@@ -142,6 +142,8 @@ bracketing assertion was re-anchored to demand a bracketing sweep again the
 moment cost starts trending upward. Five cue-parity tests that pinned the old
 675,000 boundary's STORY were rewritten to the derived bounds, and that suite is
 **681/681**: the branch now has no failing test.
+
+**Saturation sweep (2026-09-21).** `docs/audits/2026-09-20-feature-length-defects-prep/SATURATION_SWEEP.md` measures the D1 trade on scratch copies of `4a0ad86a` with only `SCARCITY_SATURATION_SCENES` varied (12 / 24 / 60 / 120 / none): the public benchmark, the blind pairs and all 21 calibration bands are identical at every setting, the `stapled_shorts` padding witness passes only at 12 and 13, and no setting both passes it and lifts a clean 100-scene feature to 90 — that feature reads 89.7 even with the saturation removed entirely.
 
 ## What the owner still owes
 
