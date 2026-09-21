@@ -39,6 +39,48 @@ assertions over this file are structural and scale-shaped:
 The file says all of this in its own boneyard header, so a reader who opens it
 without this README still gets the warning.
 
+## The doc-tier variant — `assembled-feature-doc-tier.fountain` (2026-09-21)
+
+The same twenty CC0 bodies, assembled by the same builder, in a **seeded
+order** instead of the lexicographic one:
+
+```
+node scripts/build-feature-length-fixture.mjs --variant=doc-tier          # write it
+node scripts/build-feature-length-fixture.mjs --variant=doc-tier --check  # verify
+```
+
+`--variant=doc-tier` is shorthand for `--order=seed:6` with
+`--out=tests/fixtures/feature-length/assembled-feature-doc-tier.fountain`
+(`DOC_TIER_VARIANT` in the builder). The order is a mulberry32-seeded
+Fisher–Yates permutation of the lexicographic list, so it is the same on every
+machine; `tests/core/feature-length-fixture.test.ts` byte-checks it exactly as
+it checks the primary, and asserts the default order still writes the primary
+byte-for-byte.
+
+**Why it exists.** `tests/core/coverage-next-fix-jump-honesty.test.ts`
+reproduces adversarial finding #5 (2026-09-12): a top priority the server
+resolves to the DOCUMENT tier, for which the "next fix" card must show an honest
+"no location" note rather than borrow the first root cause's line envelope. On
+the primary fixture that situation stopped existing under the feature-length
+scoring candidate — the ORPHAN_CLUE name/title guard (`e5e2b534`) makes its top
+priority a line-anchored `REVELATION_WITHOUT_SETUP` at Scene 15 and shrinks the
+first root cause's envelope from 87.9 % of the file to 5.1 %. A bounded search
+over twelve orders (reverse, then seeds 1–11; table in
+`docs/audits/2026-09-20-feature-length-defects-prep/README.md` § 2026-09-21 E3)
+found seed 6 as the first order under which the top priority is
+`NO_REVERSALS_LONG_STORY` at "Conflict layer" (document tier) and the first
+root cause's envelope covers 95.1 % of the file — every assertion of that
+describe passes on it verbatim. Only that describe and the two finding-#5
+assertions in `scripts/verify-p2-p3-surfaces.mjs`'s `P2-featurelen` phase read
+this file; every other consumer of the primary fixture is untouched.
+
+**What it is NOT.** Everything in "What it is — and what it is NOT" above
+applies in full: it is the same deliberately incoherent assembly in another
+order, and nothing may read craft meaning off it either. Its health, verdict,
+grade and issue counts are properties of a shuffled concatenation. The only
+things a test may assert about it are the same structural, scale-shaped
+properties listed above — plus the one report shape it was selected for.
+
 ## Regenerating it
 
 ```

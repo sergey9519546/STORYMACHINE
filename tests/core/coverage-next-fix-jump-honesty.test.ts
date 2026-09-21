@@ -20,6 +20,23 @@
 // reproduce the symptom. The pure boundary cases live in
 // tests/core/jump-span.test.ts; the DRIVEN half is in
 // scripts/verify-p2-p3-surfaces.mjs's P2-featurelen phase.
+//
+// ── Which fixture (2026-09-21) ───────────────────────────────────────────────
+//
+// The primary assembly (assembled-feature.fountain, lexicographic order) no
+// longer produces this situation: the feature-length scoring candidate's
+// ORPHAN_CLUE guard (e5e2b534) makes its top priority a line-anchored
+// REVELATION_WITHOUT_SETUP at Scene 15, and the first root cause's envelope
+// covers 5.1 % of the file. The describe below therefore loads
+// assembled-feature-doc-tier.fountain — the SAME twenty CC0 bodies assembled
+// by the SAME builder in a seeded order (`--variant=doc-tier`, i.e.
+// `--order=seed:6`), chosen by a bounded search recorded in
+// docs/audits/2026-09-20-feature-length-defects-prep/README.md § 2026-09-21
+// E3 as the first order under which the top priority is document-tier and the
+// old fallthrough's envelope is over 80 % of the file. It is still a real
+// report on a builder-assembled real document, not a hand-built shape; every
+// assertion below is unchanged. tests/core/feature-length-fixture.test.ts
+// byte-checks the variant against its builder.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -39,7 +56,7 @@ import {
 } from '../../src/lib/finding-jump.ts';
 
 const REPO = path.resolve(import.meta.dirname, '../..');
-const FIXTURE = path.join(REPO, 'tests/fixtures/feature-length/assembled-feature.fountain');
+const FIXTURE = path.join(REPO, 'tests/fixtures/feature-length/assembled-feature-doc-tier.fountain');
 
 describe("the feature fixture's top priority is honestly whole-draft", async () => {
   const fountain = readFileSync(FIXTURE, 'utf8');

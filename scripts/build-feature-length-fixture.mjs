@@ -36,6 +36,20 @@
 //
 //   node scripts/build-feature-length-fixture.mjs          # write the fixture
 //   node scripts/build-feature-length-fixture.mjs --check  # verify, exit 1 on drift
+//
+// VARIANTS (2026-09-21). The same assembler can order the twenty bodies
+// differently — `--order=reverse` or `--order=seed:<n>` (a seeded Fisher–Yates
+// permutation of the lexicographic list; mulberry32, so the same seed is the
+// same order on every machine) — and must then be told where to write with
+// `--out=<path>`, so a variant can never overwrite the primary fixture. The
+// header prose derives from the order, and every caveat above applies to a
+// variant in full: it is the same twenty unrelated bodies in another order,
+// and nothing may read craft meaning off it either. The one committed
+// variant is DOC_TIER_VARIANT below; see tests/fixtures/feature-length/README.md
+// for why it exists.
+//
+//   node scripts/build-feature-length-fixture.mjs --variant=doc-tier          # write it
+//   node scripts/build-feature-length-fixture.mjs --variant=doc-tier --check  # verify
 
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -53,6 +67,63 @@ export const OUTPUT_PATH = 'tests/fixtures/feature-length/assembled-feature.foun
  *  regenerated file whose own prose was false). */
 export const EXPECTED_SOURCE_COUNT = 20;
 export const AGENT_AUTHORED_COUNT = 14;
+
+/** The committed variant (see the header): the order under which, on the
+ *  feature-length scoring candidate, the assembled report's top priority is a
+ *  document-tier finding — the situation tests/core/coverage-next-fix-jump-
+ *  honesty.test.ts reproduces (adversarial finding #5, 2026-09-12), which the
+ *  ORPHAN_CLUE guard (e5e2b534) moved off the primary fixture. Found by the
+ *  bounded search recorded in docs/audits/2026-09-20-feature-length-defects-
+ *  prep/README.md § 2026-09-21 E3; the search table is the reason this is the
+ *  order and not another. */
+export const DOC_TIER_VARIANT = {
+  order: 'seed:6',
+  outputPath: 'tests/fixtures/feature-length/assembled-feature-doc-tier.fountain',
+};
+
+/** Parse an `--order` value. Throws on anything it does not recognise, so a
+ *  typo cannot silently produce the default order under a variant's name. */
+export function parseOrder(spec = 'lexicographic') {
+  if (spec === 'lexicographic') return { kind: 'lexicographic' };
+  if (spec === 'reverse') return { kind: 'reverse' };
+  const seed = /^seed:(\d{1,9})$/.exec(spec);
+  if (seed) return { kind: 'seed', seed: Number(seed[1]) };
+  throw new Error(`build-feature-length-fixture: unknown --order "${spec}" (lexicographic | reverse | seed:<n>)`);
+}
+
+/** mulberry32 — a 32-bit seeded generator small enough to read in one breath;
+ *  quality is irrelevant here, reproducibility is everything. */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Apply an order to the lexicographic file list. Pure. */
+export function orderFiles(sortedFiles, order) {
+  const files = [...sortedFiles];
+  if (order.kind === 'lexicographic') return files;
+  if (order.kind === 'reverse') return files.reverse();
+  const rand = mulberry32(order.seed);
+  for (let i = files.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [files[i], files[j]] = [files[j], files[i]];
+  }
+  return files;
+}
+
+/** The order, said the way the header says it. The lexicographic phrase is
+ *  the one the primary fixture has always carried (byte-checked). */
+function orderPhrase(order) {
+  if (order.kind === 'lexicographic') return 'lexicographic filename order';
+  if (order.kind === 'reverse') return 'reverse lexicographic filename order';
+  return `a seeded permutation (seed ${order.seed}) of lexicographic filename order`;
+}
 
 /** Fixed title page. A real submitted draft has one; the parser types these
  *  lines as action (src/lib/fountain.ts has no title-page handling — see
@@ -77,13 +148,13 @@ const TITLE_PAGE = [
  *  `boneyard` and fountain-analyzer.ts skips it. `//` is NOT Fountain comment
  *  syntax and would be scored as action — the 2026-09-04 corpus-integrity
  *  correction, enforced by tests/core/fixture-provenance-comment-guard.test.ts. */
-function provenanceBoneyard(sources) {
+function provenanceBoneyard(sources, order) {
   const lines = [];
   lines.push('/*');
   lines.push('ASSEMBLED FEATURE-LENGTH FIXTURE — NOT A STORY.');
   lines.push('');
   lines.push(`This file is a DELIBERATELY INCOHERENT assembly: the bodies of ${sources.length}`);
-  lines.push('unrelated short screenplays concatenated in lexicographic filename order.');
+  lines.push(`unrelated short screenplays concatenated in ${orderPhrase(order)}.`);
   lines.push('There is no throughline, no protagonist, no act structure and no intended');
   lines.push('meaning across the seams. It exists for ONE purpose: to exercise this');
   lines.push('repository at the length the product is actually used at, because until');
@@ -96,10 +167,21 @@ function provenanceBoneyard(sources) {
   lines.push('assertions over it are structural and scale-shaped: scene count, finding');
   lines.push('volume, span resolvability, render and analysis behaviour at length.');
   lines.push('');
-  lines.push('Generated by scripts/build-feature-length-fixture.mjs (deterministic:');
-  lines.push('lexicographic source order, verbatim bodies, fixed header). Regenerate');
-  lines.push('with `node scripts/build-feature-length-fixture.mjs`; the committed copy is');
-  lines.push('byte-checked by tests/core/feature-length-fixture.test.ts.');
+  if (order.kind === 'lexicographic') {
+    lines.push('Generated by scripts/build-feature-length-fixture.mjs (deterministic:');
+    lines.push('lexicographic source order, verbatim bodies, fixed header). Regenerate');
+    lines.push('with `node scripts/build-feature-length-fixture.mjs`; the committed copy is');
+    lines.push('byte-checked by tests/core/feature-length-fixture.test.ts.');
+  } else {
+    lines.push('Generated by scripts/build-feature-length-fixture.mjs (deterministic:');
+    lines.push(`${orderPhrase(order)}, verbatim bodies, fixed header).`);
+    lines.push('This is a VARIANT of the primary fixture (assembled-feature.fountain): the');
+    lines.push('same bodies in another order, kept so a test can reproduce a report shape');
+    lines.push('the primary order no longer produces. Every caveat above applies to it in');
+    lines.push(`full. Regenerate with \`node scripts/build-feature-length-fixture.mjs`);
+    lines.push(`--order=${orderSpec(order)} --out=<path>\`; the committed copy is byte-checked by`);
+    lines.push('tests/core/feature-length-fixture.test.ts.');
+  }
   lines.push('');
   lines.push('LICENCE — every source below is dedicated to the public domain under');
   lines.push('CC0 1.0 Universal (https://creativecommons.org/publicdomain/zero/1.0/),');
@@ -148,7 +230,13 @@ function wordCountOf(text) {
 
 /** Build the fixture text. Exported so the test can assemble in-memory and
  *  compare against the committed bytes without shelling out. */
-export function assembleFeatureFixture(repo = REPO) {
+export function orderSpec(order) {
+  if (order.kind === 'lexicographic') return 'lexicographic';
+  if (order.kind === 'reverse') return 'reverse';
+  return `seed:${order.seed}`;
+}
+
+export function assembleFeatureFixture(repo = REPO, { order = parseOrder('lexicographic') } = {}) {
   const dir = path.join(repo, SOURCE_DIR);
   const files = readdirSync(dir).filter((f) => f.endsWith('.fountain')).sort();
   if (files.length !== EXPECTED_SOURCE_COUNT) {
@@ -165,7 +253,7 @@ export function assembleFeatureFixture(repo = REPO) {
       + 'against data/screenplays/LICENSE-live-action.md and regenerate.',
     );
   }
-  const sources = files.map((file) => {
+  const sources = orderFiles(files, order).map((file) => {
     const text = readFileSync(path.join(dir, file), 'utf8').replace(/\r\n/g, '\n').trim();
     return {
       rel: `${SOURCE_DIR}/${file}`,
@@ -175,22 +263,40 @@ export function assembleFeatureFixture(repo = REPO) {
     };
   });
   const body = sources.map((s) => s.text).join('\n\n');
-  return `${TITLE_PAGE}\n\n${provenanceBoneyard(sources)}\n\n${body}\n`;
+  return `${TITLE_PAGE}\n\n${provenanceBoneyard(sources, order)}\n\n${body}\n`;
+}
+
+function argValue(name) {
+  const arg = process.argv.find((a) => a.startsWith(`--${name}=`));
+  return arg ? arg.slice(name.length + 3) : undefined;
 }
 
 function main() {
   const check = process.argv.includes('--check');
-  const out = path.join(REPO, OUTPUT_PATH);
-  const assembled = assembleFeatureFixture();
+  const variant = argValue('variant');
+  let orderArg = argValue('order');
+  let outArg = argValue('out');
+  if (variant !== undefined) {
+    if (variant !== 'doc-tier') throw new Error(`build-feature-length-fixture: unknown --variant "${variant}" (doc-tier)`);
+    orderArg = DOC_TIER_VARIANT.order;
+    outArg = DOC_TIER_VARIANT.outputPath;
+  }
+  const order = parseOrder(orderArg);
+  if (order.kind !== 'lexicographic' && outArg === undefined) {
+    throw new Error('build-feature-length-fixture: a non-default --order needs --out=<path>; the primary fixture is only ever written in lexicographic order.');
+  }
+  const outputPath = outArg ?? OUTPUT_PATH;
+  const out = path.join(REPO, outputPath);
+  const assembled = assembleFeatureFixture(REPO, { order });
   if (check) {
     let current = '';
     try { current = readFileSync(out, 'utf8'); } catch { /* missing counts as drift */ }
     if (current === assembled) {
-      process.stdout.write(`build-feature-length-fixture: ${OUTPUT_PATH} is current (${assembled.length} B, ${sceneCountOf(assembled)} scenes).\n`);
+      process.stdout.write(`build-feature-length-fixture: ${outputPath} is current (${assembled.length} B, ${sceneCountOf(assembled)} scenes).\n`);
       return 0;
     }
     process.stderr.write(
-      `build-feature-length-fixture: ${OUTPUT_PATH} DIFFERS from a fresh assembly ` +
+      `build-feature-length-fixture: ${outputPath} DIFFERS from a fresh assembly ` +
       `(committed ${current.length} B, assembled ${assembled.length} B). ` +
       'Re-run `node scripts/build-feature-length-fixture.mjs`.\n',
     );
@@ -199,7 +305,7 @@ function main() {
   mkdirSync(path.dirname(out), { recursive: true });
   writeFileSync(out, assembled, 'utf8');
   process.stdout.write(
-    `build-feature-length-fixture: wrote ${OUTPUT_PATH} — ${assembled.length} B, ` +
+    `build-feature-length-fixture: wrote ${outputPath} — ${assembled.length} B, ` +
     `${sceneCountOf(assembled)} scenes, ${wordCountOf(assembled)} words.\n`,
   );
   return 0;

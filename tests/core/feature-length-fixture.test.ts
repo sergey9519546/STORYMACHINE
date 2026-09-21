@@ -29,7 +29,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { assembleFeatureFixture, OUTPUT_PATH } from "../../scripts/build-feature-length-fixture.mjs";
+import { assembleFeatureFixture, OUTPUT_PATH, DOC_TIER_VARIANT, parseOrder } from "../../scripts/build-feature-length-fixture.mjs";
 import { parseFountain } from "../../src/lib/fountain.ts";
 import { analyzeFountainText } from "../../server/nvm/analyze/fountain-analyzer.ts";
 
@@ -49,6 +49,45 @@ describe("feature-length fixture — deterministic and regenerable", () => {
 
   it("assembles identically twice in a row (no clock, no randomness, no readdir-order dependence)", () => {
     assert.equal(assembleFeatureFixture(REPO), assembleFeatureFixture(REPO));
+  });
+});
+
+// ── The doc-tier VARIANT (2026-09-21) ────────────────────────────────────────
+// Same builder, same twenty bodies, seeded order (DOC_TIER_VARIANT.order). It
+// exists so tests/core/coverage-next-fix-jump-honesty.test.ts can reproduce a
+// document-tier top priority the primary order stopped producing under the
+// feature-length scoring candidate. Byte-checked like the primary, and held to
+// the same length floor and the same honesty header — it is not a second
+// craft stimulus, it is the first one shuffled.
+describe("feature-length doc-tier variant — deterministic, regenerable, honest", () => {
+  const variant = readFileSync(resolve(REPO, DOC_TIER_VARIANT.outputPath), "utf8");
+  const order = parseOrder(DOC_TIER_VARIANT.order);
+
+  it("is byte-identical to the builder run with the variant's order", () => {
+    assert.equal(
+      variant,
+      assembleFeatureFixture(REPO, { order }),
+      `${DOC_TIER_VARIANT.outputPath} has drifted — re-run \`node scripts/build-feature-length-fixture.mjs --variant=doc-tier\``,
+    );
+  });
+
+  it("is the primary's bodies in another order — same size and scene count, different bytes", () => {
+    assert.notEqual(variant, committed);
+    assert.equal(analyzeFountainText(variant).sceneCount, analyzeFountainText(committed).sceneCount);
+    assert.ok(analyzeFountainText(variant).sceneCount >= 140);
+  });
+
+  it("says in its own boneyard that it is a variant, names the order, and keeps the craft warning", () => {
+    const boneyard = parseFountain(variant).filter((b) => b.type === "boneyard").map((b) => b.text).join("\n");
+    assert.match(boneyard, /VARIANT of the primary fixture \(assembled-feature\.fountain\)/);
+    assert.match(boneyard, new RegExp(`--order=${DOC_TIER_VARIANT.order.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}`));
+    assert.match(boneyard, /DO NOT read craft meaning off this file/);
+    assert.equal(variant.split("\n").filter((l) => l.startsWith("//")).length, 0);
+  });
+
+  it("the default order still writes the primary fixture byte-for-byte (a variant switch must not move the default)", () => {
+    assert.equal(assembleFeatureFixture(REPO), committed);
+    assert.equal(assembleFeatureFixture(REPO, { order: parseOrder("lexicographic") }), committed);
   });
 });
 

@@ -2871,49 +2871,24 @@ async function main() {
   }
   await pageD.waitForTimeout(timing.ms(1500));
 
-  // ── Finding #5 (2026-09-12): the COMPACT card's "next fix" must not invent
-  // a line for a whole-draft priority. This fixture's top priority is
-  // NO_REVERSALS_LONG_STORY at "Conflict layer", which the server resolves to
-  // the 'document' tier; the card used to borrow the first root cause's member
-  // envelope and render "JUMP TO LINE 137", flashing 87.9% of the 2,928-line
-  // file. Driven here on the compact panel, before "Full report" replaces it.
-  const coverageAside = pageD.getByRole('region', { name: /coverage/i }).first();
-  const nextFixNoLocation = await coverageAside.locator('[data-no-location]').count();
-  const strayLineJump = await coverageAside
-    .getByRole('button', { name: /^Jump to line 137$/ })
-    .count();
-  record(
-    'P2-featurelen',
-    'finding #5: the "next fix" card shows an honest "no location" note for the whole-draft top priority (it used to say "JUMP TO LINE 137")',
-    nextFixNoLocation >= 1 && strayLineJump === 0,
-    `noLocationNotes=${nextFixNoLocation} strayLine137Jumps=${strayLineJump}`,
-  );
-  const attributedNote = coverageAside.getByText(/A located note from .+ — a different finding:/);
-  const attributedVisible = await attributedNote
-    .first()
-    .waitFor({ state: 'visible', timeout: timing.ms(10000) })
-    .then(() => true)
-    .catch(() => false);
-  record(
-    'P2-featurelen',
-    'finding #5: the root cause\'s own located note is still offered, attributed to THAT finding rather than relabelled as the priority\'s',
-    attributedVisible,
-    attributedVisible ? '' : 'no attributed "A located note from …" row beside the no-location note',
-  );
-  if (attributedVisible) {
-    const attributedJump = coverageAside.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).last();
-    const attributedName = await attributedJump.getAttribute('aria-label');
-    await attributedJump.click({ timeout: timing.ms(10000) });
-    await pageD.waitForTimeout(timing.ms(800));
-    const attributedLanded = await pageD.evaluate(() => document.querySelectorAll('.cm-sm-finding-flash').length);
-    record(
-      'P2-featurelen',
-      'finding #5: that attributed jump really moves the editor (the capability is kept, only its label changed)',
-      attributedLanded > 0,
-      `name=${JSON.stringify(attributedName)} flashed=${attributedLanded}`,
-    );
-  }
-
+  // Wait for the run to finish before opening the full report. The toggle is
+  // disabled for exactly as long as the run runs (smoke-p0-live-flow.mjs
+  // measures that property), and until 2026-09-21 the finding-#5 block sat
+  // here with a 10 s waitFor that happened to absorb the tail of the 231-scene
+  // run; with that block moved to its own context (below), the click landed on
+  // a still-disabled toggle and timed out. This is the wait that block was
+  // silently providing, made explicit.
+  await pageD
+    .waitForFunction(
+      () => {
+        const btn = [...document.querySelectorAll('button')]
+          .find((b) => /full report/i.test((b.textContent || '') + ' ' + (b.getAttribute('aria-label') || '')));
+        return !!btn && !btn.disabled;
+      },
+      undefined,
+      { timeout: timing.ms(180000) },
+    )
+    .catch(() => {});
   await pageD.getByRole('button', { name: /full report/i }).first().click({ timeout: timing.ms(20000) });
   // 2026-09-11: the heading is derived from prioritiesHeadingFor (the ONE shared
   // implementation, src/lib/priorities-copy.ts), not the literal "Top Priorities"
@@ -3120,6 +3095,94 @@ async function main() {
   }
 
   await contextD.close();
+
+  // ══════════════════════════════════════════════════════════════════════
+  // CONTEXT DT — Finding #5 (2026-09-12) on the DOC-TIER VARIANT of the
+  // feature fixture. The COMPACT card's "next fix" must not invent a line for
+  // a whole-draft priority: the top priority is NO_REVERSALS_LONG_STORY at
+  // "Conflict layer", which the server resolves to the 'document' tier; the
+  // card used to borrow the first root cause's member envelope and render
+  // "JUMP TO LINE 137", flashing 87.9% of the 2,928-line file.
+  //
+  // Until 2026-09-21 this was driven on pageDT's primary fixture. The
+  // feature-length scoring candidate's ORPHAN_CLUE guard (e5e2b534) makes the
+  // primary order's top priority a line-anchored REVELATION_WITHOUT_SETUP at
+  // Scene 15, so the situation no longer exists there; it exists on
+  // assembled-feature-doc-tier.fountain — the same twenty bodies, same builder,
+  // seeded order (`--variant=doc-tier`; tests/fixtures/feature-length/README.md
+  // says how it was chosen). Its own context, so pageDT's assertions above keep
+  // running on the primary fixture exactly as before. Driven on the compact
+  // panel, before "Full report" replaces it.
+  // ══════════════════════════════════════════════════════════════════════
+  const docTierFixturePath = join(REPO, 'tests/fixtures/feature-length/assembled-feature-doc-tier.fountain');
+  const contextDT = await browser.newContext();
+  const pageDT = await contextDT.newPage();
+  wireConsoleCapture(pageDT, genuineConsoleErrors);
+  meterApiRequests(pageDT);
+  await pageDT.goto(BASE, { waitUntil: 'domcontentloaded', timeout: timing.ms(20000) });
+  const [docTierChooser] = await Promise.all([
+    pageDT.waitForEvent('filechooser', { timeout: timing.ms(20000) }),
+    pageDT.getByText(/OPEN MY SCRIPT/i).first().click(),
+  ]);
+  await docTierChooser.setFiles(docTierFixturePath);
+  await pageDT.locator('.cm-content').first().waitFor({ timeout: timing.ms(30000) });
+  await pageDT.waitForTimeout(timing.ms(2500));
+  await pageDT.getByRole('button', { name: /^COVERAGE$/i }).first().click();
+  // Exact name — see pageC's note above.
+  const runBtnDT = pageDT.getByRole('button', { name: 'Run coverage', exact: true }).first();
+  if (await runBtnDT.isVisible().catch(() => false)) {
+    await runBtnDT.click({ timeout: timing.ms(20000) }).catch(() => {});
+  }
+  // Same recorded-failure shape as pageC above.
+  const healthRendered_pageDT = await pageDT
+    .waitForFunction(() => /HEALTH/.test(document.body.innerText), undefined, { timeout: timing.ms(180000) })
+    .then(() => true)
+    .catch(() => false);
+  record(
+    'P2-featurelen',
+    'the doc-tier variant\'s coverage run rendered a report on pageDT (finding #5 is driven on it below)',
+    healthRendered_pageDT,
+    healthRendered_pageDT ? '' : 'HEALTH never appeared — check the server log for a 429 from gameLimiter',
+  );
+  await pageDT.waitForTimeout(timing.ms(1500));
+  const coverageAside = pageDT.getByRole('region', { name: /coverage/i }).first();
+  const nextFixNoLocation = await coverageAside.locator('[data-no-location]').count();
+  const strayLineJump = await coverageAside
+    .getByRole('button', { name: /^Jump to line 137$/ })
+    .count();
+  record(
+    'P2-featurelen',
+    'finding #5: the "next fix" card shows an honest "no location" note for the whole-draft top priority (it used to say "JUMP TO LINE 137")',
+    nextFixNoLocation >= 1 && strayLineJump === 0,
+    `noLocationNotes=${nextFixNoLocation} strayLine137Jumps=${strayLineJump}`,
+  );
+  const attributedNote = coverageAside.getByText(/A located note from .+ — a different finding:/);
+  const attributedVisible = await attributedNote
+    .first()
+    .waitFor({ state: 'visible', timeout: timing.ms(10000) })
+    .then(() => true)
+    .catch(() => false);
+  record(
+    'P2-featurelen',
+    'finding #5: the root cause\'s own located note is still offered, attributed to THAT finding rather than relabelled as the priority\'s',
+    attributedVisible,
+    attributedVisible ? '' : 'no attributed "A located note from …" row beside the no-location note',
+  );
+  if (attributedVisible) {
+    const attributedJump = coverageAside.getByRole('button', { name: JUMP_CONTROL_NAME_RE }).last();
+    const attributedName = await attributedJump.getAttribute('aria-label');
+    await attributedJump.click({ timeout: timing.ms(10000) });
+    await pageDT.waitForTimeout(timing.ms(800));
+    const attributedLanded = await pageDT.evaluate(() => document.querySelectorAll('.cm-sm-finding-flash').length);
+    record(
+      'P2-featurelen',
+      'finding #5: that attributed jump really moves the editor (the capability is kept, only its label changed)',
+      attributedLanded > 0,
+      `name=${JSON.stringify(attributedName)} flashed=${attributedLanded}`,
+    );
+  }
+
+  await contextDT.close();
 
   // ══════════════════════════════════════════════════════════════════════
   // CONTEXT G — NO DEAD CONTROLS on the keyless default start screen

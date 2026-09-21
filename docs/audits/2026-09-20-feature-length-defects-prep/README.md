@@ -1589,7 +1589,7 @@ five files and says OK; no receipt entry was added).
 | `tests/core/unapplied-deduction-honesty.test.ts:139` | value collision in the test | the loop asserted no claim row's VALUE equals the graph deduction; on the candidate dead-frequency's graphDeduction is 12 and so is its sceneCount, so the "Scenes" row read "12". Each colliding row is now followed through `CLAIM_ROW_SPECS` to the non-graph report field it prints and must equal it exactly. Fail-first: a synthetic "Words" row carrying the deduction value fails by name | value check -> provenance check (graphDeduction 9 -> 12 on this script) |
 | `scripts/verify-p2-p3-surfaces.mjs` P2-rerun "the verdict the panel shows is recomputed for the edited draft (the number moves)" (CI `browser` job, `verify:surfaces`) | proxy read rounding, not the property | the step appends a scene to `runoff.fountain` and asserted the panel's rounded HEALTH moved; on the candidate the edit moves health 78.6 -> 78.9, both rendered as 79, while the report was recomputed (9 -> 10 scenes, 136 -> 178 issues). The assertion now reads the compact panel's three severity tiles (integer counts rendered for every complete report), which the edit moves and a stale report cannot show; health stays in the detail | rounded health 79 -> 79 (fails) -> severity tiles 1/24/111 -> 1/23/154 (passes) |
 | `scripts/verify-p2-p3-surfaces.mjs` P2-featurelen "top priority #3 carries a jump control" | hard-coded index | the step drove priority #3 because #1 and #2 were document-tier on this fixture; the candidate's ordering puts two line-anchored REVELATION_WITHOUT_SETUP rows first and the document-tier "Conflict layer" third, so #3 correctly has no jump. The driven row is now the first rendered card whose location is in the SERVER's own anchored set for these bytes (`featureAnchoredLocations`), with a preceding assertion that such a row exists and the index in the detail | index 2 (Conflict layer, no jump — fails) -> first server-anchored row, index 0 on the candidate (passes) |
-| `tests/core/coverage-next-fix-jump-honesty.test.ts:44` (3 of 5 subtests) | **premise gone on this fixture — left failing** | see §E3 | top priority NO_REVERSALS_LONG_STORY @ "Conflict layer" (document tier) -> REVELATION_WITHOUT_SETUP @ "Scene 15 (INT. KANE APARTMENT - BEDROOM - NIGHT)" (line-anchored, lines 201–216) |
+| `tests/core/coverage-next-fix-jump-honesty.test.ts:44` (3 of 5 subtests) | premise gone on the PRIMARY fixture — reproduced on a builder-made variant (§E3) | only this describe now loads `assembled-feature-doc-tier.fountain`, the same twenty bodies assembled by the same builder in seeded order `seed:6`; assertions verbatim | top priority NO_REVERSALS_LONG_STORY @ "Conflict layer" (document tier) -> REVELATION_WITHOUT_SETUP @ "Scene 15 (INT. KANE APARTMENT - BEDROOM - NIGHT)" (line-anchored, lines 201–216) |
 
 ### E2. The bisect behind the root-cause rows
 
@@ -1614,38 +1614,83 @@ So the ORPHAN_CLUE guard, not the formula change, is what moved the
 cluster-level numbers and the fixture's top priority; the two formula commits
 move only health.
 
-### E3. Left failing: `tests/core/coverage-next-fix-jump-honesty.test.ts`
+### E3. Finding #5's reproduction moved to a builder-made variant: `tests/core/coverage-next-fix-jump-honesty.test.ts`
 
 The describe "the feature fixture's top priority is honestly whole-draft"
-reproduces adversarial finding #5 (2026-09-12) on the real fixture: its top
-priority was `NO_REVERSALS_LONG_STORY` at "Conflict layer", which resolves to
-the document tier, and the card used to borrow the first root cause's
-line envelope (lines 137–2709, 87.9 % of the file) as if it were the priority's.
-On the candidate the fixture's top priority is `REVELATION_WITHOUT_SETUP` at
-"Scene 15 (INT. KANE APARTMENT - BEDROOM - NIGHT)", a line-anchored finding
-(the `e5e2b534` row above), so `computeTopPriorityJumpSpan` correctly returns
-lines 201–216, `documentTierLocations` correctly does not contain the location,
-and the first root cause's span now covers 5.1 % of the file (lines 169–317).
-Three of the five subtests fail — not because the card lies, but because the
-fixture no longer contains the situation the test was written to catch. The
-document-tier finding still exists in the report (it is now priority #3), but
-the card only ever renders the top priority, so there is no honest way to
-point the fixture-driven test at it without rewriting what it measures. Only
-one feature-length fixture is committed. The pure boundary cases in
-`tests/core/jump-span.test.ts` still guard the resolver; what is lost is the
-fixture-driven reproduction. Options for the owner: (a) accept the loss and
-retire the describe with a note; (b) commit a second feature-length fixture
-whose top priority is document-tier under the candidate's scoring; (c) rewrite
-the describe to assert the property on whichever priority is document-tier via
-a synthetic top-priority swap, which the test's own header rejects
-("measures the actual report rather than a hand-built shape"). This pass did
-none of them.
+reproduces adversarial finding #5 (2026-09-12) on a real report: a top priority
+the server resolves to the DOCUMENT tier (it was `NO_REVERSALS_LONG_STORY` at
+"Conflict layer"), for which the "next fix" card must show an honest "no
+location" note instead of borrowing the first root cause's line envelope
+(lines 137–2709, 87.9 % of the file). On the candidate the primary fixture no
+longer contains that situation: its top priority is `REVELATION_WITHOUT_SETUP`
+at "Scene 15 (INT. KANE APARTMENT - BEDROOM - NIGHT)", line-anchored (lines
+201–216 — the `e5e2b534` row in E2), and the first root cause's envelope covers
+5.1 % of the file (lines 169–317). Three of the five subtests failed for that
+reason, not because the card lies. The document-tier finding still exists in
+the report (priority #3), but the card only renders the top priority, and only
+one feature-length fixture was committed.
 
-The same premise is driven in the browser by
-`scripts/verify-p2-p3-surfaces.mjs`'s `P2-featurelen` phase (its two
-"finding #5" assertions expect the honest "no location" note for the top
-priority and a stray "Jump to line 137" count of zero), so the CI `browser`
-job's `verify:surfaces` step is affected in the same way. Driven here: those two assertions fail (`noLocationNotes=0 strayLine137Jumps=0`; no attributed "A located note from …" row) for exactly the reason above, and no other assertion in the battery does once the two proxy steps in the table were corrected.
+**What was done (owner decision: option b).** `scripts/build-feature-length-fixture.mjs`
+gained a variant switch — `--order=reverse` or `--order=seed:<n>` (mulberry32-seeded
+Fisher–Yates over the lexicographic list), which then requires `--out=<path>` so a
+variant can never overwrite the primary — with the header prose derived from the
+order. The default order still writes the primary fixture byte-for-byte:
+`node scripts/build-feature-length-fixture.mjs && git diff --exit-code` is clean,
+`--check` reports it current, and `tests/core/feature-length-fixture.test.ts` now
+asserts that too. A bounded search then assembled twelve orders in memory and ran
+the real doctor and root-cause pipeline on each, checking every assertion of the
+describe (sceneCount >= 140, > 2000 lines, top location in
+`documentTierLocations`, `computeTopPriorityJumpSpan` undefined, first root
+cause's `computeRootCauseJumpSpan` envelope > 80 % with owner `root-cause`,
+composite equal to it):
+
+| order | top priority | tier | first root cause | envelope | all assertions |
+|---|---|---|---|---|---|
+| `reverse` | PROTAGONIST_PASSIVITY_CLIMAX @ Scene 174 (climax peak) | anchored | Widespread Plot Logic & Payoff concerns | 0.0 % | no |
+| `seed:1` | PROTAGONIST_PASSIVITY_CLIMAX @ Scene 164 (climax peak) | anchored | Recurring orphan clue trouble in Scenes 31–38 | 71.0 % | no |
+| `seed:2` | PROTAGONIST_PASSIVITY_CLIMAX @ Scene 186 (climax peak) | anchored | Recurring zero entropy scene trouble in Scenes 41–50 | 87.0 % | no |
+| `seed:3` | NO_REVERSALS_LONG_STORY @ Conflict layer | **document** | Recurring orphan clue trouble in Scenes 1–58 | 21.9 % | no (envelope) |
+| `seed:4` | REVELATION_WITHOUT_SETUP @ Scene 14 (INT. ST. AGATHA'S HOSPITAL - PRESS ROOM - DAY) | anchored | Recurring zero entropy scene trouble in Scenes 23–30 | 91.8 % | no |
+| `seed:5` | PROTAGONIST_PASSIVITY_CLIMAX @ Scene 180 (climax peak) | anchored | Recurring zero entropy scene trouble in Scenes 3–15 | 4.3 % | no |
+| **`seed:6`** | **NO_REVERSALS_LONG_STORY @ Conflict layer** | **document** | Recurring orphan clue trouble in Scenes 2–12 | **95.1 %** | **yes — chosen** |
+| `seed:7` | REVELATION_WITHOUT_SETUP @ Scene 9 (INT. POLICE STATION - INTERVIEW ROOM - NIGHT) | anchored | Recurring zero entropy scene trouble in Scenes 15–36 | 0.0 % | no |
+| `seed:8` | NO_REVERSALS_LONG_STORY @ Conflict layer | document | Recurring zero entropy scene trouble in Scenes 44–57 | 93.3 % | yes |
+| `seed:9` | NO_REVERSALS_LONG_STORY @ Conflict layer | document | Recurring orphan clue trouble in Scenes 15–19 | 93.7 % | yes |
+| `seed:10` | PROTAGONIST_PASSIVITY_CLIMAX @ Scene 172 (climax peak) | anchored | Recurring zero entropy scene trouble in Scenes 170–231 | 24.9 % | no |
+| `seed:11` | REVELATION_WITHOUT_SETUP @ Scene 12 (INT. ST. AGATHA'S HOSPITAL - PRESS ROOM - DAY) | anchored | Recurring zero entropy scene trouble in Scenes 30–39 | 77.7 % | no |
+
+Every order keeps 231 scenes and 2,932 lines. Seed 6 is the first that
+satisfies all three conditions (seeds 8 and 9 also do; the search was stopped
+at the twelve-variant bound, not at the first hit, so the table is complete).
+It is committed as `tests/fixtures/feature-length/assembled-feature-doc-tier.fountain`
+(114,279 B, 231 scenes), written by
+`node scripts/build-feature-length-fixture.mjs --variant=doc-tier` (shorthand for
+`--order=seed:6 --out=<that path>`, `DOC_TIER_VARIANT` in the builder) and
+byte-checked by `tests/core/feature-length-fixture.test.ts` exactly as the
+primary is. Its boneyard says it is a variant, names the order, and carries the
+same "DO NOT read craft meaning off this file" warning; the fixtures README has
+a paragraph on why it exists and what it is not.
+
+**Who reads it.** Only the finding-#5 describe (its `FIXTURE` constant; every
+assertion verbatim — the header's "measures the actual report rather than a
+hand-built shape" still holds, since a builder-assembled real document is not a
+hand-built shape; 8/8 on the variant) and the two finding-#5 assertions in
+`scripts/verify-p2-p3-surfaces.mjs`'s `P2-featurelen` phase, which moved into
+their own browser context (`contextDT`) that loads the variant, so every pageD
+assertion keeps running on the primary fixture as before. Every other consumer
+of `assembled-feature.fountain` is untouched. The new fixture is a tracked
+`.fountain`, so the provenance guard (145/145), the shape-guard parity sweep and
+the analysis-budget sweep pick it up; results in E4.
+
+**Driven.** `npm run verify:surfaces` on the moved block: 250/250, exit 0 —
+"noLocationNotes=1 strayLine137Jumps=0", the attributed "A located note from …"
+row is offered, and its jump ("Jump to scene 2", 13 lines flashed) moves the
+editor. Moving the block out of pageD exposed one latent timing dependency:
+the block's own 10 s `waitFor` had been absorbing the tail of pageD's
+231-scene run before the "Full report" click, so without it the click landed
+on a still-disabled toggle and timed out. That wait is now explicit
+(`waitForFunction` on the toggle's `disabled`, 180 s, the same property
+`smoke-p0-live-flow.mjs` measures) rather than accidental.
 
 ### E4. Counts and gates
 
@@ -1653,9 +1698,9 @@ job's `verify:surfaces` step is affected in the same way. Driven here: those two
 |---|---|
 | full `npm test` before (orchestrator, `798b495d`) | 14,646 tests, 17 subtests failing (9 describes), 98 skipped, 6 todo |
 | full `npm test` after (this worktree, `8e328131`) | 14,646 tests, 14,539 pass, **3 subtests failing** (all in `tests/core/coverage-next-fix-jump-honesty.test.ts:44`, E3), 98 skipped, 6 todo, 414.9 s — every other describe from the before row is green |
-| every touched test file individually | `sample-coverage-facts` 3/3 · `p0-sample-drift` 4/4 · `start-screen-sample-card` 5/5 · `report-unverified-gates` 42/42 · `root-cause-parity` 18/18 · `verify-report` 155/155 · `priority-selection-one-list` 14/14 · `unapplied-deduction-honesty` 9/9 · `honesty-audit-claims` 15/15 · `coverage-next-fix-jump-honesty` 5 pass / 3 fail (E3) |
+| every touched test file individually | `sample-coverage-facts` 3/3 · `p0-sample-drift` 4/4 · `start-screen-sample-card` 5/5 · `report-unverified-gates` 42/42 · `root-cause-parity` 18/18 · `verify-report` 155/155 · `priority-selection-one-list` 14/14 · `unapplied-deduction-honesty` 9/9 · `honesty-audit-claims` 15/15 · `coverage-next-fix-jump-honesty` 8/8 on the doc-tier variant (was 5 pass / 3 fail on the primary) · `feature-length-fixture` 13/13 · `fixture-provenance-comment-guard` 145/145 · `fountain-shape-guard-cue-parity` 682/682 (681 + the variant's row) · `doctor-analysis-budget` 27/27 |
 | `npm run verify:p0-flow` | PASS — "report rendered: verdict=CONSIDER, health~82", keyless, zero genuine console errors. The environment's Playwright 1.63 expects build 1243 of the Chromium headless shell and `/opt/pw-browsers` holds build 1194; the run used the launcher's own `PW_CHROMIUM_PATH` override pointed at the installed build (no `playwright install` was run) |
-| `npm run verify:surfaces` | 246/248 — the two finding-#5 assertions in E3 fail; the P2-rerun and priority-jump steps in the table pass on the corrected reads (`severity tiles 1/24/111 -> 1/23/154`; driven row = priority #1, "Jump to scene 15", flashed 10). An earlier run of the same battery, taken while the full suite was running on the same 4-core box, also recorded two timeout failures on the feature-length coverage run (`HEALTH` never rendered on pageC); they did not recur on the uncontended run and are not in the table |
+| `npm run verify:surfaces` | **250/250, exit 0** with the finding-#5 assertions driven on the doc-tier variant in their own context. Before the variant: 246/248 — the two finding-#5 assertions failed on the primary fixture; the P2-rerun and priority-jump steps in the table pass on the corrected reads (`severity tiles 1/24/111 -> 1/23/154`; driven row = priority #1, "Jump to scene 15", flashed 10). An earlier run of the same battery, taken while the full suite was running on the same 4-core box, also recorded two timeout failures on the feature-length coverage run (`HEALTH` never rendered on pageC); they did not recur on the uncontended run and are not in the table |
 | `npm run lint` | 0 |
 | `npm run check-no-console` | 0 (312 files, 4 quarantine entries) |
 | `node scripts/check-scoring-receipt.mjs 6ca3fcd0..HEAD` | OK — the same five scoring-path files as before this pass, no new receipt entry |
