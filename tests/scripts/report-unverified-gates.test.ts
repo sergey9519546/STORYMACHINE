@@ -547,9 +547,26 @@ describe('floor liveness — check (5): the mutation run', () => {
   });
 
   it('the hook rewrites exactly one constant, and refuses a shape it cannot move', () => {
-    const raised = raiseFloorInSource(AUC_LIB, 'PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR', 0.5813);
+    const target = 'PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR';
+    const raised = raiseFloorInSource(AUC_LIB, target, 0.5813);
     assert.match(raised, /export const PUBLIC_SHUFFLE_DROP_PAIRED_FLOOR = 0\.5813;/);
-    assert.match(raised, /export const PUBLIC_SHUFFLE_DROP_FLOOR = 0\.5386;/);
+    // Every OTHER declared floor must survive byte-for-byte. Asserted against
+    // the source's own declaration lines rather than a literal value: until
+    // 2026-09-21 this line read `= 0\.5386;` for PUBLIC_SHUFFLE_DROP_FLOOR, so
+    // the feature-length candidate's re-lock of that floor to 0.8091 (a scoring
+    // change, correctly re-measured) failed a test about the REWRITE — a
+    // mutation-hook property that has nothing to do with what the floor is.
+    const untouched = declared.filter((f) => f.constant !== target);
+    assert.ok(untouched.length >= 5, `expected the other five public floors in scope, found ${untouched.length}`);
+    for (const { constant } of untouched) {
+      const line = AUC_LIB.match(new RegExp(`^export const ${constant} = -?[0-9.]+;$`, 'm'))?.[0];
+      assert.ok(line, `${constant} is not a single-line declaration in auc.ts`);
+      assert.ok(raised.includes(line), `the rewrite moved ${constant} — its line "${line}" is no longer present`);
+    }
+    // And the parsed result says the same thing: one value moved, the rest equal.
+    const after = new Map(parseFloorConstants(raised, 'PUBLIC_').map((f) => [f.constant, f.value]));
+    assert.equal(after.get(target), 0.5813);
+    for (const { constant, value } of untouched) assert.equal(after.get(constant), value, `${constant} moved`);
     assert.equal(raised.split('\n').length, AUC_LIB.split('\n').length, 'the rewrite must not add or remove lines');
     // A constant reshaped across two lines (or absent) must throw rather than
     // silently leave the run unmutated — an unmutated "mutation run" that
