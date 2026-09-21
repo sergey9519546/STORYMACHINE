@@ -691,3 +691,125 @@ oldest first, `cfe56403`, `706adf3a`, `852354f5`, `a36ae76a` — matching what
 | session branch | `3b05e696` | verified 14,601 / 0 at `6ca3fcd0` plus docs |
 | `lane/land-feature-length-defects` | `a36ae76a` | green, awaiting the real-corpus run; raises the primary public floor |
 | `lane/land-advice-rule-fixes` | `671b7cf2` | held; lowers it |
+
+## 13. 2026-09-21 — what the candidate's numbers mean
+
+This corrects the framing §11-§12 gave the 0.8750 figure: those passes
+reported it as a green light — evidence in the feature-length branch's
+favor, a blocker cleared, a candidate ready to merge once the owner's
+real-corpus run confirms it — without saying what the number is made of or
+whether it says anything about feature-length drafts at all. An
+independent adversarial review of the candidate's scoring code (read-only,
+both trees measured; `origin/lane/land-feature-length-defects` fetched and
+verified at `a1d8dbdb`, `c41c9d4f`, `4a0ad86a`, matching this section's
+brief) supplies both, and fixed three things it found along the way.
+
+1. **The review's headline finding is not overfitting.** It checked the
+   two obvious ways a benchmark move like this goes wrong and found
+   neither: the pre-registered split is not gamed (holdout shuffle-drop
+   matched-pair 0.4000 → 0.8000 on N=5, the friendlier half of the split),
+   and `SUB_DENSITY_STEEPNESS` was not chosen to maximize AUC (`k=1` and
+   the shipped `k=2` both read 0.8750; `k=2.6335` reads higher, 0.8906, so
+   the shipped constant leaves measured separation on the table rather
+   than chasing it). What it found instead is a composition and scope
+   problem in what 0.8750 is being asked to prove.
+   - **Composition.** Of the move from 0.5313 to 0.8750, 9 of the 13
+     newly-ordered pairs are the twelve blind-pair fixtures (six premises
+     x excellent/bad, all 10 scenes, 9 of the 12 pinned at health 76.0
+     before) un-pinning as a bloc: 0.2500 → 1.0000 on that subgroup alone.
+     On the 20 independent CC0 screenplays — the only scripts in the
+     public benchmark not written in one sitting as a matched pair — the
+     same statistic moves 0.7000 → 0.8000, a two-script change. The honest
+     headline is the second number, not the blended 0.8750.
+   - **Feature length.** On the 231-scene feature fixture, under the
+     AUC-24 shuffle-drop recipe itself, the intact-vs-degraded gap is
+     unchanged within seed noise: +15.30 on the baseline tree, +16.30 on
+     the candidate at the manifest seed, ranging −0.60 to +1.00 across
+     twelve seeds. Both intact and degraded health fall by roughly 10-11
+     points — a rank-preserving level shift that a paired-AUC statistic
+     cannot see by construction. Twenty ~135-scene stapled documents the
+     reviewer built separately order 20 of 20 on both trees. The
+     mechanism is a short-script phenomenon: one additional major finding
+     costs 0.8135 health points on a 57-word fixture and 0.0143 points on
+     the 19,293-word feature fixture — a 56.8x ratio that tracks the
+     `wordCount^0.7` density normalization almost exactly.
+   - **The 88.3 ceiling.** `140 / min(n, 12)` evaluates to 11.667 for
+     every script of 12 or more scenes, so health is capped at 88.3 there
+     regardless of quality — probed on a zero-issue document at 12, 60,
+     231 and 400 scenes, all 88.3, against a baseline that climbs to
+     88.3, 97.7, 99.4, 99.6. `excellent` (>= 90) is unreachable at feature
+     length and `RECOMMEND` (>= 85) needs density plus deductions held to
+     3.33 points combined, where the feature fixture alone carries 8.9 of
+     density. This is now disclosed in four places on the branch
+     (`4a0ad86a`); which of raise-thresholds, lower-the-saturation-floor,
+     or accept-a-retired-top-grade to pick is the owner's decision, not
+     one the review or this report makes.
+   - **Blind pairs, four of six carry no weight.** All six pairs newly
+     order or stay ordered, but four of the six gaps run only +0.1 to
+     +1.9 on documents that were all tied at 76.0 before the fix.
+   - **Attribution (leave-one-out).** The entire shuffle-drop move is the
+     `SUB_DENSITY_STEEPNESS` change — without it the statistic reads
+     0.5781. The saturation term contributes zero to it on this corpus by
+     construction (it changes only the ceiling, not the ordering at 10
+     scenes). The orphan-clue guard contributes +0.047 AUC and accounts
+     for `room-12` moving from health 33.5 to 63.9 and `transfer-window`
+     from 31.9 to 64.1 — correcting §8 and §10 above, which described
+     `room-12` as falling to 0.0; that was a misreading of the first prep
+     audit, not a measurement this report can stand behind.
+2. **Fixed on the branch, `a1d8dbdb`.** The plain-language summary
+   described the scene-count term as "adds N point(s) at M scene(s)" for
+   a term that is a flat constant above 12 scenes — restated to state the
+   floor honestly, with `summary-honesty.test.ts` now pinning both the
+   under-12 and over-12 forms and their equality at exactly 12 and 231
+   scenes. Output identity against `05faefcf`: 11 of 45 reports differ,
+   every difference confined to `plainSummary`, no number moved; recorded
+   in a standalone receipt entry.
+3. **Guards strengthened, `c41c9d4f`.** The DoS margin proof now binds to
+   the runner's measured worst-admitted rate (0.807 microseconds/unit,
+   run 35542413222) rather than only the 2026-09-05 developer-box rate
+   0.173 — 1,211 ms against the 10,000 ms target, 8.3x headroom. A
+   corpus-wide property test was added for the location-word clue guard,
+   alongside a `todo`-marked case that pins a known miss (a planted SAFE
+   under `INT. SAFE HOUSE` is never picked up as a clue by that guard).
+   The grid-limited derivation branch now checks every adjacent pair
+   instead of only the endpoints, and the ellipsis test's title was
+   corrected to match what it actually asserts.
+4. **Disclosed in `scripts/lib/auc.ts`, `4a0ad86a`,** beside the six
+   floor constants: the composition table above; the floor quantum
+   (1/32 = 0.03125, larger than the 0.02 margin, so one pair flipping
+   sign fails both primary floors — six of the twelve blind-pair gaps
+   now sit under +1.5); that `SUB_DENSITY_STEEPNESS`'s admissible window
+   was derived from the same 32 scripts the floors are measured on,
+   holdout included, so the split is spent twice; and the voice-eligible
+   weight-bound raise, labelled as a security decision needing its own
+   sign-off separate from the merge decision (a 60-cast fully-eligible
+   ensemble moves from 909,000, rejected, to 916,200, accepted). The
+   `dimensionsSitAbove` plain-summary branch fires on 13 of 21 committed
+   screenplays on both the baseline and candidate trees — the condition
+   was already true on 13 scripts before this branch, which only changes
+   which sentence that condition selects; this is recorded as the
+   owner's design decision, not a regression introduced by the branch.
+5. **State.** `origin/lane/land-feature-length-defects` sits at
+   `4a0ad86a`, zero failing tests among everything run on this branch
+   (cue-parity 681/681, public-benchmark 33/33, summary-honesty 10/10,
+   `npm run gates` exit 0). The decision the owner faces is stated
+   plainly by the review: the two halves are separable — a
+   `scoring/feature-length-saturation-only` branch exists carrying just
+   the saturation change. The steepness half carries the entire measured
+   AUC move and the entire short-script sensitivity that produces it;
+   the saturation half carries the 88.3 ceiling and has no measured
+   benefit at feature length. A flat (non-regressing) `measure-real`
+   result on the private corpus does not vindicate the saturation term —
+   it only fails to indict it, since the saturation's own effect is
+   invisible to a paired-AUC statistic by construction. The owner's four
+   steps from §12 stand unchanged (fetch, `measure-real`, manifest
+   re-lock, `lock-auc24` on recipe `v4`), with the threshold question
+   from item 1 above added to them.
+
+### 13.1 Branch heads
+
+| branch | head | note |
+|---|---|---|
+| session branch | `c48ca439` (+ this commit) | this report |
+| `lane/land-feature-length-defects` (candidate) | `4a0ad86a` | reviewed above; awaits the owner's decision |
+| `lane/land-advice-rule-fixes` | `671b7cf2` | held, unchanged this pass |
