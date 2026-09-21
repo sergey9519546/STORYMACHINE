@@ -3654,6 +3654,64 @@ pass and were re-run unchanged (`public-benchmark` 33/33,
 `git diff` on it is a single changed line; `totalIssues`, every severity count,
 `health` and `sceneCount` are byte-identical.
 
+#### PRODUCTION-LOADER PASS, 2026-09-21 — `subDensityCurve` loses a nested arrow so the calibration layer survives tsx; no number moved
+
+Added in place to this entry because the defect is this candidate's own
+(`c5c18f96` introduced `subDensityCurve` with `const sig = (x) => …` inside
+it) and the change is not a new scoring result. **No real-corpus figure is
+claimed for this range**: the private corpus is not present in this
+environment, I did not run `npm run measure-real`, and no AUC-24 value appears
+anywhere in this addendum.
+
+**What moved.** One function body in `doctor.ts`, on the corpus-scoring path
+(`computeRawCraftScore -> craftPenalty -> densityPenalty -> subDensityCurve`).
+The logistic that was a named arrow bound to a `const` inside
+`subDensityCurve` is now the hoisted function declaration `logistic`; the
+arithmetic is unchanged, term for term. Why it had to move: under the
+production loader (tsx = esbuild with `keepNames: true`; the Dockerfile CMD,
+`npm start`, `npm run dev`) a named function expression compiles to
+`__name((x) => …, "sig")`, and `__name` is a module-level `var` esbuild
+injects at the top of `doctor.ts` — hoisted but `undefined` until the module
+body runs. `calibration/reference.ts`'s top-level `await buildDistribution()`
+calls that path BEFORE `doctor.ts`'s body runs whenever `doctor.ts` is the
+entry of the doctor <-> reference cycle, which it is on every pool worker and
+on a `tsx server.ts` main thread. Result: `TypeError: __name is not a
+function`, swallowed by `reference.ts`'s fallback into an EMPTY distribution,
+so every report the production process produced since `c5c18f96` shipped
+without `percentile`, `percentileDescriptor` or `healthPercentile`. Native
+`--experimental-strip-types` (npm test, the browser gates' dev server) injects
+no helper, which is why no test in the suite saw it and `verify:production`'s
+dev-vs-prod identity check did (CI run 35553131970 on `ea27b3cc`: `first
+differing top-level key: "dimensions"`). Full diff, loader evidence per thread
+and Node version, and the fail-first test in
+`docs/audits/2026-09-20-feature-length-defects-prep/README.md` §E5.
+
+**The identity result.** `scripts/check-doctor-output-identity.mjs` against
+`git archive 263420ac`, `GIT_SHA=dev` on both sides, under
+`--experimental-strip-types`: **all 45 reports are byte-identical** (`diff -rq`
+of the two output directories reports only `_timings.json`, the wall-clock
+file). That harness runs under the loader on which the calibration layer
+already worked, so identity there is the expected reading of a pure
+restatement. Under the production loader the AFTER tree GAINS the calibration
+fields relative to BEFORE — measured with a direct harness booting the two
+servers exactly as `verify:production` §5 does, on Node 24.21.0: before,
+`/dimensions/*/percentile`, `/dimensions/*/percentileDescriptor` and
+`/healthPercentile` were `undefined` in production and present in dev; after,
+the two reports are byte-identical with `analyzedAt` excluded, on two
+consecutive requests. The six public floors, the 32-row public-corpus manifest
+and the blind-pair reading are untouched and were re-run unchanged on the
+fixed tree (`public-benchmark`, `blind-pairs-discrimination`, `calibration`,
+`script-doctor`: 148 tests, 148 pass, 0 fail in one run). No floor was
+re-locked.
+
+**The test that fails first.** `tests/core/doctor-calibration-under-tsx.test.ts`
+spawns the real `tsx/dist/cli.mjs` under `NODE_ENV=production`, loads
+`doctor.ts` first (the worker's order), and asserts the distribution holds all
+20 corpus samples on the main thread, that a pooled report and an in-thread
+report both carry every percentile field, and that the two are deep-equal.
+Without the fix: Node 22.22.2 fails on the main-thread assertion (0 of 20),
+Node 24.21.0 fails the same way; with it: 1/1 pass on both.
+
 ### 2026-09-20 — PLAIN SUMMARY STOPS ATTRIBUTING THE SATURATED SCENE-COUNT TERM TO A DOCUMENT'S SCENE COUNT — output-identity receipt (no score moved; the private corpus is absent from this environment and no real-corpus figure is claimed)
 
 **Date:** 2026-09-20. **Branch:** `lane/land-feature-length-defects`, the
@@ -3725,3 +3783,84 @@ a prior measurement. I did not run `npm run measure-real`, and I could not: the
 private corpus is absent from this environment. I also did not run `npm test`
 in full or `npm run brain`, both excluded by this pass's brief, and I pushed
 nothing.
+
+### 2026-09-21 — `subDensityCurve` LOSES ITS NESTED ARROW SO THE CALIBRATION LAYER SURVIVES THE PRODUCTION LOADER — output-identity receipt (no score moved; the private corpus is absent from this environment and no real-corpus figure is claimed)
+
+**Date:** 2026-09-21. **Branch:** `lane/devprod-dimensions`, on top of
+`263420ac` (the tip of `lane/land-feature-length-defects`).
+
+**What this entry is.** An output-identity receipt, in the shape the two
+2026-08-21 entries established: the change under it restates one function
+body in `doctor.ts` term for term (the logistic inside `subDensityCurve`
+becomes the hoisted declaration `logistic`), so there is no AUC to report and
+the honest evidence is a byte-level identity proof over every fixture this
+repository owns. The narrative half — why a named arrow on the corpus-scoring
+path emptied the calibration distribution under tsx and only there — is the
+`#### PRODUCTION-LOADER PASS, 2026-09-21` subsection of the
+`### 2026-09-20 — FEATURE-LENGTH DEFECTS PREPARED FOR MEASUREMENT` entry
+above, which this entry measures, and
+`docs/audits/2026-09-20-feature-length-defects-prep/README.md` §E5.
+
+**Git SHA:** measured at the tip of this pass on `lane/devprod-dimensions`;
+the commit that carries the fix is the one that adds this entry.
+
+**Baseline used:** `git archive 263420ac` (this lane's base), extracted to a
+sibling directory with `node_modules` symlinked. Both sides run with
+`GIT_SHA=dev` so the build stamp cannot differ.
+
+**Commands (all run in this worktree, in the foreground):**
+
+```
+GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree ../base-263420ac --out ../oi-before
+GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree .               --out ../oi-after
+node scripts/check-doctor-output-identity.mjs --compare ../oi-before ../oi-after
+node --experimental-strip-types --test tests/core/doctor-calibration-under-tsx.test.ts
+node --experimental-strip-types --test tests/core/public-benchmark.test.ts tests/core/blind-pairs-discrimination.test.ts tests/core/calibration.test.ts tests/core/script-doctor.test.ts
+PW_CHROMIUM_PATH=<installed headless shell> npm run verify:production
+```
+
+**OUTPUT IDENTITY: PASS** — `all 45 reports are byte-identical (analyzedAt
+excluded)`, with no ignored keys. The harness runs under
+`--experimental-strip-types`, the loader on which the calibration layer
+already worked before the fix, so identity there is the expected reading of
+a restatement. What the fix CHANGES is visible only under the production
+loader: a direct harness booting the two servers exactly as
+`verify:production` §5 does, on Node 24.21.0, read `/dimensions/*/percentile`,
+`/dimensions/*/percentileDescriptor` and `/healthPercentile` as `undefined`
+in production and present in dev before the fix, and the two reports as
+byte-identical after it (two consecutive requests). `npm run
+verify:production` under Node 24.21.0 with the fix: **71/71 assertions
+passed**, the dev-vs-prod identity check included. The new test fails first
+on both Node 22.22.2 and Node 24.21.0 (`main thread: reference distribution
+holds 0 of 20 corpus samples`) and passes 1/1 on both with the fix.
+
+**No AUC-24 was measured and none is claimed.** The private 761-script corpus
+is absent from this environment and `REAL_SCRIPT_CORPUS_DIR` is unset here.
+This entry claims output identity against a named baseline tree and nothing
+else. The owner's AUC-24 step for the feature-length candidate is unchanged
+and is in `docs/audits/2026-09-20-feature-length-defects-prep/README.md`.
+
+**Corpus fingerprint:** the 45-fixture deterministic set the identity harness
+owns — the 20 `data/screenplays/*.fountain` live-action fixtures, the 20
+calibration `REFERENCE_CORPUS` samples
+(`server/nvm/analyze/calibration/corpus.ts`), the P0 sample script
+(`src/lib/sample-script.ts`), and the synthetic scale and feature-length
+fixtures under `tests/fixtures/`. Every file is committed to this repository;
+the harness reads nothing else.
+
+**Supporting gates, all run here:** `npm run lint` 0 · `npm run check-no-console`
+0 (312 files under `server/`, 4 quarantine entries, every one proven
+unreachable) · `public-benchmark` + `blind-pairs-discrimination` +
+`calibration` + `script-doctor` in one run: 148 tests, 148 pass, 0 fail ·
+`doctor-calibration-under-tsx` 1/1 on Node 22.22.2 and on Node 24.21.0 ·
+`node scripts/check-scoring-receipt.mjs` on `263420ac..HEAD` and on
+`6ca3fcd0..HEAD`, both OK. The six public floors in `scripts/lib/auc.ts` are
+untouched and no floor was re-locked.
+
+**Runner attestation:** I ran every command in this entry myself, in this
+worktree, in the foreground, and read each one's output. Every figure here came
+out of one of those runs and none is transcribed from another document or from
+a prior measurement. I did not run `npm run measure-real`, and I could not: the
+private corpus is absent from this environment. I did not run `npm test` in
+full, which the brief reserves for the orchestrator, and I pushed nothing.
+

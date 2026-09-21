@@ -545,12 +545,45 @@ function densityPenalty(
  *  density 1 so it meets the power branch exactly. Split out (2026-09-07) so
  *  the anchoring arithmetic is stated once and is independently testable;
  *  its constants are passed in rather than declared here, for the same TDZ
- *  reason densityPenalty's own comment gives. */
+ *  reason densityPenalty's own comment gives.
+ *
+ *  The logistic is the hoisted function declaration `logistic` below, NOT a
+ *  `const sig = (x) => …` inside this body (what it was from 2026-09-07 to
+ *  2026-09-21). Same hazard as the constants, different carrier: this
+ *  function is on calibration/reference.ts's corpus-scoring path
+ *  (computeRawCraftScore -> craftPenalty -> densityPenalty -> here), which
+ *  reference.ts's top-level `await buildDistribution()` runs BEFORE this
+ *  module's body has evaluated whenever doctor.ts is the entry of the
+ *  doctor <-> reference cycle — i.e. on every pool worker
+ *  (doctor-worker.ts imports './doctor.ts' first) and on the main thread of
+ *  a `tsx server.ts` process. Under the production loader (tsx = esbuild
+ *  with `keepNames: true`) a NAMED function expression compiles to
+ *  `__name((x) => …, "sig")`, and `__name` is a module-level `var` esbuild
+ *  injects at the top of this file: hoisted, so no ReferenceError, but
+ *  `undefined` until the body runs — `TypeError: __name is not a function`,
+ *  swallowed by reference.ts's fallback into an EMPTY distribution, so every
+ *  report the process produced shipped without percentile fields. Native
+ *  `--experimental-strip-types` (npm test, the browser gates' dev server)
+ *  injects nothing, which is why only `verify:production`'s dev-vs-prod
+ *  identity check saw it (CI run 35553131970; docs/audits/
+ *  2026-09-20-feature-length-defects-prep/README.md §E5). A function
+ *  DECLARATION is hoisted whole and esbuild's `__name(logistic, "logistic")`
+ *  for it is a separate top-level statement that runs with the body, so
+ *  calling `logistic` early is safe. Nothing on this path may declare a
+ *  named function expression or read a module-level binding of this file;
+ *  tests/core/doctor-calibration-under-tsx.test.ts runs the real loader to
+ *  hold that. */
 function subDensityCurve(density: number, scale: number, midpoint: number, steepness: number): number {
-  const sig = (x: number) => 1 / (1 + Math.exp(-x));
-  const lo = sig(steepness * (0 - midpoint));
-  const hi = sig(steepness * (1 - midpoint));
-  return scale * (sig(steepness * (density - midpoint)) - lo) / (hi - lo);
+  const lo = logistic(steepness * (0 - midpoint));
+  const hi = logistic(steepness * (1 - midpoint));
+  return scale * (logistic(steepness * (density - midpoint)) - lo) / (hi - lo);
+}
+
+/** The standard logistic, 1 / (1 + e^-x). A declaration, deliberately —
+ *  see subDensityCurve's comment for why this must not be an arrow bound to
+ *  a `const`. */
+function logistic(x: number): number {
+  return 1 / (1 + Math.exp(-x));
 }
 
 /** The scene-scarcity half of craftPenalty, factored out on its own (Wave
