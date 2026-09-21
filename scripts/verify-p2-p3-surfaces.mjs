@@ -2399,7 +2399,23 @@ async function main() {
 
   let postsAfterClick = 0;
   let healthAfter = null;
+  let severityTilesAfter = null;
   let bannerStillVisible = null;
+  // The compact panel's three severity tiles (CoverageSummary's StatTile
+  // rows, rendered from report.bySeverity, so they move only when a run
+  // completes; the editor's live SCENE INDEX would move on the keystroke and
+  // prove nothing). Read before the edit so the assertion below compares
+  // report to report.
+  const readSeverityTiles = () => pageE.evaluate(() => {
+    const read = (id) => {
+      const tile = document.querySelector(`[aria-describedby="${id}-desc"]`);
+      const value = tile?.querySelector('.text-lg.font-bold')?.textContent?.trim() ?? null;
+      return value !== null && /^\d+$/.test(value) ? Number(value) : null;
+    };
+    const triple = [read('tile-critical'), read('tile-major'), read('tile-minor')];
+    return triple.every((n) => n !== null) ? triple.join('/') : null;
+  });
+  const severityTilesBefore = await readSeverityTiles();
   if (bannerVisible) {
     const postsBeforeClick = doctorStreamPosts.length;
     await pageE.locator('button', { hasText: /^Re-run coverage$/ }).first().click({ timeout: timing.ms(15000) });
@@ -2418,6 +2434,7 @@ async function main() {
       const m = document.body.innerText.match(/Health\s+([\d.]+)/i);
       return m ? m[1] : null;
     });
+    severityTilesAfter = await readSeverityTiles();
     bannerStillVisible = await pageE
       .locator('button', { hasText: /^Re-run coverage$/ })
       .first()
@@ -2430,11 +2447,22 @@ async function main() {
     postsAfterClick >= 1,
     `doctor/stream POSTs attributable to the click=${postsAfterClick}`,
   );
+  // Until 2026-09-21 this asserted that the rounded HEALTH the panel shows
+  // moved. That was a proxy, and the feature-length scoring candidate showed it
+  // reading rounding rather than recomputation: on this draft the appended
+  // scene moves health 78.6 -> 78.9 (measured), both of which the panel
+  // renders as 79, while the report was demonstrably recomputed (9 -> 10
+  // scenes, 136 -> 178 issues, severity tiles 1/24/111 -> 1/23/154, a new
+  // contentHash). The assertion now reads the panel's three severity tiles —
+  // integer counts the compact panel renders for every complete report, which
+  // this edit moves by 42 issues and which a stale report cannot show; the
+  // health values stay in the detail. (The panel prints the report's scene
+  // count only for an incomplete analysis, so that is not readable here.)
   record(
     'P2-rerun',
-    'the verdict the panel shows is recomputed for the edited draft (the number moves)',
-    healthAfter !== null && healthAfter !== healthBefore,
-    `before=${healthBefore} after=${healthAfter}`,
+    'the report the panel shows is recomputed for the edited draft (the severity tiles change with the added scene)',
+    severityTilesBefore !== null && severityTilesAfter !== null && severityTilesAfter !== severityTilesBefore,
+    `severity tiles (critical/major/minor) before=${severityTilesBefore} after=${severityTilesAfter}; health before=${healthBefore} after=${healthAfter}`,
   );
   record(
     'P2-rerun',
@@ -3036,10 +3064,17 @@ async function main() {
     `cards stating both=${bothNumbersShown.length} of ${countAgreement.length}`,
   );
 
-  // ── A DRIVEN jump from priority #3 ─────────────────────────────────────
-  // Priority #3 is the first top priority on this fixture that the server
-  // resolves to a span (#1 and #2 are honestly document-tier), so it is the
-  // exact row the discovery said a writer could not act on.
+  // ── A DRIVEN jump from the first server-anchored priority ──────────────
+  // The row the discovery said a writer could not act on is the first top
+  // priority the server resolves to a span. Until 2026-09-21 that row was
+  // driven by INDEX (priority #3: #1 and #2 were honestly document-tier on
+  // this fixture). The feature-length scoring candidate reorders the fixture's
+  // priorities — #1 and #2 are now line-anchored REVELATION_WITHOUT_SETUP rows
+  // and #3 is the document-tier "Conflict layer", which correctly carries NO
+  // jump — so the index is derived from the SERVER's own answer for these
+  // bytes (featureAnchoredLocations, above): the first rendered card whose
+  // location the server resolved to a span. A hard-coded index would have
+  // reported the honest no-location row as a missing control.
   // Same shared heading as above — located by the panel's own rendered text for
   // whatever count it shows, never the retired "Top Priorities" literal.
   const renderedPrioritiesHeading = await pageD.getByRole('heading', { name: prioritiesHeadingRe })
@@ -3047,12 +3082,30 @@ async function main() {
   const priorityCards = pageD.locator(
     `h3:has-text("${renderedPrioritiesHeading.replace(/"/g, '\\"')}") + div > div`,
   );
-  const thirdPriorityJump = priorityCards.nth(2).getByRole('button', { name: JUMP_CONTROL_NAME_RE }).first();
-  const thirdJumpExists = (await thirdPriorityJump.count()) > 0;
-  record('P2-featurelen', 'top priority #3 carries a jump control (it did not before 2026-09-06)', thirdJumpExists, '');
-  if (thirdJumpExists) {
-    const jumpName = await thirdPriorityJump.getAttribute('aria-label');
-    await thirdPriorityJump.click();
+  const priorityCardCount = await priorityCards.count();
+  let anchoredPriorityIndex = -1;
+  for (let i = 0; i < Math.min(priorityCardCount, 10); i++) {
+    const cardText = (await priorityCards.nth(i).innerText()).replace(/\s+/g, ' ');
+    if ([...featureAnchoredLocations].some((loc) => cardText.includes(loc))) { anchoredPriorityIndex = i; break; }
+  }
+  record(
+    'P2-featurelen',
+    'the rendered priority list holds a row the server resolved to a span (the row a writer can act on)',
+    anchoredPriorityIndex >= 0,
+    `cards=${priorityCardCount} firstAnchoredIndex=${anchoredPriorityIndex}`,
+  );
+  const anchoredPriorityJump = priorityCards.nth(Math.max(0, anchoredPriorityIndex))
+    .getByRole('button', { name: JUMP_CONTROL_NAME_RE }).first();
+  const anchoredJumpExists = anchoredPriorityIndex >= 0 && (await anchoredPriorityJump.count()) > 0;
+  record(
+    'P2-featurelen',
+    'the first server-anchored top priority carries a jump control (before 2026-09-06 no priority row did)',
+    anchoredJumpExists,
+    `priority #${anchoredPriorityIndex + 1}`,
+  );
+  if (anchoredJumpExists) {
+    const jumpName = await anchoredPriorityJump.getAttribute('aria-label');
+    await anchoredPriorityJump.click();
     await pageD.waitForTimeout(timing.ms(800));
     const landed = await pageD.evaluate(() => ({
       flashed: document.querySelectorAll('.cm-sm-finding-flash').length,
@@ -3060,7 +3113,7 @@ async function main() {
     }));
     record(
       'P2-featurelen',
-      'clicking priority #3\'s jump moves the editor to the finding (same highlightRange the Coverage jump uses)',
+      `clicking priority #${anchoredPriorityIndex + 1}'s jump moves the editor to the finding (same highlightRange the Coverage jump uses)`,
       landed.flashed > 0 || landed.focused,
       `name=${JSON.stringify(jumpName)} flashed=${landed.flashed} editorFocused=${landed.focused}`,
     );
