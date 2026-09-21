@@ -3173,3 +3173,155 @@ that nobody mistakes one for the other.
 - **Other gates on this range:** `calibration` 25/25; `pure-core-boundary` 6/6 (the leaf sits inside `server/nvm/analyze/`, so `CORE_ALLOWLIST` needed no entry); `script-doctor` 86/86; `blind-pairs-discrimination` 4/4; `doctor-worker-pool` 9/9; `doctor-history-identity` 35/35; `discrimination` 14/14; `rebuild-experiment` 41/41; `honesty-audit-claims` 15/15 after `docs/CLAIMS_REGISTER.md` row 22's `doctor.ts` pointer moved 2092-2093 -> 1862-1863 (every `doctor.ts` citation after the moved blocks shifts by exactly -230 lines, each verified to land on identical text); `docs-gating-set` 8/8; `npm run lint` 0; `npm run check-no-console` 0 (313 files, 3 quarantine entries, all proven unreachable).
 - **Runner attestation:** run in the lane worktree (`lane/craft-formula-leaf`, branched from `bafffb69`) on 2026-09-21 by the lane agent, on an Intel(R) Xeon(R) Processor @ 2.80GHz x4 sandbox (parallelism 4, 15 GiB) under node v22.22.2, linux/x64, with `tsx` resolved from the checkout's `node_modules` (the version the Dockerfile CMD installs); no API key was present and no private corpus was read. I extracted the `bafffb69` baseline myself with `git archive`, symlinked `node_modules` in from the real checkout, ran every command in the block above here, and read each one's exit code and output directly. Each probe and the control were applied by a scripted exact-match replacement, run, and reverted from a byte copy (`cmp`-verified for the baseline tree; `git status --short` empty for the worktree) before any snapshot or commit; the committed tree contains no probe. This is an output-identity receipt, not a discrimination-statistic measurement: the private real-script corpus is not present in this environment, `REAL_SCRIPT_CORPUS_DIR` is unset here, and no real-corpus figure is claimed for this range.
 - **What a reader should NOT take from this entry.** It is a code-motion output-identity receipt. It shows the score did not move — by byte identity on all 45 doctor reports and by six unchanged public-benchmark statistics — and that the two silent failure modes of the doctor<->reference cycle can no longer fire on the corpus-scoring path. It says nothing about whether the score discriminates, none of its numbers is comparable to AUC-24 or to the P1 baseline, and the formula it moved is the same formula with the same known limits: the reference set is still the 20-sample hand-authored corpus `reference.ts`'s header describes.
+
+### 2026-09-21 — PR #268 REVIEW, F3: an approved span keeps its occurrence ordinal, and a guessed relocation is reported — output-identity receipt (bit-identical, no score moved; the private corpus is not present in this environment and no real-corpus figure is claimed)
+
+- **What changed on the scoring path:** two files,
+  `server/nvm/revision/approved-spans.ts` and
+  `server/nvm/revision/pipeline.ts`. Both are classified scoring-path for a
+  single reason — they are reachable from `doctor.ts`'s import graph — not
+  because the doctor calls either of them to compute a number. Two commits in
+  this range touch `approved-spans.ts`:
+  - `fa0c7719` (finding F2) exported `lineAlignedOccurrences` and made
+    `approvedSpansSurvive` (`../rewrite-llm.ts`) decide "the locked excerpt is
+    present" with that same function instead of a bare substring `includes`.
+    Before, a rewrite that embedded the locked lines inside a modified line
+    was accepted at the survival check and then could not be found by
+    relocation on the next pass, so the lock was dropped with no warning.
+  - `c02bf3c9` (finding F3) made relocation pick the occurrence by ORDINAL
+    when the excerpt's occurrence count is unchanged, falling back to the
+    previous nearest-to-the-old-position rule (ties still to the earlier
+    occurrence) only when the count changed, and reporting that fallback in a
+    new `ambiguous` index array. With identical blocks at lines 10 and 20 and
+    the second one locked, inserting 15 lines at the top moved them to 25 and
+    35 and the old rule picked 25 — the copy the author had left free.
+  `pipeline.ts` changed in `c02bf3c9` only, to read the new `ambiguous` array
+  the way it already reads `lost`: caller-facing indices collected into a new
+  `ambiguousApprovedSpans` field on `RevisionResult`, plus one
+  `revision_locked_span_ambiguous_between_passes` warning carrying counts
+  only. `server/routes/nvm/revision.ts` also changed — comments only; it is
+  not on the scoring path and it already returned the result unreshaped.
+- **Why no score can move.** `runScriptDoctor` reaches this pipeline only
+  inside `runDiagnoseOnly()`. In that mode every pass's `rewritePass(...)`
+  returns its input before any rewrite work happens, so `revisedFountain`
+  never differs from the draft, `currentFountain !== spanAnchorFountain` is
+  never true, and the span re-location block never executes. Beyond that gate
+  the change is inert for the doctor by construction: it passes no approved
+  spans at all, so there is nothing to relocate, nothing to lose and nothing
+  to mark ambiguous. `server/nvm/analyze/calibration/reference.ts` is in the
+  same position. `aggregateReport` reads no field this range added, so
+  `ambiguousApprovedSpans` cannot reach a `ScriptDoctorReport`. The receipt
+  below is the evidence for that argument rather than its restatement.
+- **Date:** 2026-09-21
+- **Git SHA:** the range is `bed7535d..lane/codex-review-268`. Its commits are
+  `d2cda09b` (F1, converge), `fa0c7719` (F2), `c02bf3c9` (F3) and `b2dca60d`
+  (F4); the commit carrying this entry is written after them and so cannot
+  quote its own object id. `git log bed7535d..lane/codex-review-268` resolves
+  the whole range, and `docs/audits/2026-09-21-codex-review-268/README.md`
+  records it per finding.
+- **Baseline used:** the `git archive bed7535d` tree — the commit this lane
+  branched from — extracted to a scratch directory with `node_modules`
+  symlinked in from the real checkout. Both sides were run with `GIT_SHA=dev`,
+  because the extracted tree has no `.git` and `provenance.engineCommit` would
+  otherwise differ for a reason unrelated to this range.
+- **Command:** every command run for this entry, all of them in this lane
+  worktree —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types tests/core/revision-per-pass-diagnostics.test.ts
+  node --experimental-strip-types tests/core/approved-spans-enforced.test.ts
+  node --experimental-strip-types tests/core/approved-span-sanitization.test.ts
+  node --experimental-strip-types tests/core/script-doctor.test.ts
+  node --experimental-strip-types tests/core/pipeline-parallel.test.ts
+  node --experimental-strip-types tests/core/pure-core-boundary.test.ts
+  node --experimental-strip-types tests/core/llm-seam-wiring.test.ts
+  node --experimental-strip-types tests/core/typesafe-adapter.test.ts
+  node --experimental-strip-types tests/core/engine-logs-content-field-guard.test.ts
+  node --experimental-strip-types tests/core/public-benchmark.test.ts
+  node --experimental-strip-types tests/core/honesty-audit-claims.test.ts
+  node --experimental-strip-types tests/core/brain-coverage.test.ts
+  node --experimental-strip-types tests/nvm/converge/cast-alignment.test.ts
+  node --experimental-strip-types tests/routes/nvm-revision.test.ts
+  node --experimental-strip-types tests/routes/nvm-revision-approved-spans-schema.test.ts
+  node --experimental-strip-types tests/routes/nvm-converge-validation.test.ts
+  node --experimental-strip-types tests/routes/no-writer-content-in-logs.test.ts
+  git archive bed7535d | tar -x -C <scratch>/idbaseline
+  ln -s <checkout>/node_modules <scratch>/idbaseline/node_modules
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/idbaseline --out <scratch>/before
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree .                    --out <scratch>/after
+  node scripts/check-doctor-output-identity.mjs --compare <scratch>/before <scratch>/after
+  npm run benchmark:public
+  npm run brain && npm run check-brain
+  node scripts/check-scoring-receipt.mjs bed7535d..HEAD
+  ```
+  Every one exited 0. This is not `npm run measure-real`: the private
+  real-script corpus is not present in this environment, no AUC-24 value is
+  claimed anywhere in this entry, and no real-corpus figure is claimed for this
+  range. The full `npm test` is the orchestrator's run, not this lane's.
+- **Output identity:** the compare run's own line, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+  **0 of 45 fixtures differ.** This is a FULL byte-identity compare, not an
+  identity-modulo-keys one: no key was ignored and none was required to be
+  added, because the new `ambiguousApprovedSpans` field is on `RevisionResult`,
+  which the doctor's report never carries.
+- **Corpus fingerprint:** committed input sets only, no private text read.
+  (1) The 45 in-repo identity fixtures the harness scores — 20
+  `data/screenplays/*.fountain` live-action fixtures, 20 calibration
+  `REFERENCE_CORPUS` samples, the P0 sample script, and 4 synthetic
+  concatenations at 60/120/240/300 scenes. (2) The public benchmark's 32-script
+  manifest, `tests/fixtures/public-corpus-manifest.json`, unchanged by this
+  range, sha256
+  `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e`
+  (`tests/fixtures/public-benchmark-split.json`, also unchanged:
+  `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`).
+  `git diff bed7535d..HEAD -- tests/fixtures/ scripts/lib/auc.ts` is empty.
+  **The PRIVATE AUC-24 corpus was not available in this environment**
+  (`REAL_SCRIPT_CORPUS_DIR` is unset here and the corpus is local-only by
+  copyright), so no real-corpus figure is claimed for this range.
+  `AUC24_FLOOR` is untouched at 0.622 and `AUC24_DEGRADATION_ID` remains
+  `shuffle-drop/v4`.
+- **Public benchmark before/after:** all six floors' measured values reproduce
+  unchanged from the committed 32 distributable screenplays, matching both
+  `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first (PRIMARY),
+  all-pairs second: shuffle-drop **0.5313 / 0.5586**; climax-relocate
+  **0.4063 / 0.4443**; DIALOGUE_FLATTEN (the positive control) **1.0000 /
+  0.9473**, 32 of 32 ordered, zero ties. Ordered/inverted/tied counts are also
+  unchanged — shuffle-drop 17/15/0, climax-relocate 8/14/10. The suite is
+  28/28. **No floor constant in `scripts/lib/auc.ts` was touched, no floor
+  rose, no floor fell, and no re-lock was performed;** that file is not in this
+  lane's diff.
+- **Other gates on this range:** `revision-per-pass-diagnostics` 22/22;
+  `approved-spans-enforced` 27/27; `approved-span-sanitization` 10/10;
+  `script-doctor` 86/86; `pipeline-parallel` 10/10; `pure-core-boundary` 6/6;
+  `llm-seam-wiring` 7/7; `typesafe-adapter` 18/18;
+  `engine-logs-content-field-guard` 3/3; `cast-alignment` 21/21;
+  `nvm-revision` 13/13; `nvm-revision-approved-spans-schema` 15/15;
+  `nvm-converge-validation` 9/9; `no-writer-content-in-logs` 3/3;
+  `honesty-audit-claims` 15/15; `brain-coverage` 8/8; `npm run lint` 0;
+  `npm run check-no-console` 0 (313 files, 3 quarantine entries, all proven
+  unreachable).
+- **Runner attestation:** run in the lane worktree (`lane/codex-review-268`,
+  branched from `bed7535d`) on 2026-09-21 by the lane agent, on an
+  Intel(R) Xeon(R) Processor @ 2.80GHz x4 sandbox (16 GiB) under node
+  v22.22.2, linux/x64. No API key was present (`GEMINI_API_KEY` unset) and no
+  private corpus was read. I extracted the `bed7535d` baseline myself with
+  `git archive`, symlinked `node_modules` in from the real checkout, ran every
+  command in the block above here, and read each one's exit code and output
+  directly. The after-snapshot was taken from the worktree with the F1–F4 code
+  committed and `git status --short` otherwise clean. This is an
+  output-identity receipt, not a discrimination-statistic measurement: the
+  private real-script corpus is not present in this environment,
+  `REAL_SCRIPT_CORPUS_DIR` is unset here, and no real-corpus figure is claimed
+  for this range.
+- **What a reader should NOT take from this entry.** It is a
+  behaviour-change-off-the-scoring-path output-identity receipt. F2 and F3 DO
+  change behaviour — they change which lines a locked span points at after a
+  pass rewrites the draft, and whether the pipeline calls that placement
+  certain — but that behaviour is unreachable from the doctor, which is what
+  the 45 byte-identical reports and the six unchanged public-benchmark
+  statistics demonstrate. It says nothing about whether the score
+  discriminates, and none of its numbers is comparable to AUC-24 or to the P1
+  baseline.
