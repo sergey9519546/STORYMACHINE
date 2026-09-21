@@ -1816,3 +1816,63 @@ on a still-disabled toggle and timed out. That wait is now explicit
 | `brain-coverage` · `honesty-audit-claims` · `docs-gating-set` | 8/8 · 15/15 · 8/8 |
 
 Nothing was pushed.
+
+### E5. dev-vs-prod: the doctor report differed at "dimensions" in production
+
+**Scratch note, committed first so the finding survives a cut-off session;
+the root cause, fix, test and gates follow below.**
+
+CI run 35553131970 (`ea27b3cc`, `browser` job) failed `verify:production` at
+70/71: `[FAIL] dev-vs-prod :: the doctor report is byte-identical between dev
+and production (excluding analyzedAt) … first differing top-level key:
+"dimensions"`. The suite prints only the first differing key. Reproduced here
+with a direct harness that boots the two servers exactly as
+`scripts/verify-production-build.mjs` §5 does (production: `tsx server.ts`
+with `NODE_ENV=production`; dev: `bootKeylessServer`), POSTs the suite's own
+26-line "Identity Check" script to `/api/scriptide/doctor` on both, and prints
+a recursive diff with `analyzedAt` excluded. **The full diff** (every line;
+`prod=` is the production server, `dev=` the dev server):
+
+```
+/dimensions/0/percentile:           prod=undefined dev=0
+/dimensions/0/percentileDescriptor: prod=undefined dev="Structure & Pacing is in the bottom 10% of the reference set."
+/dimensions/1/percentile:           prod=undefined dev=0
+/dimensions/1/percentileDescriptor: prod=undefined dev="Character is in the bottom 10% of the reference set."
+/dimensions/2/percentile:           prod=undefined dev=0
+/dimensions/2/percentileDescriptor: prod=undefined dev="Dialogue & Voice is in the bottom 10% of the reference set."
+/dimensions/3/percentile:           prod=undefined dev=0
+/dimensions/3/percentileDescriptor: prod=undefined dev="Plot Logic & Payoff is in the bottom 10% of the reference set."
+/dimensions/4/percentile:           prod=undefined dev=0
+/dimensions/4/percentileDescriptor: prod=undefined dev="Theme & Originality is in the bottom 10% of the reference set."
+/healthPercentile:                  prod=undefined dev=50
+```
+
+Nothing else differs: `health`, `bySeverity`, every `passes` entry,
+`sceneCount`, `wordCount`, `verdict`, each dimension's `score`, `issueCount`
+and `summary` are byte-identical. What production lost is the whole
+calibration layer — `calibration/reference.ts`'s reference distribution was
+EMPTY in the production process, so `aggregateReport`'s
+`distribution.health.length > 0` guard left every percentile field undefined.
+
+The suite passed on Node 22.22.2 here and failed on Node 24.21.0 (CI's
+`node-version: "24"`, and the Dockerfile's `node:24-alpine`); both runs are on
+this checkout. Re-running `reference.ts`'s corpus loop outside its
+`try { … } catch { distribution = emptyDistribution(); }` shows the swallowed
+error, in the production process on both Node versions:
+
+```
+TypeError: __name is not a function
+    at subDensityCurve (server/nvm/analyze/doctor.ts:550:15)
+    at densityPenalty (server/nvm/analyze/doctor.ts:540:7)
+    at craftPenalty (server/nvm/analyze/doctor.ts:869:10)
+    at computeRawCraftScore (server/nvm/analyze/doctor.ts:888:16)
+    at scoreSample (server/nvm/analyze/calibration/reference.ts:245:27)
+    at async buildDistribution (server/nvm/analyze/calibration/reference.ts:273:20)
+```
+
+`__name` is esbuild's `keepNames` helper — a module-level `var` that tsx's
+loader injects at the top of every transformed module and calls around any
+named function expression, including `const sig = (x: number) => …` inside
+`subDensityCurve` (introduced by this candidate in `c5c18f96`). The base
+commit `6ca3fcd0` has percentiles under the same loader. Details, the
+loader asymmetry that makes only production see it, and the fix: below.
