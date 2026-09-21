@@ -237,7 +237,9 @@ router.post('/api/nvm/revise', aiLimiter, validate(ReviseBodySchema), asyncHandl
   }
   // raced.value is the RevisionResult as-is, so `lostApprovedSpans` (indices
   // into the caller's own `approvedSpans`, empty unless a pass edited the
-  // locked text out of the draft) reaches the client with no reshaping here.
+  // locked text out of the draft) and `ambiguousApprovedSpans` (same indexing,
+  // empty unless a lock sat on one of several identical copies whose count
+  // then changed) reach the client with no reshaping here.
   res.json(raced.value);
 }));
 
@@ -310,7 +312,8 @@ router.get('/api/nvm/revise-stream', aiLimiter, validateQuery(ReviseStreamQueryS
       REVISE_BUDGET,
       // `allCommits` — same ledger-preserving argument as POST /api/nvm/revise
       // above. This route locks no spans (the 4th argument is []), so its
-      // result's `lostApprovedSpans` is always empty; the ledger matters here
+      // result's `lostApprovedSpans` and `ambiguousApprovedSpans` are always
+      // empty; the ledger matters here
       // for exactly the same reason it does there.
       () => runRevisionPipeline(compiled, records, structure, [], event => {
         emitSSE(event); // pass_complete event per revision pass
