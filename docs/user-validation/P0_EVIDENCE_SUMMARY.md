@@ -25,6 +25,14 @@ above was fixed.
 - Decision: **INCONCLUSIVE (placeholder)** — pending >=5 valid sessions; see "P0 decision" section below
 - P0 gate: **NOT YET EVALUATED**
 
+**Correction (2026-09-19):** five harness-generated files (`P0-S01.md`
+through `P0-S05.md`) were tracked in `docs/user-validation/sessions/` from
+merge `5a125054` (2026-08-12) through this date, despite this section's
+counters and every session table in this document reading 0 /
+"No sessions documented" throughout that window. They were not real
+sessions, inflated no counter here, and were removed on 2026-09-19; see
+`PHASE_TRACKER.md`'s 2026-09-19 decision-log row for the full incident.
+
 No participants or sessions are represented in this document yet. Recruitment and scheduling may proceed — fielding was authorized 2026-08-04 (`PHASE_TRACKER.md` decision log). **Both static-report AND live-flow sessions may now begin.** The API-level certification below (commit `c5749b9`) confirms the committed static stimulus matches the live pipeline byte-for-byte in health/verdict/scene-count, and the browser-DOM click-through was subsequently certified (2026-07-28, `main` tip `1a7f3b4`/`4c131df` — StartScreen → "Try sample coverage" → ScriptDoctorPanel renders a full report with zero genuine console errors; see `PHASE_TRACKER.md` "Browser DOM smoke"). The historical "live-flow still requires a manual click-through" caveat is **resolved**; the prior paragraph's wording is retained below for the record. Historical blocker evidence (superseded, kept for the record): supported `npm run dev`, `npx tsx server.ts`, `node --import tsx server.ts`, and absolute-entry invocations exited 0 without binding the requested isolated port; the already-running `commit: dev` instance logged a CodeMirror update crash and `503` responses from `/api/analyze-script` during provisional inspection. Root cause and fix below; the fix is confirmed present at `c5749b9`.
 
 ### Blocker root cause found and fixed (2026-07-15)
@@ -220,7 +228,7 @@ engine work proceeds in parallel with P0 evidence-gathering.
 | Quick-start guide | `docs/user-validation/P0_QUICK_START.md` | Ready for field use | — |
 | Static stimulus report | `docs/user-validation/sample-coverage-report.html` | Generated; see stimulus note below | — |
 | Stimulus generator | `scripts/generate-p0-sample-report.ts` (`npm run generate-p0-sample`) | Reproducible | — |
-| Session artifacts | `docs/user-validation/sessions/` | Empty; `.gitkeep` only | — |
+| Session artifacts | `docs/user-validation/sessions/` | Empty; `.gitkeep` only *(Correction, 2026-09-19: true again as of this date; see `PHASE_TRACKER.md`'s 2026-09-19 decision-log row)* | — |
 | Evidence summary | `docs/user-validation/P0_EVIDENCE_SUMMARY.md` | PLANNED | — |
 | Phase tracker | `docs/user-validation/PHASE_TRACKER.md` | P0 ACTIVE | — |
 | P1 baseline inventory | `docs/user-validation/P1_BASELINE_INVENTORY.md` | Inventory only; P1 measurement is evidence-gated and its validity gate is unmet (P0: 0/5, no verdict; P4 remains barred) | — |

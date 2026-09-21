@@ -2257,3 +2257,1071 @@ that nobody mistakes one for the other.
   **not** run `npm run measure-real` — the private corpus is not present here
   and no AUC-24 value is claimed anywhere in this entry. Full method and both
   decomposition tables: `docs/p1-benchmark/PUBLIC_BENCHMARK_2026-09-06.md` §11.
+
+### 2026-09-20 — REVISION PASSES DIAGNOSE THE CURRENT DOCUMENT; approved spans re-located between passes — output-identity receipt (no score moved; the private corpus is not present in this environment and no real-corpus figure is claimed)
+
+- **What changed on the scoring path:** two files, both inside
+  `server/nvm/revision/`, both classified scoring-path for the same single
+  reason — they are reachable from `doctor.ts`'s import graph, not because the
+  doctor calls either of them to compute a number.
+  `server/nvm/revision/pipeline.ts` used to compute `records`/`structure`/
+  `annotations` once, from the draft as submitted, and hand that same triple to
+  all 14 passes while `currentFountain` was rewritten underneath them, so
+  passes 2..14 diagnosed the pre-revision document (SESSION_REPORT_2026-09-19.md
+  §4 row 3). It now re-derives them with `analyzeFountainText(currentFountain)`
+  whenever the draft a pass is about to see differs, byte for byte, from the
+  draft the current diagnostics describe — and skips the work entirely when it
+  does not. In the same loop, each `ApprovedSpan`'s 1-based line range is
+  re-pointed at its own excerpt in the new draft by the second file,
+  `server/nvm/revision/approved-spans.ts` (new, pure, exported
+  `relocateApprovedSpans` and the one shared `normalizeLineEndings`), closing
+  the half of the locked-spans defect that `docs/audits/2026-09-19-locked-spans/
+  README.md` §3 recorded as out of scope for that lane. A third file,
+  `server/nvm/revision/rewrite-llm.ts`, lost its private copy of
+  `normalizeLineEndings` and imports the shared one; it is off the scoring path
+  and the gate confirms that (it is not among the files the run below names).
+- **Why no score can move.** `runScriptDoctor` reaches this pipeline only
+  inside `runDiagnoseOnly()`, and in that mode every pass's `rewritePass(...)`
+  returns its input before any rewrite work happens, so `revisedFountain` never
+  differs from the draft. Both new behaviours are gated on the draft having
+  changed (`currentFountain !== diagnosedFountain`, and the span anchor's
+  equivalent), so on the doctor's path neither the re-derivation nor the
+  re-location ever executes: the doctor reads exactly the
+  `records`/`structure`/`annotations` it always did. The doctor also takes the
+  concurrent diagnose-only branch, which this range does not touch at all. The
+  receipt below is the evidence for that argument rather than its restatement.
+- **Date:** 2026-09-20
+- **Git SHA:** the first commit on `lane/per-pass-diagnostics`, branched from
+  `26d930dd`. Its own object id is not quoted here because this entry is
+  written inside that commit; `docs/audits/2026-09-20-per-pass-diagnostics/
+  README.md` records the id, and `git log 26d930dd..lane/per-pass-diagnostics`
+  resolves it.
+- **Baseline used:** the `git archive 26d930dd` tree (the commit this lane
+  branched from), extracted to a scratch directory with `node_modules`
+  symlinked in from the real checkout. Both sides of the comparison were run
+  with `GIT_SHA=dev`, because the extracted tree has no `.git` and
+  `provenance.engineCommit` would otherwise differ for a reason that has
+  nothing to do with this range.
+- **Command:**
+  ```
+  git archive 26d930dd | tar -x -C <scratch>/baseline
+  ln -s <checkout>/node_modules <scratch>/baseline/node_modules
+  GIT_SHA=dev node --experimental-strip-types scripts/check-doctor-output-identity.mjs --tree <scratch>/baseline --out <scratch>/before
+  GIT_SHA=dev node --experimental-strip-types scripts/check-doctor-output-identity.mjs --tree .                 --out <scratch>/after
+  GIT_SHA=dev node --experimental-strip-types scripts/check-doctor-output-identity.mjs --compare <scratch>/before <scratch>/after
+  node --experimental-strip-types scripts/benchmark-public.ts --json
+  ```
+  Exit codes 0 / 0 / 0 / 0. This is not `npm run measure-real`: the private
+  real-script corpus is not present in this environment, no AUC-24 value is
+  claimed anywhere in this entry, and no real-corpus figure is claimed for this
+  range.
+- **Output identity:** the compare run's own line, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+- **Public benchmark before/after:** all six floors' measured values reproduce
+  unchanged from the committed 32 distributable screenplays, matching both
+  `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first, all-pairs
+  second: shuffle-drop 0.5313 / 0.5586; climax-relocate 0.4063 / 0.4443;
+  DIALOGUE_FLATTEN (the positive control) 1.0000 / 0.9473, 32 of 32 ordered,
+  zero ties. Ordered/inverted/tied counts are also unchanged — shuffle-drop
+  17/15/0, climax-relocate 8/14/10. No floor constant in `scripts/lib/auc.ts`
+  was touched and no re-lock was performed.
+- **Corpus fingerprint:** two committed input sets, no private text read. (1)
+  The 45 in-repo identity fixtures the harness scores — 20
+  `data/screenplays/*.fountain` live-action fixtures, 20 calibration
+  `REFERENCE_CORPUS` samples, the P0 sample script, and 4 synthetic
+  concatenations at 60/120/240/300 scenes. (2) The public benchmark's 32-script
+  manifest, `tests/fixtures/public-corpus-manifest.json`, unchanged by this
+  range, sha256
+  `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e`; the
+  `--json` run above reports 32 scripts and each script's own sha256, and every
+  row's `sceneCount`/`words`/`health`/`verdict` still matches the locked
+  manifest (`tests/core/public-benchmark.test.ts`, 28/28). No manifest re-lock
+  was needed, because no produced script's health, verdict, or scene count
+  moved — which is what the identity PASS above says.
+- **Runner attestation:** run in the session worktree on 2026-09-20 by the lane
+  agent; no key, no corpus. I extracted the baseline tree with
+  `git archive 26d930dd` myself, symlinked `node_modules` in from the real
+  checkout, ran the three harness commands and the benchmark command above
+  myself, and read each one's exit code and output directly from its own log
+  file. I also ran the new test file `tests/core/revision-per-pass-diagnostics
+  .test.ts` against this range's tree with the two source edits stashed — three
+  of its fourteen assertions failed, including pass 2 of the pipeline reporting
+  the issues of an 18-scene draft while holding a 6-scene one — and again with
+  them restored, where all fourteen pass. This is an output-identity receipt,
+  not a discrimination-statistic measurement: the private real-script corpus is
+  not present in this environment, `REAL_SCRIPT_CORPUS_DIR` is unset here, and
+  no real-corpus figure is claimed for this range. The byte-level identity of
+  all 45 reports and the six unchanged public-benchmark statistics are the
+  evidence this range owes.
+
+### 2026-09-20 — SCENE GRAMMAR UNIFIED: scenesFromFountain uses the doctor's own heading grammar and '..'/'...' are no longer headings (PUBLIC-CORPUS — not an AUC-24 receipt; the private corpus is not present in this environment, so no real-corpus figure is claimed)
+
+- **Date:** 2026-09-20
+- **Git SHA:** the lane commit on `lane/scene-grammar`, branched from
+  `26d930dd` — a real commit in this repository, and the baseline every
+  before/after figure below is measured against.
+- **Why this entry exists.** Scoring-path files changed:
+  `src/lib/fountain.ts` (the parser's scene-heading test),
+  `server/nvm/analyze/scene-split.ts` (`scenesFromFountain`, the splitter under
+  the emotional arc and nine other signal modules),
+  `server/nvm/analyze/doctor.ts` (one inline copy of that splitter),
+  `server/nvm/analyze/screenplay-normalizer.ts` and
+  `server/nvm/analyze/canonical-fountain.ts`.
+  `node scripts/check-scoring-receipt.mjs 26d930dd..HEAD` requires a receipt
+  for this range, and this is it.
+- **What changed, in one sentence each.** (1) `scenesFromFountain` split on
+  `INT.`/`EXT.` alone while the doctor's own `sceneCount` recognised the full
+  slugline vocabulary and Fountain forced headings, so on an
+  `EST.`/`I/E.`/`INT./EXT.`/`.FORCED` script the arc — and therefore
+  `arcIncoherenceDeduction`, the one feature-scale deduction wired into health
+  — saw too few scenes to fire at all. (2) The parser treated any line starting
+  with `.` as a forced heading; Fountain requires `.` + alphanumeric, so a
+  `...` continuation line inside dialogue became a scene heading. Both are
+  rows 5 and 6 of `SESSION_REPORT_2026-09-19.md` §4, both VERIFIED there.
+  There is now ONE predicate, `isSceneHeadingLine` in `src/lib/fountain.ts`,
+  used by the parser and by all six former copies of it.
+- **Command:** every command run for this entry, all of them in this
+  worktree —
+  ```
+  npm run lint
+  node --experimental-strip-types --test tests/core/scene-grammar.test.ts
+  node --experimental-strip-types --test tests/core/calibration.test.ts
+  node --experimental-strip-types --test tests/core/public-benchmark.test.ts
+  node --experimental-strip-types --test tests/core/auc24-table.test.ts
+  node --experimental-strip-types --test tests/core/real-script-corpus.test.ts
+  node --experimental-strip-types --test tests/core/story-graph-corpus-auc.test.ts
+  node --experimental-strip-types --test tests/core/honesty-audit-claims.test.ts
+  node --experimental-strip-types --test tests/security/fountain-shape-guard-cue-parity.test.ts
+  npm run benchmark:public -- --json          # before (on 26d930dd) and after
+  git archive 26d930dd | tar -x -C <baseline>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree .          --out <after>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --compare <before> <after>
+  npm run gates
+  node scripts/check-scoring-receipt.mjs 26d930dd..HEAD
+  ```
+- **Corpus fingerprint:** the committed PUBLIC 32-script set — 20 CC0
+  screenplays in `data/screenplays/` plus the 12 blind-pair fixtures — read
+  through `tests/fixtures/public-corpus-manifest.json`, whose bytes this lane
+  did not change: sha256
+  `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e`
+  (`tests/fixtures/public-benchmark-split.json`, also unchanged:
+  `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`). Every
+  one of the 32 rows — `sceneCount`, `words`, `health`, `verdict` — came back
+  byte-identical after the change, so no `--lock` was needed and none was run.
+  **The PRIVATE AUC-24 corpus was not available in this environment**
+  (`REAL_SCRIPT_CORPUS_DIR` is unset here and the corpus is local-only by
+  copyright), so no real-corpus figure is claimed for this range.
+- **Runner attestation:** run in the session worktree
+  (`lane/scene-grammar`, branched from `26d930dd`) on 2026-09-20 by the lane
+  agent; no API key, no private corpus. Every command in the block above was
+  executed here and its output read; every number below is copied from that
+  output.
+- **Measured public AUCs, before → after (N = 32; matched-pair is PRIMARY;
+  seeded 2000-resample percentile bootstrap, seed 42):**
+  - `SHUFFLE_DROP` — matched-pair **0.5313 → 0.5313**, all-pairs
+    **0.5586 → 0.5586**; ordered/inverted/tied **17/15/0 → 17/15/0**.
+  - `CLIMAX_RELOCATE` — matched-pair **0.4063 → 0.4063**, all-pairs
+    **0.4443 → 0.4443**; ordered/inverted/tied **8/14/10 → 8/14/10**.
+  - `DIALOGUE_FLATTEN` (positive control) — matched-pair **1.0000 → 1.0000**,
+    all-pairs **0.9473 → 0.9473**; ordered/inverted/tied **32/0/0 → 32/0/0**.
+  - **All six numbers are unchanged, so none of the six floor constants in
+    `scripts/lib/auc.ts` moved and no floor was re-locked. `scripts/lib/auc.ts`
+    is not in this lane's diff. No floor rose; no floor fell.** The reason is
+    not luck and was checked: across the 20 CC0 screenplays, the 20 calibration
+    samples, the P0 sample and the committed `tests/fixtures/*.fountain`
+    scripts — 41 documents — there are **0 non-INT/EXT headings, 0 forced
+    `.HEADING` lines, 0 `..`-leading lines and 0 space-form `INT `/`EXT `
+    headings**. This corpus cannot see either defect, which is exactly why
+    neither defect was caught by it.
+- **Output identity:** `check-doctor-output-identity.mjs --compare` against a
+  `git archive 26d930dd` baseline, both sides `GIT_SHA=dev` →
+  **"OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt
+  excluded)."** **0 of 45 fixtures differ**, so there is no per-fixture
+  attribution table to write: the 41 file-backed fixtures contain none of the
+  heading forms this change affects (counted above) and the 4 synthetic
+  fixtures are generated `INT.` headings. This is a genuine limit of the
+  instrument, not a proof of no effect — see the two figures below, measured
+  on inputs the fixture set does not contain.
+- **Measured effect on inputs the fixture set DOES NOT contain** (both figures
+  produced here, pre-change tree vs post-change tree, same script, same
+  command):
+  - A 16-scene script whose headings are `EST.`/`I/E.`/`INT./EXT.`/`.FORCED`
+    (`tests/fixtures/scene-grammar/mixed-headings.fountain`):
+    `scenesFromFountain` returned **3 scenes before, 16 after**, against the
+    doctor's own `sceneCount` of 16 on both trees. The emotional arc it feeds
+    went from **3 points to 16**, crossing `ARC_DED_MIN_SCENES` = 15.
+  - A 5-scene script with one `...and then nothing.` continuation line inside a
+    dialogue block: **before, scenes 5 → 6 and health 62 → 37.8 (verdict
+    CONSIDER → PASS) purely from adding that line; after, 5 → 5 and 62 → 62.**
+- **Measured AUC-24:** **none is claimed for this range, and none was produced
+  here.** The private corpus is not present in this environment. The owner's
+  next `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` and
+  `npm run lock-auc24` on degradation recipe `shuffle-drop/v3` are the first
+  real-corpus figures this grammar will produce, and the first AUC-24 figures
+  of any kind that will reflect it. `AUC24_FLOOR` is untouched at 0.622.
+  **`tests/core/real-script-corpus.test.ts`'s manifest must be re-locked as
+  part of that run:** scene counts change on every corpus script that uses an
+  `EST.`/`I/E.`/`INT./EXT.`/forced heading or contains a `...`-leading line, and
+  the manifest pins health/verdict/sceneCount per script. That test is
+  env-gated and skipped here (1 pass / 73 skipped), so this lane could not and
+  did not re-lock it.
+- **What a reader should NOT take from this entry.** It is a public-corpus
+  receipt. It shows that on the 32 committed scripts the score is byte-for-byte
+  what it was, and it shows two measured deltas on synthetic inputs that use
+  heading forms the committed corpus does not. It says nothing about whether
+  the score discriminates, and it is not comparable to AUC-24 or to the P1
+  baseline.
+
+### 2026-09-20 — FORCED HEADINGS IN ANY SCRIPT: the forced-heading rule accepts a Unicode letter or number after the dot (PUBLIC-CORPUS — not an AUC-24 receipt; the private corpus is not present in this environment, so no real-corpus figure is claimed)
+
+- **Date:** 2026-09-20
+- **Git SHA:** the lane commit on `lane/unicode-forced-heading`, branched
+  from `bf4f3bff` — a real commit in this repository, and the baseline every
+  before/after figure below is measured against.
+- **Why this entry exists.** Exactly one scoring-path file changed:
+  `src/lib/fountain.ts` (`FORCED_SCENE_HEADING_RE` and its explaining
+  comment). `node scripts/check-scoring-receipt.mjs bf4f3bff..HEAD` requires
+  a receipt for this range, and this is it.
+- **What changed, in one sentence.** `FORCED_SCENE_HEADING_RE` — the Fountain
+  forced-scene-heading test `parseFountain` and every one of its six former
+  copies now call through `isSceneHeadingLine` — widened from
+  `/^\.(?=[A-Za-z0-9])/` to `/^\.(?=[\p{L}\p{N}])/u`: a leading `.` followed
+  by ANY Unicode letter or number is a forced heading, not only an ASCII one.
+  The 2026-09-20 scene-grammar lane (`docs/audits/2026-09-20-scene-grammar/
+  README.md` §2, "The one place the grammar is narrower than before")
+  flagged `.МОСКВА` as deliberately unrecognised and named this as the one
+  place to widen it later. Fountain's own rule is "a period followed by a
+  character", not "a period followed by an ASCII character", the repository
+  already ships `tests/core/multilingual-headings.test.ts` for the standard
+  slugline vocabulary, and the owner's own projects include Armenian- and
+  Russian-language material. `..`, `...` and a `.` followed by punctuation or
+  a space are still not headings — none of those characters is `\p{L}` or
+  `\p{N}`, so row 6 of `SESSION_REPORT_2026-09-19.md` §4 (the ellipsis fix,
+  same lane) is unaffected. Every consumer of the constant was checked
+  (`grep -rn 'FORCED_SCENE_HEADING_RE\|isSceneHeadingLine' src server
+  scripts --include=*.ts`): none builds a second regex from `.source`, so
+  the added `u` flag needed no other edit, and the parity guard
+  (`server/lib/validation.ts`'s `isSceneSegmentHeading`, which now calls
+  `isSceneHeadingLine` directly rather than mirroring it) picks up the
+  widening automatically.
+- **Command:** every command run for this entry, all of them in this
+  worktree —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types --test tests/core/scene-grammar.test.ts
+  node --experimental-strip-types --test tests/core/multilingual-headings.test.ts
+  node --experimental-strip-types --test tests/core/scene-segments.test.ts
+  node --experimental-strip-types --test tests/core/fountain-analyzer.test.ts
+  node --experimental-strip-types --test tests/core/script-doctor.test.ts
+  node --experimental-strip-types --test tests/core/calibration.test.ts
+  node --experimental-strip-types --test tests/core/public-benchmark.test.ts
+  node --experimental-strip-types --test tests/core/honesty-audit-claims.test.ts
+  node --experimental-strip-types --test tests/security/fountain-shape-guard-cue-parity.test.ts
+  node --experimental-strip-types --test tests/core/incremental-reparse.test.ts
+  node --experimental-strip-types --test tests/core/editor-decorations.test.ts
+  npm run benchmark:public -- --json          # before (on bf4f3bff) and after
+  git archive bf4f3bff | tar -x -C <baseline>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree .          --out <after>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --compare <before> <after>
+  npm run build
+  npm run gates
+  node scripts/check-scoring-receipt.mjs bf4f3bff..HEAD
+  ```
+- **Corpus fingerprint:** the committed PUBLIC 32-script set — 20 CC0
+  screenplays in `data/screenplays/` plus the 12 blind-pair fixtures — read
+  through `tests/fixtures/public-corpus-manifest.json`, whose bytes this lane
+  did not change: sha256
+  `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e`
+  (`tests/fixtures/public-benchmark-split.json`, also unchanged:
+  `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`). Every
+  one of the 32 rows — `sceneCount`, `words`, `health`, `verdict` — came back
+  byte-identical after the change, so no `--lock` was needed and none was
+  run. Plus the 45 in-repo output-identity fixtures (20 CC0 screenplays, 20
+  calibration samples, the P0 sample, 4 synthetic concatenations, and the
+  `tests/fixtures/*.fountain` set) — none contains a non-Latin forced
+  heading, so this identity check is a limit of the instrument, not proof of
+  no effect; the two measured deltas below cover what the fixture set
+  cannot see. **The PRIVATE AUC-24 corpus was not available in this
+  environment** (`REAL_SCRIPT_CORPUS_DIR` is unset here and the corpus is
+  local-only by copyright), so no real-corpus figure is claimed for this
+  range.
+- **Runner attestation:** run in the session worktree
+  (`lane/unicode-forced-heading`, branched from `bf4f3bff`) on 2026-09-20 by
+  the lane agent; no API key, no private corpus. Every command in the block
+  above was executed here and its output read directly from its own log;
+  every number below is copied from that output.
+- **Output identity:** `check-doctor-output-identity.mjs --compare` against a
+  `git archive bf4f3bff` baseline, both sides `GIT_SHA=dev` →
+  **"OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt
+  excluded)."** **0 of 45 fixtures differ** — expected, since the fixture set
+  has no forced headings in any non-Latin script (counted above).
+- **Measured public AUCs, before → after (N = 32; matched-pair is PRIMARY;
+  seeded 2000-resample percentile bootstrap, seed 42):**
+  - `SHUFFLE_DROP` — matched-pair **0.5313 → 0.5313**, all-pairs
+    **0.5586 → 0.5586**; ordered/inverted/tied **17/15/0 → 17/15/0**.
+  - `CLIMAX_RELOCATE` — matched-pair **0.4063 → 0.4063**, all-pairs
+    **0.4443 → 0.4443**; ordered/inverted/tied **8/14/10 → 8/14/10**.
+  - `DIALOGUE_FLATTEN` (positive control) — matched-pair **1.0000 → 1.0000**,
+    all-pairs **0.9473 → 0.9473**; ordered/inverted/tied **32/0/0 → 32/0/0**.
+  - **All six numbers are unchanged, so none of the six floor constants in
+    `scripts/lib/auc.ts` moved and no floor was re-locked. `scripts/lib/
+    auc.ts` is not in this lane's diff. No floor rose; no floor fell.** Every
+    per-script pair row (`real`, `degraded`, `intactScenes`, `degradedScenes`
+    for every one of the 32 scripts, all three degradations) came back
+    byte-for-byte identical between the two `--json` runs — none of the 32
+    committed scripts contains a forced heading in a non-Latin script, so
+    this widening cannot move a number on this corpus.
+- **Measured effect on an input the fixture set does not contain** (both
+  figures produced here, pre-change tree vs post-change tree, same script,
+  same command): a 3-scene script with Cyrillic, Armenian and CJK forced
+  headings (`.МОСКВА - ДЕНЬ`, `.ЕРЕВАН - НОЧЬ`, `.東京 - ДЕНЬ`,
+  `tests/fixtures/scene-grammar/unicode-forced-headings.fountain`):
+  `scenesFromFountain` returned **0 scenes before, 3 after**, and the
+  doctor's own `sceneCount` went from **1 to 3** on the same text.
+- **Measured AUC-24:** **none is claimed for this range, and none was
+  produced here.** The private corpus is not present in this environment.
+  The owner's next `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real`
+  and `npm run lock-auc24` on degradation recipe `shuffle-drop/v3` remain
+  the obligations named in the 2026-09-20 scene-grammar entry above; this
+  change does not add a new one, since no committed AUC-24 manifest exists
+  yet to re-lock. `AUC24_FLOOR` is untouched at 0.622.
+- **What a reader should NOT take from this entry.** It is a public-corpus
+  receipt. It shows that on the 32 committed scripts the score is byte-for-
+  byte what it was, and it shows one measured delta on a synthetic input
+  using heading forms the committed corpus does not contain. It says nothing
+  about whether the score discriminates, and it is not comparable to AUC-24
+  or to the P1 baseline.
+
+### 2026-09-20 — REVISION RE-DIAGNOSIS KEEPS THE LEDGER'S STRUCTURE; a lost approved span is dropped, never re-anchored — output-identity receipt (no score moved; the private corpus is not present in this environment and no real-corpus figure is claimed)
+
+- **What changed on the scoring path:** two files, both inside
+  `server/nvm/revision/`, both classified scoring-path for the same single
+  reason — they are reachable from `doctor.ts`'s import graph, not because the
+  doctor calls either of them to compute a number. This range fixes the two
+  defects a review found in the 2026-09-20 per-pass-diagnostics entry above.
+  (1) `server/nvm/revision/pipeline.ts`'s re-derivation replaced all three
+  diagnostics with `analyzeFountainText(currentFountain)`'s — and that
+  function builds its structure as `analyzeStructure(records, [])`, commits
+  hard-zeroed, because it has no ledger (`fountain-analyzer.ts`'s own comment
+  says so). `commits` is the ONLY source of `totalClockPressure`
+  (`server/nvm/screenplay/structure.ts`), which decides `actPosition`,
+  `completionPercent` and `approachingClimax`. So on the route path — which
+  computes `analyzeStructure(records, allCommits)` itself — one changed byte in
+  pass 1 silently reset passes 2..14 from the caller's reading to "act 1, 0%,
+  not approaching climax"; six pass files branch on those fields.
+  `runRevisionPipeline` now takes the StoryCommit ledger as an optional eighth
+  argument (default `[]`) and recomputes `analyzeStructure(freshRecords,
+  commits)` instead of adopting the commit-less structure; the records and
+  annotations still come from the text, because there is no ledger for a draft
+  a pass just rewrote. `server/routes/nvm/revision.ts` (off the scoring path)
+  passes `allCommits` on both of its pipeline calls.
+  (2) In the same loop, a span whose locked excerpt no longer occurs in the
+  draft was warned about and then carried forward at its STALE line numbers —
+  so from the next pass on, `approvedSpansSurvive` cut the excerpt out of the
+  NEW document at the OLD numbers and enforced whatever text had moved into
+  them: the author's real locked lines became freely deletable while an
+  unrelated passage was silently locked in their place. Such a span is now
+  DROPPED from enforcement for the rest of the run, never re-anchored onto
+  different text, and reported in the result's new `lostApprovedSpans` field
+  (indices into the caller's own array, which the route returns unreshaped).
+  `server/nvm/revision/approved-spans.ts` lost a tie-break arm that could not
+  fire — `lineAlignedOccurrences` returns ascending candidates, so a strict `<`
+  already gives "earlier wins" — and its doc comment now states that its `lost`
+  bucket is a report, not a recommendation to keep using the stale range.
+- **Why no score can move.** `runScriptDoctor` reaches this pipeline only
+  inside `runDiagnoseOnly()`, and in that mode every pass's `rewritePass(...)`
+  returns its input before any rewrite work happens, so `revisedFountain` never
+  differs from the draft and neither the re-derivation nor the span re-location
+  ever executes. Beyond that gate, both changes are inert for the doctor by
+  construction: it calls `runRevisionPipeline` with at most seven arguments and
+  so takes `commits = []`, which is exactly the value `analyzeFountainText`'s
+  structure was already built with — the new code path computes the identical
+  structure object for it — and it passes no approved spans at all, so nothing
+  can be dropped or reported. The same is true of
+  `server/nvm/analyze/calibration/reference.ts`. `aggregateReport` reads no
+  field this range added, so the new `lostApprovedSpans` cannot reach a
+  `ScriptDoctorReport`. The receipt below is the evidence for that argument
+  rather than its restatement.
+- **Date:** 2026-09-20
+- **Git SHA:** the first commit on `lane/pipeline-ledger-structure`, branched
+  from `02d8cfb4`. Its own object id is not quoted here because this entry is
+  written inside that commit; `docs/audits/2026-09-20-per-pass-diagnostics/
+  README.md` §10 records the id, and
+  `git log 02d8cfb4..lane/pipeline-ledger-structure` resolves it.
+- **Baseline used:** the `git archive 02d8cfb4` tree (the commit this lane
+  branched from), extracted to a scratch directory with `node_modules`
+  symlinked in from the real checkout. Both sides of the comparison were run
+  with `GIT_SHA=dev`, because the extracted tree has no `.git` and
+  `provenance.engineCommit` would otherwise differ for a reason that has
+  nothing to do with this range.
+- **Command:** every command run for this entry, all of them in this worktree —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types tests/core/revision-per-pass-diagnostics.test.ts
+  node --experimental-strip-types tests/core/approved-spans-enforced.test.ts
+  node --experimental-strip-types tests/core/approved-span-sanitization.test.ts
+  node --experimental-strip-types tests/core/llm-seam-wiring.test.ts
+  node --experimental-strip-types tests/core/pure-core-boundary.test.ts
+  node --experimental-strip-types tests/core/honesty-audit-claims.test.ts
+  node --experimental-strip-types tests/core/pipeline-parallel.test.ts
+  node --experimental-strip-types tests/core/script-doctor.test.ts
+  node --experimental-strip-types tests/core/public-benchmark.test.ts
+  node --experimental-strip-types tests/core/brain-coverage.test.ts
+  node --experimental-strip-types tests/routes/nvm-revision.test.ts
+  node --experimental-strip-types tests/routes/nvm-revision-budget.test.ts
+  node --experimental-strip-types tests/routes/nvm-revision-budget-attempts.test.ts
+  node --experimental-strip-types tests/routes/nvm-revision-approved-spans-schema.test.ts
+  node --experimental-strip-types tests/passes/<each of the 15>.test.ts
+  git archive 02d8cfb4 | tar -x -C <scratch>/baseline
+  ln -s <checkout>/node_modules <scratch>/baseline/node_modules
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/baseline --out <scratch>/before
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/wt-p2   --out <scratch>/after
+  node scripts/check-doctor-output-identity.mjs --compare <scratch>/before <scratch>/after
+  npm run benchmark:public -- --json
+  node scripts/check-scoring-receipt.mjs 02d8cfb4..HEAD
+  ```
+  Every one exited 0. This is not `npm run measure-real`: the private
+  real-script corpus is not present in this environment, no AUC-24 value is
+  claimed anywhere in this entry, and no real-corpus figure is claimed for this
+  range.
+- **Output identity:** the compare run's own line, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+  **0 of 45 fixtures differ.**
+- **A second, narrower identity proof, at the pipeline itself.** The doctor's
+  45 reports are produced through `runDiagnoseOnly()`, where the changed code
+  provably never runs, so that PASS is necessary but not sufficient: it says
+  nothing about the sequential rewrite loop where the change actually lives.
+  So the pipeline's own output was hashed directly. On the fixture where pass 1
+  cuts an 18-scene draft to 6 scenes — the sequential loop, re-derivation and
+  all — the SHA-256 of `{passResults, finalFountain, originalFountain,
+  totalIssuesFound, passesWithChanges, failedPasses}` with `commits` omitted is
+  `0bc2c05561f0f5d03d81af5c1e7f2f3900498c7f75f7f2d28d3b80db1424efec` on the
+  `02d8cfb4` tree and the same value after the change. It is pinned as a test
+  (`(b)` in `tests/core/revision-per-pass-diagnostics.test.ts`), and on the
+  pre-change tree that test fails only on the new `lostApprovedSpans` field
+  being absent — the hash assertion above it passes there, which is the point.
+- **Public benchmark before/after:** all six floors' measured values reproduce
+  unchanged from the committed 32 distributable screenplays, matching both
+  `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first (PRIMARY),
+  all-pairs second: shuffle-drop **0.5313 / 0.5586**; climax-relocate
+  **0.4063 / 0.4443**; DIALOGUE_FLATTEN (the positive control)
+  **1.0000 / 0.9473**, 32 of 32 ordered, zero ties. Ordered/inverted/tied
+  counts are also unchanged — shuffle-drop 17/15/0, climax-relocate 8/14/10.
+  **No floor constant in `scripts/lib/auc.ts` was touched, no floor rose, no
+  floor fell, and no re-lock was performed;** that file is not in this lane's
+  diff.
+- **Corpus fingerprint:** two committed input sets, no private text read. (1)
+  The 45 in-repo identity fixtures the harness scores — 20
+  `data/screenplays/*.fountain` live-action fixtures, 20 calibration
+  `REFERENCE_CORPUS` samples, the P0 sample script, and 4 synthetic
+  concatenations at 60/120/240/300 scenes. (2) The public benchmark's 32-script
+  manifest, `tests/fixtures/public-corpus-manifest.json`, unchanged by this
+  range, sha256
+  `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e`
+  (`tests/fixtures/public-benchmark-split.json`, also unchanged:
+  `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`). Every
+  one of the 32 rows — `sceneCount`, `words`, `health`, `verdict` — came back
+  byte-identical, so no manifest re-lock was needed and none was run
+  (`tests/core/public-benchmark.test.ts`, 28/28). **The PRIVATE AUC-24 corpus
+  was not available in this environment** (`REAL_SCRIPT_CORPUS_DIR` is unset
+  here and the corpus is local-only by copyright), so no real-corpus figure is
+  claimed for this range. `AUC24_FLOOR` is untouched at 0.622 and
+  `AUC24_DEGRADATION_ID` remains `shuffle-drop/v3`.
+- **Measured effect the identity fixtures cannot show.** The whole of this
+  range is invisible to the doctor by construction, so the two behaviours were
+  measured where they live, on the same fixture, pre-change tree vs post-change
+  tree. (i) With a one-commit ledger carrying `RAISE_CLOCK` 20 — enough for
+  `act3` on its own — and a pass-1 rewrite that prepends two lines to an
+  18-scene draft: the structure the pipeline hands pass 2 reads **act1 / 0% /
+  approachingClimax false before, act3 / 100% / approachingClimax true after**,
+  against a caller structure of act3/100%/true. In reported rules: pass 3
+  (intention) gains `CLIMAX_WITHOUT_CHOICE` and pass 6 (character-arc) gains
+  `NO_REVELATIONS` and `CLIMAX_EMOTIONALLY_FLAT`, none of which fired before;
+  pass 1's rules are identical either way, because it reads the caller's
+  structure before any re-derivation can happen. The same run with no ledger
+  passed in is unchanged from the pre-change tree in every rule — that is the
+  contrast the test pins. (ii) With two locked spans and a pass-1 edit that
+  removes the second one's text: pass 2 was handed **both spans before (the
+  lost one still at startLine 41, endLine 43, now addressing the scene above
+  it), one span after**; the result's `lostApprovedSpans` reads `[1]` — the
+  caller's own index — and a pass-2 rewrite deleting the formerly locked text
+  is accepted, as it must be once the lock is honestly gone.
+- **Runner attestation:** run in the session worktree
+  (`lane/pipeline-ledger-structure`, branched from `02d8cfb4`) on 2026-09-20 by
+  the lane agent; no API key, no private corpus. I extracted the baseline tree
+  with `git archive 02d8cfb4` myself, symlinked `node_modules` in from the real
+  checkout, ran every command in the block above here, and read each one's exit
+  code and output directly from its own log. I also ran the extended test file
+  `tests/core/revision-per-pass-diagnostics.test.ts` against this range's tree
+  with the two source edits stashed — 4 of its 18 tests failed, the first
+  failure message being "pass 3 must still read the ledger's act3 after pass 1
+  changed the draft" (expected true, actual false) — and again with them
+  restored, where all 18 pass; `tests/routes/nvm-revision.test.ts` failed 3 of
+  13 the same way and passes 13/13 restored. This is an output-identity
+  receipt, not a discrimination-statistic measurement: the private real-script
+  corpus is not present in this environment, `REAL_SCRIPT_CORPUS_DIR` is unset
+  here, and no real-corpus figure is claimed for this range. The byte-level
+  identity of all 45 reports, the pipeline's own unchanged output hash, and the
+  six unchanged public-benchmark statistics are the evidence this range owes.
+- **What a reader should NOT take from this entry.** It is an output-identity
+  receipt on committed fixtures. It shows the score did not move; it says
+  nothing about whether the score discriminates, and none of its numbers is
+  comparable to AUC-24 or to the P1 baseline.
+
+### 2026-09-20 — SCENE SPLIT NORMALIZES LINE ENDINGS; AUC-24 RECIPE ID BUMPED TO shuffle-drop/v4 (PUBLIC-CORPUS — not an AUC-24 receipt; the private corpus is not present in this environment, so no real-corpus figure is claimed; no table has ever been locked, so nothing is invalidated)
+
+- **Date:** 2026-09-20
+- **Git SHA:** `c607f4b5` on `lane/scene-split-cr-and-recipe-v4`, branched
+  from `02d8cfb4` — a real commit in this repository, and the baseline every
+  before/after figure below is measured against.
+- **Why this entry exists.** One scoring-path file changed:
+  `server/nvm/analyze/scene-split.ts` (`scenesFromFountain`, the splitter
+  under the emotional arc and nine other signal modules).
+  `node scripts/check-scoring-receipt.mjs 02d8cfb4..HEAD` requires a receipt
+  for this range, and this is it.
+- **What changed, in one sentence each.** (1) Review finding 6:
+  `scenesFromFountain` reaches `parseFountain` (via `sceneHeadingLineIndices`)
+  and `splitLinesKeepingEndings`, neither of which treats a bare `\r` as a
+  line break, so a script using classic Mac line endings read as one line and
+  undercounted scenes relative to its CRLF/LF twin — `scenesFromFountain` now
+  normalizes `\r\n?` -> `\n` before segmenting, at the top of the function.
+  (2) Review finding 4: the AUC-24 recipe's shared segmentation dependency
+  (`scripts/lib/scene-segments.ts` -> `src/lib/fountain.ts`'s
+  `isSceneHeadingLine`) changed twice after the `shuffle-drop/v3` bump without
+  a matching id bump — a `...`-leading line stopped being misread as a forced
+  scene heading, and the forced-heading class widened to any Unicode letter
+  or number — so `AUC24_DEGRADATION_ID` bumps to `shuffle-drop/v4`
+  (`scripts/lib/auc.ts`); `AUC24_FLOOR` is untouched at 0.622.
+- **Command:** every command run for this entry, all of them in this
+  worktree —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types --test tests/core/scene-split-line-endings.test.ts
+  node --experimental-strip-types --test tests/core/scene-grammar.test.ts
+  node --experimental-strip-types --test tests/core/scene-segments.test.ts
+  node --experimental-strip-types --test tests/core/auc.test.ts
+  node --experimental-strip-types --test tests/core/auc24-table.test.ts
+  node --experimental-strip-types --test tests/core/public-benchmark.test.ts
+  node --experimental-strip-types --test tests/core/public-benchmark-limits.test.ts
+  node --experimental-strip-types --test tests/core/calibration.test.ts
+  node --experimental-strip-types --test tests/core/script-doctor.test.ts
+  node --experimental-strip-types --test tests/core/fountain-analyzer.test.ts
+  node --experimental-strip-types --test tests/core/emotional-arc.test.ts
+  node --experimental-strip-types --test tests/core/honesty-audit-claims.test.ts
+  node --experimental-strip-types --test tests/scripts/report-unverified-gates.test.ts
+  npm run benchmark:public -- --json          # before (on 02d8cfb4) and after
+  git archive 02d8cfb4 | tar -x -C <baseline>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <baseline> --out <before>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree .          --out <after>
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --compare <before> <after>
+  npm run gates
+  node scripts/check-scoring-receipt.mjs 02d8cfb4..HEAD
+  ```
+- **Corpus fingerprint:** the committed PUBLIC 32-script set — 20 CC0
+  screenplays in `data/screenplays/` plus the 12 blind-pair fixtures — read
+  through `tests/fixtures/public-corpus-manifest.json`, whose bytes this lane
+  did not change. Every one of the 32 rows — `sceneCount`, `words`, `health`,
+  `verdict` — came back byte-identical after the change, so no `--lock` was
+  needed and none was run. Plus the 45 in-repo output-identity fixtures (20
+  CC0 screenplays, 20 calibration samples, the P0 sample, and 4 synthetic
+  concatenations) — **none is CR-only** (counted: all use `\n` or, where
+  present in the source files, `\r\n`), so this identity check is a limit of
+  the instrument for finding 6's fix specifically — the measured effect below
+  covers what the fixture set cannot see. **The PRIVATE AUC-24 corpus was not
+  available in this environment** (`REAL_SCRIPT_CORPUS_DIR` is unset here and
+  the corpus is local-only by copyright), so no real-corpus figure is claimed
+  for this range.
+- **Runner attestation:** run in the session worktree
+  (`lane/scene-split-cr-and-recipe-v4`, branched from `02d8cfb4`) on
+  2026-09-20 by the lane agent; no API key, no private corpus. Every command
+  in the block above was executed here and its output read directly from its
+  own log; every number below is copied from that output.
+- **Output identity:** `check-doctor-output-identity.mjs --compare` against a
+  `git archive 02d8cfb4` baseline, both sides `GIT_SHA=dev` →
+  **"OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt
+  excluded)."** **0 of 45 fixtures differ** — expected, since none of the 45
+  is CR-only (counted above), so this identity check cannot see finding 6's
+  fix at all; the measured effect below is on an input the fixture set does
+  not contain.
+- **Measured public AUCs, before → after (N = 32; matched-pair is PRIMARY;
+  seeded 2000-resample percentile bootstrap, seed 42):**
+  - `SHUFFLE_DROP` — matched-pair **0.5313 → 0.5313**, all-pairs
+    **0.5586 → 0.5586**.
+  - `CLIMAX_RELOCATE` — matched-pair **0.4063 → 0.4063**, all-pairs
+    **0.4443 → 0.4443**.
+  - `DIALOGUE_FLATTEN` (positive control) — matched-pair **1.0000 → 1.0000**,
+    all-pairs **0.9473 → 0.9473**.
+  - **All six numbers are unchanged, so none of the six floor constants in
+    `scripts/lib/auc.ts` moved and no floor was re-locked.** None of the 32
+    committed public-benchmark scripts is CR-only, and `shuffleDropDegrade`
+    reads scene boundaries through `scripts/lib/scene-segments.ts`, which
+    this change does not touch — so the recipe's behaviour on this corpus is
+    unaffected by finding 6's fix by construction, not by measurement luck.
+- **Measured effect on an input the fixture set does not contain** (both
+  figures produced here, before this commit vs after, same script, same
+  command): a double-spaced 3-scene script using classic Mac (`\r`-only) line
+  endings — `analyzeFountainText`'s own `normalizeScreenplay` heuristic fired
+  and reported `sceneCount = 3`, while `scenesFromFountain(...).length` was
+  **1** before this commit (the whole document read as one line and one
+  heading) and is **3** after — matching `sceneCount` for the first time. A
+  minimal (non-double-spaced) 2-scene CR-only probe went from
+  `scenesFromFountain(...).length = 1` to `2`, matching its CRLF and LF twins
+  (both already `2`).
+- **Measured AUC-24 recipe change:** `countFountainScenes`
+  (`scripts/lib/scene-segments.ts`, which `shuffleDropDegrade` calls) on a
+  script containing an `...and then nothing.` dialogue line reads **2** at
+  this commit; the same probe against a `git archive 26d930dd` checkout (the
+  commit the `shuffle-drop/v3` bump's own tree was built on) reads **3** —
+  the ellipsis-heading fix that already landed on this branch, between the v3
+  bump and this commit, changed the recipe's segmentation without a matching
+  id bump. `AUC24_DEGRADATION_ID` is now `shuffle-drop/v4`. Verified by the
+  same probe that a bare-`\r` script's segmentation through
+  `scripts/lib/scene-segments.ts` is **unchanged by this commit**:
+  `countFountainScenes` on the CR-only probe above reads **1** both before
+  and after — finding 6's fix landed only in
+  `server/nvm/analyze/scene-split.ts`'s separate `scenesFromFountain`.
+- **Measured AUC-24:** **none is claimed for this range, and none was
+  produced here.** The private corpus is not present in this environment.
+  The owner's next `REAL_SCRIPT_CORPUS_DIR=<corpus> npm run measure-real` and
+  `npm run lock-auc24` on degradation recipe `shuffle-drop/v4` are the first
+  real-corpus figures this recipe id will produce; `AUC24_FLOOR` is untouched
+  at 0.622, and since `tests/fixtures/auc24-table.json` has never existed,
+  nothing is invalidated by the id bump.
+- **What a reader should NOT take from this entry.** It is a public-corpus
+  receipt. It shows that on the 32 committed scripts and the 45 output-identity
+  fixtures the score is byte-for-byte what it was, because none of them is
+  CR-only, and it shows two measured deltas on synthetic inputs the committed
+  corpus does not contain. It says nothing about whether the score
+  discriminates, and it is not comparable to AUC-24 or to the P1 baseline.
+
+### 2026-09-20 — burrowsDelta HOISTS THE CORPUS STATISTICS OUT OF ITS WORD LOOP — output-identity receipt (bit-identical, no score moved; the private corpus is not present in this environment and no real-corpus figure is claimed)
+
+- **What changed on the scoring path:** one file,
+  `server/nvm/analyze/voice-delta.ts`. It is scoring-path for one reason —
+  `server/nvm/analyze/fountain-analyzer.ts` imports `analyzeVoices` from it, so
+  it sits on `doctor.ts`'s import graph. `burrowsDelta(a, b, functionWords)`
+  computed `freqA` and `freqB` once and then called `corpusStats({ a, b }, word,
+  words)` from INSIDE its loop over the 65 function words; `corpusStats` re-ran
+  `relativeFrequencies` over BOTH sides on every iteration — 2 x 65 = 130 full
+  re-tokenizations per character pair, of two maps the caller already held. The
+  statistics do not depend on the word beyond indexing it, so they are now
+  computed in one pass, by `combinedCorpusStats(freqA, freqB, words)`, before
+  the loop. `corpusStats` is gone; it had no other caller and was not exported.
+- **Why no number can move, and how the arithmetic was kept:** the new helper is
+  the old `corpusStats` body with its two `Array.prototype.reduce` calls
+  unrolled over the exactly two samples it was ever handed. `Object.values({ a,
+  b })` is always length 2 and always in that order, so the old function's
+  `freqs.length === 0` and `freqs.length < 2` early returns were unreachable
+  from `burrowsDelta`; everything else is preserved literally, including the `0`
+  seed each reduce started from, so the per-word accumulation SEQUENCE (seed,
+  then a, then b) is byte-for-byte the old one. Floating-point addition is not
+  associative, which is why this was not rewritten as `(fA + fB) / 2`: that
+  shape would pass a tolerance check and could fail an identity check. The
+  exported signature, the `a.length === 0 || b.length === 0` degenerate guard,
+  the `count > 0 ? sumAbsDelta / count : 0` return and `analyzeVoices`'s
+  abstention rules are untouched.
+- **Date:** 2026-09-20
+- **Git SHA:** the first commit on `lane/burrows-delta-hoist`, branched from `925164dc`. Its own object id is not quoted here because this entry is written inside that commit; `docs/audits/2026-09-20-burrows-delta-hoist/README.md` §1 records the id once it exists, and `git log 925164dc..lane/burrows-delta-hoist` resolves it.
+- **Baseline used:** `925164dc` — the commit this lane branched from and the tree the change is measured against. Two forms of it were used, both real: a `git archive 925164dc` export unpacked to a scratch directory with `node_modules` symlinked in from the real checkout (for the output-identity harness and the before-timings), and a `git worktree add --detach 925164dc` checkout (for the security suite, whose fixture enumeration needs a `.git`). Both sides of the identity comparison ran with `GIT_SHA=dev`, because the archive export has no `.git` and `provenance.engineCommit` would otherwise differ for a reason that has nothing to do with this change.
+- **Command:** every command below was run in this lane's worktree (or, where stated, in the `925164dc` baseline tree), and each one's exit code and output was read directly from its own log —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types tests/core/voice-delta.test.ts
+  node --experimental-strip-types tests/core/voice-delta-hoist-identity.test.ts
+  node --experimental-strip-types tests/core/voice-separation-abstention.test.ts
+  node --experimental-strip-types tests/core/voice-bound-derivation.test.ts
+  node --experimental-strip-types tests/security/fountain-shape-guard-cue-parity.test.ts   # in BOTH trees
+  node --experimental-strip-types tests/core/script-doctor.test.ts
+  node --experimental-strip-types tests/core/calibration.test.ts
+  node --experimental-strip-types tests/core/public-benchmark.test.ts
+  node --experimental-strip-types tests/core/public-benchmark-limits.test.ts
+  node --experimental-strip-types tests/core/coverage-html.test.ts
+  node --experimental-strip-types tests/core/honesty-audit-claims.test.ts
+  node --experimental-strip-types tests/core/auc24-table.test.ts
+  node --experimental-strip-types tests/core/brain-coverage.test.ts
+  git archive 925164dc | tar -x -C <scratch>/base-tree
+  ln -s <checkout>/node_modules <scratch>/base-tree/node_modules
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/base-tree --out <scratch>/before
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/wt-h      --out <scratch>/after
+  node scripts/check-doctor-output-identity.mjs --compare <scratch>/before <scratch>/after
+  npm run benchmark:public -- --json
+  npm run gates
+  node scripts/check-scoring-receipt.mjs 925164dc..HEAD
+  ```
+  Every one exited 0 except `tests/core/brain-coverage.test.ts`, which reports 7 of 8: its check (e), the generated graph's freshness, holds only once `npm run brain` regenerates `docs/brain/brain.graph.json` and `GRAPH.md`, and regenerating the graph is outside this lane's scope. Its other seven checks pass, including (b), the one that requires this range's new `docs/audits/` directory to have a brain note citing it. This is not `npm run measure-real`: the private real-script corpus is not present in this environment, no AUC-24 value is claimed anywhere in this entry, and no real-corpus figure is claimed for this range.
+- **Output identity:** the compare run's own line, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+  **0 of 45 fixtures differ.**
+- **Bit-identity, pair by pair:** `tests/core/voice-delta-hoist-identity.test.ts` holds a frozen verbatim copy of `git show 925164dc:server/nvm/analyze/voice-delta.ts`'s implementation (only the top-level identifiers renamed, so it can sit beside the live module) and compares it against the shipped function with `Object.is`, not a tolerance. **3,706 pairs compared, maxDeltaDiff = 0** — 385 from the seeded generated corpus (a 25-voice cast at varied lengths and registers, plus 78 degenerate and boundary shapes: empty, one empty string, whitespace-only, punctuation-only, a single function word, a single content word, no function words at all, one function word repeated, digits and symbols, apostrophes, all-uppercase; plus four 2,000-line sets; plus three custom function-word sets including an empty one) and 3,321 from every character pair in `tests/fixtures/feature-length/assembled-feature.fountain` (82 speaking characters). The pooled delta over those 3,321 feature pairs is `2674.920634920615` on both implementations, identical to the last bit.
+- **Speed, three runs each, OLD module vs NEW module on the same machine and the same inputs:** the isolated Burrows's-Delta pair loop over the feature fixture's own dialogue (3,321 pairs) went **7586.1 / 7531.3 / 7165.3 ms -> 157.3 / 150.8 / 151.0 ms (47.5x best-to-best, 49.9x median-to-median)**. `analyzeVoices` on the `max-admitted` shape at cast 80 (3,160 pairs — the shape `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` is derived against) went **5974.4 / 5966.2 / 6046.6 ms -> 120.8 / 118.1 / 117.7 ms (50.7x)**; on `uniform-min` at cast 150 (11,175 pairs — the shape `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` is derived against) it went **10342.5 / 10566.0 / 10187.1 ms -> 235.8 / 236.3 / 236.8 ms (43.2x)**. End to end through `analyzeFountainText`, the max-admitted document (58,260 chars) went **5666.0 / 6163.1 / 6165.9 ms -> 151.2 / 133.1 / 131.4 ms (43.1x)** and the uniform-min 150 document (33,710 chars) went **10139.4 / 10197.7 / 8833.9 ms -> 239.5 / 242.3 / 244.1 ms (36.9x best-to-best, 41.8x median-to-median)**.
+- **What the speed numbers do NOT say:** end to end on `assembled-feature.fountain` itself the analyzer reads **38.8 / 29.3 / 31.8 ms before and 44.8 / 32.1 / 31.8 ms after — no change, and none was available** — because at `925164dc` `analyzeVoices` ABSTAINS on that fixture (its all-or-nothing `MIN_WORDS = 30` rule: one character under the floor abstains the whole document), so the hoisted code never runs on it. The fixture's 3,321 pairs are what the channel WOULD cost if it scored, which is what the isolated pair-loop row above measures and what the feature-length branch's per-character eligibility would make real.
+- **Cost margin on the guard's own assertion, before and after.** `tests/security/fountain-shape-guard-cue-parity.test.ts` is **677 pass / 0 fail on BOTH trees**, and prints two figures. The weight headroom is unchanged, as it must be — this lane touches cost, not weight: `voice-eligible-weight headroom: worst tracked fixture is "data/screenplays/runoff.fountain" at 170.0x` on both. The cost line moves: `voice-bound worst-case cost: max-admitted N=80 (102 words/speaker) cpu 6510ms (43% of the 15000ms half-budget target), wall 6415ms` at `925164dc`, and `cpu 300ms (2% of the 15000ms half-budget target), wall 246ms` here — **21.7x more CPU margin under the same 15,000 ms target, on the same machine.**
+- **No bound was re-derived and no constant moved.** `MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT` stays at 675,000 and `MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT` at 80; `tests/fixtures/voice-bound-derivation.json`, the ubuntu-latest table the second constant is re-derived from, is untouched and `tests/core/voice-bound-derivation.test.ts` is 8/8. Both were measured BEFORE this hoist, so they are now conservative rather than wrong, and re-deriving them is a separate lane needing a fresh `npm run measure-voice-bound` on the runner. The only edit to `server/lib/validation.ts` in this range is comment text recording that, and recording that the pre-hoist per-unit rates quoted in its round-1/round-2 derivations (0.0173-0.0187 ms/unit, and the 0.022 conservative upper bound) no longer describe this code.
+- **Corpus fingerprint:** committed input sets only, no private text read. (1) The 45 in-repo identity fixtures the harness scores — 20 `data/screenplays/*.fountain` live-action fixtures, 20 calibration `REFERENCE_CORPUS` samples, the P0 sample script, and 4 synthetic concatenations at 60/120/240/300 scenes. (2) The public benchmark's 32-script manifest, `tests/fixtures/public-corpus-manifest.json`, unchanged by this range, sha256 `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e` (`tests/fixtures/public-benchmark-split.json`, also unchanged: `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`). (3) `tests/fixtures/feature-length/assembled-feature.fountain`, read but not modified, sha256 `b438618901f55db0b65143281d87b97357811072873533cc11854686785f903b`. Every one of the 32 manifest rows — `sceneCount`, `words`, `health`, `verdict` — came back byte-identical, so no manifest re-lock was needed and none was run. **The PRIVATE AUC-24 corpus was not available in this environment** (`REAL_SCRIPT_CORPUS_DIR` is unset here and the corpus is local-only by copyright), so no real-corpus figure is claimed for this range. `AUC24_FLOOR` is untouched at 0.622 and `AUC24_DEGRADATION_ID` remains `shuffle-drop/v4`.
+- **Public benchmark before/after:** all six floors' measured values reproduce unchanged from the committed 32 distributable screenplays, matching both `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first (PRIMARY), all-pairs second: shuffle-drop **0.5313 / 0.5586**; climax-relocate **0.4063 / 0.4443**; DIALOGUE_FLATTEN (the positive control) **1.0000 / 0.9473**, 32 of 32 ordered, zero ties. Ordered/inverted/tied counts are also unchanged — shuffle-drop 17/15/0, climax-relocate 8/14/10. **No floor constant in `scripts/lib/auc.ts` was touched, no floor rose, no floor fell, and no re-lock was performed;** that file is not in this lane's diff.
+- **Runner attestation:** run in the session worktree (`lane/burrows-delta-hoist`, branched from `925164dc`) on 2026-09-20 by the lane agent, on an Intel(R) Xeon(R) Processor @ 2.10GHz x4 sandbox (parallelism 4, 16 GiB) under node v22.22.2, linux/x64; no API key was present and no private corpus was read. I extracted the `925164dc` baseline myself with `git archive` and with `git worktree add --detach`, symlinked `node_modules` in from the real checkout, ran every command in the block above here, and read each one's exit code and output directly. The before-timings and after-timings come from the same script run once per tree, back to back, on that machine. A fail-first run is not meaningful for an identity pin the ordinary way round — copied into the `925164dc` checkout the new test passes 3/3, because there the frozen copy and the shipped function are literally the same code — so the test was falsified the other way instead, by breaking the hoist on purpose in this tree. Replacing the unrolled variance sum with the mathematically equal `E[x^2] - mean^2` makes it fail immediately and by name: `GEN_0 x GEN_1: old 1.2380952380952381 !== new 1.2380952380954005 (bit-identity required, not tolerance)`, and again on the feature fixture, `NELL x DELGADO: old 0.7936507936507936 !== new 0.7936507936510317`. The file was restored from a byte copy taken before that probe and re-run 3/3. That is the evidence that the 3,706 passing comparisons are a real constraint and not a formality. This is an output-identity receipt, not a discrimination-statistic measurement: the private real-script corpus is not present in this environment, `REAL_SCRIPT_CORPUS_DIR` is unset here, and no real-corpus figure is claimed for this range.
+- **What a reader should NOT take from this entry.** It is a pure-performance output-identity receipt. It shows the score did not move — by byte identity on all 45 doctor reports, by `Object.is` on 3,706 Burrows's-Delta pairs, and by six unchanged public-benchmark statistics. It says nothing about whether the score discriminates, none of its numbers is comparable to AUC-24 or to the P1 baseline, and it does NOT raise either voice-eligibility bound: it only makes the cost those bounds are derived against far smaller than the derivation charged it.
+
+### 2026-09-21 — production-loader guard (calibration catch made loud; no formula change) — output-identity receipt (bit-identical, no score moved; the private corpus is not present in this environment and no real-corpus figure is claimed)
+
+- **What changed on the scoring path:** one file,
+  `server/nvm/analyze/calibration/reference.ts`. It is scoring-path because
+  `calibration/**` is on `doctor.ts`'s import graph and this file's top-level
+  `await` scores the 20-sample reference corpus through `computeRawCraftScore`
+  at module load. The change is to the FALLBACK, not the formula: the
+  module-load build was wrapped in a bare `catch {}` that turned any throw into
+  the empty distribution silently; it now runs through an exported
+  `settleDistribution(build, log)` whose catch logs
+  `CALIBRATION_UNAVAILABLE_LOG_MSG` at error level through
+  `server/lib/logger.ts` (stderr, structured JSON, carrying the thrown error's
+  name and message, the thread — `main` or `worker N` — the corpus size and
+  `percentileFieldsAbsent: true`) and then returns the SAME empty distribution
+  it always did. `buildDistribution`, `scoreSample`, `DIMENSION_PASS_MAP`,
+  `MIN_CORPUS_SIZE`, `emptyDistribution` and `getReferenceDistribution` are
+  untouched; `doctor.ts` is not in this range's diff. Two new imports:
+  `node:worker_threads` (for the thread name) and the logger, which
+  `tests/core/pure-core-boundary.test.ts` already allows on the doctor's graph
+  (it was already reachable through `revision/pipeline.ts`).
+- **Why this range exists:** on 2026-09-21 the feature-length candidate branch
+  (`lane/land-feature-length-defects`) was found shipping every production
+  doctor report without `healthPercentile`, `dimensions[].percentile` or
+  `dimensions[].percentileDescriptor`. Mechanism, verified there and
+  reproduced here by probe: the production loader (`tsx server.ts` — the
+  Dockerfile CMD, `npm start`, `npm run dev`) transforms through esbuild with
+  `keepNames: true`, which injects a module-level `var __name` helper and
+  wraps every NAMED function expression in a call to it; inside the
+  doctor.ts <-> reference.ts import cycle that `var` is hoisted but
+  uninitialised when reference.ts's top-level await scores the corpus, so a
+  `const sig = (x) => …` the candidate had added inside `subDensityCurve`
+  threw `TypeError: __name is not a function`, and the bare catch emptied the
+  distribution. `npm test` and the dev server run
+  `node --experimental-strip-types`, which injects no helper, so no test saw
+  it; only `verify:production`'s dev-vs-prod check did, at 70/71 of a browser
+  battery. THIS branch has no named function expression on the
+  `computeRawCraftScore` path, and the new guard test confirms it: under the
+  real tsx CLI with `NODE_ENV=production`, the main-thread distribution holds
+  20 of 20 samples, the in-thread and pooled reports both carry every
+  percentile field, the pool served exactly one worker run and zero
+  in-process runs, and the two reports are `deepEqual` with `analyzedAt`
+  excluded. What the branch DID share with the candidate were the two
+  structural weaknesses — the swallowing catch and no test that exercises the
+  production loader — and both are closed in this range.
+- **Why no number can move:** the only scoring-path edit is inside a `catch`
+  branch that, on this tree, never executes: the corpus build succeeds in
+  every thread under both loaders. The success path is `return await
+  build()` — the same `buildDistribution()` promise the old code awaited,
+  returned by identity — so the distribution the doctor ranks against is the
+  same twenty sorted raw craft scores and the same five sorted dimension
+  arrays as before. No constant, weight, threshold, deduction, segmenter or
+  pass changed. The output-identity harness below confirms it on all 45
+  fixtures, and all six public-benchmark statistics reproduce to four
+  decimals.
+- **Date:** 2026-09-21
+- **Git SHA:** `ed07e688` — `test(calibration): guard the production loader; make the empty-distribution fallback loud`, the first commit on `lane/prod-loader-guard`, branched from `3fde3f1d` (this entry is written in a later commit on the same lane; `git log 3fde3f1d..lane/prod-loader-guard` lists all of them).
+- **Baseline used:** `3fde3f1d` — the session branch head this lane branched from and the tree the change is measured against, as a `git archive 3fde3f1d` export unpacked to a scratch directory with `node_modules` symlinked in from the real checkout. Both sides of the identity comparison ran with `GIT_SHA=dev`, because the archive export has no `.git` and `provenance.engineCommit` differs for a reason unrelated to this change otherwise.
+- **Command:** every command below was run in this lane's worktree (or, where stated, in the `3fde3f1d` baseline tree), and each one's exit code and output was read directly from its own log —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types --test tests/core/doctor-calibration-under-tsx.test.ts   # 3 runs: clean, fail-first probe, clean
+  node --experimental-strip-types --test tests/core/calibration.test.ts
+  node --experimental-strip-types --test tests/core/pure-core-boundary.test.ts
+  node --experimental-strip-types --test tests/core/public-benchmark.test.ts
+  node --experimental-strip-types --test tests/core/blind-pairs-discrimination.test.ts
+  node --experimental-strip-types --test tests/core/script-doctor.test.ts
+  node --experimental-strip-types --test tests/core/doctor-worker-pool.test.ts
+  node --experimental-strip-types --test tests/core/doctor-history-identity.test.ts
+  node --experimental-strip-types --test tests/core/honesty-audit-claims.test.ts tests/core/brain-coverage.test.ts tests/core/docs-gating-set.test.ts
+  git archive 3fde3f1d | tar -x -C <scratch>/loader-base
+  ln -s <checkout>/node_modules <scratch>/loader-base/node_modules
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/loader-base --out <scratch>/loader-before
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/wt-loader  --out <scratch>/loader-after
+  node scripts/check-doctor-output-identity.mjs --compare <scratch>/loader-before <scratch>/loader-after
+  npm run brain && npm run check-brain
+  node scripts/check-scoring-receipt.mjs 3fde3f1d..HEAD
+  ```
+  Every one exited 0 except the fail-first probe run of the guard test, which was REQUIRED to exit 1 and did (see the attestation). This is not `npm run measure-real`: the private real-script corpus is not present in this environment, no AUC-24 value is claimed anywhere in this entry, and no real-corpus figure is claimed for this range. The full `npm test` is the orchestrator's run, not this lane's.
+- **Output identity:** the compare run's own line, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+  **0 of 45 fixtures differ.** The after-snapshot was taken from the tree at `ed07e688` with the same `reference.ts` bytes this range ships (a later commit reworded one comment in that file; comments do not reach the harness's output).
+- **The guard, and its fail-first probe:** `tests/core/doctor-calibration-under-tsx.test.ts` spawns `process.execPath` running `tsx/dist/cli.mjs` (the same resolution `scripts/verify-production-build.mjs` uses — no `.bin` shim, so it holds on Windows) with `NODE_ENV=production` and `DOCTOR_POOL_PREWARM=0`, on a probe that imports `doctor.ts` FIRST (the cycle entry every pool worker uses), runs a 3-scene script in-thread, calls `clearDoctorCache()`, runs the same script through the real pool, shuts the pool down and prints both reports plus the main thread's distribution size and the pool counters. On this tree it passes 1/1 in **4.64 s and 4.11 s wall** (the test itself ~3.2 s; the rest is the runner). Falsified on purpose: `const sig = (x: number) => x;` was inserted inside `densityPenalty` (on the `computeRawCraftScore` path) and `weightedIssues` wrapped in it, and the test failed by name — `main thread: reference distribution holds 0 of 20 corpus samples — buildDistribution() threw and was swallowed into emptyDistribution()` — while the production child's stderr carried the new log line, `{"level":"error","msg":"calibration reference distribution unavailable: …","error":"TypeError: __name is not a function","thread":"main","corpusSize":20,"percentileFieldsAbsent":true}`. Under this box's Node 22.22.2 only the main thread emptied (the candidate's audit measured Node 24.21.0 emptying the workers too); the guard asserts both threads, so either version fails it. `doctor.ts` was restored from a byte copy taken before the probe (`git status` clean on that file) and the test re-run 1/1.
+- **The catch is unit-tested:** `tests/core/calibration.test.ts` gained four `settleDistribution` cases — a succeeding builder is returned by identity and logs nothing; a throwing builder yields the well-formed empty distribution and exactly one log line carrying `CALIBRATION_UNAVAILABLE_LOG_MSG`, `error: "TypeError: __name is not a function"`, `percentileFieldsAbsent: true`, `corpusSize: 20` and a thread name; a non-`Error` throw is quoted as a string; and with the default sink the line lands on `process.stderr` as JSON at level `error`, and not on stdout. The suite is 25/25 (was 21).
+- **Corpus fingerprint:** committed input sets only, no private text read. (1) The 45 in-repo identity fixtures the harness scores — 20 `data/screenplays/*.fountain` live-action fixtures, 20 calibration `REFERENCE_CORPUS` samples, the P0 sample script, and 4 synthetic concatenations at 60/120/240/300 scenes. (2) The public benchmark's 32-script manifest, `tests/fixtures/public-corpus-manifest.json`, unchanged by this range, sha256 `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e` (`tests/fixtures/public-benchmark-split.json`, also unchanged: `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`). Every one of the 32 manifest rows — `sceneCount`, `words`, `health`, `verdict` — came back byte-identical, so no manifest re-lock was needed and none was run. **The PRIVATE AUC-24 corpus was not available in this environment** (`REAL_SCRIPT_CORPUS_DIR` is unset here and the corpus is local-only by copyright), so no real-corpus figure is claimed for this range. `AUC24_FLOOR` is untouched at 0.622 and `AUC24_DEGRADATION_ID` remains `shuffle-drop/v4`.
+- **Public benchmark before/after:** all six floors' measured values reproduce unchanged from the committed 32 distributable screenplays, matching both `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first (PRIMARY), all-pairs second: shuffle-drop **0.5313 / 0.5586**; climax-relocate **0.4063 / 0.4443**; DIALOGUE_FLATTEN (the positive control) **1.0000 / 0.9473**, 32 of 32 ordered, zero ties. Ordered/inverted/tied counts are also unchanged — shuffle-drop 17/15/0, climax-relocate 8/14/10. The suite is 28/28. **No floor constant in `scripts/lib/auc.ts` was touched, no floor rose, no floor fell, and no re-lock was performed;** that file is not in this lane's diff.
+- **Runner attestation:** run in the lane worktree (`lane/prod-loader-guard`, branched from `3fde3f1d`) on 2026-09-21 by the lane agent, on an Intel(R) Xeon(R) Processor @ 2.80GHz x4 sandbox (parallelism 4, 15 GiB) under node v22.22.2, linux/x64, with `tsx` resolved from the checkout's `node_modules` (the version the Dockerfile CMD installs); no API key was present and no private corpus was read. I extracted the `3fde3f1d` baseline myself with `git archive`, symlinked `node_modules` in from the real checkout, ran every command in the block above here, and read each one's exit code and output directly. The fail-first probe described above was run twice on this tree (once with the guard's stderr assertions first, once with them last, to confirm which assertion names the failure), and `doctor.ts` was restored from a pristine byte copy after each; the committed tree contains no probe. This is an output-identity receipt, not a discrimination-statistic measurement: the private real-script corpus is not present in this environment, `REAL_SCRIPT_CORPUS_DIR` is unset here, and no real-corpus figure is claimed for this range.
+- **What a reader should NOT take from this entry.** It is a defensive-change output-identity receipt. It shows the score did not move — by byte identity on all 45 doctor reports and by six unchanged public-benchmark statistics — and that this branch does not carry the candidate's loader defect today. It says nothing about whether the score discriminates, none of its numbers is comparable to AUC-24 or to the P1 baseline, and the guard test proves the calibration layer SURVIVES the production loader, not that the percentiles it produces mean anything: the reference set is still the 20-sample hand-authored corpus `reference.ts`'s header describes.
+
+### 2026-09-21 — craft formula moved to a leaf module (code motion; no formula change) — output-identity receipt (bit-identical, no score moved; the private corpus is not present in this environment and no real-corpus figure is claimed)
+
+- **What changed on the scoring path:** three files. `server/nvm/analyze/doctor.ts`
+  (always-scoring) LOST four functions and the design comment above them —
+  `densityPenalty`, `scarcityPenalty`, `craftPenalty`, `computeRawCraftScore`,
+  every constant they read still declared inside the function that reads it —
+  and gained one import plus a re-export (`export { computeRawCraftScore }`) so
+  every existing import site still resolves. `server/nvm/analyze/craft-formula.ts`
+  is NEW and reachable from doctor.ts (tier 2): it holds those functions with
+  bodies byte-identical to the text removed from doctor.ts (verified by
+  `diff` of the extracted 209 + 47 lines against the leaf minus its header:
+  the only differences are four `export` keywords and three doc-comment
+  sentences that described the cycle in the present tense), and it imports
+  NOTHING. `server/nvm/analyze/calibration/reference.ts` (always-scoring,
+  `calibration/**`) changed ONE import specifier — `computeRawCraftScore`
+  from `'../craft-formula.ts'` instead of `'../doctor.ts'` — plus header
+  comments. No constant, weight, threshold, deduction, segmenter or pass
+  changed; the code that runs for every report is the same code, reached
+  through one more module boundary.
+- **Why this range exists:** `reference.ts` scores its 20-sample corpus in a
+  top-level `await` at module load through `computeRawCraftScore`, and until
+  this range it imported that function from `doctor.ts` while `doctor.ts`
+  imported `reference.ts` back. Whenever `doctor.ts` was the cycle's entry
+  (every pool worker; a `tsx server.ts` main thread) the corpus build ran
+  code from a module whose body had not evaluated, and two hazards lived
+  there, each swallowed by the calibration fallback into an empty
+  distribution: a module-level formula const in its temporal dead zone
+  (CLAUDE.md's long-standing gotcha) and, under the production loader, a named
+  nested function expression compiling to a call on esbuild's uninitialised
+  `__name` var (the 2026-09-21 production-loader-guard finding). Both were
+  guarded by tests; both remained live hazards for the next editor. With the
+  formula in an import-free leaf that `reference.ts` imports directly, the
+  cycle is gone from the corpus-scoring path by construction: the static walk
+  (`scripts/lib/import-graph.mjs`, the receipt gate's own walker) reports
+  `reference.ts`'s closure at 60 files WITHOUT `doctor.ts` (it was 68 files
+  WITH it), `craft-formula.ts`'s closure as exactly itself, and `doctor.ts`
+  reaching both one-directionally. `tests/core/craft-formula-leaf.test.ts`
+  (new, 3/3) pins those three facts and asserts doctor.ts's re-export is the
+  leaf's binding by identity.
+- **The two probes, and the control:** each probe was applied to the leaf,
+  measured, and reverted from a byte copy (`git status` clean afterwards).
+  (a) A module-level `const PROBE_MODULE_LEVEL_SCARCITY_SCALE = 140` in the
+  leaf, read by `scarcityPenalty` in place of its local — previously the TDZ
+  failure: `tests/core/doctor-calibration-under-tsx.test.ts` **1/1 PASS**,
+  `tests/core/calibration.test.ts` **25/25 PASS**. (b) A named nested arrow
+  `const sig = (x: number) => x` inside `densityPenalty`, wrapping
+  `weightedIssues` (this tree has no `subDensityCurve` — that function exists
+  only on the feature-length candidate — so the arrow went where the prior
+  lane's fail-first probe put it) — previously the `__name` failure under tsx:
+  tsx guard **1/1 PASS**, calibration **25/25 PASS**. CONTROL: probe (a)'s
+  exact edit applied to `doctor.ts` in the `bafffb69` baseline tree (the
+  pre-move layout): the tsx guard **FAILS by name** — `main thread: reference
+  distribution holds 0 of 20 corpus samples` — and a direct probe importing
+  `doctor.ts` first prints `"error":"ReferenceError: Cannot access
+  'PROBE_MODULE_LEVEL_SCARCITY_SCALE' before initialization"` and
+  `distribution=0` under BOTH `tsx` and `node --experimental-strip-types`
+  (the TDZ is a language mechanism; only the `__name` twin is loader-specific).
+  `calibration.test.ts` passed 25/25 on that same control tree, because it
+  imports `reference.ts` before `doctor.ts` and so never enters the cycle
+  from the failing side — the tsx guard is the instrument that sees these
+  hazards, and it stays. The baseline tree's `doctor.ts` was restored from a
+  pristine byte copy and `cmp`-verified after each control run.
+- **Why no number can move:** the formula's bodies are byte-identical and the
+  constants they read are the same function-local values; the leaf has no
+  module state; `reference.ts` calls the same function through a different
+  specifier; `doctor.ts` calls it through an import instead of a local
+  declaration. Comments and the module boundary are the only differences. The
+  output-identity harness below confirms it on all 45 fixtures and all six
+  public-benchmark statistics reproduce to four decimals with identical
+  ordered/inverted/tied counts.
+- **Date:** 2026-09-21
+- **Git SHA:** `e2e8a5d9` — `refactor(doctor): move the craft formula into craft-formula.ts, a leaf, so reference.ts no longer imports doctor.ts`, the first commit on `lane/craft-formula-leaf`, branched from `bafffb69` (this entry is written in a later commit on the same lane; `git log bafffb69..lane/craft-formula-leaf` lists all of them).
+- **Baseline used:** `bafffb69` — the session branch head this lane branched from and the tree the change is measured against, as a `git archive bafffb69` export unpacked to a scratch directory with `node_modules` symlinked in from the real checkout. Both sides of the identity comparison ran with `GIT_SHA=dev`, because the archive export has no `.git` and `provenance.engineCommit` would otherwise differ for a reason unrelated to this change.
+- **Command:** every command below was run in this lane's worktree (or, where stated, in the `bafffb69` baseline tree), and each one's exit code and output was read directly from its own log —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types --test tests/core/doctor-calibration-under-tsx.test.ts   # clean, probe (a), probe (b), clean; and the control in the baseline tree
+  node --experimental-strip-types --test tests/core/calibration.test.ts                    # same five runs
+  node --experimental-strip-types --test tests/core/craft-formula-leaf.test.ts
+  node --experimental-strip-types --test tests/core/pure-core-boundary.test.ts
+  node --experimental-strip-types --test tests/core/public-benchmark.test.ts
+  node --experimental-strip-types --test tests/core/blind-pairs-discrimination.test.ts
+  node --experimental-strip-types --test tests/core/script-doctor.test.ts
+  node --experimental-strip-types --test tests/core/doctor-worker-pool.test.ts
+  node --experimental-strip-types --test tests/core/doctor-history-identity.test.ts
+  node --experimental-strip-types --test tests/core/discrimination.test.ts
+  node --experimental-strip-types --test tests/core/rebuild-experiment.test.ts
+  node --experimental-strip-types --test tests/core/honesty-audit-claims.test.ts tests/core/docs-gating-set.test.ts tests/core/brain-coverage.test.ts
+  git archive bafffb69 | tar -x -C <scratch>/leaf-base
+  ln -s <checkout>/node_modules <scratch>/leaf-base/node_modules
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/leaf-base --out <scratch>/leaf-before
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/wt-leaf   --out <scratch>/leaf-after
+  node scripts/check-doctor-output-identity.mjs --compare <scratch>/leaf-before <scratch>/leaf-after
+  npm run brain && npm run check-brain
+  node scripts/check-scoring-receipt.mjs bafffb69..HEAD
+  ```
+  Every one exited 0 except the control run of the tsx guard in the baseline tree, which was REQUIRED to exit 1 and did (see the probes field). This is not `npm run measure-real`: the private real-script corpus is not present in this environment, no AUC-24 value is claimed anywhere in this entry, and no real-corpus figure is claimed for this range. The full `npm test` is the orchestrator's run, not this lane's.
+- **Output identity:** the compare run's own line, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+  **0 of 45 fixtures differ.** The after-snapshot was taken from the worktree at `e2e8a5d9` with `git status --short` empty (the probes above had been reverted from a byte copy before the snapshot; later commits on this lane touch documentation only, and comments do not reach the harness's output).
+- **Corpus fingerprint:** committed input sets only, no private text read. (1) The 45 in-repo identity fixtures the harness scores — 20 `data/screenplays/*.fountain` live-action fixtures, 20 calibration `REFERENCE_CORPUS` samples, the P0 sample script, and 4 synthetic concatenations at 60/120/240/300 scenes. (2) The public benchmark's 32-script manifest, `tests/fixtures/public-corpus-manifest.json`, unchanged by this range, sha256 `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e` (`tests/fixtures/public-benchmark-split.json`, also unchanged: `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`). Every one of the 32 manifest rows — `sceneCount`, `words`, `health`, `verdict` — came back byte-identical, so no manifest re-lock was needed and none was run. **The PRIVATE AUC-24 corpus was not available in this environment** (`REAL_SCRIPT_CORPUS_DIR` is unset here and the corpus is local-only by copyright), so no real-corpus figure is claimed for this range. `AUC24_FLOOR` is untouched at 0.622 and `AUC24_DEGRADATION_ID` remains `shuffle-drop/v4`.
+- **Public benchmark before/after:** all six floors' measured values reproduce unchanged from the committed 32 distributable screenplays, matching both `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first (PRIMARY), all-pairs second: shuffle-drop **0.5313 / 0.5586**; climax-relocate **0.4063 / 0.4443**; DIALOGUE_FLATTEN (the positive control) **1.0000 / 0.9473**, 32 of 32 ordered, zero ties. Ordered/inverted/tied counts are also unchanged — shuffle-drop 17/15/0, climax-relocate 8/14/10. The suite is 28/28. **No floor constant in `scripts/lib/auc.ts` was touched, no floor rose, no floor fell, and no re-lock was performed;** that file is not in this lane's diff.
+- **Other gates on this range:** `calibration` 25/25; `pure-core-boundary` 6/6 (the leaf sits inside `server/nvm/analyze/`, so `CORE_ALLOWLIST` needed no entry); `script-doctor` 86/86; `blind-pairs-discrimination` 4/4; `doctor-worker-pool` 9/9; `doctor-history-identity` 35/35; `discrimination` 14/14; `rebuild-experiment` 41/41; `honesty-audit-claims` 15/15 after `docs/CLAIMS_REGISTER.md` row 22's `doctor.ts` pointer moved 2092-2093 -> 1862-1863 (every `doctor.ts` citation after the moved blocks shifts by exactly -230 lines, each verified to land on identical text); `docs-gating-set` 8/8; `npm run lint` 0; `npm run check-no-console` 0 (313 files, 3 quarantine entries, all proven unreachable).
+- **Runner attestation:** run in the lane worktree (`lane/craft-formula-leaf`, branched from `bafffb69`) on 2026-09-21 by the lane agent, on an Intel(R) Xeon(R) Processor @ 2.80GHz x4 sandbox (parallelism 4, 15 GiB) under node v22.22.2, linux/x64, with `tsx` resolved from the checkout's `node_modules` (the version the Dockerfile CMD installs); no API key was present and no private corpus was read. I extracted the `bafffb69` baseline myself with `git archive`, symlinked `node_modules` in from the real checkout, ran every command in the block above here, and read each one's exit code and output directly. Each probe and the control were applied by a scripted exact-match replacement, run, and reverted from a byte copy (`cmp`-verified for the baseline tree; `git status --short` empty for the worktree) before any snapshot or commit; the committed tree contains no probe. This is an output-identity receipt, not a discrimination-statistic measurement: the private real-script corpus is not present in this environment, `REAL_SCRIPT_CORPUS_DIR` is unset here, and no real-corpus figure is claimed for this range.
+- **What a reader should NOT take from this entry.** It is a code-motion output-identity receipt. It shows the score did not move — by byte identity on all 45 doctor reports and by six unchanged public-benchmark statistics — and that the two silent failure modes of the doctor<->reference cycle can no longer fire on the corpus-scoring path. It says nothing about whether the score discriminates, none of its numbers is comparable to AUC-24 or to the P1 baseline, and the formula it moved is the same formula with the same known limits: the reference set is still the 20-sample hand-authored corpus `reference.ts`'s header describes.
+
+### 2026-09-21 — PR #268 REVIEW, F3: an approved span keeps its occurrence ordinal, and a guessed relocation is reported — output-identity receipt (bit-identical, no score moved; the private corpus is not present in this environment and no real-corpus figure is claimed)
+
+- **What changed on the scoring path:** two files,
+  `server/nvm/revision/approved-spans.ts` and
+  `server/nvm/revision/pipeline.ts`. Both are classified scoring-path for a
+  single reason — they are reachable from `doctor.ts`'s import graph — not
+  because the doctor calls either of them to compute a number. Two commits in
+  this range touch `approved-spans.ts`:
+  - `fa0c7719` (finding F2) exported `lineAlignedOccurrences` and made
+    `approvedSpansSurvive` (`../rewrite-llm.ts`) decide "the locked excerpt is
+    present" with that same function instead of a bare substring `includes`.
+    Before, a rewrite that embedded the locked lines inside a modified line
+    was accepted at the survival check and then could not be found by
+    relocation on the next pass, so the lock was dropped with no warning.
+  - `c02bf3c9` (finding F3) made relocation pick the occurrence by ORDINAL
+    when the excerpt's occurrence count is unchanged, falling back to the
+    previous nearest-to-the-old-position rule (ties still to the earlier
+    occurrence) only when the count changed, and reporting that fallback in a
+    new `ambiguous` index array. With identical blocks at lines 10 and 20 and
+    the second one locked, inserting 15 lines at the top moved them to 25 and
+    35 and the old rule picked 25 — the copy the author had left free.
+  `pipeline.ts` changed in `c02bf3c9` only, to read the new `ambiguous` array
+  the way it already reads `lost`: caller-facing indices collected into a new
+  `ambiguousApprovedSpans` field on `RevisionResult`, plus one
+  `revision_locked_span_ambiguous_between_passes` warning carrying counts
+  only. `server/routes/nvm/revision.ts` also changed — comments only; it is
+  not on the scoring path and it already returned the result unreshaped.
+- **Why no score can move.** `runScriptDoctor` reaches this pipeline only
+  inside `runDiagnoseOnly()`. In that mode every pass's `rewritePass(...)`
+  returns its input before any rewrite work happens, so `revisedFountain`
+  never differs from the draft, `currentFountain !== spanAnchorFountain` is
+  never true, and the span re-location block never executes. Beyond that gate
+  the change is inert for the doctor by construction: it passes no approved
+  spans at all, so there is nothing to relocate, nothing to lose and nothing
+  to mark ambiguous. `server/nvm/analyze/calibration/reference.ts` is in the
+  same position. `aggregateReport` reads no field this range added, so
+  `ambiguousApprovedSpans` cannot reach a `ScriptDoctorReport`. The receipt
+  below is the evidence for that argument rather than its restatement.
+- **Date:** 2026-09-21
+- **Git SHA:** the range is `bed7535d..lane/codex-review-268`. Its commits are
+  `d2cda09b` (F1, converge), `fa0c7719` (F2), `c02bf3c9` (F3) and `b2dca60d`
+  (F4); the commit carrying this entry is written after them and so cannot
+  quote its own object id. `git log bed7535d..lane/codex-review-268` resolves
+  the whole range, and `docs/audits/2026-09-21-codex-review-268/README.md`
+  records it per finding.
+- **Baseline used:** the `git archive bed7535d` tree — the commit this lane
+  branched from — extracted to a scratch directory with `node_modules`
+  symlinked in from the real checkout. Both sides were run with `GIT_SHA=dev`,
+  because the extracted tree has no `.git` and `provenance.engineCommit` would
+  otherwise differ for a reason unrelated to this range.
+- **Command:** every command run for this entry, all of them in this lane
+  worktree —
+  ```
+  npm run lint
+  npm run check-no-console
+  node --experimental-strip-types tests/core/revision-per-pass-diagnostics.test.ts
+  node --experimental-strip-types tests/core/approved-spans-enforced.test.ts
+  node --experimental-strip-types tests/core/approved-span-sanitization.test.ts
+  node --experimental-strip-types tests/core/script-doctor.test.ts
+  node --experimental-strip-types tests/core/pipeline-parallel.test.ts
+  node --experimental-strip-types tests/core/pure-core-boundary.test.ts
+  node --experimental-strip-types tests/core/llm-seam-wiring.test.ts
+  node --experimental-strip-types tests/core/typesafe-adapter.test.ts
+  node --experimental-strip-types tests/core/engine-logs-content-field-guard.test.ts
+  node --experimental-strip-types tests/core/public-benchmark.test.ts
+  node --experimental-strip-types tests/core/honesty-audit-claims.test.ts
+  node --experimental-strip-types tests/core/brain-coverage.test.ts
+  node --experimental-strip-types tests/nvm/converge/cast-alignment.test.ts
+  node --experimental-strip-types tests/routes/nvm-revision.test.ts
+  node --experimental-strip-types tests/routes/nvm-revision-approved-spans-schema.test.ts
+  node --experimental-strip-types tests/routes/nvm-converge-validation.test.ts
+  node --experimental-strip-types tests/routes/no-writer-content-in-logs.test.ts
+  git archive bed7535d | tar -x -C <scratch>/idbaseline
+  ln -s <checkout>/node_modules <scratch>/idbaseline/node_modules
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree <scratch>/idbaseline --out <scratch>/before
+  GIT_SHA=dev node scripts/check-doctor-output-identity.mjs --tree .                    --out <scratch>/after
+  node scripts/check-doctor-output-identity.mjs --compare <scratch>/before <scratch>/after
+  npm run benchmark:public
+  npm run brain && npm run check-brain
+  node scripts/check-scoring-receipt.mjs bed7535d..HEAD
+  ```
+  Every one exited 0. This is not `npm run measure-real`: the private
+  real-script corpus is not present in this environment, no AUC-24 value is
+  claimed anywhere in this entry, and no real-corpus figure is claimed for this
+  range. The full `npm test` is the orchestrator's run, not this lane's.
+- **Output identity:** the compare run's own line, verbatim:
+  ```
+  OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+  ```
+  **0 of 45 fixtures differ.** This is a FULL byte-identity compare, not an
+  identity-modulo-keys one: no key was ignored and none was required to be
+  added, because the new `ambiguousApprovedSpans` field is on `RevisionResult`,
+  which the doctor's report never carries.
+- **Corpus fingerprint:** committed input sets only, no private text read.
+  (1) The 45 in-repo identity fixtures the harness scores — 20
+  `data/screenplays/*.fountain` live-action fixtures, 20 calibration
+  `REFERENCE_CORPUS` samples, the P0 sample script, and 4 synthetic
+  concatenations at 60/120/240/300 scenes. (2) The public benchmark's 32-script
+  manifest, `tests/fixtures/public-corpus-manifest.json`, unchanged by this
+  range, sha256
+  `ed420951cc21b4dd0e6a8f50ef6928e670b85d19f44131d51b249920d855c93e`
+  (`tests/fixtures/public-benchmark-split.json`, also unchanged:
+  `977fa938f76e54f95ffe913c9fae4e868d78fcf58f1c640ff2197a1112df837b`).
+  `git diff bed7535d..HEAD -- tests/fixtures/ scripts/lib/auc.ts` is empty.
+  **The PRIVATE AUC-24 corpus was not available in this environment**
+  (`REAL_SCRIPT_CORPUS_DIR` is unset here and the corpus is local-only by
+  copyright), so no real-corpus figure is claimed for this range.
+  `AUC24_FLOOR` is untouched at 0.622 and `AUC24_DEGRADATION_ID` remains
+  `shuffle-drop/v4`.
+- **Public benchmark before/after:** all six floors' measured values reproduce
+  unchanged from the committed 32 distributable screenplays, matching both
+  `scripts/lib/auc.ts` and CLAUDE.md's table. Matched-pair first (PRIMARY),
+  all-pairs second: shuffle-drop **0.5313 / 0.5586**; climax-relocate
+  **0.4063 / 0.4443**; DIALOGUE_FLATTEN (the positive control) **1.0000 /
+  0.9473**, 32 of 32 ordered, zero ties. Ordered/inverted/tied counts are also
+  unchanged — shuffle-drop 17/15/0, climax-relocate 8/14/10. The suite is
+  28/28. **No floor constant in `scripts/lib/auc.ts` was touched, no floor
+  rose, no floor fell, and no re-lock was performed;** that file is not in this
+  lane's diff.
+- **Other gates on this range:** `revision-per-pass-diagnostics` 22/22;
+  `approved-spans-enforced` 27/27; `approved-span-sanitization` 10/10;
+  `script-doctor` 86/86; `pipeline-parallel` 10/10; `pure-core-boundary` 6/6;
+  `llm-seam-wiring` 7/7; `typesafe-adapter` 18/18;
+  `engine-logs-content-field-guard` 3/3; `cast-alignment` 21/21;
+  `nvm-revision` 13/13; `nvm-revision-approved-spans-schema` 15/15;
+  `nvm-converge-validation` 9/9; `no-writer-content-in-logs` 3/3;
+  `honesty-audit-claims` 15/15; `brain-coverage` 8/8; `npm run lint` 0;
+  `npm run check-no-console` 0 (313 files, 3 quarantine entries, all proven
+  unreachable).
+- **Runner attestation:** run in the lane worktree (`lane/codex-review-268`,
+  branched from `bed7535d`) on 2026-09-21 by the lane agent, on an
+  Intel(R) Xeon(R) Processor @ 2.80GHz x4 sandbox (16 GiB) under node
+  v22.22.2, linux/x64. No API key was present (`GEMINI_API_KEY` unset) and no
+  private corpus was read. I extracted the `bed7535d` baseline myself with
+  `git archive`, symlinked `node_modules` in from the real checkout, ran every
+  command in the block above here, and read each one's exit code and output
+  directly. The after-snapshot was taken from the worktree with the F1–F4 code
+  committed and `git status --short` otherwise clean. This is an
+  output-identity receipt, not a discrimination-statistic measurement: the
+  private real-script corpus is not present in this environment,
+  `REAL_SCRIPT_CORPUS_DIR` is unset here, and no real-corpus figure is claimed
+  for this range.
+- **What a reader should NOT take from this entry.** It is a
+  behaviour-change-off-the-scoring-path output-identity receipt. F2 and F3 DO
+  change behaviour — they change which lines a locked span points at after a
+  pass rewrites the draft, and whether the pipeline calls that placement
+  certain — but that behaviour is unreachable from the doctor, which is what
+  the 45 byte-identical reports and the six unchanged public-benchmark
+  statistics demonstrate. It says nothing about whether the score
+  discriminates, and none of its numbers is comparable to AUC-24 or to the P1
+  baseline.

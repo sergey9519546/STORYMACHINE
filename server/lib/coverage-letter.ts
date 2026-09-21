@@ -35,7 +35,7 @@
 // margin on the longest of the 21.
 //
 // The three-to-four-page range holds because the length is BOUNDED BY THE
-// ENGINE, not by this renderer: doctor.ts:1920 caps `topPriorities` at ten, so
+// ENGINE, not by this renderer: doctor.ts:1690 caps `topPriorities` at ten, so
 // a 231-scene feature and a 9-scene short produce letters within 0.5 pp of each
 // other. tests/core/coverage-letter.test.ts asserts the range, on the shipped
 // shape, at `<= 4.0` — the sentence itself rather than a window around it.

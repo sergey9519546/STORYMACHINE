@@ -57,13 +57,54 @@
 //      down; the fallback is what makes that guarantee, and
 //      DOCTOR_WORKER_POOL=off exercises the same path by hand.
 //
+//      THE LATCH HAS THREE TRIGGERS, and the third is what makes this
+//      property's sentence TRUE rather than merely intended (C9, 2026-09-19).
+//      `new Worker()` throwing and an `'error'` event on a not-yet-ready
+//      worker were the original two. They do not cover the case the sentence
+//      above names most explicitly — "a bundler that did not emit the worker
+//      file", or any environment where the worker STARTS but cannot
+//      `import('./doctor.ts')` — because doctor-worker.ts used to report that
+//      as an ordinary per-job `error` message: `ready` stayed false, no
+//      `'error'` event fired, and the pool rejected the caller and kept the
+//      slot, so every subsequent request repeated it. The front door 500'd
+//      forever instead of falling back. The worker now posts a distinct
+//      `load_failed` (and exits with DOCTOR_WORKER_LOAD_FAILED_EXIT behind
+//      it), and handleWorkerEnvironmentFailure() below treats both as this
+//      case: latch, log ONCE at warn, and hand the in-flight caller to the
+//      in-process path so they still get a report.
+//
+//      THE LATCH IS ALSO VISIBLE. Before this lane it was a private boolean:
+//      once it set, `/health` showed only a rising `inProcessRuns`, which a
+//      deep read produces too, so an operator could not tell a server that
+//      had permanently lost its workers from one doing ordinary deep-read
+//      work. doctorPoolStatus() now reports `disabled`/`disabledReason`,
+//      GET /health carries them as `poolDisabled`/`poolDisabledReason`, and
+//      the single `doctor_pool_disabled` warn line names the reason.
+//
 //   5. A BOUNDED WALL CLOCK (Decision #7, 2026-09-06, as amended by its
 //      round-2 review). A submission may not wait, or run, indefinitely —
 //      and those are TWO bounds, not one, because only the second is a
 //      property of the draft: DOCTOR_QUEUE_BUDGET_MS (60 s) bounds the wait
 //      for a free worker and answers 503 + Retry-After with a contention
 //      sentence; DOCTOR_ANALYSIS_BUDGET_MS (30 s) bounds occupancy once
-//      running and answers 400 with the analysis sentence. Both numbers and
+//      running and answers 400 with the analysis sentence.
+//
+//      NEITHER BUDGET IS ENFORCED ON THE IN-PROCESS FALLBACK PATH, and that
+//      is deliberate, not an oversight — read this before Decision #7's text
+//      leads you to expect otherwise (C10, 2026-09-19). Enforcement here is
+//      ONE primitive: terminate the worker. On the main thread there is no
+//      thread to terminate, so a budget that fired would reject the caller
+//      while the analysis kept running to completion underneath them —
+//      stopping the wait without stopping the work, which is the failure the
+//      mechanism exists to prevent rather than a milder version of it. So the
+//      fallback path (property 4's latch, DOCTOR_WORKER_POOL=off, and deep
+//      read) arms no timer and skips admission control, exactly as Cancel has
+//      no effect there. What it does NOT do any more is stay silent about it:
+//      a fallback run that outlasts the analysis budget logs
+//      `doctor_inprocess_over_budget` with its elapsed ms once it finishes —
+//      visibility, never a rejection, because adding one would change
+//      behaviour on the path whose whole job is to be no worse than the
+//      product was before this file existed. Both numbers and
 //      both sentences live in server/lib/doctor-budget.ts; the enforcement
 //      lives here, and the running half reuses property 2's primitive rather
 //      than inventing a second kind of cancellation. Like Cancel, both apply
@@ -84,13 +125,33 @@
 
 import { Worker } from 'node:worker_threads';
 import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { logger } from '../../lib/logger.ts';
 import { DoctorAnalysisBudgetExceededError, doctorAnalysisBudgetMs, doctorQueueBudgetMs } from '../../lib/doctor-budget.ts';
 import type { StoryContext } from '../revision/passes/types.ts';
 import type { ScriptDoctorReport, DoctorProgressEvent } from './types.ts';
+import { DOCTOR_WORKER_LOAD_FAILED_EXIT } from './doctor-worker.ts';
 import type { DoctorWorkerRequest, DoctorWorkerResponse } from './doctor-worker.ts';
 
 const WORKER_URL = new URL('./doctor-worker.ts', import.meta.url);
+
+/** The script a worker is spawned from. Production always takes WORKER_URL.
+ *
+ *  `DOCTOR_WORKER_SCRIPT` is a TEST-ONLY override (ignored under
+ *  NODE_ENV=production, documented as test-only in README.md) for pointing
+ *  the pool at a stand-in worker — the generic escape hatch beside the more
+ *  specific DOCTOR_WORKER_DOCTOR_MODULE the load-failure suite actually uses.
+ *  `pathToFileURL`, not `new URL(...)`: a Windows path is not a URL, and
+ *  CLAUDE.md's Windows note is explicit that module URLs must be built with
+ *  the url helpers rather than by string surgery. */
+function workerUrl(): URL {
+  const override = process.env.DOCTOR_WORKER_SCRIPT;
+  if (override && process.env.NODE_ENV !== 'production') {
+    return pathToFileURL(path.resolve(override));
+  }
+  return WORKER_URL;
+}
 
 /** Idle workers are terminated after this long with nothing to do. Keeps a
  *  short-lived process (a test run, a CLI script) from being held open or
@@ -145,6 +206,10 @@ interface WorkerSlot {
   idleTimer?: NodeJS.Timeout;
   /** Set once the worker has confirmed it can load doctor.ts. */
   ready: boolean;
+  /** Set when this worker reported it could not load the doctor module at
+   *  all (C9). Its `'exit'` — which follows immediately, by design — is then
+   *  already accounted for and must not be handled a second time. */
+  loadFailed?: boolean;
   /** purgeDoctorWorkers() marked this worker's realm as holding a report
    *  someone asked to be forgotten, but it was mid-job at the time. It is
    *  terminated the moment that job settles rather than being killed under a
@@ -161,11 +226,20 @@ interface WorkerSlot {
 // unable to fail for the reason it names: a slow-but-cached run and a
 // fast-but-uncached run are indistinguishable to it.
 //
-// So the pool counts what actually happened. These three are the complete,
-// mutually exclusive set of outcomes for a submission that reaches
-// runScriptDoctorOffThread and is not rejected: it was answered from the
-// coordinator LRU, it ran on a worker, or it ran in-process. A test (and
-// GET /health) can now assert the MECHANISM rather than a symptom of it.
+// So the pool counts what actually happened. These three are the complete set
+// of outcomes for a submission that reaches runScriptDoctorOffThread and is
+// not rejected: it was answered from the coordinator LRU, it ran on a worker,
+// or it ran in-process. A test (and GET /health) can now assert the MECHANISM
+// rather than a symptom of it.
+//
+// They were described here as MUTUALLY EXCLUSIVE, and since 2026-09-19 that
+// is one case short of true, so the word is gone rather than quietly wrong:
+// a submission dispatched to a worker that then proves it cannot load the
+// doctor at all increments `workerRuns` at dispatch AND `inProcessRuns` when
+// property (4)'s fallback re-runs it on the main thread. That is the honest
+// account of what happened to it — it really was handed to a worker, and it
+// really did end up running here — and it happens at most once per process,
+// because the same event latches the pool off for good.
 // Monotonic for the life of the process; resetDoctorPoolCountersForTests()
 // rebases them for a test that wants deltas from a known point.
 let cacheHits = 0;
@@ -185,6 +259,69 @@ const slots: WorkerSlot[] = [];
 let nextRequestId = 1;
 /** Latched when the environment proves it cannot run the worker at all. */
 let poolDisabled = false;
+/** Why it latched, in one operator-readable sentence — null while it has not.
+ *  Reported by doctorPoolStatus() and by GET /health, because before this
+ *  lane the latch was observable only as a rising `inProcessRuns`, which an
+ *  ordinary deep read produces as well (C10). Sanitized — see
+ *  sanitizeDisabledReason() below (2026-09-19 review finding 7) — before it
+ *  is ever stored, since GET /health is unauthenticated. */
+let poolDisabledReason: string | null = null;
+
+/** Cap on the stored/reported disabled reason (2026-09-19 review finding 7). */
+const DISABLED_REASON_MAX_LEN = 200;
+
+/** An absolute POSIX-style path: two or more `/segment` components in a row.
+ *  Deliberately requires 2+ segments so an incidental single `/` (a fraction
+ *  in prose, a flag like `-1/2`) is never mistaken for a path. */
+const UNIX_ABS_PATH_RE = /(?:\/[\w.@-]+){2,}/g;
+/** An absolute Windows path: a drive letter, colon, backslash, then one or
+ *  more backslash-separated components, stopping at whitespace or a quote —
+ *  the owner's machine is Windows (CLAUDE.md), so this reason can carry one
+ *  of these too. */
+const WINDOWS_ABS_PATH_RE = /[A-Za-z]:\\[^\s'"]+/g;
+
+/**
+ * Strip absolute filesystem paths out of a pool-disabled reason, and cap its
+ * length, before it is ever stored (2026-09-19 review finding 7). The raw
+ * `Error.message` from a failed dynamic import names the FULL absolute path
+ * to both the missing module and to doctor-worker.ts itself — e.g. `Cannot
+ * find module '/home/writer/app/server/nvm/analyze/…ts' imported from
+ * '/home/writer/app/server/nvm/analyze/doctor-worker.ts'` — and
+ * `poolDisabledReason` reaches GET /health, which is unauthenticated: an
+ * operator's server layout should not be legible to anyone who can reach that
+ * route. The module-not-found WORDING ("Cannot find module", "could not load
+ * the doctor module", …) is deliberately left alone — only path segments are
+ * replaced with the literal placeholder `<path>` — so the reason stays
+ * diagnostic (still names the class of failure) without naming the box.
+ */
+function sanitizeDisabledReason(reason: string): string {
+  const withoutPaths = reason
+    .replace(WINDOWS_ABS_PATH_RE, '<path>')
+    .replace(UNIX_ABS_PATH_RE, '<path>');
+  return withoutPaths.length > DISABLED_REASON_MAX_LEN
+    ? withoutPaths.slice(0, DISABLED_REASON_MAX_LEN)
+    : withoutPaths;
+}
+
+/** Latch property (4) ON, once. Idempotent by construction: the guard is what
+ *  makes `doctor_pool_disabled` exactly ONE line per process rather than one
+ *  per rejected job, and what keeps the FIRST reason — the one that actually
+ *  describes the environment — from being overwritten by whatever the second
+ *  worker to notice happened to say. */
+function disablePool(reason: string): void {
+  if (poolDisabled) return;
+  poolDisabled = true;
+  poolDisabledReason = sanitizeDisabledReason(reason);
+  logger.warn('doctor_pool_disabled', { reason: poolDisabledReason });
+}
+
+/** Test-only: un-latch, so one test file can exercise the environment case
+ *  without poisoning every later test in the same process. Production never
+ *  calls it — the latch is permanent by design (property 4). */
+export function resetDoctorPoolDisabledForTests(): void {
+  poolDisabled = false;
+  poolDisabledReason = null;
+}
 /** Latched for the duration of shutdownDoctorPool() so the eager respawn
  *  below cannot race a teardown into spawning the worker it just killed. */
 let shuttingDown = false;
@@ -447,21 +584,72 @@ function dropSlot(slot: WorkerSlot): void {
   if (at >= 0) slots.splice(at, 1);
 }
 
+/** Report — never enforce — that a FALLBACK run outlasted the budget the
+ *  worker path would have held it to (C10, 2026-09-19).
+ *
+ *  The budget itself stays unarmed here, for the reason armQueueBudget() and
+ *  property (5) both spell out: there is no thread to terminate on the main
+ *  thread, so a rejection would stop the caller's wait while the analysis ran
+ *  on underneath them. But "not enforceable" is not a reason to be SILENT.
+ *  Once the latch is set, admission control is skipped and both budgets are
+ *  absent process-wide, and the only thing `/health` showed for it was a
+ *  rising `inProcessRuns` — which a deep read produces too. So a fallback run
+ *  that would have been killed on a worker now says so, after the fact, with
+ *  what it actually cost.
+ *
+ *  Gated on the QUEUE budget being configured, as the brief specifies: an
+ *  operator who has switched the wall-clock bound off (`0`/`off`) has said
+ *  they do not want this server reasoning about wall clock, and this line
+ *  would be noise rather than a signal. `meanJobMs` rides along because it is
+ *  what admission control would have judged this submission against had there
+ *  been a queue to admit it to.
+ *
+ *  DEEP READ IS EXCLUDED. It is I/O-bound LLM fan-out that legitimately
+ *  outruns a CPU budget (this file's header says so), it is in-process by
+ *  design rather than by failure, and warning on every one of them would bury
+ *  the case this exists to surface. */
+function reportInProcessOverBudget(startedAt: number, reason: 'fallback' | 'deep-read'): void {
+  if (reason !== 'fallback') return;
+  const queueBudgetMs = doctorQueueBudgetMs();
+  if (queueBudgetMs <= 0) return;
+  const analysisBudgetMs = doctorAnalysisBudgetMs();
+  if (analysisBudgetMs <= 0) return;
+  const elapsedMs = Date.now() - startedAt;
+  if (elapsedMs <= analysisBudgetMs) return;
+  logger.warn('doctor_inprocess_over_budget', {
+    elapsedMs, analysisBudgetMs, queueBudgetMs, meanJobMs,
+    poolDisabled, poolDisabledReason,
+  });
+}
+
 /** Run the doctor on this thread. The fallback path, and the deep-read path.
  *  `onProgress` is forwarded straight through — same thread, no serialization
  *  boundary to cross, so this is a plain pass-through rather than the
- *  postMessage relay the worker path needs (doctor-worker.ts). */
+ *  postMessage relay the worker path needs (doctor-worker.ts).
+ *
+ *  `reason` is what the run is doing here, and it decides one thing only:
+ *  whether an over-budget run is worth an operator's attention (see
+ *  reportInProcessOverBudget above). It changes nothing about the analysis. */
 async function runInProcess(
   request: Omit<DoctorWorkerRequest, 'id'>,
   onProgress?: (event: DoctorProgressEvent) => void,
+  reason: 'fallback' | 'deep-read' = 'fallback',
 ): Promise<ScriptDoctorReport> {
   inProcessRuns++;
-  const { runScriptDoctor } = await import('./doctor.ts');
-  return runScriptDoctor(
-    request.fountain,
-    request.storyContext,
-    { ...(request.deepRead ? { deepRead: true } : {}), onProgress },
-  );
+  const startedAt = Date.now();
+  try {
+    const { runScriptDoctor } = await import('./doctor.ts');
+    return await runScriptDoctor(
+      request.fountain,
+      request.storyContext,
+      { ...(request.deepRead ? { deepRead: true } : {}), onProgress },
+    );
+  } finally {
+    // In a `finally` so a run that throws is measured too: an analysis that
+    // spent 90 s and then failed is exactly as much of an operator problem as
+    // one that spent 90 s and succeeded.
+    reportInProcessOverBudget(startedAt, reason);
+  }
 }
 
 /**
@@ -641,15 +829,61 @@ function respawnWarmWorkerAfterTerminate(reason: 'budget' | 'cancel' | 'purge'):
   void settled.finally(() => { respawnPromises.delete(settled); });
 }
 
+/**
+ * Property (4)'s handler: this worker proved the ENVIRONMENT cannot host the
+ * pool, not that one draft failed. Latch (once, with a reason and one warn
+ * line), drop the slot, and — crucially — hand the caller whose job was on it
+ * to the in-process path rather than rejecting them, so the request that
+ * discovered the problem still gets a report.
+ *
+ * Shared by the three triggers that can reach it with a job attached: an
+ * `'error'` event on a not-yet-ready worker, the `load_failed` message
+ * doctor-worker.ts posts when it cannot import the doctor at all (C9), and
+ * that message's exit-code backstop. Idempotent: disablePool() latches once,
+ * dropSlot() is a no-op on a slot already gone, and the job is only settled
+ * if the slot still holds one.
+ *
+ * ORDER (2026-09-19 review finding 8): `setBusy(slot, false)` runs BEFORE
+ * `dropSlot(slot)`, not after. Every other settlement path in this file
+ * (finishJob, onRunBudgetExceeded, the abort handler in dispatch()) marks the
+ * slot idle first and only then removes it from `slots` — dropSlot() also
+ * clears the slot's idle timer, and the one place that used to run in the
+ * opposite order left `slots.indexOf(slot)` already `-1` by the time
+ * anything downstream of `setBusy` could act on membership. Nothing here
+ * currently re-arms an idle timer on this path, but matching the order every
+ * other caller uses removes the one place a future edit near either call
+ * could reintroduce a timer racing a slot that is no longer in the pool.
+ */
+function handleWorkerEnvironmentFailure(slot: WorkerSlot, reason: string): void {
+  const active = slot.active;
+  if (active) {
+    slot.active = undefined;
+    setBusy(slot, false);
+  }
+  dropSlot(slot);
+  disablePool(reason);
+  if (active) {
+    // Disarm the budget before retrying in-process: from here on there is no
+    // worker to terminate, so a budget that fired would reject the caller
+    // while the main thread kept running the analysis to completion — the
+    // "stopped the wait, not the work" outcome this mechanism exists to
+    // avoid. Same carve-out, same reason, as the in-process path
+    // armQueueBudget() never arms at all.
+    clearAnalysisBudget(active.job);
+    runInProcess(active.job.request, active.job.onProgress).then(active.job.resolve, active.job.reject);
+  }
+  pump();
+}
+
 function spawnSlot(): WorkerSlot | undefined {
   let worker: Worker;
   try {
-    worker = new Worker(WORKER_URL);
-  } catch {
+    worker = new Worker(workerUrl());
+  } catch (err: unknown) {
     // The environment cannot start the worker (loader, permissions, missing
     // file after a bundling step). Latch off and let every caller run
     // in-process — see property (4) in this file's header.
-    poolDisabled = true;
+    disablePool(`worker thread could not be started: ${err instanceof Error ? err.message : String(err)}`);
     return undefined;
   }
 
@@ -658,6 +892,21 @@ function spawnSlot(): WorkerSlot | undefined {
   worker.on('message', (message: DoctorWorkerResponse) => {
     if (message.type === 'ready') {
       slot.ready = true;
+      return;
+    }
+    if (message.type === 'load_failed') {
+      // C9: the worker started but cannot import the doctor at all. That is
+      // property (4)'s environment case, NOT a failed analysis, and it is
+      // handled without consulting `message.id` — a worker that cannot load
+      // the module will never serve any job, including the ones still queued,
+      // so the whole pool goes down rather than this one slot.
+      slot.loadFailed = true;
+      handleWorkerEnvironmentFailure(slot, `worker could not load the doctor module: ${message.message}`);
+      // The worker exits itself (DOCTOR_WORKER_LOAD_FAILED_EXIT), but a
+      // stand-in that only posts the message must not be left holding a
+      // thread open. terminate() on an already-exited worker resolves
+      // harmlessly, and the `'exit'` it produces finds no active job.
+      void worker.terminate();
       return;
     }
     const active = slot.active;
@@ -677,6 +926,7 @@ function spawnSlot(): WorkerSlot | undefined {
   });
 
   worker.on('error', (err) => {
+    if (slot.loadFailed) { dropSlot(slot); pump(); return; } // already handled as the environment case
     const active = slot.active;
     dropSlot(slot);
     if (!slot.ready) {
@@ -684,20 +934,10 @@ function spawnSlot(): WorkerSlot | undefined {
       // an environment that cannot host the pool rather than as a failed
       // analysis, and retry the job in-process so the user still gets a
       // report.
-      poolDisabled = true;
-      if (active) {
-        slot.active = undefined;
-        setBusy(slot, false);
-        // Disarm the budget before retrying in-process: from here on there is
-        // no worker to terminate, so a budget that fired would reject the
-        // caller while the main thread kept running the analysis to
-        // completion — the "stopped the wait, not the work" outcome this
-        // mechanism exists to avoid. Same carve-out, same reason, as the
-        // in-process path armAnalysisBudget() never arms at all.
-        clearAnalysisBudget(active.job);
-        runInProcess(active.job.request, active.job.onProgress).then(active.job.resolve, active.job.reject);
-      }
-    } else if (active) {
+      handleWorkerEnvironmentFailure(slot, `worker failed before it was ready: ${err.message}`);
+      return;
+    }
+    if (active) {
       slot.active = undefined;
       setBusy(slot, false);
       active.job.reject(err);
@@ -705,9 +945,22 @@ function spawnSlot(): WorkerSlot | undefined {
     pump();
   });
 
-  worker.on('exit', () => {
+  worker.on('exit', (code) => {
     const active = slot.active;
     dropSlot(slot);
+    // C9 BACKSTOP. doctor-worker.ts posts `load_failed` and THEN exits with
+    // this code, so ordinarily the message above has already latched the pool
+    // and `slot.loadFailed` is set. This branch is for the one case that
+    // would otherwise be silent: the message being lost (a port torn down
+    // under it, a runtime that drops a queued message on exit). It keys on
+    // the EXIT CODE and not on `!slot.ready`, deliberately — `ready` is also
+    // false for a perfectly healthy worker cancelled during its first, cold
+    // job, and latching the pool off for a Cancel would be a far worse defect
+    // than the one this fixes.
+    if (!slot.loadFailed && code === DOCTOR_WORKER_LOAD_FAILED_EXIT) {
+      handleWorkerEnvironmentFailure(slot, 'worker exited without loading the doctor module');
+      return;
+    }
     if (active) {
       slot.active = undefined;
       // An exit with a job still attached that was NOT an abort (aborts
@@ -827,7 +1080,7 @@ export async function runScriptDoctorOffThread(
 
   // Deep read stays in-process — see this file's header for why.
   if (deepRead || poolDisabled || !poolEnabled()) {
-    const report = await runInProcess(request, onProgress);
+    const report = await runInProcess(request, onProgress, deepRead ? 'deep-read' : 'fallback');
     doctorCacheAdopt(fountain, report, storyContext, deepRead);
     return report;
   }
@@ -955,14 +1208,20 @@ export function purgeDoctorWorkers(): number {
 /** Introspection for tests: whether the pool is actually carrying work, or
  *  has fallen back to in-process execution. */
 export function doctorPoolStatus(): {
-  enabled: boolean; disabled: boolean; workers: number; queued: number;
+  enabled: boolean; disabled: boolean; disabledReason: string | null;
+  workers: number; queued: number;
   analysisBudgetMs: number; queueBudgetMs: number; retryAfterSeconds: number;
   meanJobMs: number; eagerRespawn: boolean; admission: boolean;
   cacheHits: number; workerRuns: number; inProcessRuns: number;
 } {
   return {
     enabled: poolEnabled(),
+    // C10 (2026-09-19): the latch and WHY it latched. `disabled` existed but
+    // was reported nowhere an operator looks; `disabledReason` is new, and is
+    // the difference between "this box is doing a lot of deep reads" and
+    // "this box permanently lost its workers at 04:12".
     disabled: poolDisabled,
+    disabledReason: poolDisabledReason,
     workers: slots.length,
     queued: queue.length,
     // Decision #7: 0 on either of these means the operator switched that

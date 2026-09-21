@@ -109,6 +109,132 @@
       "path": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md"
     },
     {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Cast Grounding",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Converge Contract",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Converge Stream Close",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Doctor Pool Fallback",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Generation Prompt Inputs",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Generator Honesty.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Generator Honesty",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Generator Honesty.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Harness Honesty",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Locked Spans",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Receipt Gate Inplace.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Receipt Gate Inplace",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Receipt Gate Inplace.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 Revise Deadline",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-19 TypeSafe Cast Alignment",
+      "path": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Approved Spans Schema.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Approved Spans Schema",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Approved Spans Schema.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Burrows Delta Hoist.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Burrows Delta Hoist",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Burrows Delta Hoist.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B1 B2.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Dead Weight B1 B2",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B1 B2.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B3.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Dead Weight B3",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B3.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Parked Branches",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Per-Pass Diagnostics",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-20 Scene Grammar",
+      "path": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-21 Codex Review 268.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-21 Codex Review 268",
+      "path": "docs/brain/Audits/Audit - 2026-09-21 Codex Review 268.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-21 Craft Formula Leaf",
+      "path": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md"
+    },
+    {
+      "id": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md",
+      "type": "audit",
+      "title": "Audit — 2026-09-21 Prod Loader Guard",
+      "path": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md"
+    },
+    {
       "id": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md",
       "type": "branch",
       "title": "Branch — Adversarial 2026-09-12",
@@ -163,6 +289,18 @@
       "path": "docs/brain/Decisions/Decision 1 - User Validation First.md"
     },
     {
+      "id": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md",
+      "type": "decision",
+      "title": "Decision #10 — Lanes Push at Checkpoints, Not at Every Commit (2026-09-18)",
+      "path": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md"
+    },
+    {
+      "id": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "type": "decision",
+      "title": "Decision #11 — Move the AUC-24 Table Deadline to 2026-11-01 (2026-09-20)",
+      "path": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md"
+    },
+    {
       "id": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md",
       "type": "decision",
       "title": "Decision #2 — Retire the P0 Hard-Gate (2026-08-11)",
@@ -209,12 +347,6 @@
       "type": "decision",
       "title": "Decision #9 — Generation Quality Becomes a Measured Track (2026-09-13)",
       "path": "docs/brain/Decisions/Decision 9 - Generation Quality Becomes a Measured Track.md"
-    },
-    {
-      "id": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md",
-      "type": "decision",
-      "title": "Decision #9 — Lanes Push at Checkpoints, Not at Every Commit (2026-09-18)",
-      "path": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md"
     },
     {
       "id": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
@@ -685,6 +817,12 @@
       "path": "docs/brain/Sessions/Session - 2026-09-13 CI Green and the Story Track.md"
     },
     {
+      "id": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md",
+      "type": "session",
+      "title": "Session — 2026-09-18: Node 24, the Container Path, the Healthcheck, and the Docs Fast Path",
+      "path": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md"
+    },
+    {
       "id": "docs/brain/Surfaces/Surface - Collab Room.md",
       "type": "surface",
       "title": "Surface — Collab Room",
@@ -1128,11 +1266,11 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
-      "to": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md"
+      "to": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md"
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
-      "to": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md"
+      "to": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md"
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
@@ -1156,7 +1294,7 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md",
-      "to": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md"
+      "to": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md"
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 Edge Image.md",
@@ -1216,6 +1354,438 @@
     },
     {
       "from": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Contract.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md",
+      "to": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md",
+      "to": "docs/brain/Decisions/Decision 7 - Per-Analysis Wall-Clock Budget.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Doctor Pool Fallback.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md",
+      "to": "docs/brain/Decisions/Decision 8 - Necessity Certificate is Form-Checked Never Judged.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md",
+      "to": "docs/brain/Generation/Generation - Story Bench.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Generator Honesty.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 Story Bench Lane.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Generator Honesty.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Generator Honesty.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Receipt Gate Inplace.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Receipt Gate Inplace.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "to": "docs/brain/Generation/Generation - Story Bench.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "to": "docs/brain/Generation/Generation - Story Bench.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Converge Stream Close.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "to": "docs/brain/Generation/Generation - Story Bench.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-19 TypeSafe Cast Alignment.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Approved Spans Schema.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Approved Spans Schema.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Approved Spans Schema.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Burrows Delta Hoist.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Cast Grounding.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Burrows Delta Hoist.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B1 B2.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B3.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B1 B2.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Dead Weight B3.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Forced Cue.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Renderer Residuals.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Advice Rule Fixes.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Stacked R5 plus Advice.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Saturation Only.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Adversarial 2026-09-12.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Forced Cue.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Branches/Branch - Renderer Residuals.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Parked Branches.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Generation Prompt Inputs.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Receipt Gate Inplace.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Claims Register Lane.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Output-Identity Harness.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Harness Honesty.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-12 Adversarial Review.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Public Benchmark.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Output-Identity Harness.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Fountain Shape Guard.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Measurements/Measurement - PUBLIC_BENCHMARK_2026-09-06.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Glossary.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-20 Scene Grammar.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Codex Review 268.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Codex Review 268.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Codex Review 268.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Locked Spans.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Codex Review 268.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
+      "to": "docs/brain/Glossary.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
+      "to": "docs/brain/Branches/Branch - Feature-Length Defects.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Craft Formula Leaf.md",
+      "to": "docs/brain/Patterns.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-20 Burrows Delta Hoist.md"
+    },
+    {
+      "from": "docs/brain/Audits/Audit - 2026-09-21 Prod Loader Guard.md",
       "to": "docs/brain/Patterns.md"
     },
     {
@@ -1391,6 +1961,46 @@
       "to": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md"
     },
     {
+      "from": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md",
+      "to": "docs/brain/Decisions/Decision 9 - Generation Quality Becomes a Measured Track.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md",
+      "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "to": "docs/brain/Owner/Owner - Lock AUC24 Table.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "to": "docs/brain/Owner/Owner - Lock AUC24 Table.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md",
+      "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
       "from": "docs/brain/Decisions/Decision 2 - Retire the P0 Hard-Gate.md",
       "to": "docs/brain/Decisions/Decision 1 - User Validation First.md"
     },
@@ -1413,6 +2023,10 @@
     {
       "from": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md",
       "to": "docs/brain/Gates/Gate - AUC-24 Ratchet.md"
+    },
+    {
+      "from": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md",
+      "to": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md"
     },
     {
       "from": "docs/brain/Decisions/Decision 6 - License the Repository.md",
@@ -1447,18 +2061,6 @@
       "to": "docs/brain/Generation/Generation - Story Bench.md"
     },
     {
-      "from": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md",
-      "to": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md"
-    },
-    {
-      "from": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md",
-      "to": "docs/brain/Audits/Audit - 2026-09-13 CI Green.md"
-    },
-    {
-      "from": "docs/brain/Decisions/Decision 9 - Lanes Push at Checkpoints.md",
-      "to": "docs/brain/Decisions/Decision 5 - Every Reported Unverified Gate Gets an Expiry.md"
-    },
-    {
       "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
       "to": "docs/brain/Branches/Branch - R5 Verbosity Bias.md"
     },
@@ -1473,6 +2075,10 @@
     {
       "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
       "to": "docs/brain/Gates/Gate - Receipt Gate.md"
+    },
+    {
+      "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
+      "to": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md"
     },
     {
       "from": "docs/brain/Gates/Gate - AUC-24 Ratchet.md",
@@ -1649,6 +2255,10 @@
     {
       "from": "docs/brain/Generation/Generation - Story Bench.md",
       "to": "docs/brain/Decisions/Decision 3 - Demote Generative Surface to Labs.md"
+    },
+    {
+      "from": "docs/brain/Generation/Generation - Story Bench.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-19 Revise Deadline.md"
     },
     {
       "from": "docs/brain/Generation/Generation - Story Bench.md",
@@ -2152,6 +2762,10 @@
     },
     {
       "from": "docs/brain/Owner/Owner - Lock AUC24 Table.md",
+      "to": "docs/brain/Decisions/Decision 11 - Move the AUC-24 Table Deadline.md"
+    },
+    {
+      "from": "docs/brain/Owner/Owner - Lock AUC24 Table.md",
       "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
     },
     {
@@ -2609,6 +3223,26 @@
     {
       "from": "docs/brain/Sessions/Session - 2026-09-13 CI Green and the Story Track.md",
       "to": "docs/brain/Owner/Owner - R5 Measurement and Merge.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 Node 24.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 Edge Image.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 Healthcheck IPv4.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md",
+      "to": "docs/brain/Decisions/Decision 10 - Lanes Push at Checkpoints.md"
+    },
+    {
+      "from": "docs/brain/Sessions/Session - 2026-09-18 Node 24 Container Path Healthcheck Docs Fast Path.md",
+      "to": "docs/brain/Audits/Audit - 2026-09-18 CI Docs Fast Path.md"
     },
     {
       "from": "docs/brain/Surfaces/Surface - Coverage HTML.md",

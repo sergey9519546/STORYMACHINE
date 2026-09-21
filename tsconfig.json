@@ -24,39 +24,38 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  // QUARANTINE (non-destructive): the v5.0 "narrative OS" experimental
-  // subsystem merged in feat(audit)/cbf56a4 never compiled (241 tsc errors
-  // pre-quarantine). None of this is wired into the running server
-  // (routes/app/server.ts) except the small live closure reachable from
-  // server/engine/Stage.ts, which is fixed in place, not excluded. Everything
-  // below stays in the repo untouched — re-include piecemeal as each area is
-  // finished. See CLAUDE.md "Standing task" for why: the wave-generated rule
-  // catalog and this WIP research surface are both explicitly deprioritized
-  // behind demand-first validation (ROADMAP P0-P2).
+  // QUARANTINE (what is left of it). The v5.0 "narrative OS" experimental
+  // subsystem that this list used to quarantine — server/nvm/quantum,
+  // server/nvm/research, server/planning, server/nvm/infinity-gate, the dead
+  // server/nvm/kernel files, server/nvm/live/v5-loop.ts and their never-run
+  // tests — was REMOVED on 2026-09-20 under the owner's decision on Proposal
+  // B2 of docs/proposals/DEAD_WEIGHT_REMOVAL_2026-08-24.md (audit:
+  // docs/audits/2026-09-20-dead-weight-b1-b2/README.md; recoverable from git
+  // history at bf4f3bff). Its exclude entries went with it, because
+  // scripts/check-no-console.mjs derives its exemption set from this array and
+  // rejects an entry naming a file that no longer exists.
+  //
+  // The live closure inside server/nvm/kernel/ — event-store.ts, types.ts and
+  // adapters/commit-to-events.ts, all reachable from server/engine/Stage.ts —
+  // was never excluded and is untouched.
+  //
+  // Only two real quarantine entries remain, each with its own reason:
+  //   - **/*.bench.ts          benchmarks are not part of the type-checked app.
+  //   - tests/story-vector.test.ts
+  //                            intentionally emptied by the 2026-08-03 audit
+  //                            fix; its assertions live in the suites that run.
+  //
+  // server/nvm/kernel/event-store.test.ts used to be listed here too: it RAN
+  // (scripts/run-tests.mjs TEST_FILES, 32 passing assertions over the live
+  // event store) but did not type-check, because its fixtures had drifted
+  // from AtomicFact/EmotionState/StoryOp. That gap is closed (2026-09-20;
+  // docs/audits/2026-09-20-dead-weight-b1-b2/README.md, "event-store.test.ts
+  // now type-checks") — the fixtures were fixed, not the entry deleted for
+  // any other reason, and the file is no longer excluded.
   "exclude": [
     "node_modules",
     "dist",
-    "server/nvm/quantum",
-    "server/nvm/research",
-    "server/nvm/infinity-gate",
-    "server/planning",
     "**/*.bench.ts",
-    "server/nvm/kernel/adapters/type-enrichment.ts",
-    "server/nvm/kernel/adapters/type-enrichment.test.ts",
-    "server/nvm/kernel/adapters/index.ts",
-    "server/nvm/kernel/v5-examples.ts",
-    "server/nvm/kernel/adapters.ts",
-    "server/nvm/kernel/__tests__",
-    "server/nvm/kernel/event-store.test.ts",
-    "server/nvm/kernel/index.ts",
-    "server/nvm/kernel/integration.ts",
-    "server/nvm/kernel/trinity-gate.ts",
-    "server/nvm/kernel/trinity-gate-example.ts",
-    "server/nvm/kernel/trinity-gate-demo.ts",
-    "server/nvm/kernel/verifiers",
-    "server/nvm/live/v5-loop.ts",
-    "server/nvm/__tests__",
-    "tests/apdl.test.ts",
     "tests/story-vector.test.ts"
   ]
 }

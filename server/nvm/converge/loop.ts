@@ -21,6 +21,7 @@ import type { GhostReason } from '../repro/ghost-ledger.ts';
 import type { WritersRoomResult, Critique } from '../room/room.ts';
 import type { DirectorPolicy } from '../selfplay/mine.ts';
 import { runTier1, tier1Passes, runTier2, runTier3, tier3Rank, failedProofs } from '../proof/kernel.ts';
+import type { IntentionalGroundingOptions } from '../proof/tier1/intentional.ts';
 import { deriveTensionLedger } from '../valuation/futures.ts';
 import { runQualityEngine } from '../quality/index.ts';
 import { runWritersRoom } from '../room/room.ts';
@@ -32,6 +33,7 @@ import { applyStoryOps } from '../ops/dispatcher.ts';
 import { queryPolicy } from '../selfplay/mine.ts';
 import { computeTopology } from '../valuation/topology.ts';
 import { makePrng, randInt } from '../repro/seed.ts';
+import { alignCandidateCast, type CastAlignment } from './cast-alignment.ts';
 
 // Pick an operator not yet tried in this convergence session; if all have been tried, pick randomly.
 function pickUntried(
@@ -59,6 +61,25 @@ export interface ConvergeStep {
   ghostReason?: GhostReason;
   /** Abridged writers' room transcript for this candidate. */
   writersRoomSummary?: string;
+  /**
+   * The cast-alignment step's own record for this candidate
+   * (server/nvm/converge/cast-alignment.ts), attached beside `tier1Results`
+   * because the two are read together: alignment is what the proof saw BEFORE
+   * it ran.
+   *
+   * PRESENT WHENEVER THE FEATURE RAN — including, deliberately, when it failed
+   * (`applied: false` with a reason and a redacted error). A step that reached
+   * Tier 1 through a silently-skipped alignment is exactly the shape of failure
+   * this repository keeps finding (STORY_BENCH §1), so the record is not
+   * conditional on success.
+   *
+   * ABSENT when TYPESAFE_CAST_ALIGNMENT is unset — the feature's default. That
+   * keeps this loop's output byte-identical to what it was before the feature
+   * existed on every deployment that has not opted in; the disabled case is a
+   * configuration state, not an event worth recording on 3 candidates × 8
+   * iterations of every converge.
+   */
+  castAlignment?: CastAlignment;
 }
 
 // Deliverable 1 (close the generate→audit→select loop): previously every
@@ -145,6 +166,16 @@ export interface ConvergeResult {
    * this candidate's ops and re-proves them against current session state.
    */
   winner: ConvergeWinner | null;
+  /**
+   * C11 fix (2026-09-19 converge-contract lane): true iff at least one
+   * candidate this run ever passed Tier 1 — equivalently, `winner !== null`.
+   * Exists as its own field (rather than making callers infer it from
+   * `winner`) so a consumer that reads `ir` for diagnostics — which is ALWAYS
+   * populated, winner or not — has an explicit, unambiguous signal for "this
+   * is a rejected/synthesized candidate, not a Tier-1-passing one" without
+   * re-deriving it from `winner === null`.
+   */
+  tier1Passed: boolean;
 }
 
 export interface ConvergeBudget {
@@ -259,6 +290,38 @@ export async function convergeScene(
       systemPreamble,
     };
 
+    // ── Cast grounding (2026-09-19) ──────────────────────────────────────────
+    // What IntentionalProof is allowed to treat as an existing character. When
+    // the caller supplied `target.cast`, the proof stops letting a candidate
+    // ground its own invented names (server/nvm/proof/tier1/intentional.ts) and
+    // the cast is the ground truth instead.
+    //
+    // `allowIntroduce` keeps the G9 inversion legal in the one case that could
+    // otherwise contradict itself: if the spec this candidate was generated
+    // against TOLD it to introduce a character, the proof must not then block
+    // it for doing so. It is derived from THIS iteration's constraint list, not
+    // from a second list, so the instruction and the proof cannot drift.
+    //
+    // Note what it is worth today: with a cast supplied, proofsToConstraints no
+    // longer emits `must_introduce_character` at all (it emits the act-through-
+    // the-cast constraint instead), and no other constraint source in the loop
+    // emits that kind — so this list is empty on every iteration of the current
+    // pipeline. It is wired from the spec rather than hardcoded to `[]` because
+    // the proof's allowance and the spec's instruction are the same fact, and
+    // the lane that adds a second constraint source should not have to discover
+    // that they were only accidentally in agreement.
+    //
+    // `undefined` when the caller named no cast: runTier1 then behaves exactly
+    // as it did before this lane existed.
+    const grounding: IntentionalGroundingOptions | undefined = target.cast === undefined
+      ? undefined
+      : {
+          cast: target.cast,
+          allowIntroduce: specConstraints
+            .filter(c => c.kind === 'must_introduce_character' && typeof c.detail === 'string' && c.detail.length > 0)
+            .map(c => c.detail as string),
+        };
+
     let candidates: NarrativeTransitionIR[];
     // G2→G1: Writers' Room drives mutation operator selection after iteration 0.
     // G13→G1: Director Policy (from corpus) biases operator when room has no consensus.
@@ -310,9 +373,33 @@ export async function convergeScene(
     }> = [];
 
     for (let ci = 0; ci < candidates.length; ci++) {
-      const candidate = candidates[ci];
+      let candidate = candidates[ci];
       const candidateId = `c${iter}-${ci}`;
-      const tier1Results = runTier1(candidate, state);
+      // Cast alignment (2026-09-19) — OFF unless TYPESAFE_CAST_ALIGNMENT=1, in
+      // which case model-invented character names are resolved to the cast
+      // already in `state` before the proof reads them. It sits HERE, and not
+      // inside the generator, because this is the last point at which the
+      // candidate is still just an IR and the first at which the thing that
+      // would reject it (runTier1, immediately below) is about to look. It
+      // never throws and returns the same object when it changes nothing, so
+      // with the flag off the next line sees exactly what it always saw.
+      // The loop carries no AbortSignal of its own (the route's budget races
+      // the whole operation instead — server/routes/nvm/converge.ts), so none
+      // is forwarded; the adapter's own 10 s timeout is the deadline.
+      // `grounding` is the SAME object handed to runTier1 on the next line, so
+      // the set alignment offers as options is the set the proof accepts.
+      const castAlignmentOutcome = await alignCandidateCast(candidate, state, { target, grounding });
+      candidate = castAlignmentOutcome.ir;
+      // Write the aligned IR back into the array (2026-09-21, PR #268 review
+      // finding F1). `lastCandidates` aliases `candidates`, and the
+      // budget-exhausted path below returns `lastCandidates[last]` when
+      // nothing passed Tier 1 — so an aligned candidate that still failed a
+      // DIFFERENT proof used to leave the loop with its invented names
+      // restored, while every step and record said they had been aligned,
+      // and /api/nvm/converge-arc applied those ids to rollingState. With the
+      // flag off `ir` is the same object reference, so this is a no-op there.
+      candidates[ci] = candidate;
+      const tier1Results = runTier1(candidate, state, grounding);
       const passed = tier1Passes(tier1Results);
       // Apply candidate ops to get post-transition state before valuing — otherwise
       // every candidate in an iteration gets the identical pre-transition tension score,
@@ -376,6 +463,9 @@ export async function convergeScene(
         writersRoomSummary: roomResult
           ? `dominant=${roomResult.dominantCritic} op=${roomResult.suggestedOperator ?? 'none'} consensus=${roomResult.consensus}`
           : undefined,
+        castAlignment: castAlignmentOutcome.alignment.reason === 'disabled'
+          ? undefined
+          : castAlignmentOutcome.alignment,
       };
       history.push(step);
       budget.onStep?.(step);
@@ -450,13 +540,17 @@ export async function convergeScene(
           tension: winner.valuation,
           quality: winner.quality,
         },
+        // convergedThisIter only ever holds candidates that passed Tier 1
+        // (buffered above under `if (passed && tensionMet && qualityMet)`),
+        // so reaching this branch at all means Tier 1 was passed.
+        tier1Passed: true,
       };
     }
 
     if (best) {
       // Merge Tier 1 + Tier 2 failures so the next GenerationSpec includes
       // both hard-block fixes and quality-gate guidance.
-      const t1Failures = failedProofs(runTier1(best, state));
+      const t1Failures = failedProofs(runTier1(best, state, grounding));
       const t2Failures = failedProofs(runTier2(best, state));
       currentFailures = [...t1Failures, ...t2Failures];
       // Quality-aware (Wave 27): capture quality warnings from best candidate
@@ -472,7 +566,11 @@ export async function convergeScene(
   // callers can detect low-craft fallbacks.
   // lastCandidates[-1] would be undefined when the array is empty, so guard the index.
   let finalIR = best ?? (lastCandidates.length > 0 ? lastCandidates[lastCandidates.length - 1] : null);
-  if (!finalIR && llmCallCount <= llmCallLimit) {
+  // C11 fix: was `<=`, which let this fallback fire even after llmCallCount had
+  // already reached llmCallLimit inside the main loop above (i.e. it spent a
+  // (maxLLMCalls + 1)th generation). `<` means this only spends a generation
+  // when the main loop actually left budget unused.
+  if (!finalIR && llmCallCount < llmCallLimit) {
     llmCallCount++;
     const fallback = await generate(buildGenerationSpec(state, target), 1);
     finalIR = fallback[0] ?? null;
@@ -489,11 +587,26 @@ export async function convergeScene(
       ops: [],
       preconditions: [],
       postconditions: [],
-      provenance: { origin: 'model_generated', createdAt: Date.now() },
+      // C11 fix: `model: 'stub'` matches llm-generator.ts's stubIR() convention
+      // (grepped: server/nvm/generate/llm-generator.ts's stubIR() and
+      // `stubbedFromLLM` check both key off `provenance.model === 'stub'`) so a
+      // consumer that already filters stub-vs-real output by that field catches
+      // this synthesized, never-proof-passed IR too, instead of it reading as
+      // ordinary model output because `origin` says 'model_generated'.
+      provenance: { origin: 'model_generated', createdAt: Date.now(), model: 'stub' },
     } as unknown as NarrativeTransitionIR;
   }
   const finalLedger = deriveTensionLedger(applyStoryOps(state, finalIR.ops), target.sceneIdx);
   const finalQReport = runQualityEngine(finalIR, state);
+  // C11 fix: previously this was `bestComposite` (or 0 when nothing passed
+  // Tier 1) — describing `best`, not `finalIR`, whenever the two diverged
+  // (finalIR falls back to the last-evaluated candidate, or the synthesized
+  // stub, exactly when best is null). Recomputing from `finalIR` with the
+  // loop's own composite formula means finalComposite/finalValuation/
+  // finalQuality always describe the SAME ir — the one this function returns.
+  const finalTensionNorm = normalizeTension(finalLedger.totalTension, target.tensionTarget);
+  const rawFinalComposite = 0.6 * finalTensionNorm + 0.4 * finalQReport.score;
+  const finalComposite = isFinite(rawFinalComposite) ? rawFinalComposite : 0;
   const safeBestComposite = (!isFinite(bestComposite) || isNaN(bestComposite)) ? 0 : bestComposite;
 
   // Deliverable 1: the budget-exhausted path's "winner" is exactly the argmax the
@@ -512,12 +625,14 @@ export async function convergeScene(
     converged: false,
     finalValuation: finalLedger.totalTension,
     finalQuality: finalQReport.score,
-    finalComposite: safeBestComposite,
+    finalComposite,
     ghosts,
     candidates: candidateRecords,
     roomTranscript: lastRoomResult?.critiques,
     winner: (bestCandidateId && best)
       ? { candidateId: bestCandidateId, ir: best, composite: safeBestComposite, tension: bestValuation, quality: bestQualityScore }
       : null,
+    // See ConvergeResult.tier1Passed's doc — equivalent to `winner !== null` here.
+    tier1Passed: bestCandidateId !== null,
   };
 }

@@ -92,6 +92,33 @@ function pinBaseline(repo: string, sha: string): string {
 
 const REPORT_BRANCH = 'scoring/fixture-report';
 
+/** The one scoring-path file every fixture branch edits, and the line it edits. */
+const CRAFT_FORMULA = 'server/nvm/analyze/craft-formula.ts';
+const SCARCITY_LINE = 'const SCARCITY_SCALE = 140;';
+
+/** A REAL one-line scoring change, not a comment (round-1 review §4c): the
+ *  scarcity scale moves every script's health, so a fixture branch's AUC-24
+ *  differs from the baseline's and the manifest re-lock actually moves fields.
+ *  A comment-only touch made both numbers identical and printed "0 field(s)
+ *  moved", which exercised neither path.
+ *
+ *  This is a SOURCE-TEXT patch, not an import, so a grep for importers will
+ *  not find it when the formula moves: `SCARCITY_SCALE` lived in doctor.ts
+ *  until merge 846b8bf7 (2026-09-21) moved the craft formula into
+ *  craft-formula.ts, an import-free leaf that doctor.ts imports, and this test
+ *  kept patching doctor.ts until the assertion below cancelled every subtest.
+ *  The leaf is in doctor.ts's reachable set, so `check-scoring-receipt`
+ *  classifies it scoring-path (tier 2) — which is what makes the edit exercise
+ *  the gate this test is about. If the constant moves again, repoint
+ *  CRAFT_FORMULA and re-confirm reachability with
+ *  scripts/lib/import-graph.mjs's computeReachableSet from doctor.ts. */
+function bumpScarcityScale(tree: string, to: number): void {
+  const file = path.join(tree, CRAFT_FORMULA);
+  const src = readFileSync(file, 'utf8');
+  assert.ok(src.includes(SCARCITY_LINE), `the fixture needs \`${SCARCITY_LINE}\` to still exist in ${CRAFT_FORMULA}`);
+  writeFileSync(file, src.replace(SCARCITY_LINE, `const SCARCITY_SCALE = ${to};`), 'utf8');
+}
+
 /** A corpus-shape probe the fixture branch carries and its BASE does not — the
  *  shape of the real thing (`scripts/probe-corpus-shape.ts` exists on the three
  *  adversarial-stack branches and on neither `main` nor
@@ -173,15 +200,7 @@ describe('owner:measure end to end, on the committed public corpus', () => {
     // the branch the run commits to (which the pre-flight refuses).
     const build = path.join(tmp, 'build');
     git(clone, ['worktree', 'add', '--quiet', '-b', FIXTURE_BRANCH, build, baseSha]);
-    const doctor = path.join(build, 'server/nvm/analyze/doctor.ts');
-    // A REAL one-line scoring change, not a comment (round-1 review §4c): the
-    // scarcity scale moves every script's health, so the branch's AUC-24
-    // differs from the baseline's and the manifest re-lock actually moves
-    // fields. A comment-only touch made both numbers identical and printed
-    // "0 field(s) moved", which exercised neither path.
-    const doctorSrc = readFileSync(doctor, 'utf8');
-    assert.ok(doctorSrc.includes('const SCARCITY_SCALE = 140;'), 'the fixture needs this constant to still exist');
-    writeFileSync(doctor, doctorSrc.replace('const SCARCITY_SCALE = 140;', 'const SCARCITY_SCALE = 152;'), 'utf8');
+    bumpScarcityScale(build, 152);
     writeFileSync(path.join(build, 'scripts/probe-corpus-shape.ts'), FIXTURE_PROBE, 'utf8');
     const receipt = path.join(build, 'docs/p1-benchmark/MEASUREMENT_RECEIPTS.md');
     writeFileSync(receipt, readFileSync(receipt, 'utf8') + pendingEntry(), 'utf8');
@@ -195,8 +214,7 @@ describe('owner:measure end to end, on the committed public corpus', () => {
     // never accepted (round-1 review, F3).
     const build2 = path.join(tmp, 'build-report');
     git(clone, ['worktree', 'add', '--quiet', '-b', REPORT_BRANCH, build2, baseSha]);
-    const doctor2 = path.join(build2, 'server/nvm/analyze/doctor.ts');
-    writeFileSync(doctor2, readFileSync(doctor2, 'utf8').replace('const SCARCITY_SCALE = 140;', 'const SCARCITY_SCALE = 133;'), 'utf8');
+    bumpScarcityScale(build2, 133);
     const receipt2 = path.join(build2, 'docs/p1-benchmark/MEASUREMENT_RECEIPTS.md');
     writeFileSync(receipt2, readFileSync(receipt2, 'utf8')
       + pendingEntry().replace(/FIXTURE E2E/g, 'FIXTURE REPORT').replace(/scoring\/fixture-e2e/g, REPORT_BRANCH), 'utf8');
@@ -516,8 +534,7 @@ describe('a REJECTED step: nothing re-locked, the table locked on the baseline',
     const build = path.join(dir, 'build');
     const branch = 'scoring/fixture-reject';
     git(repo, ['worktree', 'add', '--quiet', '-b', branch, build, base]);
-    const doctor = path.join(build, 'server/nvm/analyze/doctor.ts');
-    writeFileSync(doctor, readFileSync(doctor, 'utf8').replace('const SCARCITY_SCALE = 140;', 'const SCARCITY_SCALE = 161;'), 'utf8');
+    bumpScarcityScale(build, 161);
     const receipt = path.join(build, 'docs/p1-benchmark/MEASUREMENT_RECEIPTS.md');
     writeFileSync(receipt, readFileSync(receipt, 'utf8') + pendingEntry().replace(/FIXTURE E2E/g, 'FIXTURE REJECT'), 'utf8');
     git(repo, ['-C', build, 'add', '-A']);

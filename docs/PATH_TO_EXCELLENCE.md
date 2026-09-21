@@ -1,6 +1,16 @@
 # Path to Excellence — from working checkout to better-than-the-best
 
-**State as of 2026-09-13, main @ 16b669f6 (ten session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
+**Validity read, current as of 2026-09-20, `main` @ `26d930dd`.** The
+blind-pair harness orders **1 of 6** pairs (mean gap -0.0167); the public
+benchmark's matched-pair AUCs are **0.5313** (shuffle-drop) and **0.4063**
+(climax-relocate), both intervals containing 0.5; dialogue-flatten (the
+positive control) reads 1.0000. Where "The scoring branch" bullet below
+narrates a branch reading "one of six to four of six," that describes the
+unmerged `scoring/feature-length-defects` branch's own measurement, not
+`main`'s current state — see `docs/CLAIMS_REGISTER.md` row 121 and
+CLAUDE.md's Standing task section.
+
+**State as of 2026-09-19, main @ 28754489 (eleven session records below); as of 2026-08-24, main @ 092a601d: Phases W and E are COMPLETE,
 Phase S's code lanes are DONE, and Phase P's evidence lanes have reported**
 — all six W lanes, all five E lanes, the judged E exit gate (met after one
 honest NOT-MET round), S1–S3, the first release (`1.0.0-rc.1`, Docker image
@@ -34,6 +44,118 @@ Product-surface verification was covered by the orchestrator's own full
 browser battery on this tip (smoke PASS, focus-traps 14/14, surfaces 115/115,
 ui-polish 19/19, command-palette 17/17, local-safety-net 8/8) after that
 agent hit its session limit. The written record is trustworthy as-is.
+
+**2026-09-18 — Node 24, the container path, the healthcheck, and the docs-only fast
+path.** Four audited lanes, plus four merged PRs. `lane/node-24` moved `setup-node`
+and all three Dockerfile stages from 22 to 24 LTS, matching the owner's move off
+Node 25.2.1 (past end of life) to 24.21.0 LTS
+(`docs/audits/2026-09-18-node-24/README.md`). `lane/edge-image-real` found
+`edge.yml`'s Docker image had never once built since the 2026-09-13 account-block
+lift — three real runs, three failures, `better-sqlite3`'s `node-gyp rebuild`
+missing Python in the build image (`docs/audits/2026-09-18-edge-image/README.md`).
+`lane/healthcheck-ipv4` found the container `HEALTHCHECK` reporting `unhealthy` on
+every probe — `server.ts` binds `0.0.0.0` only and busybox `wget` resolves
+`localhost` to `::1` first — plus a non-default `PORT` breaking compose; both fixed
+(`docs/audits/2026-09-18-healthcheck-ipv4/README.md`). `lane/ci-docs-fast-path`
+measured a markdown-only push running the full `test` + `browser` CI pair, rejected
+a blanket `paths-ignore` (`honesty-audit`/`check-brain` read parts of `docs/**`),
+and added classify jobs instead
+(`docs/audits/2026-09-18-ci-docs-fast-path/README.md`) — also where [[Decision 10 -
+Lanes Push at Checkpoints]] was decided. Four more merged PRs fixed Windows
+portability and a feature-length regression: #261 (long-path-safe `npm test`), #262
+(OS-independent brain graph), #263 (Windows test-suite fixes, owner-measure-e2e on
+PRs), #267 (tab-stop split).
+
+Later, 2026-09-19: the ranked findings in `SESSION_REPORT_2026-09-19.md` §4 were
+substantially closed by lanes that ran later the same day — rows 1, 2, 4, 9, 11,
+12, 13, 14, 15, 17 and 19 fixed and lane-recorded under `docs/audits/2026-09-19-*/`
+(themeHint/approvedSpans prompt inputs, locked spans, revise-route budget,
+generator honesty, harness honesty, doctor-pool fallback, converge contract, and
+the receipt gate's in-place-rewrite blind spot), plus a chore removing 17 tracked
+`.pyc` files. One integration regression surfaced in the independent full-suite
+verification that followed the merges — a claims-register line-anchor drifted six
+lines when the generator-honesty edit landed — and was fixed by re-anchoring it.
+Final head `8933fb0a`, `RUN_E2E=1 npm test`: 14,469 tests, 0 failures, 98 skipped
+(env-gated). Rows 3, 5, 6, 7, 8, 10, 16 and 18 remain open; see
+`SESSION_REPORT_2026-09-19.md` §7 for the row-by-row mapping and commits.
+A later review round the same day closed row 10 (`IntentionalProof` now
+grounds against an optional caller-supplied cast instead of the candidate
+IR) and fixed four of ten findings from an adversarial read-only review of
+the six merged lanes — a receipt-gate regression, a generator parse-error
+path, two locked-span edge cases, and two doctor-pool low-severity issues —
+plus re-anchored the claims register a second time after the same anchor
+drift recurred; see `SESSION_REPORT_2026-09-19.md` §7.1. Final head
+`0edb6df2`, `RUN_E2E=1 npm test`: 14,512 tests, 0 failures, 98 skipped
+(env-gated), 1 todo. A fourth pass on 2026-09-20 landed the `burrowsDelta`
+corpus-statistics hoist (`04fb13cc`) bit-identically, 43x to 51x faster on
+the worst admitted shapes. The feature-length candidate on
+`lane/land-feature-length-defects` (tip `ca5f2e85`) closed three of its four
+failing tests in a second pass and is now one method blocker — a
+GitHub Actions runner re-derivation of the voice-weight bound, which the
+lane could not fabricate — away from green. The runner derivation then
+ran (run 35542413222), and the feature-length candidate now has zero
+failing tests, awaiting only the owner's real-corpus AUC-24. The
+candidate's own review (`SESSION_REPORT_2026-09-19.md` §13) found the
+0.8750 public-benchmark figure is mostly the twelve blind-pair fixtures
+un-pinning as a bloc, with the 20 independent screenplays alone moving
+0.70 → 0.80, no measured benefit at feature length, and an 88.3 health
+ceiling above 12 scenes; all of this is now disclosed on the branch. The
+merge remains the owner's decision after the real-corpus run. A 2026-09-21
+sweep measured the saturation constant's trade on the candidate: the
+padding-resistance witness (`stapled_shorts`) passes only at a saturation
+point of 13 or below, the top grade (`excellent`) is reachable only at 14
+or above, and no setting gives both — the owner's call alongside the merge
+(`SESSION_REPORT_2026-09-19.md` §14). The candidate branch had in fact been
+red in CI on every push while §12 called it green — no lane's brief on the
+branch had included the full `npm test`. At `ea27b3cc` it passes an
+independent full suite with zero failures, with adversarial finding #5's
+fixture-driven reproduction moved to a builder-made variant fixture
+(`SESSION_REPORT_2026-09-19.md` §15). The candidate carried a
+production-only defect since `c5c18f96`: the calibration layer emptied
+under the production loader, so every production doctor report shipped
+without `healthPercentile` or any dimension `percentile`; CI's
+dev-vs-prod check caught it on 2026-09-21, and it was fixed at
+`f1843253`. Main's lineage did not have the defect but shared its two
+structural weaknesses; it now tests the production loader and logs the
+calibration fallback instead of swallowing it silently (`284ba5de`), and
+the voice cost-rate constant is re-fitted from the GitHub Actions
+runner's own measurement of its own shape rather than a stale
+developer-box figure (`SESSION_REPORT_2026-09-19.md` §16). The craft
+formula now lives in a leaf module (`846b8bf7`, byte-identical), so the
+doctor↔reference cycle no longer runs it; the move broke one source-text
+test fixture, fixed at `b9a1c60b`, and the shifted line citations were
+repointed at `23879294` (`SESSION_REPORT_2026-09-19.md` §17). PR #268
+carries the session's work to `main`, its four automated-review findings
+were each reproduced and fixed (`15daf904`), and its one red check is a
+repository setting, Dependency graph, not a code change
+(`SESSION_REPORT_2026-09-19.md` §18).
+
+2026-09-20 closed the remaining §4 rows under owner authorization: row 3
+(per-pass diagnostics), rows 5 and 6 (the unified scene-heading grammar),
+row 7 (the AUC-24 table gate deadline moved to 2026-11-01, Decision #11),
+row 8 (all 17 parked branches triaged), row 16 (the blind-pair number and
+the two public-benchmark intervals now lead README, NORTH_STAR, ROADMAP and
+ARCHITECTURE), and row 18 (dead-weight proposal B3 removed). See
+`SESSION_REPORT_2026-09-19.md` §8 for the commit table. Final head
+`1db74c21`, full suite: 14,561 tests, 0 failures, 98 skipped. The owner
+still needs to run `measure-real` and `lock-auc24` on the corpus and commit
+`tests/fixtures/auc24-table.json` before 2026-11-01 — no real-corpus figure
+has been claimed for the new grammar. A second pass on 2026-09-20 decided
+three of the owner's remaining items: Unicode forced scene headings are now
+recognized, proposal B2 (the v5.0 closure) was removed, and the receipt
+gate's Command-label pattern was widened in lockstep with its simulation-
+language scan (`SESSION_REPORT_2026-09-19.md` §9). `scoring/advice-rule-
+fixes` is landed on `lane/land-advice-rule-fixes` but not merged into main:
+the landing is gate-clean, but it lowers the public benchmark's primary
+shuffle-drop floor below its prior value, so the merge is held pending the
+owner's real-corpus AUC-24 run on that branch. A third pass the same day
+fixed one BLOCKER and two HIGH findings from an adversarial review of that
+day's code (a re-diagnosis bug that zeroed clock pressure across passes 2-14,
+a receipt-gate scan that could miss a wrapped Command label, and an
+unbounded approved-span prompt block). `scoring/feature-length-defects` was
+also prepared for measurement and now measures 0.8750 shuffle-drop
+(matched-pair) and 4 of 6 blind pairs on `lane/land-feature-length-defects`,
+held for the same owner real-corpus run.
 
 **2026-09-13 — CI green, and the story track begins: four defects only
 the runner could show, the owner's run as one command, and generation

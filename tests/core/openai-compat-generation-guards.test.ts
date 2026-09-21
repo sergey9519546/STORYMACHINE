@@ -388,7 +388,7 @@ describe('generative call sites use the configured provider, not the Gemini cons
   });
 
   it('the NVM candidate generator calls the wired provider', async () => {
-    const { makeLLMCandidateGenerator } = await import('../../server/nvm/generate/llm-generator.ts');
+    const { makeLLMCandidateGenerator, isStubIR } = await import('../../server/nvm/generate/llm-generator.ts');
 
     let calls = 0;
     const payload = JSON.stringify({
@@ -422,15 +422,15 @@ describe('generative call sites use the configured provider, not the Gemini cons
     const irs = await generate(spec, 1);
     assert.equal(calls, 1, 'the wired provider must be the one that is called');
     assert.equal(irs.length, 1);
-    assert.notEqual(
-      irs[0].provenance.model, 'stub',
+    assert.equal(
+      isStubIR(irs[0]), false,
       'a provider that answered must not be reported as a structural stub — that is the silent fallback this regression is about',
     );
     assert.equal(irs[0].ops.length, 2);
   });
 
   it('still falls back to the documented stub when no provider can answer', async () => {
-    const { makeLLMCandidateGenerator } = await import('../../server/nvm/generate/llm-generator.ts');
+    const { makeLLMCandidateGenerator, isStubIR } = await import('../../server/nvm/generate/llm-generator.ts');
     setLLMProvider({ generate: async () => { throw new Error('no provider'); } });
     const generate = makeLLMCandidateGenerator();
     const spec = {
@@ -441,7 +441,7 @@ describe('generative call sites use the configured provider, not the Gemini cons
     } as unknown as Parameters<typeof generate>[0];
     const irs = await generate(spec, 2);
     assert.equal(irs.length, 2);
-    assert.ok(irs.every((ir) => ir.provenance.model === 'stub'), 'the keyless fallback must be unchanged');
+    assert.ok(irs.every(isStubIR), 'the keyless fallback must be unchanged');
   });
 
   // ── The provider POLICY for these two surfaces (round 2, review MEDIUM 5) ──

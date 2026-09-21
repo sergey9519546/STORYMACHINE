@@ -88,10 +88,18 @@ describe('routes/config — GET /ready and /health.doctorPool', () => {
     // rather than passing unnoticed. Zero here because this server has not
     // analysed anything yet — which is itself the assertion that the
     // counters start at a known point and are not fabricated.
+    // Lane doctor-pool-fallback (2026-09-19, C10): two more additive fields,
+    // the pool's permanent in-process fallback latch and its reason. A
+    // healthy process reports false/null; a process that has lost its workers
+    // says so here instead of being indistinguishable from one doing deep
+    // reads (which raise `inProcessRuns` as well). The latched shape has its
+    // own test in tests/routes/doctor-pool-disabled-health.test.ts, which
+    // needs a real broken worker and therefore its own process.
     assert.deepEqual(body.doctorPool, {
       warm: false, warmedAt: null, ms: null, timedOut: false,
       completedAfterDeadline: false, settledAfterTimeoutMs: null,
       cacheHits: 0, workerRuns: 0, inProcessRuns: 0,
+      poolDisabled: false, poolDisabledReason: null,
     });
   });
 

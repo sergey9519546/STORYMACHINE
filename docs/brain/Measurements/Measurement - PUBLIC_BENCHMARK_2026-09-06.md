@@ -61,7 +61,7 @@ reading of the same branches.
 **A finding for the scoring lane, filed here so it does not live only in a
 benchmark doc.** Under shuffle-drop the corpus keeps 72.5% of its words but
 only 50.2% of its weighted issues, and the sub-density branch is a logistic
-with steepness 50 around midpoint 0.52 (`doctor.ts:447-449`) — a near-step
+with steepness 50 around midpoint 0.52 (`craft-formula.ts:237-238`) — a near-step
 function crossed by a density move of ~±0.05. `counter-offer` crosses it in one
 step (density penalty 10.000 → 0.000, health +4.0) and `room-12` gains 36.5
 points, both while a third of the script is deleted. Stated as a property of

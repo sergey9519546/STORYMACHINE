@@ -7,7 +7,7 @@ import type { NarrativeState } from '../state/NarrativeState.ts';
 import type { ProofResult } from './contract.ts';
 import { temporalProof } from './tier1/temporal.ts';
 import { causalProof } from './tier1/causal.ts';
-import { intentionalProof } from './tier1/intentional.ts';
+import { intentionalProof, type IntentionalGroundingOptions } from './tier1/intentional.ts';
 import { mechanismProof } from './tier1/mechanism.ts';
 import { epistemicProof } from './tier1/epistemic.ts';
 import { continuityProof } from './tier1/continuity.ts';
@@ -26,11 +26,21 @@ import { attributionProof } from './tier4/attribution.ts';
 
 // The 8 Tier 1 hard-block proofs (Wave 1: 7 + Wave 3 B1: EarnedRevealProof).
 // A transition that fails any of these must not become a StoryCommit.
-export function runTier1(ir: NarrativeTransitionIR, state: NarrativeState): ProofResult[] {
+//
+// `opts` (2026-09-19, cast-grounding lane) is read by IntentionalProof alone —
+// it is the caller's statement of which characters exist in this story
+// (server/nvm/proof/tier1/intentional.ts). Omitting it is the pre-2026-09-19
+// contract and leaves all eight results byte-identical, which is why every
+// existing caller of runTier1 is unchanged.
+export function runTier1(
+  ir: NarrativeTransitionIR,
+  state: NarrativeState,
+  opts?: IntentionalGroundingOptions,
+): ProofResult[] {
   return [
     temporalProof(ir, state),
     causalProof(ir, state),
-    intentionalProof(ir, state),
+    intentionalProof(ir, state, opts),
     mechanismProof(ir, state),
     epistemicProof(ir, state),
     continuityProof(ir, state),

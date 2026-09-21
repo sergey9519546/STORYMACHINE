@@ -1,6 +1,6 @@
 ---
 type: owner
-updated: 2026-09-13
+updated: 2026-09-20
 sources: [scripts/owner-measure.mjs, docs/p1-benchmark/owner-measurement-plan.json, docs/PATH_TO_EXCELLENCE.md, scripts/report-unverified-gates.mjs]
 status: active
 ---
@@ -41,8 +41,12 @@ SKIP banner; [[Owner - R5 Measurement and Merge]] has that asymmetry in full.
 [[Gate - AUC-24 Ratchet]]'s CI-recomputable path
 (`tests/core/auc24-table.test.ts`) skips until
 `tests/fixtures/auc24-table.json` is committed. This gate carries a
-deadline: **blocks CI from 2026-10-01**
-([[Decision 5 - Every Reported Unverified Gate Gets an Expiry]]).
+deadline: **blocks CI from 2026-11-01**
+([[Decision 5 - Every Reported Unverified Gate Gets an Expiry]] set the
+original 2026-10-01 date; [[Decision 11 - Move the AUC-24 Table Deadline]]
+moved it to 2026-11-01, because `AUC24_DEGRADATION_ID` was bumped to
+`shuffle-drop/v3` on 2026-09-19 and a table locked before that date would
+already be invalid on the current recipe).
 
 ## The number this produces is the first of its kind
 
@@ -72,4 +76,4 @@ artifact is for.
 - `scripts/owner-measure.mjs` — the command whose last step this is
 - `docs/p1-benchmark/owner-measurement-plan.json` — its `lock` section
 - `docs/PATH_TO_EXCELLENCE.md` "What only the owner can do now"
-- `scripts/report-unverified-gates.mjs` (the `auc24-table` gate, `expires: '2026-10-01'`)
+- `scripts/report-unverified-gates.mjs` (the `auc24-table` gate, `expires: '2026-11-01'`)

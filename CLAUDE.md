@@ -1,7 +1,8 @@
 # STORYMACHINE — Project Memory
 
 Orientation: `docs/UNIFIED_STATE_2026-09-02.md` (one reconciliation of every
-branch/PR/stash/orphan — start here for "where is everything?") ·
+branch/PR/stash/orphan — start here for "where is everything?"; see its
+2026-09-19 addendum for current branch state) ·
 `docs/PATH_TO_EXCELLENCE.md` (current lane sequence and live
 status — start here for "what do I do next?") · `ROADMAP.md` (canonical
 demand-driven phase semantics) · `NORTH_STAR.md` (product constitution) ·
@@ -43,8 +44,13 @@ node --experimental-strip-types tests/<area>/<file>.test.ts   # one file, fast
 ```
 
 Run the file(s) you touched, then the full `npm test` (0 failures required)
-before every push. CI runs lint + test + build on every branch, plus a
-`console.` grep over `server/**` — a hit fails the build.
+before every push. CI runs lint + test + build on every branch, plus
+`npm run check-no-console` (`scripts/check-no-console.mjs`), which derives
+its exemptions from `tsconfig.json`'s `exclude` quarantine and only allows
+one after proving that path unreachable from `server.ts`'s import graph —
+a raw recursive grep for `console.` under `server/**` shows ~600 hits today
+while the gate passes, but the rule it enforces is unchanged: no new
+`console.*` in server code actually reachable at runtime.
 
 ## Security constraints (must always hold)
 
@@ -76,10 +82,31 @@ before every push. CI runs lint + test + build on every branch, plus a
   is the only variable. Changing one band's richness without matching every
   other band reintroduces the measured confound and the calibration tests
   will (correctly) fail. See `reference.ts`'s header.
-- Formula constants in `server/nvm/analyze/doctor.ts` stay function-local:
-  module-level consts hit a temporal dead zone through the doctor↔reference
-  circular import and the failure is silently swallowed by a fallback
-  (documented at the site — it cost a real bug hunt).
+- The craft formula (`densityPenalty`, `scarcityPenalty`, `craftPenalty`,
+  `computeRawCraftScore`) lives in `server/nvm/analyze/craft-formula.ts`, a
+  LEAF that imports nothing; `doctor.ts` re-exports `computeRawCraftScore`
+  and `calibration/reference.ts` imports it from the leaf, so since
+  2026-09-21 the doctor↔reference import cycle no longer runs the formula
+  (`reference.ts` does not import `doctor.ts` at all;
+  `tests/core/craft-formula-leaf.test.ts` pins both graph facts). Until then
+  two things failed silently on that path, each swallowed by the calibration
+  fallback: a module-level formula const sat in its temporal dead zone
+  (`ReferenceError: Cannot access … before initialization`, under BOTH
+  loaders — it cost a real bug hunt), and under the production loader (`tsx`,
+  esbuild `keepNames`) a NAMED nested function expression or arrow
+  (`const f = (x) => …`) reachable from `computeRawCraftScore` compiled to a
+  `__name(...)` call on a hoisted, uninitialised module var (production only
+  — `npm test` and the dev server run `--experimental-strip-types`, which
+  injects no helper). Both were re-probed against the leaf and PASS
+  (`docs/audits/2026-09-21-craft-formula-leaf/README.md`). What remains:
+  formula constants stay function-local and the path stays free of named
+  function expressions AS CONVENTION (belt and braces — the leaf must stay
+  import-free for the structural fix to hold); the guard
+  `tests/core/doctor-calibration-under-tsx.test.ts` still spawns the real tsx
+  CLI on every `npm test`, and the fallback logs through
+  `server/lib/logger.ts` instead of swallowing. `calibration.test.ts` alone
+  cannot see either hazard: it imports `reference.ts` before `doctor.ts`, so
+  it passed 25/25 on a tree where the tsx guard failed 0 of 20.
 - The revision pipeline's 14-pass execution order is still live. The old
   wave-rotation order is retired history — never use it to choose new work.
 - The owner's checkout is no longer on OneDrive (moved 2026-09-18 to a local,
@@ -111,12 +138,12 @@ before every push. CI runs lint + test + build on every branch, plus a
   therefore push `lane/<name>` at meaningful checkpoints — a completed unit
   of work, before a long-running operation, before handing off to a reviewer,
   and always before the lane goes idle — and **when in doubt, push**. The
-  cadence is "checkpoints", not "every commit" (Decision #9, 2026-09-18:
+  cadence is "checkpoints", not "every commit" (Decision #10, 2026-09-18:
   "remote repositories are meant for milestone synchronization, not real-time
   keystroke saving"), but the durability property is not relaxed by that, only
   re-timed: between checkpoints a lane still has everything to lose to the
   same class of rebuild. Reviews are committed under `docs/audits/` before the
-  merge; see `docs/LANE_STANDARD.md` §7 and `docs/DECISION_LOG.md` Decision #9.
+  merge; see `docs/LANE_STANDARD.md` §7 and `docs/DECISION_LOG.md` Decision #10.
 - Parallel sessions ship concurrently: pull the integration branch and check
   `git log` before starting any implementation work. Do not assume `main` or
   any other branch name; use the current session's designated branch.
@@ -130,7 +157,7 @@ INVERSE_CHEKHOV_GUN in `33a2ee48`; `docs/rulebook/README.md` is the
 machine-counted authority — the earlier "~8,917 rules, ~5,701
 from a bulk Wave 1191" story was shown to be inaccurate by the 2026-07-14
 audit — `docs/audits/2026-07-14-high-end-audit/PHASE_2_REPOSITORY_RECONSTRUCTION.md`
-R2-C01), and by the doctor's own measurement (`doctor.ts:2092-2093`) the
+R2-C01), and by the doctor's own measurement (`doctor.ts:1862-1863`) the
 entire weighted-rule channel contributes AUC ~0.076 to discrimination while
 scene-count scarcity carries AUC ~0.938. More rules stopped adding signal a
 long time ago; they add maintenance cost and undercut the trust story. Do not
@@ -177,7 +204,7 @@ committed table of 24 intact/degraded health values — but only once that table
 exists: it is produced by `npm run lock-auc24` on the owner's machine, is not
 committed yet, and until it is, that test skips and
 `scripts/report-unverified-gates.mjs` reports the gap (blocking from
-2026-10-01). Both the floor and the degradation recipe now live in
+2026-11-01, Decision #11). Both the floor and the degradation recipe now live in
 `scripts/lib/auc.ts`; edit the constant there, not a literal in a test.
 
 **THE RECIPE'S SCENE SEGMENTATION CHANGED ON 2026-09-12, AND THE 0.731 WAS
@@ -195,6 +222,29 @@ measurement's job), and `AUC24_DEGRADATION_ID` is bumped to `shuffle-drop/v2` so
 an old-recipe table can never be compared to a new measurement. On the 32
 committed public-benchmark scripts the new segmentation produces byte-identical
 output, which is why neither shuffle-drop floor below moved.
+**2026-09-19 (harness-honesty lane): `AUC24_DEGRADATION_ID` bumped again, to
+`shuffle-drop/v3` — `reassembleFountainScenes` now inserts a `\n` after a
+relocated scene slice that lacks its own line terminator, fixing a defect
+where a script with no trailing newline could have its un-terminated final
+scene welded onto the next scene's heading once the shuffle moved it out of
+last position (verified by probe); `AUC24_FLOOR` is untouched and, since no
+table has ever been locked, nothing is invalidated.**
+**2026-09-20 (scene-split-cr-and-recipe-v4 lane): `AUC24_DEGRADATION_ID` bumped
+again, to `shuffle-drop/v4` — the shared heading grammar the recipe reads
+(`scripts/lib/scene-segments.ts` -> `src/lib/fountain.ts`) was corrected and
+widened in two lanes that landed after the v3 bump without a matching id
+bump: a `...`-leading dialogue or action line is no longer misread as a
+forced scene heading (verified by probe: a script with an `...and then
+nothing.` line went from 3 scenes to 2 under `countFountainScenes`), and the
+forced-heading rule now accepts any Unicode letter or number after the dot,
+not only ASCII. `AUC24_FLOOR` is untouched at 0.622 and, since no table has
+ever been locked, nothing is invalidated. The same lane also fixed
+`server/nvm/analyze/scene-split.ts`'s `scenesFromFountain` (a separate
+splitter, feeding the emotional arc and a dozen signal modules, not the
+AUC-24/public-benchmark recipes) to normalize `\r\n?` -> `\n` before
+segmenting, so a bare-`\r` script no longer undercounts scenes relative to
+its CRLF/LF twin there; this does not touch `shuffleDropDegrade`, which still
+reads scene boundaries off raw text via `scripts/lib/scene-segments.ts`.**
 
 It is NOT comparable to the 761-script P1 baseline
 (`docs/p1-benchmark/DISCRIMINATION_BASELINE_2026-07-29.md`), which reports
@@ -267,11 +317,11 @@ before the score.
 
 None of these six is comparable to AUC-24 or to the P1 baseline — 32 short
 scripts vs feature-length, and the one feature-scale deduction that is WIRED
-INTO HEALTH (`ARC_DED_MIN_SCENES` = 15, `doctor.ts:2104`) never fires at this
+INTO HEALTH (`ARC_DED_MIN_SCENES` = 15, `doctor.ts:1874`) never fires at this
 length, so the public benchmark measures a strictly smaller engine. *(This
 sentence also named `CLIMAX_DED_MIN_SCENES` until 2026-09-12. That constant
 gates `climaxZoneDecayDeduction`, which is exported and wired into NOTHING —
-`doctor.ts:2127-2131` records the revert, "it over-fired on real scripts with
+`doctor.ts:1897-1901` records the revert, "it over-fired on real scripts with
 naturally flat climaxes" — so "never fires at this length" implied it fires at
 some length. It fires at no length. Adversarial finding 6.)* What
 distinguishes the two measurement channels from each other is scene count:

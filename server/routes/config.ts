@@ -137,6 +137,17 @@ router.get('/health', (_req, res) => {
       cacheHits: pool.cacheHits,
       workerRuns: pool.workerRuns,
       inProcessRuns: pool.inProcessRuns,
+      // C10 (2026-09-19): the pool's permanent fallback latch, and why it
+      // latched. `inProcessRuns` alone could not answer the operator's
+      // question — a deep read increments it too — so a server that had
+      // silently lost its worker pool (and with it the whole Decision #7
+      // wall-clock budget, which is enforceable only by terminating a worker)
+      // read exactly like a healthy one doing deep reads. `poolDisabled` is
+      // false and `poolDisabledReason` null on every healthy process; when it
+      // flips, the reason is the same sentence the single
+      // `doctor_pool_disabled` warn line carries.
+      poolDisabled: pool.disabled,
+      poolDisabledReason: pool.disabledReason,
     },
   });
 });

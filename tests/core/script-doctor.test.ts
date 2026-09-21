@@ -205,12 +205,12 @@ describe('runScriptDoctor — diagnose-only guarantee', () => {
 });
 
 describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
-  // Post-saturation-fix formula (doctor.ts's craftPenalty):
+  // Post-saturation-fix formula (craft-formula.ts's craftPenalty):
   //   penalty = DENSITY_SCALE * (weightedIssues / wordCount^WORD_COUNT_EXPONENT)^DENSITY_POWER
   //           + SCARCITY_SCALE / sceneCount
   // with DENSITY_SCALE=2.5, WORD_COUNT_EXPONENT=0.7, DENSITY_POWER=3.75,
-  // SCARCITY_SCALE=140 (doctor.ts). The exponents are irrational-ish tuned
-  // constants (see doctor.ts's craftPenalty comment for the empirical
+  // SCARCITY_SCALE=140 (craft-formula.ts). The exponents are irrational-ish tuned
+  // constants (see craft-formula.ts's craftPenalty comment for the empirical
   // rationale), so — like the prior formula's spot-checks — these assert
   // against the ROUNDED displayed value rather than hand-expanded arithmetic;
   // computeHealthScore itself is the single source of truth for the formula.
@@ -223,7 +223,7 @@ describe('computeHealthScore / gradeForHealth — formula spot-check', () => {
 
   it('approaches, but does not necessarily hit, 100 for zero issues at a well-evidenced scene count', () => {
     // Zero issues still carries a small scarcityPenalty (SCARCITY_SCALE /
-    // sceneCount = 140/25 = 5.6) — a deliberate residual (see doctor.ts's
+    // sceneCount = 140/25 = 5.6) — a deliberate residual (see craft-formula.ts's
     // craftPenalty comment): a report is never "0 issues, therefore
     // literally 100" purely from a big denominator, it's the scarcity
     // correction fading toward (not to) zero as scenes accumulate.
@@ -1295,7 +1295,8 @@ function buildDimensionSkewedResult(
 
   return {
     passResults,
-    finalFountain: '', originalFountain: '', totalIssuesFound: 0, passesWithChanges: 0, failedPasses: [], completedAt: 0,
+    finalFountain: '', originalFountain: '', totalIssuesFound: 0, passesWithChanges: 0, failedPasses: [],
+    lostApprovedSpans: [], ambiguousApprovedSpans: [], completedAt: 0,
   };
 }
 
@@ -1320,7 +1321,7 @@ function buildResultWithOneIssue(location: string, rule = 'DIALOGUE_ON_THE_NOSE'
   });
   return {
     passResults, finalFountain: '', originalFountain: '',
-    totalIssuesFound: 1, passesWithChanges: 0, failedPasses: [], completedAt: 0,
+    totalIssuesFound: 1, passesWithChanges: 0, failedPasses: [], lostApprovedSpans: [], ambiguousApprovedSpans: [], completedAt: 0,
   };
 }
 
@@ -1468,7 +1469,7 @@ describe('runScriptDoctor report shape — dimension-collapse fix, end to end (W
   it('length-invariance is NOT expected of the dimension formula the same way as overall health — sanity: dimension scores stay in [0, 100] across a 1x/2x/3x-issue sweep', () => {
     // Not a strict invariance claim (the overall health length-invariance test
     // in calibration.test.ts is the binding one, and it is untouched by this
-    // wave — see doctor.ts's craftPenalty comment). This is a basic sanity
+    // wave — see craft-formula.ts's craftPenalty comment). This is a basic sanity
     // bound: whatever the dimension curve does as issue volume scales up, it
     // must never leave the documented [0, 100] contract.
     const analysis = buildAnalysisFixture(9, 608);

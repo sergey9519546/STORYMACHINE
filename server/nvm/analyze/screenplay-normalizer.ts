@@ -22,16 +22,16 @@
 // structural element until the next one. Wrapped fragments inside a block are
 // joined into flowing text.
 
-import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS } from '../../../src/lib/fountain.ts';
+import { CUE_INITIAL_CLASS, CUE_LETTER_CLASS, isSceneHeadingLine } from '../../../src/lib/fountain.ts';
 
-// Heading detection is kept BYTE-COMPATIBLE with src/lib/fountain.ts's
-// parseFountain (a scene_heading is `/^(INT|EXT|EST|I\/E)[. ]/i` OR any line
-// beginning with '.'), so every line the real parser counts as a scene is also
-// treated as a heading here and emitted verbatim — the normalizer can NEVER
-// change scene segmentation, only reflow the text between headings. Several
-// corpus scripts (Ratatouille, Coco, Up) mark scenes with '.'-forced headings
-// instead of INT/EXT, which is exactly why alignment matters.
-const HEADING_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
+// Heading detection is BYTE-COMPATIBLE with src/lib/fountain.ts's parseFountain
+// because since 2026-09-20 it IS that function: every line the real parser
+// counts as a scene is treated as a heading here and emitted verbatim — the
+// normalizer can NEVER change scene segmentation, only reflow the text between
+// headings. Several corpus scripts (Ratatouille, Coco, Up) mark scenes with
+// '.'-forced headings instead of INT/EXT, which is why alignment matters. The
+// hand-copy that used to sit here had drifted from the parser exactly as row 6
+// of SESSION_REPORT_2026-09-19.md describes (both read `...` as a heading).
 const TRANSITION_RE = /^(CUT TO|FADE (IN|OUT|TO)|DISSOLVE( TO)?|SMASH CUT|MATCH CUT|IRIS (IN|OUT)|WIPE TO|BACK TO|INTERCUT|THE END|FADE)\b/i;
 // A caps "cue candidate": the bare name (minus a trailing parenthetical like
 // (V.O.)/(CONT'D)/(O.S.)) is short, up to 4 words, all-caps letters + a few
@@ -44,7 +44,7 @@ const PURE_PAREN_RE = /^\([^)]*\)$/;
 const CUE_INITIAL_LETTER_RE = new RegExp(`[${CUE_INITIAL_CLASS}]`, 'u');
 const CUE_BODY_RE = new RegExp(`^[${CUE_LETTER_CLASS}0-9 .,'&/#\\-]+$`, 'u');
 
-export function isHeading(t: string): boolean { return HEADING_RE.test(t) || t.startsWith('.'); }
+export function isHeading(t: string): boolean { return isSceneHeadingLine(t); }
 function isTransition(t: string): boolean {
   return TRANSITION_RE.test(t) || (/[A-Z]\s*TO:\s*$/.test(t) && t === t.toUpperCase() && t.length <= 20);
 }

@@ -1,6 +1,6 @@
 ---
 type: gate
-updated: 2026-09-12
+updated: 2026-09-20
 sources: [CLAUDE.md, tests/core/real-script-corpus.test.ts, tests/core/auc24-table.test.ts, scripts/lib/auc.ts, scripts/lib/scene-segments.ts, tests/fixtures/real-corpus-manifest.json]
 status: active
 ---
@@ -41,9 +41,11 @@ error rather than a tie. Consequences:
 * **`AUC24_FLOOR` is untouched at 0.622.** Moving a floor is a measurement's
   job, and a recipe that degrades strictly more aggressively is exactly where a
   guessed floor would be a guess wearing a gate's clothes.
-* `AUC24_DEGRADATION_ID` is bumped to `shuffle-drop/v2`, so an old-recipe table
-  can never be compared to a new measurement —
-  `tests/core/auc24-table.test.ts` refuses it.
+* `AUC24_DEGRADATION_ID` is bumped to `shuffle-drop/v2` (and again, 2026-09-19,
+  to `shuffle-drop/v3`, for the reassembly fix that stops a degradation from
+  welding two scenes together on a script with no trailing newline — see
+  `scripts/lib/auc.ts`), so an old-recipe table can never be compared to a
+  new measurement — `tests/core/auc24-table.test.ts` refuses it.
 * On the 32 committed scripts of [[Gate - Public Benchmark]] the new
   segmentation produces byte-identical output (0 of 32 differ), which is why
   neither shuffle-drop floor there moved.
@@ -57,8 +59,13 @@ committed table); `npm test` alone runs the table-based assertion once
 `tests/core/real-script-corpus.test.ts`; `tests/core/auc24-table.test.ts`;
 tracked by [[Gate - Receipt Gate]]'s reporting sibling,
 `scripts/report-unverified-gates.mjs` (this gate's table-commit gap
-`expires: 2026-10-01`, blocking after that date — see
-[[Decision 5 - Every Reported Unverified Gate Gets an Expiry]]).
+`expires: 2026-11-01`, blocking after that date — moved from 2026-10-01 by
+[[Decision 11 - Move the AUC-24 Table Deadline]], since
+`AUC24_DEGRADATION_ID` was bumped to `shuffle-drop/v3` on 2026-09-19 and a
+table locked before that date would already be invalid on the current
+recipe; see also
+[[Decision 5 - Every Reported Unverified Gate Gets an Expiry]], which set the
+original date).
 
 **What it cannot catch:** a no-op degradation used to be invisible here and is
 not any more, but the floor's VALUE is still unverifiable in CI. Also: this is

@@ -148,6 +148,41 @@ recommendation is "do not ship it untested", not "it is known to be worthless".
 
 ## Proposal B — the unreachable server closure
 
+> **Acted on 2026-09-20 (B1 + B2).** The owner's decision on this document:
+> **A keep, B1 do, B2 remove the v5.0 closure only**, plus the never-run v5.0
+> test files. Executed on `lane/dead-weight-b1-b2` from `bf4f3bff` in the
+> commit *"chore: remove the quarantined v5.0 closure and its never-run tests
+> (dead-weight proposal B2)"*. Everything removed is recoverable from git
+> history at `bf4f3bff`. Full inventory, classification, dependency map and
+> before/after gate counts:
+> `docs/audits/2026-09-20-dead-weight-b1-b2/README.md`.
+>
+> - **B1 needed no change.** It had already shipped in `a2448714`:
+>   `scripts/run-tests.mjs` already carries `'tests/critics'` in `TEST_ROOTS`
+>   and `server/nvm/kernel/event-store.test.ts` in `TEST_FILES`. The 34
+>   assertions were re-run to confirm they are real (2 + 32, zero failures).
+>   No commit was made for it rather than a cosmetic one.
+> - **B2 removed 64 files:** the 42 non-test source files of the reachability
+>   allowlist's groups 1–3 (16,153 lines), 7 never-run test files, 12 markdown
+>   reports inside the deleted trees, and 3 benchmarks. The gate moved from 78
+>   unreachable files / 24,722 lines to **36 / 8,517**, and
+>   `check-no-console`'s tsconfig-derived quarantine from 23 entries to 4.
+> - **Correction to this section's own figure.** The B2 recommendation below
+>   says the closure is "51 files, 17,120 lines". It is **42 files / 16,153
+>   lines**; 51/17,120 is the table's total minus `analyze/**`, which also
+>   includes the 9 "assorted elsewhere" modules that have no v5.0 provenance.
+>   Those 9, and the 27 unwired `analyze/**` candidates, were left in place.
+> - **Kept:** Proposal A entirely (per its own recommendation), the live kernel
+>   closure (`event-store.ts`, `types.ts`, `adapters/commit-to-events.ts` and
+>   their test and bench), `server/nvm/__tests__/m1.5-harness.ts` (imported by
+>   18 live test files), `tests/story-vector.test.ts`, allowlist groups 4 and
+>   5, and the 19 `docs/` files that describe the removed subsystem — dated
+>   records, not code.
+>
+> The text below is left as written on 2026-08-24, except for this note and
+> the B3 note further down.
+
+
 ### The measurement, re-derived
 
 Static BFS from `server.ts`, following relative `import` / `export ... from` /
@@ -249,6 +284,26 @@ assertions over live code never run**: 32 in `event-store.test.ts` (over
 for and does not collect.
 
 ### Two items outside `server/**`
+
+> **Acted on 2026-09-20.** The owner authorized B3 specifically — and nothing
+> wider — and it was executed: `agent-scheduler/` (12 tracked files) and
+> `test-freeride.js` were deleted in commit
+> `chore: remove agent-scheduler/ and test-freeride.js (dead-weight proposal
+> B3)`. Both of this section's claims were re-verified immediately before
+> deletion: `node test-freeride.js` still exited 1 with the module-not-found
+> error quoted below, and `agent-scheduler/` was still imported by nothing
+> (`grep -rn "from '.*agent-scheduler\|require(.*agent-scheduler" .` found no
+> hits). No reference to either path existed in `package.json`, any CI
+> workflow, `tsconfig.json`'s exclude list, `scripts/run-tests.mjs`,
+> `scripts/check-no-console.mjs`, `scripts/verify-server-reachability.mjs`, or
+> `.dockerignore`, so no config file needed a follow-up edit. Full dependency
+> map and gate results in
+> `docs/audits/2026-09-20-dead-weight-b3/README.md`. **Proposal A, B1, B2, and
+> the four never-run v5.0 test files remain proposals awaiting the owner** —
+> this lane touched only the two items below. *(Superseded later the same day:
+> the owner decided A keep / B1 do / B2 remove the v5.0 closure, and that was
+> executed — see the "Acted on 2026-09-20 (B1 + B2)" note at the top of this
+> Proposal B section.)*
 
 **`agent-scheduler/`** — 12 tracked files (`git ls-files agent-scheduler | wc -l`
 = 12): four markdown reports, `cron-config.json`, `crontab-schedule.txt`,

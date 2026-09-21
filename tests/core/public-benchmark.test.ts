@@ -349,7 +349,7 @@ describe('public benchmark — the three degradations', () => {
 
   it('CLIMAX_RELOCATE preserves scene count on every script, so the scarcity term cancels', () => {
     // This is the assertion that earns the phrase "isolates order-sensitivity".
-    // scarcityPenalty = 140/sceneCount (doctor.ts:465-467) is the doctor's
+    // scarcityPenalty = 140/sceneCount (craft-formula.ts:254-257) is the doctor's
     // highest-AUC term; if this degradation moved scene count even on one
     // script, the second number would be measuring the same artifact as the
     // first and the comparison between them would be worthless.

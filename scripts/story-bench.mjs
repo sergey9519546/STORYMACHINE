@@ -56,6 +56,7 @@ import { fetch as undiciFetch, Agent } from 'undici';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isStubIR } from '../server/nvm/generate/llm-generator.ts';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = path.join(REPO, 'tests', 'fixtures', 'story-bench-premises.json');
@@ -78,8 +79,24 @@ export function runDirName(now = new Date()) {
  * Turn a fixture premise into the SceneTarget[] the converge routes require.
  * This is the step the product does not have; keeping it here, named, is how
  * the bench avoids implying otherwise.
+ *
+ * `cast` (2026-09-19, cast-grounding lane) is the premise's own cast ids, and
+ * sending it CHANGES WHAT THIS BENCH MEASURES. Until this run the bench seeded
+ * those characters with UPDATE_BELIEF ops only at COMMIT of scene 0
+ * (castGroundingOps below), so during convergence of scene 0 the state knew
+ * nobody, and IntentionalProof — which until this lane let a candidate ground
+ * its own invented names — blocked a real cast member referenced before its
+ * belief while passing "Char1" whenever the candidate also invented a belief
+ * for it. With `cast` sent: a cast member referenced at scene 0 is no longer a
+ * block, and an invented name is one even when the candidate grounds it
+ * itself. Tier-1 block counts before and after this commit are therefore not
+ * comparable (docs/audits/2026-09-19-cast-grounding/README.md).
+ *
+ * Omitted entirely for a premise with no cast, because absent and empty mean
+ * different things to the proof (server/lib/validation.ts's note on the field).
  */
 export function beatsToSceneTargets(premise) {
+  const cast = (premise.cast ?? []).map((c) => c.id);
   return premise.beats.map((b, i) => ({
     sceneIdx: i,
     sceneFunction: b.sceneFunction,
@@ -87,6 +104,7 @@ export function beatsToSceneTargets(premise) {
     tensionTarget: b.tensionTarget,
     qualityTarget: 60,
     themeHint: b.themeHint,
+    ...(cast.length > 0 ? { cast } : {}),
   }));
 }
 
@@ -676,8 +694,13 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
       // stubIR's own ops — so a run in which every committed scene is a stub
       // measured the transport and the stub generator, not generation. The
       // first run of this bench was exactly that, in all six premises, and the
-      // table could not show it.
-      const fromModel = ir?.provenance?.model !== undefined && ir.provenance.model !== 'stub';
+      // table could not show it. Routed through llm-generator.ts's own
+      // `isStubIR` (2026-09-19, generator-honesty) rather than re-deriving the
+      // `=== 'stub'` check here, so the ONE place that knows what counts as a
+      // stub is the module that produces stubs — `ir` here is the plain JSON
+      // this script got back over HTTP, not a class instance, but isStubIR
+      // only reads `.provenance.model`, so it works on either.
+      const fromModel = ir?.provenance?.model !== undefined && !isStubIR(ir);
       if (fromModel) committedNonStub++;
       modelAuthoredOps += fromModel ? ir.ops.length : 0;
       console.log(
@@ -771,7 +794,7 @@ async function runOnePremise({ base, premise, outDir, logBuffer }) {
   writeFileSync(path.join(outDir, `${premise.id}.doctor.json`), JSON.stringify({
     health: report?.health ?? null,
     // PASS is the REJECTION verdict, not an endorsement: verdictFor
-    // (server/nvm/analyze/doctor.ts:860) is `health >= 85 && sceneCount >= 8 ->
+    // (server/nvm/analyze/doctor.ts:630) is `health >= 85 && sceneCount >= 8 ->
     // RECOMMEND; health < 60 -> PASS; else CONSIDER`, and PASS is a reader
     // passing ON the script. Recorded here so nobody reads this file the way
     // this bench's own first report read it.

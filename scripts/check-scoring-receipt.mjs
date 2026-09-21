@@ -131,13 +131,13 @@
 //    change." THAT THEORY WAS FALSE FOR THE ACTUAL FILES INVOLVED (2026-09-02
 //    retrospective, finding #3) and the restriction is now removed:
 //      - doctor.ts imports `layoutScreenplay` from src/lib/screenplay-layout.ts
-//        DIRECTLY (doctor.ts:67) and uses its return value to compute `pages`
-//        (doctor.ts:864) — not rendering, an input to a number the report
+//        DIRECTLY (doctor.ts:80) and uses its return value to compute `pages`
+//        (doctor.ts:666) — not rendering, an input to a number the report
 //        emits.
 //      - fountain-analyzer.ts (tier 1, always-scoring) imports
 //        src/lib/fountain.ts, which decides what counts as a scene heading —
 //        i.e. it produces `sceneCount`, the single highest-AUC term the
-//        doctor emits (~0.938, doctor.ts:2092-2093). The old prefix filter
+//        doctor emits (~0.938, doctor.ts:1862-1863). The old prefix filter
 //        discarded it unconditionally.
 //      - Proven on commit c9023b8f ("multi-language scene headings"): the old
 //        gate named only screenplay-normalizer.ts in that range while the
@@ -428,6 +428,185 @@ export function addedReceiptLines(range) {
 }
 
 // ---------------------------------------------------------------------------
+// In-place rewrites: an entry whose OWN heading line was not touched
+// ---------------------------------------------------------------------------
+//
+// BUG FOUND 2026-09-19 (docs/audits/2026-09-19-receipt-gate-inplace/): every
+// function above builds an "entry" purely from the CONTENT of lines a diff
+// added, in file order, with grouping starting only at a `###` heading among
+// THOSE lines. That is exactly right for a brand-new entry (100% of its lines
+// are added), but it silently drops an EXISTING entry whose fields were
+// rewritten in place while its heading text stayed byte-identical — the
+// heading is unchanged, so `git diff --unified=0` never emits it as a `+`
+// line, so it never starts a group, so every field line changed underneath it
+// is either (a) orphaned — added before any recognized heading, and
+// `extractEntries()`'s own docstring says lines there "belong to no entry and
+// are ignored" — or (b), worse, misattributed to whatever LATER heading the
+// diff stream happens to hit next.
+//
+// Reproduced two ways in the audit's fixtures: alone, a body-only rewrite of
+// a still-PENDING-headed entry correctly still fails the range (no entry is
+// ever recognized, so "gained no new entry" fires) — safe, but for the wrong
+// reason, and it stops being safe the moment a SECOND, genuinely well-formed
+// entry is anywhere else in the same range. With that second entry present,
+// `extractEntries()` finds exactly one entry (the second one), it validates
+// clean, and `checkReceiptForRange` returns `ok: true` — a scoring-path range
+// where the only entry it actually inspected has nothing to do with the
+// change, while an entry whose heading STILL reads PENDING sits right there
+// in the file, never once passed to `validateEntry`. That is a false pass.
+//
+// The fix does not touch how a brand-new entry is found — `extractEntries()`
+// keeps doing exactly that. It adds a second, independent detector that finds
+// entries the first one cannot see: it reads the diff's HUNK HEADERS (not
+// their content) to get the changed line NUMBERS in the range's target
+// tree, reads that tree's FULL current receipt text, and asks which entries'
+// line SPANS (heading through the line before the next heading) overlap a
+// changed line number. An entry found this way is validated against its
+// FULL current body, not a partial diff view, and any entry `extractEntries`
+// already recognized is skipped here so the two detectors never double-count
+// the same entry.
+
+/** Parse `@@ -a,b +c,d @@` hunk headers from a `--unified=0` diff of ONE file
+ *  into the NEW-file 1-indexed line ranges each hunk touches (the `+c,d`
+ *  side). `d` omitted means 1 line; `d` present as `0` is a pure-deletion
+ *  hunk, whose single insertion POINT is `c` — that point is still reported
+ *  (as the single-line range `[c, c]`) so a line removed without a
+ *  replacement is not invisible to the overlap check below. */
+export function parseUnifiedZeroHunks(diffText) {
+  const ranges = [];
+  const HUNK_RE = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/;
+  for (const line of diffText.split('\n')) {
+    const m = HUNK_RE.exec(line);
+    if (!m) continue;
+    const start = Number(m[1]);
+    const count = m[2] === undefined ? 1 : Number(m[2]);
+    ranges.push(count === 0 ? [start, start] : [start, start + count - 1]);
+  }
+  return ranges;
+}
+
+/** The right-hand ref of a two-point range (`A..B` / `A...B`), defaulting to
+ *  `HEAD` when it is omitted — git's own default for an open-ended range.
+ *  Returns null for a single-ref range, which diffs against the working tree
+ *  instead (see `isSingleRefRange`). */
+export function rangeRightRef(range) {
+  if (isSingleRefRange(range)) return null;
+  const m = range.match(/\.\.\.?(.*)$/);
+  const right = m ? m[1].trim() : '';
+  return right || 'HEAD';
+}
+
+/** The receipt file's full text on the NEW side of `range`: the working tree
+ *  for a single-ref range (which is what it is diffed against), or the
+ *  content at the range's right-hand ref for a two-point range — the exact
+ *  tree `git diff --unified=0 range`'s `+` side line numbers are relative to.
+ *  Returns null when the file does not exist there. */
+function receiptTargetText(range) {
+  if (isSingleRefRange(range)) {
+    const abs = path.join(ROOT, RECEIPT_PATH);
+    return existsSync(abs) ? readFileSync(abs, 'utf8') : null;
+  }
+  try {
+    return git(['show', `${rangeRightRef(range)}:${RECEIPT_PATH}`]);
+  } catch {
+    return null;
+  }
+}
+
+/** A markdown thematic break — `---`, `***`, `___` (3 or more of the same
+ *  character, optionally surrounded by whitespace) on a line by itself. The
+ *  ledger uses `---` to visually separate entries; that separator carries no
+ *  content of its own and belongs to neither entry, so it is treated the
+ *  same as a blank line when trimming an entry's span (see `entriesWithSpans`
+ *  below). Does not require the three characters to be identical to each
+ *  other ONLY within one run (`-{3,}` etc.) — mixed runs like `-*-` are not a
+ *  thematic break under CommonMark and are correctly left as content. */
+const SEPARATOR_LINE_RE = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/;
+
+/** Every entry in `lines` (the FULL file, not just added lines), with its
+ *  0-indexed `[start, end)` span: `start` is the heading's own index, `end`
+ *  is the index of the next heading (or `lines.length`). Unlike
+ *  `extractEntries()`, this sees an entry whose heading text is unchanged.
+ *
+ *  Also computes `contentEnd`: `end` with any trailing BLANK lines OR
+ *  markdown rule lines (`SEPARATOR_LINE_RE`) trimmed off. This is what the
+ *  overlap check below actually uses, and it is not a cosmetic nicety —
+ *  measured 2026-09-19 (docs/audits/2026-09-19-receipt-gate-inplace/):
+ *  appending a brand-new entry right after an untouched one inserts a blank
+ *  separator line ahead of the new heading, and that inserted blank line's
+ *  line NUMBER falls, by plain index arithmetic, inside the PRECEDING
+ *  entry's `[start, end)` span — so the overlap check read a clean append of
+ *  an unrelated entry as an in-place edit of the one before it, and (with
+ *  `alreadyRecognized` correctly excluding the new entry it belongs to)
+ *  validated that unrelated, untouched entry as if this range had rewritten
+ *  it. `contentEnd` excludes exactly that separator, so a hunk that touches
+ *  nothing but the blank line ahead of a new heading no longer overlaps the
+ *  entry above it.
+ *
+ *  BUG FOUND 2026-09-20 (docs/audits/2026-09-20-per-pass-diagnostics/
+ *  README.md §7): trimming only BLANK lines left a `---` rule line itself
+ *  inside the preceding entry's span whenever an author separates a newly
+ *  appended entry from the previous one with such a rule (the ledger's own
+ *  convention between many entries). The rule then overlapped the append
+ *  hunk exactly as the blank line above used to, and `entriesModifiedInPlace`
+ *  re-validated the historical entry against TODAY's field rules — the
+ *  2026-09-12 entry's `**Commands (…)**` field failed the `**Command**`
+ *  pattern this way, a false FAIL of an honest append. A separator line is
+ *  not content belonging to either entry any more than a blank line is, so
+ *  it is now trimmed the same way. This does not touch how a genuine edit
+ *  inside an entry's own field lines is detected — those lines are never
+ *  blank or rule-shaped, so the overlap test still sees them. */
+function entriesWithSpans(lines) {
+  const entries = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = ENTRY_HEADING_RE.exec(lines[i].trim());
+    if (!m) continue;
+    if (entries.length > 0) entries[entries.length - 1].end = i;
+    entries.push({ date: m[1], heading: lines[i].trim(), start: i, end: lines.length });
+  }
+  for (const entry of entries) {
+    let contentEnd = entry.end;
+    while (
+      contentEnd > entry.start + 1
+      && (lines[contentEnd - 1].trim() === '' || SEPARATOR_LINE_RE.test(lines[contentEnd - 1]))
+    ) contentEnd--;
+    entry.contentEnd = contentEnd;
+  }
+  return entries;
+}
+
+/** Entries the range modified in place without touching their own heading
+ *  line — see the section header above for why these are otherwise
+ *  invisible. `alreadyRecognized` is the set of heading strings
+ *  `extractEntries()` already found in this same range; an entry here is
+ *  skipped when its heading is in that set, so the two detectors never
+ *  report the same entry twice. Returns `{ heading, lines }` objects shaped
+ *  exactly like `extractEntries()`'s, but with the entry's FULL current body
+ *  (every field, not only the ones this range's diff happened to change). */
+function entriesModifiedInPlace(range, alreadyRecognized) {
+  let diffText;
+  try {
+    diffText = git(['diff', '--unified=0', range, '--', RECEIPT_PATH]);
+  } catch {
+    return [];
+  }
+  const hunkRanges = parseUnifiedZeroHunks(diffText);
+  if (hunkRanges.length === 0) return [];
+  const targetText = receiptTargetText(range);
+  if (targetText === null) return [];
+  const lines = targetText.split('\n');
+  const found = [];
+  for (const span of entriesWithSpans(lines)) {
+    if (alreadyRecognized.has(span.heading)) continue;
+    const spanStart1 = span.start + 1; // 1-indexed heading line number
+    const spanEnd1 = span.contentEnd; // 1-indexed number of the entry's last NON-BLANK line
+    const overlaps = hunkRanges.some(([hs, he]) => hs <= spanEnd1 && he >= spanStart1);
+    if (overlaps) found.push({ heading: span.heading, lines: lines.slice(span.start + 1, span.end) });
+  }
+  return found;
+}
+
+// ---------------------------------------------------------------------------
 // Receipt entry validation
 // ---------------------------------------------------------------------------
 //
@@ -444,10 +623,25 @@ export function addedReceiptLines(range) {
  *  (`### <YYYY-MM-DD> — …`) deliberately does not match. */
 const ENTRY_HEADING_RE = /^###\s+(\d{4}-\d{2}-\d{2})\b(.*)$/;
 
+/** A bolded Command field label: `**Command:**`, `**Command**:`, the plural
+ *  `**Commands:**`, or either with a parenthetical qualifier before the
+ *  colon — `**Commands (all run in this worktree):**`. Three honest
+ *  historical entries in the ledger (2026-09-12 and after) use the plural
+ *  form because more than one command was run; both singular and plural,
+ *  with or without a parenthetical, are the same claim and must be read the
+ *  same way by every scan that looks at this field — see CLAIM_FIELD_LABELS
+ *  below, which reuses this exact pattern so the field can't widen out from
+ *  under the simulation-language check. The closing `**` is required right
+ *  after the optional parenthetical/colon, so `**Commander:**` or
+ *  `**Command line:**` — a different label that merely starts with the same
+ *  letters — do NOT match. */
+const COMMAND_FIELD_RE = /\*\*\s*Commands?(?:\s*\([^)]*\))?\s*:?\s*\*\*/i;
+
 /** Fields required by §3's template. Matched on the bolded label, tolerating
- *  both `**Command:**` and `**Command**:` (the ledger contains both). */
+ *  both `**Command:**` and `**Command**:` (the ledger contains both), plus
+ *  the plural/parenthetical Command forms above. */
 const REQUIRED_FIELDS = [
-  { label: 'Command', patterns: [/\*\*\s*Command\s*:?\s*\*\*/i] },
+  { label: 'Command', patterns: [COMMAND_FIELD_RE] },
   { label: 'Corpus fingerprint', patterns: [/\*\*\s*Corpus\s+fingerprint\s*:?\s*\*\*/i] },
   { label: 'Runner attestation', patterns: [/\*\*\s*Runner\s+attestation\s*:?\s*\*\*/i] },
   {
@@ -466,8 +660,34 @@ const REQUIRED_FIELDS = [
  *  copyright restrictions)". Prose fields elsewhere in an entry are NOT
  *  scanned with this list, because honest entries legitimately reason about
  *  what a weaker instrument "would be" (the 2026-08-21 W1/W2 entry argues
- *  exactly that about AUC) — those get the narrower whole-entry list below. */
-const CLAIM_FIELD_LABELS = ['Command', 'Git SHA', 'Baseline used', 'Runner attestation', 'Attestation'];
+ *  exactly that about AUC) — those get the narrower whole-entry list below.
+ *
+ *  Most entries here are plain labels, looked up with fieldValue()'s
+ *  label-derived regex. Command carries an explicit `pattern` instead — the
+ *  SAME COMMAND_FIELD_RE used in REQUIRED_FIELDS above — so that widening
+ *  what counts as a Command field (singular/plural, with a parenthetical)
+ *  widens what this scan reads too. What that actually guarantees (fixed
+ *  2026-09-19, docs/audits/2026-09-19-receipt-gate-inplace/): the
+ *  required-field presence check, this simulation-language scan, and the
+ *  PENDING field scan all locate a field with the SAME `findFieldLine()` —
+ *  a per-line match, never a joined-body one — so a field only counts as
+ *  present when there is a SINGLE LINE all three scans can see it on. Before
+ *  that fix the presence check alone tested the joined body, so a Command
+ *  label that wrapped onto a second line — e.g. `**Commands (all run` /
+ *  `in this worktree):**` — satisfied the presence check (the parenthetical
+ *  matched across the newline) while the other two scans, which read line by
+ *  line, never saw the field at all; simulation language or a PENDING marker
+ *  in such a field slipped through silently (2026-09-19 adversarial finding,
+ *  Finding 3). Sharing one line-matching primitive is what makes that
+ *  impossible now: the field is either found in the same place by all three,
+ *  or found by none of them. */
+const CLAIM_FIELD_LABELS = [
+  { label: 'Command', pattern: COMMAND_FIELD_RE },
+  { label: 'Git SHA' },
+  { label: 'Baseline used' },
+  { label: 'Runner attestation' },
+  { label: 'Attestation' },
+];
 const CLAIM_FIELD_SIMULATION_RE = /\b(?:simulated|simulation|hypothetical(?:ly)?|estimated|approximated|extrapolated|would\s+be|not\s+actually\s+run|mocked)\b/i;
 
 /** Phrasings that cannot occur in an honest receipt anywhere in the entry.
@@ -495,14 +715,32 @@ const HAS_DIGIT_RE = /[0-9]/;
  *  a two-line window (the disclaimer routinely wraps onto the next line). */
 const SHA_DISCLAIMED_RE = /does\s+not\s+exist|nonexistent|non-existent|no\s+longer\s+exists|not\s+resolvable|unresolvable|could\s+not\s+get\s+object/i;
 
+/** The index of the line in `entryLines` where a field's bolded label
+ *  STARTS, matched against ONE LINE at a time — never a joined body — or -1
+ *  if no line matches. This is the single primitive every field-locating
+ *  scan in this file goes through: the required-field presence check, the
+ *  claim/simulation-language scan, and the PENDING field scan. A label that
+ *  wraps its parenthetical onto a second line (`**Commands (all run` /
+ *  `in this worktree):**`) does not match here even though it would match a
+ *  regex run against `entryLines.join('\n')` — and because every scan shares
+ *  this function, a field is either found in the same place by all of them,
+ *  or found by none. See Finding 3 (2026-09-19,
+ *  docs/audits/2026-09-19-receipt-gate-inplace/) for the bug this closes: the
+ *  presence check used to test the joined body directly, so a two-line label
+ *  could satisfy "field present" while remaining invisible to the other two
+ *  scans. */
+function findFieldLine(entryLines, pattern) {
+  return entryLines.findIndex((l) => pattern.test(l));
+}
+
 /** A field's full text (its labeled line plus any continuation lines, up to
  *  the next bolded bullet at any indent), located by a caller-supplied regex
- *  rather than a label string — shared by fieldValue() (label-based lookup)
- *  and the PENDING required-field scan (which needs each REQUIRED_FIELDS
- *  pattern, including the "Git SHA (or Baseline used)" alternation, tried in
- *  turn against the same line-matching logic). */
+ *  rather than a label string via `findFieldLine()` — shared by fieldValue()
+ *  (label-based lookup) and the PENDING required-field scan (which needs each
+ *  REQUIRED_FIELDS pattern, including the "Git SHA (or Baseline used)"
+ *  alternation, tried in turn against the same line-matching logic). */
 function fieldValueByPattern(entryLines, pattern) {
-  const start = entryLines.findIndex((l) => pattern.test(l));
+  const start = findFieldLine(entryLines, pattern);
   if (start === -1) return null;
   const out = [entryLines[start]];
   for (let i = start + 1; i < entryLines.length; i++) {
@@ -625,13 +863,22 @@ export function validateEntry(entry, { objectExists = shaResolves } = {}) {
   }
 
   for (const field of REQUIRED_FIELDS) {
-    if (!field.patterns.some((re) => re.test(body))) {
-      problems.push(`missing required field **${field.label}** (see §3's entry template)`);
+    // Per-line, via findFieldLine() — NOT `re.test(body)` against the joined
+    // entry text. A field only counts as present when the claim scan and the
+    // PENDING scan (both per-line) can see it too; see findFieldLine()'s
+    // docstring and Finding 3 (2026-09-19).
+    if (!field.patterns.some((re) => findFieldLine(entry.lines, re) !== -1)) {
+      problems.push(
+        `missing required field **${field.label}** (see §3's entry template). If you wrote this `
+        + "field's label across two lines — e.g. wrapping a parenthetical qualifier onto its own "
+        + 'line — that is not a recognized field: every scan in this file reads a field label from '
+        + 'a single line, so put the whole bolded label back on one line.',
+      );
     }
   }
 
-  for (const label of CLAIM_FIELD_LABELS) {
-    const value = fieldValue(entry.lines, label);
+  for (const { label, pattern } of CLAIM_FIELD_LABELS) {
+    const value = pattern ? fieldValueByPattern(entry.lines, pattern) : fieldValue(entry.lines, label);
     if (!value) continue;
     const hit = CLAIM_FIELD_SIMULATION_RE.exec(value);
     if (hit) {
@@ -685,16 +932,39 @@ export function extractEntries(lines) {
  * Returns { ok, problems }.
  *
  * `structuralOnly: true` keeps the "a new dated entry must exist" requirement
- * but skips per-entry content validation. That mode exists for ONE caller:
- * release.yml, which checks a whole release window (previous v* tag → this
- * tag) rather than a single change. Content validation is a property of the
- * moment an entry is written — an honest entry cites the branch SHA it was
- * measured at, and after that branch is squash-merged the SHA is no longer in
- * the repository at all (verified: the 2026-08-04 craft-spec and 2026-08-07
- * pilot entries both cite SHAs that no longer resolve, and both are honest).
- * Re-validating them months later manufactures failures on exactly the
- * carefully-written receipts this guard is meant to encourage. Entry content
- * is validated where it can be validated: in CI, on the range that adds it.
+ * but skips per-entry content validation for a BRAND-NEW entry. That mode
+ * exists for ONE caller: release.yml, which checks a whole release window
+ * (previous v* tag → this tag) rather than a single change. Content
+ * validation is a property of the moment an entry is written — an honest
+ * entry cites the branch SHA it was measured at, and after that branch is
+ * squash-merged the SHA is no longer in the repository at all (verified: the
+ * 2026-08-04 craft-spec and 2026-08-07 pilot entries both cite SHAs that no
+ * longer resolve, and both are honest). Re-validating them months later
+ * manufactures failures on exactly the carefully-written receipts this guard
+ * is meant to encourage. Entry content is validated where it can be
+ * validated: in CI, on the range that adds it.
+ *
+ * BUG FOUND AND FIXED 2026-09-19 (regression from the in-place detector added
+ * earlier the same day, docs/audits/2026-09-19-receipt-gate-inplace/): an
+ * earlier version of this function folded `inPlace` into the EXISTENCE test
+ * (`entries.length === 0 && inPlace.length === 0`) — since
+ * `entriesModifiedInPlace` finds an entry by hunk line-number OVERLAP with no
+ * requirement about what changed, editing so much as one word inside ANY old
+ * entry (a typo fix in a `Corpus fingerprint` line, or an appended
+ * `- **Note:** …` bullet — the exact move this function's own error string
+ * calls out: "Appending lines to an existing entry is not a receipt for a new
+ * scoring change") made `inPlace.length` nonzero and satisfied "this range
+ * added a receipt entry", even though nothing new was added and the touched
+ * entry was already well-formed. `checkReceiptForRange` then printed
+ * "gained a well-formed new entry in the same range. OK." for a range that
+ * gained no entry at all. The fix: `inPlace` entries contribute VALIDATION,
+ * never EXISTENCE. Their validation also runs BEFORE the existence check —
+ * and in BOTH modes, `structuralOnly` included — because a still-PENDING
+ * entry rewritten in place beside an unrelated well-formed entry (C-DANGER
+ * below) has to fail by name in a whole-release-window scan just as much as
+ * in a single-change one; `structuralOnly` only ever excused a BRAND-NEW
+ * entry's field validation (release.yml's own reasoning above), never an
+ * existing entry's.
  */
 export function checkReceiptForRange(range, opts = {}) {
   const { structuralOnly = false, ...entryOpts } = opts;
@@ -703,6 +973,28 @@ export function checkReceiptForRange(range, opts = {}) {
     return { ok: false, problems: [`${RECEIPT_PATH} gained no content in this range.`] };
   }
   const entries = extractEntries(addedReceiptLines(range));
+  // See "In-place rewrites" above: an entry rewritten in place without
+  // touching its own heading line is invisible to `entries` above no matter
+  // how thoroughly its fields changed. `inPlace` finds those by line-number
+  // overlap against the target tree's full entry spans instead of by diff
+  // content, and skips anything `entries` already recognized.
+  const inPlace = entriesModifiedInPlace(range, new Set(entries.map((e) => e.heading)));
+
+  // In-place entries are validated FIRST, and unconditionally of
+  // `structuralOnly` — see the bug note above. A problem found here (most
+  // often PENDING, but any validateEntry() rule applies) fails the range by
+  // name regardless of whether this range also happens to add a brand-new
+  // entry elsewhere.
+  const problems = [];
+  for (const entry of inPlace) {
+    for (const p of validateEntry(entry, entryOpts)) problems.push(`${entry.heading}\n      ${p}`);
+  }
+  if (problems.length > 0) return { ok: false, problems };
+
+  // Existence: only a brand-new entry (recognized by `extractEntries` because
+  // its OWN heading line was added) counts. An in-place rewrite that reached
+  // this point was validated above and found clean, but a clean edit to an
+  // existing entry is still not a receipt for a NEW scoring change.
   if (entries.length === 0) {
     return {
       ok: false,
@@ -714,7 +1006,6 @@ export function checkReceiptForRange(range, opts = {}) {
     };
   }
   if (structuralOnly) return { ok: true, problems: [] };
-  const problems = [];
   for (const entry of entries) {
     for (const p of validateEntry(entry, entryOpts)) problems.push(`${entry.heading}\n      ${p}`);
   }

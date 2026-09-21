@@ -1051,7 +1051,7 @@ including each guard's recorded pre-fix failure);
 
 ---
 
-## Decision #9: Lanes Push at Checkpoints, Not at Every Commit (2026-09-18)
+## Decision #10: Lanes Push at Checkpoints, Not at Every Commit (2026-09-18)
 
 **Context**: `docs/LANE_STANDARD.md` §7 item 1 has said, since the 2026-09-07
 sandbox rebuild that erased every worktree, the session's scratch directory,
@@ -1138,7 +1138,118 @@ decision to argue with instead of a sentence in a §7 someone rewrote.
 `lane/ci-docs-fast-path`, recording the instruction that round 1 acted on and
 did not log. The round-1 review approved the §7 rewrite as written and asked
 only for this entry and for `CLAUDE.md` to lead with the durability reason
-rather than the objection; both are done in the same change.
+rather than the objection; both are done in the same change. **Renumbered
+2026-09-19** from "Decision #9" to "Decision #10" — this entry and Decision
+#9 ("Generation Quality Becomes a Measured Track…", 2026-09-13, above) had
+been given the same number when this entry was created; the docs-truth lane
+renumbered the later (2026-09-18) entry and updated every by-number citation
+of it (`CLAUDE.md`, `docs/LANE_STANDARD.md` §7, `docs/brain/**`) rather than
+the earlier one, since the earlier entry is cited by number from
+`docs/story-generation/STORY_BENCH_2026-09-13.md` and
+`docs/CLAIMS_REGISTER.md` row 119 and renumbering it would have required
+touching files outside that lane's scope.
+
+## Decision #11: Move the AUC-24 Table Deadline to 2026-11-01 (2026-09-20)
+
+**Context**: `scripts/report-unverified-gates.mjs`'s `auc24-table` gate
+(protecting `tests/core/auc24-table.test.ts`, which recomputes the AUC-24
+floor in CI from a committed table of numbers rather than corpus text) has
+carried `expires: '2026-10-01'` since Decision #5 (2026-09-03). That table,
+`tests/fixtures/auc24-table.json`, has never been committed — it can only be
+produced by `npm run lock-auc24` running against the private, copyright-
+restricted real-script corpus on the owner's machine, which cannot reach CI.
+With the date unmoved, the gate would flip `report-unverified-gates.mjs` to
+exit 1 on every branch from 2026-10-01, per the gate's own design (this
+reporter's expiry mechanism exists precisely to block once a reported gap
+sits open past its deadline; see the "EXPIRY" section at the top of that
+script). Substantively, the deadline could not have been met even if the
+owner had run the lock before 2026-10-01: `AUC24_DEGRADATION_ID` was bumped
+to `shuffle-drop/v3` on 2026-09-19 (a reassembly fix so a degradation no
+longer welds two scenes together on a script with no trailing newline), so
+any table locked on the prior recipe would already be invalid and refused by
+`tests/core/auc24-table.test.ts`. The first table this recipe can ever
+produce can only be locked from 2026-09-19 onward.
+
+**The Question**: Does the `auc24-table` gate's expiry move, and if so, to
+what date and on what authority?
+
+**Options Considered**:
+
+1. **Leave it at 2026-10-01.** CI goes red on every branch on that date for a
+   gap the owner could not have closed in time even with the corpus in hand,
+   since the valid recipe did not exist until 2026-09-19. A gate is supposed
+   to force a real decision, not manufacture an unmeetable one.
+2. **Delete the gate.** Rejected: the gate protects a real, closable gap (one
+   local command, `npm run lock-auc24`, on the owner's machine) and deleting
+   it would remove the only forcing function that keeps that gap from
+   staying open indefinitely — exactly the failure mode Decision #5 and the
+   2026-09-02 retrospective both exist to prevent.
+3. **Move the date deliberately, in a reviewed diff.** The gate's own header
+   sanctions exactly this as one of three acceptable responses to an expiry
+   arriving ("move the date deliberately — in a diff a reviewer sees and can
+   refuse"). Chosen.
+
+**Decision**: Move `scripts/report-unverified-gates.mjs`'s `auc24-table`
+gate's `expires` from `2026-10-01` to `2026-11-01`, aligned with the latest
+existing gate deadline already in that file (the `craft-kb` gate,
+`data/craft/craft-kb.json`, also `2026-11-01`, set by Decision #5). Nothing
+else in the reporter's gate list changes: `AUC24_FLOOR` (0.622) and
+`AUC24_DEGRADATION_ID` (`shuffle-drop/v3`) are untouched — this is a
+deadline move, not a measurement or a floor change, and moving a floor is
+a measurement's job, not this decision's.
+
+**Rationale**: The reason is substantive, not merely administrative: the
+recipe the table must be locked on did not exist as a stable target until
+2026-09-19, so 2026-10-01 was never a date the owner could realistically
+meet with a *valid* table — locking earlier would have produced a table on
+`shuffle-drop/v2` or older, which the test's own recipe-ID check refuses.
+The corpus cannot reach CI by design (local-only, copyright; mounting it via
+secrets was rejected, since secrets are not a corpus transport and
+uploading the text anywhere is the exact exposure the de-identification work
+exists to avoid), so the owner-local step remains the only path to close
+this gate, unchanged by this decision. Aligning the new date with the
+`craft-kb` gate's existing 2026-11-01 rather than inventing a third date
+keeps the reporter's deadlines to the minimum distinct set this file's
+gates actually need.
+
+**Implications**:
+
+- Before 2026-11-01 the owner must run `npm run measure-real` (a fresh
+  measurement on the current recipe) and `npm run lock-auc24` against the
+  real corpus, then commit the resulting `tests/fixtures/auc24-table.json`.
+  `npm run owner:measure` runs both in sequence and stages the file.
+- If the table is not committed by 2026-11-01, `scripts/
+  report-unverified-gates.mjs` exits 1 and `npm run gates` fails on every
+  branch, by design — the same blocking behavior the unmoved date would have
+  produced on 2026-10-01, now aligned with a date the recipe could actually
+  be met by.
+- `CLAUDE.md`'s "(blocking from 2026-10-01)" gotcha, `scripts/
+  owner-measure.mjs`'s deadline comments, `docs/p1-benchmark/
+  MEASUREMENT_RUNBOOK.md`, and the `docs/brain/Gates/Gate - AUC-24 Ratchet.md`
+  and `docs/brain/Owner/Owner - Lock AUC24 Table.md` notes are updated to
+  2026-11-01 in the same change as this entry; dated session records, audit
+  directories and the P1/public-benchmark baseline docs that cited
+  2026-10-01 as a fact observed at their own time of writing are left as
+  written, per this project's standing convention for dated records.
+- `tests/scripts/report-unverified-gates.test.ts`'s assertion against the
+  real gate list's rendered `expires:` line is updated to 2026-11-01 in the
+  same change; its unrelated unit tests that use an arbitrary example date
+  of 2026-10-01 to exercise `isExpired`/`evaluateGates` in general are
+  untouched, since they test the mechanism, not this gate.
+
+**Expected Outcomes**: `npm run gates` and `node scripts/
+report-unverified-gates.mjs` continue to report the `auc24-table` gate as
+SKIPPED (not EXPIRED) through 2026-10-31, giving the owner a deadline the
+current recipe can actually be met by; from 2026-11-01, the gate blocks
+exactly as it would have on the old date if the table is still uncommitted.
+
+**Status**: Active
+
+**Revision History**: 2026-09-20 — created in `lane/gate-expiry` to move the
+`auc24-table` gate's expiry from 2026-10-01 to 2026-11-01 ahead of that
+deadline, per the finding recorded in `SESSION_REPORT_2026-09-19.md` §4 row
+7 and the `AUC24_DEGRADATION_ID` bump to `shuffle-drop/v3` recorded in
+`CLAUDE.md` on 2026-09-19.
 
 ---
 

@@ -35,7 +35,7 @@ import { NECESSITY_MAX_CHARS } from './necessity-certificate.ts';
 // on this range), so importing FROM the scoring-reachable src/lib/fountain.ts
 // does not touch a scoring-path file. See realVoiceEligibleWeightRejectionReason's
 // own comment for why this is now called directly instead of hand-modelled.
-import { CHARACTER_CUE_RE, CUE_INITIAL_CLASS, CUE_LETTER_CLASS, parseFountain, type FountainBlock } from '../../src/lib/fountain.ts';
+import { CHARACTER_CUE_RE, CUE_INITIAL_CLASS, CUE_LETTER_CLASS, isSceneHeadingLine, parseFountain, type FountainBlock } from '../../src/lib/fountain.ts';
 // isCharacterCue is the OTHER cue predicate in this repo — the one
 // server/nvm/analyze/screenplay-normalizer.ts's normalizeScreenplay() itself
 // uses to decide, during its double-spaced reflow, whether a line becomes a
@@ -804,6 +804,40 @@ export const MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT = 675_000;
 // computeReachableSet), so it is scoring-path and needs a measurement receipt.
 // But it is the fix to point at — free and bit-identical — rather than a pair
 // cap, which would move scores.
+//
+// LANDED 2026-09-20 — AND NEITHER BOUND MOVED, DELIBERATELY. The hoist above
+// shipped on `lane/burrows-delta-hoist` with its output-identity receipt
+// (docs/p1-benchmark/MEASUREMENT_RECEIPTS.md, 2026-09-20; lane record at
+// docs/audits/2026-09-20-burrows-delta-hoist/README.md): bit-identical over
+// 3,706 pairs at `maxDeltaDiff = 0`, all 45 doctor reports byte-identical, all
+// six public-benchmark floors unmoved. Measured on that lane's sandbox, three
+// runs each, OLD module vs NEW module in one process:
+//
+//   * `analyzeVoices` on `max-admitted` at cast 80 (3,160 pairs, the shape
+//     MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is DERIVED against):
+//     5,974 / 5,966 / 6,047 ms -> 121 / 118 / 118 ms — 50.6x.
+//   * `analyzeVoices` on `uniform-min` at cast 150 (11,175 pairs, the shape
+//     MAX_FOUNTAIN_VOICE_ELIGIBLE_WEIGHT is derived against):
+//     10,343 / 10,566 / 10,187 ms -> 236 / 236 / 237 ms — 43.8x.
+//   * `analyzeFountainText` END TO END on the max-admitted document:
+//     5,666 / 6,163 / 6,166 ms -> 151 / 133 / 131 ms — 43.1x, which is the
+//     "~99% of the derivation shape's cost" claim above, measured from the
+//     outside.
+//
+// NOTHING HERE WAS RE-DERIVED ON THOSE TIMINGS, and that is the point. Both
+// bounds, and the committed table at tests/fixtures/voice-bound-derivation.json
+// that MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT is re-derived from, were measured
+// BEFORE the hoist, on the runner, under `npm test`. They are therefore now
+// CONSERVATIVE by roughly the ratios above rather than wrong — the admitted
+// worst shape costs far less than the derivation charged it — and a bound that
+// is too strict rejects documents it could serve, which is a narrowing to
+// re-open on purpose with a fresh `npm run measure-voice-bound` on the runner,
+// not a silent side effect of a perf lane. Raising either number here without
+// re-locking that table fails tests/core/voice-bound-derivation.test.ts, which
+// is the guard working. Any per-ms-per-unit rate quoted in the round-1/round-2
+// derivations ABOVE (0.0173-0.0187, and the 0.022 conservative upper bound) is
+// likewise a PRE-HOIST rate and must not be reused as if it still described
+// this code.
 export const MAX_FOUNTAIN_VOICE_ELIGIBLE_DISTINCT = 80;
 // 2026-09-06 review round 7 follow-up, non-blocking — RESIDUAL accepted
 // worst case, recorded here rather than left unstated: a document sitting
@@ -1004,14 +1038,14 @@ const SCENE_HEADING_PREFIX_RE = /^(INT|EXT|EST|I\/E)[. ]/;
 // drop it under VOICE_ELIGIBLE_MIN_WORDS, and skip the bound just the
 // same. The predicate has to MATCH parseFountain's, not merely
 // approximate it in either direction.
-const SCENE_SEGMENT_RE = /^(INT|EXT|EST|I\/E|INTERIOR|EXTERIOR|ESTABLECIENDO|INT\/EXT|INTÉRIEUR|EXTÉRIEUR|INTERIEUR|EXTERIEUR|INNEN|AUSSEN)[. ]/iu;
+// 2026-09-20: the regex that used to sit here is now src/lib/fountain.ts's own.
 /** True exactly when src/lib/fountain.ts's parseFountain would classify a
  *  pre-trimmed line as a `scene_heading` block. Exported for
  *  tests/security/fountain-shape-guard-cue-parity.test.ts's "ROUND 5"
  *  parity proof only — every real call site inside this file passes an
  *  already-`.trim()`-ed line, matching parseFountain's own `trimmed`. */
 export function isSceneSegmentHeading(trimmedLine: string): boolean {
-  return SCENE_SEGMENT_RE.test(trimmedLine) || trimmedLine.startsWith('.');
+  return isSceneHeadingLine(trimmedLine);  // parseFountain's own predicate, not a mirror of it (2026-09-20)
 }
 
 /** One occurrence the guard counts against the CUE-COUNT bounds (distinct/
@@ -2480,14 +2514,93 @@ export const InjectOpsBodySchema = z.object({
   label: z.string().max(256).optional(),
 });
 
+// The six SceneFunction values server/nvm/ir/NarrativeTransitionIR.ts declares
+// and server/nvm/generate/llm-generator.ts's IR_SCHEMA enumerates for the LLM
+// response schema — one list, so a target's declared function and a
+// generated candidate's function are always checked against the same set.
+export const SCENE_FUNCTIONS = [
+  'advance_plot', 'reveal_character', 'build_tension',
+  'provide_relief', 'set_up_payoff', 'establish_world',
+] as const;
+
+// 2026-09-19 converge-contract lane (C12): SceneTarget used to be
+// `z.object({ sceneIdx: z.number() }).passthrough()` — everything the
+// convergence loop (server/nvm/converge/loop.ts) actually treats as a typed
+// SceneTarget (server/nvm/generate/proof-spec.ts) arrived unvalidated. A
+// string `tensionTarget` silently made `valuationScore >= target.tensionTarget`
+// meaningless (a string comparison that is never true the way the caller
+// expects), and free-text members flowed into the generation prompt with no
+// bound on their size. `activeMechanisms`/`tensionTarget`/`qualityTarget`/
+// `themeHint`/`necessity` are now all typed; `.passthrough()` is dropped
+// because neither client that builds this body (scripts/story-bench.mjs,
+// src/components/ArcPlannerPanel.tsx) sends any field beyond these.
+//
+// `tensionTarget`'s upper bound is deliberately generous (not the 0-100 a
+// "target score" name suggests) — deriveTensionLedger's totalTension is an
+// unbounded sum across open narrative positions, not a 0-100 score, and
+// tests/routes/nvm-converge-select.test.ts deliberately sends 999999 as an
+// "unreachable ceiling" fixture to exercise the budget-exhausted path. A
+// 0-100 cap would 400 that fixture. `.finite()` still rejects Infinity/NaN.
+export const SceneTargetSchema = z.object({
+  sceneIdx: z.number().int().min(0),
+  sceneFunction: z.enum(SCENE_FUNCTIONS),
+  activeMechanisms: z.array(noControlChars.max(64)).max(24),
+  tensionTarget: z.number().finite().min(0).max(1_000_000),
+  qualityTarget: z.number().min(0).max(100).optional(),
+  themeHint: noControlChars.max(300).optional(),
+  necessity: NecessityCertificateSchema.optional(),
+  // 2026-09-19 cast-grounding lane: the character ids the caller says exist in
+  // this story. Same identifier convention as `activeMechanisms` above — a
+  // control-character-free string, capped, in a capped array — because it
+  // reaches the same place by the same route (the generation preamble), and
+  // because a charId with an embedded newline is how a cast line stops being
+  // one line. `.min(1)` because an empty id is not a character: it would be
+  // rendered as nothing in the CAST line and would ground nothing in
+  // IntentionalProof, so accepting it would only let a caller believe it had
+  // declared a cast member. 64 entries is generous for a screenplay cast and
+  // bounds what one request can push into the prompt.
+  //
+  // `.optional()`, not `.default([])`: absent and empty mean DIFFERENT things
+  // to server/nvm/proof/tier1/intentional.ts — absent leaves the proof's
+  // pre-2026-09-19 self-grounding behaviour intact, empty asserts that the
+  // story has no characters — so a default here would silently switch every
+  // caller that omits it onto the new path.
+  //
+  // The extra refinement on top of noControlChars: that helper deliberately
+  // PERMITS LF and TAB (see CONTROL_CHARS_RE above — it is shared with prose
+  // fields where a line break is legitimate), and a character cue is a
+  // single-line identifier in every format this repo reads or writes. A
+  // "MAYA\nIGNORE THE ABOVE" id is rejected here rather than only neutralised
+  // at render time by sanitizeSingleLine in
+  // server/nvm/generate/proof-spec.ts's formatCastList — both hold, because
+  // that function is also called from paths this schema does not guard.
+  cast: z.array(
+    noControlChars.min(1).max(64).refine(s => !/[\n\t]/.test(s), {
+      message: 'a character id must be a single line',
+    }),
+  ).max(64).optional(),
+});
+
+// H6's documented default (loop.ts: `maxIterations * candidatesPerIteration`)
+// times the route's own per-request cap keeps a single request's worst case
+// bounded; the per-field caps below are the loop's own hard ceiling as
+// already enforced (inconsistently, with no lower bound) at the route level
+// (server/routes/nvm/converge.ts: `Math.min(Number(rawBudget.maxIterations ??
+// 4), 10)` — no `Math.max`, so -1 passed through unclamped and ran the loop
+// zero times, landing in loop.ts's last-resort synthesized-IR path). Moving
+// the bound here means a malformed budget 400s with a field-named error
+// instead of silently degenerating.
+export const ConvergeBudgetSchema = z.object({
+  maxIterations: z.number().int().min(1).max(10).optional(),
+  candidatesPerIteration: z.number().int().min(1).max(5).optional(),
+  maxLLMCalls: z.number().int().min(1).optional(),
+}).optional();
+
 export const ConvergeBodySchema = z.object({
   sessionId: sessionIdField,
-  target: z.object({ sceneIdx: z.number() }).passthrough(),
+  target: SceneTargetSchema,
   seed: z.number().optional(),
-  budget: z.object({
-    maxIterations: z.number().optional(),
-    candidatesPerIteration: z.number().optional(),
-  }).passthrough().optional(),
+  budget: ConvergeBudgetSchema,
 });
 
 // POST /api/nvm/converge/commit — the missing back-half of generate→audit→select
@@ -2516,9 +2629,15 @@ export const ConvergeCommitBodySchema = z.object({
   summary: z.string().max(500).optional(),
 });
 
+// C12: per-scene targets share SceneTargetSchema with POST /api/nvm/converge
+// (server/routes/nvm/converge.ts documents them as the same request shape —
+// see this route's `budget` reuse below) — was `z.array(z.unknown())`, so an
+// arc's scenes were exactly as unvalidated as a single converge target.
 export const ConvergeArcBodySchema = z.object({
   sessionId: sessionIdField,
-  scenes: z.array(z.unknown()).min(1).max(8),
+  scenes: z.array(SceneTargetSchema).min(1).max(8),
+  seed: z.number().optional(),
+  budget: ConvergeBudgetSchema,
 });
 
 // POST /api/nvm/whatif/explore — What-If Lab compose endpoint (Run 6).
@@ -2611,9 +2730,112 @@ export const CompileBodySchema = z.object({
   title: z.string().max(256).optional(),
 });
 
+// ApprovedSpan (server/nvm/revision/passes/types.ts) — a 1-based, inclusive
+// line range the caller asks the 14-pass revision pipeline to leave alone,
+// plus an optional reason shown to the LLM. Until 2026-09-20 this arrived as
+// `z.array(z.unknown())`, force-cast at the route
+// (server/routes/nvm/revision.ts), so a malformed span never 400'd — it
+// silently lost its lock instead: relocateApprovedSpans
+// (server/nvm/revision/approved-spans.ts) treats a non-finite/out-of-range
+// startLine/endLine as `skipped`, and approvedSpanInstructions
+// (server/nvm/revision/rewrite-llm.ts) treats a non-string `reason` as ''.
+// Both of those consumer-side tolerances are KEPT (defence in depth for any
+// caller that reaches them outside this route) — this schema exists so the
+// one shipped sender (src/components/RevisionPanel.tsx, the only caller
+// found across src/, scripts/ and tests/ that POSTs approvedSpans over HTTP)
+// gets a 400 naming the field instead of a silent no-op lock.
+//
+// `startLine`/`endLine` are ints because the sender always sends numbers
+// (`Number(spanStart)` et al.) and a string coordinate ("3") is exactly the
+// kind of value relocateApprovedSpans's `Number.isFinite` check was built to
+// shrug off rather than reject — the .refine() below turns "shrug off" into
+// "name both fields and 400".
+//
+// `reason` is optional, matching the ApprovedSpan interface's own consumers
+// (not the TS type, which marks it required) — approvedSpanInstructions
+// already treats an absent/non-string reason as no reason at all, and the
+// UI's own "Protected spans" form always sends one anyway (min 1 char after
+// trim, capped at 300), so making it required here would only reject a
+// caller this repo doesn't have. 500, not 300, because a future non-UI
+// caller may reasonably say more than the panel's form allows; the field
+// still lands truncated to 120 chars in the prompt
+// (approvedSpanInstructions's sanitizeSingleLine(s.reason, 120)) regardless
+// of what this cap permits through. `noControlChars` is the same helper
+// SceneTargetSchema's `themeHint` uses — a reason is free text shown to the
+// LLM, not a single-line identifier, so (unlike `cast` above) no extra
+// single-line refinement is added.
+//
+// The array is capped at 200: generous for a human marking up protected
+// passages by hand (the UI form adds one span per click-through), while
+// still bounding how many entries one request can push through
+// relocateApprovedSpans's per-span document scan and into the rewrite
+// prompt's per-pass span-instruction block.
+//
+// 2026-09-20 (review finding 2, HIGH, adversarial-probe-confirmed): the
+// 200-entry array cap above bounds the COUNT of spans, not the SIZE of any
+// one of them — this comment used to claim otherwise. `endLine` had no
+// upper bound at all, and approvedSpanInstructions (rewrite-llm.ts) sliced
+// `lines.slice(startLine - 1, endLine)` unclamped, so
+// `{startLine: 1, endLine: 9007199254740991}` x200 on a 4,000-line draft
+// built a 57 MB "APPROVED — DO NOT CHANGE" prompt block per pass (x14
+// passes) from a ~12 KB request body, with no prompt-size guard before
+// `provider.generate()`. Two bounds close that: `endLine` itself is capped
+// at APPROVED_SPAN_MAX_LINE (200,000 — matches FixSpanSchema's shape below,
+// which is also a 1-based inclusive line-range schema, though that schema
+// has no equivalent upper bound of its own to inherit; this one is new),
+// and the superRefine below on ReviseBodySchema separately bounds the SUM,
+// across every span in one request, of `(endLine - startLine + 1)` — the
+// actual line count relocateApprovedSpans/approvedSpanInstructions will
+// scan/quote — to APPROVED_SPAN_TOTAL_LINES_MAX (20,000: a full feature
+// screenplay is ~6,000 lines, so this leaves headroom for a caller who
+// genuinely wants most of a long draft protected while still rejecting the
+// pathological "cover a document many times over" shape). The per-span
+// prompt-block size itself is additionally capped, independently, inside
+// approvedSpanInstructions (rewrite-llm.ts) — defence in depth for any
+// caller that reaches the pipeline without going through this schema.
+export const APPROVED_SPAN_MAX_LINE = 200_000;
+export const APPROVED_SPAN_TOTAL_LINES_MAX = 20_000;
+
+export const ApprovedSpanSchema = z.object({
+  startLine: z.number().int().min(1),
+  endLine: z.number().int().max(APPROVED_SPAN_MAX_LINE),
+  reason: noControlChars.max(500).optional(),
+}).refine(s => s.endLine >= s.startLine, {
+  message: 'endLine must be on or after startLine',
+  path: ['endLine'],
+});
+
 export const ReviseBodySchema = z.object({
   sessionId: sessionIdField,
-  approvedSpans: z.array(z.unknown()).optional(),
+  approvedSpans: z.array(ApprovedSpanSchema).max(200).optional(),
+  title: z.string().max(256).optional(),
+}).superRefine((body, ctx) => {
+  if (!body.approvedSpans || body.approvedSpans.length === 0) return;
+  const totalLines = body.approvedSpans.reduce(
+    (sum, s) => sum + (s.endLine - s.startLine + 1),
+    0,
+  );
+  if (totalLines > APPROVED_SPAN_TOTAL_LINES_MAX) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        `combined span length (${totalLines} lines) exceeds the ` +
+        `${APPROVED_SPAN_TOTAL_LINES_MAX}-line request limit`,
+      path: ['approvedSpans'],
+    });
+  }
+});
+
+// GET /api/nvm/revise-stream's query-string counterpart to ReviseBodySchema
+// above (2026-09-19, revise-deadline lane) — same two fields the SSE route
+// actually reads (`req.query.sessionId` via sessionId(), `?title=`), same
+// bounds, so a malformed value gets the same 400 shape the POST route already
+// gives instead of a 200 SSE stream carrying a generic `revision_error` event.
+// approvedSpans has no query-string equivalent (the SSE route never accepts
+// approved spans — it always calls runRevisionPipeline with []), so it is not
+// part of this schema.
+export const ReviseStreamQuerySchema = z.object({
+  sessionId: sessionIdField,
   title: z.string().max(256).optional(),
 });
 
@@ -3381,6 +3603,30 @@ export function validateParams(schema: z.ZodTypeAny) {
     const result = schema.safeParse(req.params);
     if (!result.success) {
       const msg = result.error.issues[0]?.message ?? 'Invalid request parameters';
+      const path = result.error.issues[0]?.path.join('.') ?? '';
+      res.status(400).json({ error: path ? `${path}: ${msg}` : msg });
+      return;
+    }
+    next();
+  };
+}
+
+// Usage:  app.get('/api/foo', validateQuery(FooQuerySchema), handler)
+// Same 400 shape as validate()/validateParams() above, applied to req.query
+// instead of req.body — for GET routes (e.g. a query-driven SSE stream) that
+// take request-shaping input on the query string rather than a JSON body.
+// (2026-09-19, revise-deadline lane): GET /api/nvm/revise-stream was the
+// first caller — before this it flushed SSE headers and only THEN read
+// req.query inside a try/catch that turned any error, including a malformed
+// value, into a 200-status SSE `*_error` event rather than a clean 400.
+// Running as middleware ahead of the handler fixes that ordering: a bad query
+// is rejected before headers are ever sent, the same way validate() rejects a
+// bad body before a route does any work.
+export function validateQuery(schema: z.ZodTypeAny) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      const msg = result.error.issues[0]?.message ?? 'Invalid query parameters';
       const path = result.error.issues[0]?.path.join('.') ?? '';
       res.status(400).json({ error: path ? `${path}: ${msg}` : msg });
       return;

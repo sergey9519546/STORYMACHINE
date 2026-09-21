@@ -1,0 +1,519 @@
+# Lane record — per-pass diagnostics (2026-09-20)
+
+**Branch:** `lane/per-pass-diagnostics`, from `26d930dd`.
+**Code commit:** `e3c3b53a`.
+**Scope:** make each of the 14 revision passes diagnose the document it is
+actually handed, and make an author's approved spans follow that document's
+text when it moves. Two files on the scoring path
+(`server/nvm/revision/pipeline.ts` and the new
+`server/nvm/revision/approved-spans.ts`), one off it
+(`server/nvm/revision/rewrite-llm.ts`). `server/nvm/analyze/doctor.ts` and the
+Fountain heading grammar were not touched — a concurrent lane owns those.
+
+---
+
+## 1. What the thing is
+
+`runRevisionPipeline` (`server/nvm/revision/pipeline.ts`) receives a compiled
+screenplay plus three diagnostic inputs — `records`, `structure` and
+`annotations` — and runs 14 passes over the draft. Each pass reads the draft
+text AND those three diagnostics, reports issues, and hands back a possibly
+rewritten draft that the next pass receives. The three inputs come from the
+caller, not from the pipeline: the route (`server/routes/nvm/revision.ts`)
+builds them from the StoryCommit ledger, the doctor builds them with
+`analyzeFountainText`.
+
+Two things were threaded through all 14 passes unchanged while the draft
+underneath them changed.
+
+**The diagnostics.** Computed once, from the draft as submitted. From pass 2
+onward every pass was reading the pre-revision document's records while
+holding the post-pass-1 text — the defect recorded in
+SESSION_REPORT_2026-09-19.md §4 row 3, and a plausible mechanism for passes
+acting on issues a prior pass already resolved.
+
+**The approved spans.** An `ApprovedSpan` is a 1-based inclusive line range
+plus a reason. A line range means nothing except relative to one document, and
+the line count changes as passes rewrite. The locked-spans lane
+(`docs/audits/2026-09-19-locked-spans/README.md` §3) named this as the half of
+its defect it was not allowed to fix, because the fix lives in `pipeline.ts`.
+
+One correction to the brief's premise, for the record: the brief says to call
+again "whatever function produced `records`/`structure`/`annotations` from the
+original at the top of the pipeline." No such function is in the pipeline. The
+values arrive as parameters, and on the route path they are derived from
+StoryCommits, not from text — see §4.
+
+## 2. The fix
+
+### 2.1 Diagnostics are re-derived for the draft a pass will see
+
+The sequential loop now carries `passRecords`/`passStructure`/
+`passAnnotations` alongside `diagnosedFountain`, the draft those three
+describe. Before each pass, if `currentFountain !== diagnosedFountain`, the
+three are replaced with `analyzeFountainText(currentFountain)`'s and the
+anchor advances. Byte-equality is the test, not a `changed` flag: a pass that
+rewrote the draft back to what it already was costs nothing, and a pass that
+returns different text while reporting `changed: false` is still re-diagnosed.
+
+A pass that changes nothing therefore costs nothing at all, which matters:
+`analyzeFountainText` over a feature-length draft is not free, and 13
+unconditional re-derivations per revise request would be a real cost paid for
+no information.
+
+If `analyzeFountainText` throws, the previous diagnostics are kept (stale —
+which is the defect this block exists to close, so it is logged at error as
+`revision_rediagnose_failed`, not swallowed) and the anchor is NOT advanced,
+so the next pass retries against its own draft rather than being frozen by one
+failure. A successful re-derivation logs `revision_pass_rediagnosed` at debug
+with the pass index, the pass name and the new scene count — no text.
+
+### 2.2 Approved spans are re-located by their own text
+
+`server/nvm/revision/approved-spans.ts` is new, pure, and exports
+`relocateApprovedSpans(prevDoc, nextDoc, spans)`. For each span it cuts the
+excerpt out of `prevDoc` at `startLine..endLine` (`endLine` clamped to the
+document, exactly as `approvedSpansSurvive` clamps it), finds that excerpt in
+`nextDoc` as WHOLE LINES after CRLF/CR → LF normalization, and rewrites the
+line numbers to the occurrence nearest the span's previous position, ties
+going to the earlier one. It returns the same-length, same-order array plus
+three index lists — `moved`, `lost`, `skipped` — and never the span text, so
+all three are safe for a caller to log.
+
+Three decisions worth naming:
+
+* **Whole-line alignment on both ends.** The excerpt was cut on line
+  boundaries, so a match starting mid-line is different text that merely ends
+  the same way; re-pointing a lock at it would move the lock onto lines the
+  author never approved. Requiring alignment also means the match's line
+  number IS the new `startLine`, with no partial-line arithmetic.
+* **Nearest occurrence, not first.** A locked range can legitimately sit
+  inside repeated text. "First occurrence wins" would move a lock on the
+  second of two identical blocks onto the first the moment a pass edited
+  something above them.
+* **A lost span keeps its indices.** After an accepted LLM rewrite this cannot
+  happen — `approvedSpansSurvive` (`rewrite-llm.ts`, 2026-09-19) rejects any
+  rewrite that does not preserve every locked excerpt verbatim — but a
+  non-LLM editor of the draft is not bound by that check. Losing the whole
+  span array because one span's text was edited would be worse than carrying
+  one stale range forward with a warning, so the pipeline logs
+  `revision_locked_span_lost_between_passes` at warn with indices and counts
+  only.
+
+`rewrite-llm.ts` lost its private copy of `normalizeLineEndings` and imports
+the shared one. The survival check and the re-location have to agree about
+what counts as the same line endings; one implementation is how they cannot
+drift.
+
+### 2.3 Nothing else moved
+
+`RevisionResult.originalFountain` is still the draft as submitted. The
+diagnose-only concurrent branch is untouched. Pass 1 still reads exactly the
+`records`/`structure`/`annotations` the caller passed in — only the
+re-derivation, for a draft the caller never saw, comes from the text.
+
+## 3. Why the score cannot move
+
+`runScriptDoctor` reaches this pipeline only inside `runDiagnoseOnly()`. In
+that scope every pass's trailing `rewritePass(...)` returns its input before
+any rewrite work happens (`rewrite.ts`'s diagnose-only guard), so
+`revisedFountain` never differs from the draft. Both new behaviours are gated
+on the draft having changed, so on the doctor's path neither the re-derivation
+nor the re-location ever executes. The doctor also takes the concurrent
+branch, which this lane does not touch.
+
+Measured rather than argued — output identity against a `git archive 26d930dd`
+tree, both sides `GIT_SHA=dev`:
+
+```
+OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+```
+
+Receipt: `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, entry
+`### 2026-09-20 — REVISION PASSES DIAGNOSE THE CURRENT DOCUMENT …`.
+
+## 4. What this changes for the route path, honestly
+
+On `POST /api/nvm/revise` and `/api/nvm/revise-stream`, `records` and
+`structure` are built from the StoryCommit ledger
+(`buildScreenplayMemory`/`analyzeStructure`), which carries per-scene signal
+the text reconstruction infers heuristically. Once a pass rewrites the draft,
+this change replaces those with `analyzeFountainText`'s. That is a real trade:
+the ledger-derived records are richer, but they describe a document that no
+longer exists, and there is no ledger for a draft an LLM just rewrote. A pass
+reading accurate signal about the wrong document is worse than a pass reading
+heuristic signal about the right one, and a re-derivation from the ledger is
+not available at all. Pass 1 — the only pass whose draft the ledger genuinely
+describes — still gets the ledger's version.
+
+Every consumer of those three values was read: the route passes them straight
+into the pipeline and returns the result; `/api/nvm/memory` and
+`/api/nvm/compile` build their own and never reach the pipeline; the doctor
+holds its own `mergedAnalysis` for `aggregateReport` and is unaffected. No
+caller depends on the passes having seen the original's diagnostics.
+
+## 5. Fail-first evidence
+
+`tests/core/revision-per-pass-diagnostics.test.ts` (new, 14 assertions), run
+with this lane's two source edits stashed and `approved-spans.ts` left in
+place:
+
+```
+    not ok 1 - (a) a pass that cuts the draft makes every later pass diagnose the CUT draft
+    ok 2 - (b) a pass that changes nothing costs no re-derivation
+ok 2 - relocateApprovedSpans (pure)      [10/10]
+    not ok 1 - (d) two lines inserted in pass 1 move the locked range for pass 2
+    not ok 2 - a pass that edits the locked text itself warns with indices only and keeps the old range
+# tests 14
+# pass 11
+# fail 3
+```
+
+(a)'s failure message, with a fake rewriter cutting an 18-scene draft to 6
+scenes in pass 1:
+
+```
+pass 2 (causality) diagnosed a different document than the one it was handed
+```
+
+— pass 2 reported 10 issues, including `CAUSAL_ACT1_VOID` over "Act 1 (Scenes
+1–4)" of an 18-scene reading and `ACT2_CAUSAL_DESERT` over "Act 2 (Scenes
+5–13)", where the same 6-scene draft analysed from the start reports 2. Across
+passes 2..14 the run named eleven scenes (Scene 7 … Scene 18) that no longer
+existed in the document being revised. (d)'s failure, verbatim: pass 2 held
+`startLine: 41, endLine: 43` where the locked text had moved to
+`startLine: 43, endLine: 45` — exactly the two lines pass 1 inserted above it.
+
+With the fix restored: `# pass 14 # fail 0`.
+
+(b) is a guard, not a regression test — before the fix there was no
+re-derivation at all, so it passed vacuously. What it pins is the skip: it
+fails the moment the re-derivation is made unconditional.
+
+## 6. Gates
+
+| gate | exit | result |
+|---|---|---|
+| `tests/core/revision-per-pass-diagnostics.test.ts` (new) | 0 | 14/14 (3 fail pre-fix) |
+| `tests/routes/nvm-revision.test.ts` | 0 | 12/12 |
+| `tests/routes/nvm-revision-budget.test.ts` | 0 | 5/5 |
+| `tests/routes/nvm-revision-budget-attempts.test.ts` | 0 | 1/1 |
+| `tests/core/approved-spans-enforced.test.ts` | 0 | 22/22 |
+| `tests/core/approved-span-sanitization.test.ts` | 0 | 7/7 |
+| all 15 `tests/passes/*.test.ts` | 0 | 6,477 assertions, 0 fail |
+| `tests/core/llm-seam-wiring.test.ts` | 0 | 7/7 |
+| `tests/core/pure-core-boundary.test.ts` | 0 | 6/6 |
+| `tests/core/public-benchmark.test.ts` | 0 | 28/28 |
+| `tests/core/honesty-audit-claims.test.ts` | 0 | 15/15 |
+| `tests/core/pipeline-parallel.test.ts` | 0 | 10/10 |
+| `tests/core/core-01/02/03.test.ts` | 0 | 424 / 427 / 307 |
+| `tests/core/calibration.test.ts` | 0 | 21/21 |
+| `tests/core/scoring-receipt-guard.test.ts` | 0 | 26/26 |
+| `tests/core/receipt-gate-inplace-rewrite.test.ts` | 0 | 10/10 |
+| `tests/core/brain-coverage.test.ts` | 0 | 8/8 |
+| `npm run lint` (`tsc --noEmit`) | 0 | clean |
+| `npm run check-no-console` | 0 | 311 files checked, 23 quarantine entries, OK |
+| `npm run check-server-reachability` | 0 | OK |
+| `npm run check-docs` | 0 | clean |
+| `npm run honesty-audit` | 0 | 469 files + 560 markdown + 120 claim rows, clean |
+| `npm run gates` | 0 | public-benchmark suite RAN and failed on a raised floor by name |
+| `node scripts/check-scoring-receipt.mjs 26d930dd..HEAD` | 0 | names both scoring-path files, receipt accepted |
+| output identity, baseline `git archive 26d930dd`, both sides `GIT_SHA=dev` | 0 | all 45 reports byte-identical |
+
+Public benchmark, reproduced with `scripts/benchmark-public.ts --json`, all
+six unchanged: shuffle-drop 0.5313 paired / 0.5586 all-pairs (17 ordered, 15
+inverted, 0 tied); climax-relocate 0.4063 / 0.4443 (8 / 14 / 10);
+DIALOGUE_FLATTEN 1.0000 / 0.9473 (32 / 0 / 0). No floor in
+`scripts/lib/auc.ts` was touched and no re-lock was performed.
+
+`npm test` and `npm run brain` were out of scope for this lane and were not
+run, so `docs/brain/brain.graph.json` and `GRAPH.md` still need an
+integrator's `npm run brain` to include this lane's vault note.
+
+## 7. A gate defect found on the way, not fixed here
+
+Appending the receipt entry after a `---` horizontal rule made
+`scripts/check-scoring-receipt.mjs` fail the range by reporting a missing
+`**Command**` field on the PRECEDING entry — the 2026-09-12 public-benchmark
+re-lock, which writes `**Commands (all run in this worktree…` (plural) and so
+does not match `REQUIRED_FIELDS`'s `/\*\*\s*Command\s*:?\s*\*\*/i`.
+
+The mechanism is `entriesModifiedInPlace`: it trims TRAILING BLANK lines off
+an entry's span before the overlap test (the 2026-09-19 receipt-gate-inplace
+fix), but a `---` line is not blank, so it stays inside the preceding entry's
+span, the new hunk overlaps it, and that historical entry is validated as an
+"in-place rewrite" — exactly the retroactive re-validation of history the
+script's own header says it must not do. Dropping the rule matched the
+ledger's existing convention (entries are separated by one blank line) and the
+gate passed, so nothing was changed in the script. It is a live trap for the
+next lane that separates its entry with a rule.
+
+## 8. What was NOT done
+
+* **`npm test` and `npm run brain`** — excluded by the lane brief.
+* **No stricter schema for `approvedSpans` at the route.** It still arrives as
+  `z.array(z.unknown())` (`server/lib/validation.ts`), force-cast. Malformed
+  spans are handled (`skipped`), not rejected; the real fix is a schema, in
+  `validation.ts`, which this lane did not own.
+* **No re-derivation from the StoryCommit ledger.** See §4 — there is no
+  ledger for a draft a pass just rewrote.
+* **`doctor.ts` and the heading grammar** — owned by a concurrent lane.
+
+## 9. Files touched
+
+* `server/nvm/revision/pipeline.ts` — the per-pass re-derivation and span
+  re-location, plus the doc comments that used to say spans were threaded
+  through unchanged.
+* `server/nvm/revision/approved-spans.ts` — new.
+* `server/nvm/revision/rewrite-llm.ts` — imports the shared
+  `normalizeLineEndings` instead of defining a second one.
+* `tests/core/revision-per-pass-diagnostics.test.ts` — new.
+* `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` — the 2026-09-20 entry, appended
+  at the end.
+* `docs/audits/2026-09-20-per-pass-diagnostics/README.md`,
+  `docs/brain/Audits/Audit - 2026-09-20 Per-Pass Diagnostics.md` — this
+  record.
+
+---
+
+## § Review findings 1 and 5 fixed
+
+**Branch:** `lane/pipeline-ledger-structure`, from `02d8cfb4`.
+**Code commit:** `6061ae9d`. **Records commit:** see §10.
+
+A review of the lane recorded above found two defects in it. Both are fixed
+here, in the same two files, with the same output-identity obligation.
+
+### 1. The re-derivation threw the ledger away (BLOCKER)
+
+§2.1 replaced all three diagnostics with `analyzeFountainText(currentFountain)`
+'s. That function's structure is `analyzeStructure(records, [])` — its own
+comment at `fountain-analyzer.ts` ~2433 says "commits=[] — see file-header
+comment for why this is safe", and it is safe THERE, because the analyzer has
+no ledger. It is not safe in the pipeline, because the caller does.
+
+`commits` is the only thing `analyzeStructure` reads besides `records`
+(`server/nvm/screenplay/structure.ts`: one use, at `totalClockPressure`), and
+that scalar decides `actPosition`, `completionPercent` and, through
+`actPosition === 'act3'`, `approachingClimax`. `server/routes/nvm/revision.ts`
+computes the caller's structure as `analyzeStructure(records, allCommits)`. So
+once pass 1 changed one byte, passes 2..14 read act 1 / 0% / not approaching
+where the ledger said act 3 / 100% / approaching. The reviewer's probe, now an
+assertion in the test file: same records, commits vs `[]` →
+`{act3, 100, true}` vs `{act1, 0, false}`. Six pass files branch on those
+fields — `passes/structure.ts` (604, 614-619), `intention.ts` 685,
+`pacing.ts` 711, `payoff.ts` (607, 672, 743, 788), `character-arc.ts`
+(688, 699), `conflict.ts` 658.
+
+§4 above is right that there is no ledger for a draft an LLM just rewrote —
+but that argument applies to `records` and `annotations`, which describe scenes
+that moved. It does not apply to the ledger itself. The commits are not a
+property of the draft; they are as true after pass 7 as before pass 1. The
+pipeline's own docstring already said the ledger "carries signal no text
+reconstruction can", and then dropped it at the first re-derivation.
+
+**Fix.** `runRevisionPipeline` takes the StoryCommit ledger as an optional
+EIGHTH argument, defaulting to `[]`. On re-derivation it computes
+`analyzeStructure(rediagnosed.records, commits)` instead of taking
+`rediagnosed.structure`; `records` and `annotations` still come from the text.
+The route passes `allCommits` on both of its pipeline calls. Eighth and not
+earlier because `doctor.ts` passes `forceSequentialForTest` positionally as the
+seventh, and `doctor.ts` belongs to a concurrent lane — so the route also
+passes `false` explicitly, which is the default it has always taken.
+
+The default is what makes this inert for every deterministic caller:
+`analyzeFountainText`'s structure IS `analyzeStructure(records, [])`, so with
+`commits = []` the new code computes the identical object.
+
+### 2. A lost approved span was kept, not dropped (MEDIUM)
+
+§2.2's last decision — "a lost span keeps its indices" — is the one that does
+not hold up. The pipeline warned and then set `passSpans = relocation.spans`
+(which still contains the lost span at its OLD line numbers) and advanced
+`spanAnchorFountain` to the new draft. From the next pass, `approvedSpansSurvive`
+cuts the excerpt out of the NEW document at those numbers and enforces it. Two
+things follow, neither of them the author's intent: the text they actually
+locked is now unprotected and freely deletable, and some unrelated passage that
+happens to sit at those lines is silently locked in its place — with no further
+warning, because a span is only reported lost once.
+
+§2.2's reasoning ("losing the whole span array would be worse than carrying one
+stale range forward") compares the wrong two options. The choice is not
+"carry it" vs "throw away every span"; it is "carry it" vs "drop THAT span".
+
+**Fix.** A lost span is removed from `passSpans` for the rest of the run. It is
+never re-anchored onto different text — the nearest match is still different
+text. The warning names the index the CALLER gave it (the loop now carries
+`passSpanOrigins`, because positions stop agreeing with the caller's array
+after the first drop) and adds `remainingApprovedSpans`; `totalApprovedSpans`
+is now the caller's total rather than the working array's length. The result
+carries `lostApprovedSpans: number[]`, those same caller-facing indices, and
+`POST /api/nvm/revise` returns the `RevisionResult` unreshaped, so it reaches
+the client. `aggregateReport` reads no field this adds, so it cannot reach a
+`ScriptDoctorReport`.
+
+Also in `approved-spans.ts`: the tie-break arm
+`|| (distance === bestDistance && candidates[i] < bestStart)` is deleted.
+`lineAlignedOccurrences` scans left to right and returns ascending candidates,
+so the first candidate at the minimum distance is already the earliest and a
+strict `<` never replaces it — the arm could not fire for any input. The
+comment now states that ascending order gives "earlier wins" for free, and the
+existing `ties between equidistant occurrences go to the earlier one` test
+still pins the behaviour.
+
+### 3. Fail-first evidence
+
+`tests/core/revision-per-pass-diagnostics.test.ts` grew from 14 tests to 18
+(the "keeps the old range" test is replaced by its opposite). Run against this
+lane's tree with the source edits stashed and the tests in place:
+
+```
+    ok 1 - (d) two lines inserted in pass 1 move the locked range for pass 2
+    not ok 2 - (c) a span whose locked text a pass edited away is DROPPED, reported, and no longer enforced
+    not ok 3 - a run that loses nothing reports lostApprovedSpans: []
+    ok 1 - the ledger and the text disagree about the act, which is what makes this observable
+    not ok 2 - (e) pass 1 changing one byte does not reset the act clock for passes 2..14
+    not ok 3 - (b) with `commits` omitted the pipeline output is byte-identical to the pre-lane tree
+# tests 18
+# pass 14
+# fail 4
+```
+
+(e)'s first failing assertion, verbatim: `pass 3 must still read the ledger's
+act3 after pass 1 changed the draft` — expected `true`, actual `false`. (c)'s:
+`a lost span must be dropped from the enforced set`, with pass 2 holding both
+spans, the lost one still at `startLine: 41, endLine: 43` — which in the
+edited draft addresses lines of the scene above the one the author locked.
+(b) is the identity pin, and it is the interesting failure: pre-change it
+fails ONLY on `undefined !== []` for the new `lostApprovedSpans` field, at the
+line AFTER the hash assertion — so the hash itself matched on the unfixed
+tree, which is exactly what that test exists to say. The ten pure
+`relocateApprovedSpans` assertions pass on both trees, as a pure-function suite
+must. With the fix restored: `# pass 18 # fail 0`.
+
+`tests/routes/nvm-revision.test.ts` is 10 pass / 3 fail against the unfixed
+tree (`lostApprovedSpans must always be present as an array`, and `the field
+must be serialized, not dropped as undefined`) and 13 / 0 against this one.
+
+### 4. Why no score can move
+
+Same argument as §3 above, plus two properties of this range specifically: the
+doctor and `calibration/reference.ts` call `runRevisionPipeline` with at most
+seven arguments, so they take `commits = []` — the exact value
+`analyzeFountainText`'s structure was already built with — and they pass no
+approved spans, so nothing can be dropped or reported.
+
+Measured rather than argued. Output identity against a `git archive 02d8cfb4`
+tree, both sides `GIT_SHA=dev`:
+
+```
+OUTPUT IDENTITY: PASS — all 45 reports are byte-identical (analyzedAt excluded).
+```
+
+That PASS is necessary but not sufficient, because it exercises only
+`runDiagnoseOnly()`, where the changed code provably never runs. So the
+pipeline's own output was hashed at the sequential loop, on the fixture where
+pass 1 cuts an 18-scene draft to 6: the SHA-256 of the six pre-lane
+`RevisionResult` fields with `commits` omitted is
+`0bc2c05561f0f5d03d81af5c1e7f2f3900498c7f75f7f2d28d3b80db1424efec` on
+`02d8cfb4` and the same after. It is pinned as test (b).
+
+Receipt: `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md`, entry
+`### 2026-09-20 — REVISION RE-DIAGNOSIS KEEPS THE LEDGER'S STRUCTURE …`.
+
+### 5. Measured effect, where it is visible
+
+Same fixture, pre-change tree vs post-change tree.
+
+| what | before | after |
+|---|---|---|
+| structure handed to pass 2, one-commit `RAISE_CLOCK 20` ledger | act1 / 0% / `approachingClimax` false | act3 / 100% / true |
+| pass 3 (intention) rules | — | gains `CLIMAX_WITHOUT_CHOICE` |
+| pass 6 (character-arc) rules | — | gains `NO_REVELATIONS`, `CLIMAX_EMOTIONALLY_FLAT` |
+| pass 1 (structure) rules | unchanged | unchanged |
+| spans handed to pass 2 after pass 1 deletes one span's text | both (lost one at 41–43, now other text) | only the surviving one |
+| `lostApprovedSpans` | field did not exist | `[1]` — the caller's own index |
+
+The same run with NO ledger passed in is unchanged in every rule from the
+pre-change tree. Pass 1 is unaffected either way: it reads the caller's
+structure before any re-derivation can happen.
+
+### 6. Gates
+
+| gate | exit | result |
+|---|---|---|
+| `tests/core/revision-per-pass-diagnostics.test.ts` | 0 | 18/18 (14/4 pre-fix) |
+| `tests/routes/nvm-revision.test.ts` | 0 | 13/13 (10/3 pre-fix) |
+| `tests/routes/nvm-revision-budget.test.ts` | 0 | 5/5 |
+| `tests/routes/nvm-revision-budget-attempts.test.ts` | 0 | 1/1 |
+| `tests/routes/nvm-revision-approved-spans-schema.test.ts` | 0 | 10/10 |
+| `tests/core/approved-spans-enforced.test.ts` | 0 | 22/22 |
+| `tests/core/approved-span-sanitization.test.ts` | 0 | 7/7 |
+| all 15 `tests/passes/*.test.ts` | 0 | 6,477 assertions, 0 fail |
+| `tests/core/llm-seam-wiring.test.ts` | 0 | 7/7 |
+| `tests/core/pure-core-boundary.test.ts` | 0 | 6/6 |
+| `tests/core/honesty-audit-claims.test.ts` | 0 | 15/15 |
+| `tests/core/pipeline-parallel.test.ts` | 0 | 10/10 |
+| `tests/core/script-doctor.test.ts` | 0 | 86/86 |
+| `tests/core/public-benchmark.test.ts` | 0 | 28/28 |
+| `tests/core/brain-coverage.test.ts` | 0 | 8/8 |
+| `npm run lint` (`tsc --noEmit`) | 0 | clean |
+| `npm run check-no-console` | 0 | 312 files checked, 3 quarantine entries, OK |
+| `npm run check-docs` | 0 | clean |
+| `npm run honesty-audit` | 0 | clean |
+| `npm run benchmark:public -- --json` | 0 | six numbers unchanged |
+| `node scripts/check-scoring-receipt.mjs 02d8cfb4..HEAD` | 0 | names both scoring-path files, receipt accepted |
+| output identity, baseline `git archive 02d8cfb4`, both sides `GIT_SHA=dev` | 0 | all 45 reports byte-identical |
+
+Public benchmark, all six unchanged: shuffle-drop 0.5313 paired / 0.5586
+all-pairs (17 ordered / 15 inverted / 0 tied); climax-relocate 0.4063 / 0.4443
+(8 / 14 / 10); DIALOGUE_FLATTEN 1.0000 / 0.9473 (32 / 0 / 0). No floor in
+`scripts/lib/auc.ts` was touched and no re-lock was performed.
+
+### 7. What was NOT done
+
+* **`npm test` and `npm run brain`** — excluded by the lane brief, so the
+  committed graph still needs an integrator's `npm run brain`.
+* **`server/nvm/analyze/fountain-analyzer.ts` was not touched.** It is correct
+  as written: it has no ledger, so `analyzeStructure(records, [])` is the only
+  structure it can build. The defect was the pipeline adopting that value, and
+  that is where the fix lives.
+* **`doctor.ts` still calls the pipeline with no ledger,** which is right — it
+  is analysing a text file, not a session, and there is no ledger to pass. That
+  is also why this range carries an output-identity receipt and not a
+  re-measured AUC.
+* **No stricter `approvedSpans` schema** and **no change to
+  `rewrite-llm.ts`** — both owned by concurrent lanes.
+
+### 8. What §2.2 and §7 above now read differently
+
+§2.2's third bullet ("A lost span keeps its indices") and the sentence in §2.1
+about spans being re-pointed are superseded by this section for the LOST case
+only; the moved and skipped cases are unchanged. §7's note about the receipt
+gate and `---` separators still holds — this section is inside an audit README,
+not the receipts ledger, and the new receipt entry is separated by a blank
+line, exactly as that section advises.
+
+### 9. Files touched
+
+* `server/nvm/revision/pipeline.ts` — the `commits` parameter, the
+  ledger-preserving re-derivation, the span drop, `lostApprovedSpans`.
+* `server/nvm/revision/approved-spans.ts` — dead tie-break arm removed, doc
+  comment on what `lost` means for a caller.
+* `server/routes/nvm/revision.ts` — passes `allCommits` on both pipeline calls.
+* `tests/core/revision-per-pass-diagnostics.test.ts` — 4 new tests, 1 replaced.
+* `tests/routes/nvm-revision.test.ts` — `lostApprovedSpans` in the shape
+  assertion plus one dedicated test.
+* `tests/core/script-doctor.test.ts` — two `RevisionResult` fixtures gain the
+  new required field.
+* `docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` — the receipt, appended at the
+  end.
+* This section and `docs/brain/Audits/Audit - 2026-09-20 Per-Pass
+  Diagnostics.md` — the record.
+
+### 10. Commits
+
+* `6061ae9d` — `fix(revise): re-diagnosis keeps the ledger's clock pressure; a
+  lost approved span is dropped, not re-anchored` (code + tests + receipt).
+* the commit carrying this section — `docs(audit): per-pass diagnostics review
+  fixes`.

@@ -23,7 +23,7 @@
 // Voice (percentile 20) read "TOP 80%" next to the score 98.
 //
 // AND the badge ranks a DIFFERENT statistic from the number beside it:
-// `doctor.ts:2257` ranks `build.rawScore` (unclamped, scarcity term included)
+// `doctor.ts:2027` ranks `build.rawScore` (unclamped, scarcity term included)
 // while the badge sits next to the clamped display score, which is why a 100/100
 // dimension read "bottom 10%" and an 81.5 read "top 10%". Re-ranking is a scoring
 // change and is NOT part of this lane; what IS here is that the gate withholds the

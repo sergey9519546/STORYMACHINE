@@ -13,9 +13,16 @@ const LEGACY_REPORTS = [
   'docs/V5.0_VICTORY.md',
   'docs/V5.0_INTEGRATION_WORK_PLAN.md',
   'docs/trinity-gate-integration-report.md',
-  'server/nvm/kernel/TRINITY_GATE.md',
-  'server/nvm/quantum/README.md',
-  'server/planning/IMPLEMENTATION_SUMMARY.md',
+  // The three in-tree v5.0 reports this list also covered — server/nvm/kernel/
+  // TRINITY_GATE.md, server/nvm/quantum/README.md and server/planning/
+  // IMPLEMENTATION_SUMMARY.md — were deleted on 2026-09-20 with the v5.0
+  // closure they described (Proposal B2 of
+  // docs/proposals/DEAD_WEIGHT_REMOVAL_2026-08-24.md; audit in
+  // docs/audits/2026-09-20-dead-weight-b1-b2/README.md). A banner is a way to
+  // stop a live document being mistaken for current truth; a document that no
+  // longer exists cannot be. The four docs/ reports above stayed — they are
+  // dated records of the project's history, not code — and this test still
+  // holds them to their banners.
 ];
 
 function extractFirstScreenBanner(document: string, label: string) {

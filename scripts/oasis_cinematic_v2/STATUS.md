@@ -10,8 +10,11 @@ Verified: `python3 -c "import scripts.oasis_cinematic_v2"` raises
 none of which are installed and none of which appear in any requirements file.
 
 It is NOT connected to `server/planning/oasis-integration.ts` — grepped in
-both directions, zero references. That TypeScript file is an independent,
-never-implemented stub that happens to share the name.
+both directions, zero references. That TypeScript file was an independent,
+never-implemented stub that happened to share the name; it was deleted on
+2026-09-20 with the rest of the v5.0 closure (see
+`docs/audits/2026-09-20-dead-weight-b1-b2/README.md`), which changes nothing
+here, because the two were never connected.
 
 It is also unrelated to the live OASIS in `server/routes/game.ts`, which is
 real, wired, and correctly gated behind the Labs flag per ROADMAP P2.

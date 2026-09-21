@@ -1,0 +1,516 @@
+# Audit — 2026-09-19 receipt-gate-inplace
+
+**Lane:** `lane/receipt-gate-inplace`. **Scope:** add the missing test for
+`scripts/check-scoring-receipt.mjs`'s "rewrite a PENDING entry in place"
+path — the exact edit `docs/UNIFIED_STATE_2026-09-02.md`'s 2026-09-11
+addendum and `docs/brain/Owner/Owner - R5 Measurement and Merge.md` document
+as the owner's actual closing move after a real corpus run — and fix the
+gate if the test found it wrong. It did.
+
+## What was untested
+
+`tests/core/scoring-receipt-guard.test.ts`, `tests/core/check-scoring-
+receipt.test.ts` and `tests/scripts/receipt-conversion.test.ts` between them
+cover ~9 shapes of "append a brand-new PENDING entry" and the mechanical
+three-scan converter that rewrites one, but none of the three drives
+`check-scoring-receipt.mjs`'s real CLI over a range whose diff never
+re-emits the entry's own `### ` heading line — i.e. a range that edits an
+existing entry's FIELDS while its heading text stays byte-identical to what
+it was in the base commit. That is precisely the shape a hand-edited (or
+partially-scripted) in-place conversion can take, and it is the one shape
+`extractEntries()`'s own docstring already flagged as a blind spot without
+anyone having written a fixture for it: "anything added before the first
+[recognized heading] belongs to no entry and is ignored."
+
+## The six cases, and what the gate does on each (after the fix)
+
+All driven through the real CLI (`node scripts/check-scoring-receipt.mjs`,
+via `spawnSync`, on a throwaway git repo, push-event shaped) in
+`tests/core/receipt-gate-inplace-rewrite.test.ts`. Every case starts from
+the SAME base state: a `before` commit that files one PENDING entry (heading
+`### 2026-09-19 — LANE RECEIPT-GATE-INPLACE: fixture scoring change —
+PENDING OWNER MEASUREMENT`, every field's value literally `pending owner
+measurement`, field set copied from the real 2026-08-21 W1/W2 entry: Date,
+Git SHA, Command, Measured AUC-24, Corpus fingerprint, Runner attestation).
+
+| case | what the `after` commit does | result |
+|---|---|---|
+| (a) | (the `before` commit itself — not a range under test, the fixture every other row rewrites from) | n/a |
+| (b) | heading rewritten to drop PENDING; every field given a real-looking measured value | **PASS**, exit 0, "gained a well-formed new entry" |
+| (c) | heading left byte-identical (still literally PENDING); every field measured | **FAIL**, exit 1, names `PENDING ENTRY`, quotes the heading, says `the entry heading contains "PENDING"` |
+| (d) | heading rewritten to drop PENDING; every field measured except Corpus fingerprint, whose new text still contains the phrase "pending owner measurement" | **FAIL**, exit 1, `the **Corpus fingerprint** field contains "PENDING"` |
+| (e) | entry rewritten in place to fully measured; `doctor.ts` **not** touched in this range | **PASS**, exit 0, "no scoring-path files changed" (the receipt is never even inspected) |
+| (f) | a NEW PENDING entry and a NEW well-formed entry are both filed in the same range (UNIFIED_STATE's "append beside" case — the PENDING entry is new to the range here, unlike (c)/(d)) | **FAIL**, exit 1, names the PENDING entry |
+
+Two additional cases pin the bug found while building the above (next
+section): **C-DANGER** (a still-PENDING entry, heading untouched, body
+rewritten to look measured, sitting beside an unrelated well-formed entry —
+must not false-pass) and a regression guard (appending a brand-new entry
+right after an untouched, already-valid entry must not false-FAIL on the
+untouched one). Both pass after the fix; C-DANGER reproducibly failed
+(`ok: true`, exit 0) before it.
+
+## The bug found, and the fix
+
+`extractEntries()` groups ADDED diff lines into entries by finding a
+`### <date>` heading among them; a line added before any such heading
+"belongs to no entry and is ignored" (its own docstring). That is correct
+for a brand-new entry (100% of its lines are added) but wrong for an
+existing entry rewritten in place without touching its heading: none of its
+changed field lines are ever grouped into anything, because the heading line
+that would start the group was never part of the diff.
+
+Alone, this fails SAFE — case (c) above still exits 1, because zero entries
+are ever recognized in the range, and `checkReceiptForRange`'s "gained no
+new entry" fallback fires. That is not the failure mode that matters. The
+dangerous one is **C-DANGER**: the moment a SECOND, genuinely unrelated,
+well-formed entry exists anywhere else in the same range, `extractEntries()`
+finds exactly that one entry, validates it clean, and
+`checkReceiptForRange` returns `ok: true` — a scoring-path range containing
+an entry whose heading still, in the committed tree, literally reads
+`PENDING OWNER MEASUREMENT`, and that entry was never once passed to
+`validateEntry`. Reproduced against the unmodified gate before any fix:
+`C-DANGER` exited 0.
+
+**The fix** (`scripts/check-scoring-receipt.mjs`): a second, independent
+detector, `entriesModifiedInPlace()`, that does not rely on the diff's
+CONTENT at all. It reads the diff's hunk headers (`@@ -a,b +c,d @@`) to get
+the changed line NUMBERS in the range's target tree, reads that tree's full
+current receipt text, and asks which entries' line SPANS (heading through
+the line before the next heading) overlap a changed line number — a pure
+position correlation, independent of whether the entry's heading itself
+happened to be part of the diff. Any entry found this way that
+`extractEntries()` did not already recognize is validated against its FULL
+current body and merged into `checkReceiptForRange`'s problem list.
+
+**A second bug surfaced while validating the fix itself, before it shipped**:
+the first version of `entriesModifiedInPlace()` used each entry's raw
+`[start, end)` span (`end` = the next heading's line index) for the overlap
+test. Appending a brand-new entry right after an untouched one inserts a
+blank separator line ahead of the new heading, and that inserted blank
+line's line number falls, by plain index arithmetic, inside the PRECEDING
+entry's span — so the detector read a clean append of an unrelated entry as
+an in-place edit of the entry before it, and (correctly, since the new
+entry is excluded via `alreadyRecognized`) went on to validate the
+untouched, unrelated entry as if this range had rewritten it. Reproduced
+directly against the real repository history: `node scripts/check-scoring-
+receipt.mjs 53f6e377..<owner-measure-e2e-fixture-tip>` — a range that only
+ever appends a NEW entry after the real ledger's real, untouched, final
+`2026-09-12 — PUBLIC BENCHMARK RE-LOCK …` entry — failed, quoting that
+untouched entry: `missing required field **Command**` (that entry
+legitimately has no `Command` field; it was never meant to be validated).
+`tests/scripts/owner-measure-e2e.test.ts`'s "the REAL check-scoring-receipt
+CLI exits 0 on the committed tree" caught this immediately (1 failure out
+of 56 on that file). Fixed by giving each entry a `contentEnd` — `end` with
+trailing BLANK lines trimmed off — and using that, not `end`, for the
+overlap test. The regression-guard case above pins this specific shape shut.
+
+## What was run
+
+- `tests/core/receipt-gate-inplace-rewrite.test.ts` (new, this lane): 7/7 pass.
+- `tests/core/scoring-receipt-guard.test.ts`: 26/26 pass.
+- `tests/core/check-scoring-receipt.test.ts`: 8/8 pass.
+- `tests/scripts/receipt-conversion.test.ts`: 43/43 pass.
+- `tests/scripts/owner-measure-e2e.test.ts`: 56/56 pass (1/56 failed against
+  the pre-fix gate — see above — and passed once `contentEnd` was added).
+- `tests/scripts/owner-measure-plan.test.ts`: 30/30 pass.
+- `tests/core/ci-gates-intact.test.ts`: 64/64 pass.
+- `npm run lint`: clean (`tsc --noEmit`).
+- `npm run check-no-console`: OK (310 files checked, 23 quarantine entries,
+  all proven unreachable).
+- `node scripts/check-scoring-receipt.mjs 53f6e377..HEAD`: see the lane's
+  final report — this lane's own range should pass once its receipt-gate
+  test file is treated as the scoring-path receipt it is not (this repo's
+  scoring path is `server/nvm/analyze/**` + `server/nvm/revision/passes/**`
+  + doctor.ts's reachable set; `scripts/check-scoring-receipt.mjs` itself is
+  gate tooling, not scoring code, so this lane's change is not expected to
+  require a `MEASUREMENT_RECEIPTS.md` entry).
+- `node --experimental-strip-types tests/core/brain-coverage.test.ts`: run
+  after this note was added, to confirm the staleness guard is satisfied.
+
+Per the lane brief, `npm test` and `npm run brain` were **not** run in this
+lane.
+
+## § Regression found in review and fixed
+
+An adversarial reviewer's probe found that this lane's own fix
+(`entriesModifiedInPlace()`, above) had introduced a NEW false pass in
+`checkReceiptForRange()` (~lines 850-880 at the time), fixed here on
+`lane/receipt-gate-existence`.
+
+**The false-pass shape.** The version of `checkReceiptForRange()` this lane
+shipped folded the new `inPlace` result into the EXISTENCE test:
+`if (entries.length === 0 && inPlace.length === 0) return { ok: false, ... }`.
+But `entriesModifiedInPlace()` finds an entry by hunk line-number OVERLAP
+with the entry's span — it has no requirement about *what* changed inside
+that span. So any edit at all inside any *old* entry — a one-word typo fix
+in a `Corpus fingerprint` line, or appending one `- **Note:** …` bullet (the
+exact move this same function's own error string forbids: "Appending lines
+to an existing entry is not a receipt for a new scoring change") — made
+`inPlace.length` nonzero and satisfied "this range added a receipt entry",
+even though the range added no entry at all and the edited entry was
+already well-formed. The gate then printed, untruthfully, "gained a
+well-formed new entry in the same range. OK." It also weakened
+`structuralOnly` mode (release.yml's whole-release-window check), which
+returned `ok: true` right after that same existence test, before any
+in-place validation ran.
+
+**The probe result.** Two attacks, confirmed on the branch before the fix
+below:
+
+- **Attack A** — a scoring-path file (`server/nvm/analyze/doctor.ts`)
+  changed, plus a one-word typo fix inside a previous, valid, measured
+  entry's `Corpus fingerprint` line, with no new entry anywhere in the
+  range: PASS (exit 0) on the branch, "gained a well-formed new entry in
+  the same range. OK."; correctly FAILS (exit 1, "gained no new entry") at
+  `53f6e377` (pre-lane).
+- **Attack B** — the same scoring-path change, plus one appended
+  `- **Note:** …` bullet on a previous valid entry, no new entry: PASS
+  (exit 0) on the branch, same untruthful "gained a well-formed new entry"
+  (or, under `--structural-only`, "gained a new entry … OK
+  (content was validated by CI on the range that added it)."); correctly
+  FAILS at `53f6e377`.
+
+Both were reproduced directly against the unfixed
+`checkReceiptForRange()` via the real CLI (`node
+scripts/check-scoring-receipt.mjs`, spawned over a throwaway git repo,
+push-event shaped) before any code changed on this branch — see the
+fail-first test runs below.
+
+**The fix** (`scripts/check-scoring-receipt.mjs`, `checkReceiptForRange()`):
+`inPlace` entries now contribute VALIDATION, never EXISTENCE. Their
+validation runs FIRST — before the existence check, and unconditionally of
+`structuralOnly` — so a problem found in an in-place entry (most often
+PENDING, but any `validateEntry()` rule) fails the range by name regardless
+of whether the range also happens to add a brand-new entry elsewhere
+(C-DANGER, above, still fails this way in both modes). Existence is then
+decided by `entries.length === 0` alone — a brand-new entry, recognized
+because its OWN heading line was added — never by `inPlace.length`. A
+brand-new entry's field validation is still skipped under `structuralOnly`
+(release.yml's existing, intentional behavior, unchanged), but an in-place
+edit is validated in both modes, because the false pass this closes is
+reachable in both. The success message ("gained a well-formed new entry")
+is only ever printed when `entries.length > 0`, so it can no longer
+describe a range that added nothing.
+
+**The new tests**
+(`tests/core/receipt-gate-inplace-rewrite.test.ts`, describe block
+"REGRESSION: an in-place edit must never count as a NEW entry (existence
+test)"):
+
+- **ATTACK A** — typo-fix-only edit inside a previous valid entry plus a
+  scoring-path change: asserts exit 1 and stderr matching `/gained no new
+  entry/`. Run against the unfixed script first: failed (`0 !== 1`, actual
+  exit 0, stdout containing "gained a well-formed new entry in the same
+  range. OK."). Passes after the fix.
+- **ATTACK B** — appended Note bullet, same shape: same fail-first result
+  (`0 !== 1`) before the fix, passes after.
+- **ATTACK B, `--structural-only`** — the same append, run through the CLI's
+  `--structural-only` flag (release.yml's whole-window mode): fail-first
+  result (`0 !== 1`, stdout "gained a new entry in the same range. OK
+  (content was validated by CI on the range that added it).") before the
+  fix, passes after.
+
+All 7 pre-existing cases in the same file — (b)-(f), C-DANGER, and the
+append-after-untouched-entry regression guard — were re-run unchanged
+against both the unfixed and fixed script and passed both times (10/10
+total after the fix, 7/10 before it — see this lane's final report for the
+full TAP output). `tests/core/scoring-receipt-guard.test.ts` (26/26),
+`tests/core/check-scoring-receipt.test.ts` (8/8),
+`tests/scripts/receipt-conversion.test.ts` (43/43),
+`tests/scripts/owner-measure-e2e.test.ts` (56/56),
+`tests/scripts/owner-measure-plan.test.ts` (30/30) and
+`tests/core/ci-gates-intact.test.ts` (64/64) all still pass. `npm run lint`
+is clean. `node scripts/check-scoring-receipt.mjs 1e7779de..HEAD` and `node
+scripts/check-scoring-receipt.mjs $(git merge-base origin/main
+HEAD)..HEAD` both report "no scoring-path files changed. OK." — this fix
+lives in gate tooling (`scripts/check-scoring-receipt.mjs` and its test
+file), not on the scoring path, so no `MEASUREMENT_RECEIPTS.md` entry is
+required for it.
+
+## § Rule-line separator fix (2026-09-20, `lane/receipt-gate-rule-span`)
+
+Found on the way by the per-pass-diagnostics lane
+(`docs/audits/2026-09-20-per-pass-diagnostics/README.md` §7), not fixed
+there: `entriesWithSpans()`'s `contentEnd` trimmed only trailing BLANK lines
+off an entry's span before the overlap test above. A markdown thematic break
+(`---`, `***`, `___`) is not blank, so when an author separates a newly
+appended entry from the previous one with such a rule — the ledger's own
+separator convention, and exactly how the real 2026-09-12 entry precedes the
+next one — the rule line stayed inside the PRECEDING entry's span, the
+append's hunk overlapped it (the hunk's first added line IS the rule line),
+and `entriesModifiedInPlace()` re-validated that historical entry against
+TODAY's field rules. Reproduced exactly as the finding describes: an old
+entry using the real ledger's own `**Commands (all run in this worktree
+…)**` (plural) phrasing failed `REQUIRED_FIELDS`'s singular
+`/\*\*\s*Command\s*:?\s*\*\*/i` pattern the moment it was re-validated,
+reporting `missing required field **Command**` for a range that never
+touched that entry — a false FAIL of an honest append, in the safe
+direction, but one that blocks a normal ledger convention.
+
+**The fix:** trailing lines that are blank OR match
+`SEPARATOR_LINE_RE = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/` are now both trimmed
+when computing `contentEnd`. Nothing else about span computation changed,
+and the 2026-09-19 existence fix directly above (in-place entries validate
+but never count as new) is untouched — verified by re-running this file's
+full existing suite (cases (b)-(f), C-DANGER, and the append-after-untouched
+regression guard) unchanged against both the pre-fix and post-fix script.
+
+**New tests** (`tests/core/receipt-gate-inplace-rewrite.test.ts`, describe
+block "a separator rule after an entry is not part of its span"):
+
+- **(g)** a well-formed new entry appended after a `---` rule following an
+  older entry whose fields (plural `**Commands (…)**`) would fail today's
+  validation if re-checked: asserts exit 0. Run against the unfixed script
+  first — failed (`1 !== 0`), stderr naming `missing required field
+  **Command**` on the OLD entry's heading, exactly the false FAIL the finding
+  describes. Passes after the fix.
+- **(h)** the same, with a `***` rule instead of `---` — same fail-first
+  result before the fix, passes after.
+- **(i)** a GENUINE in-place edit to that older entry's `Corpus fingerprint`
+  field line, with the same `---` rule sitting right after it, no new entry
+  added: asserts exit 1. This one is not fail-first — the edited field line
+  is never blank or rule-shaped, so the overlap test still sees it regardless
+  of the `contentEnd` change — and it passed identically before and after the
+  fix, confirming the separator trim does not swallow a real edit that
+  happens to sit beside a rule line.
+
+All pre-existing cases in this file — (b)-(f), C-DANGER, the
+append-after-untouched-entry regression guard, and all three
+existence-test ATTACK cases — were re-run against both the unfixed and
+fixed script and passed both times (13/13 total after the fix, 11/13
+before it: (g) and (h) are the only two that flip).
+`tests/core/scoring-receipt-guard.test.ts` (26/26),
+`tests/core/check-scoring-receipt.test.ts` (8/8),
+`tests/scripts/receipt-conversion.test.ts` (43/43),
+`tests/scripts/owner-measure-e2e.test.ts` (56/56) and
+`tests/core/ci-gates-intact.test.ts` (64/64) all still pass.
+`tests/core/honesty-audit-claims.test.ts` (15/15) passes. `npm run lint` is
+clean. `node scripts/check-scoring-receipt.mjs 5d1a14ce..HEAD` reports "no
+scoring-path files changed. OK." and `node scripts/check-scoring-receipt.mjs
+$(git merge-base origin/main HEAD)..HEAD` still reports the concurrent
+per-pass-diagnostics lane's own two scoring-path files with its own
+well-formed receipt — this fix again lives only in gate tooling, so no new
+`MEASUREMENT_RECEIPTS.md` entry is required for it.
+
+## § Command label widened in lockstep with the claim scan
+
+**Lane:** `lane/receipt-gate-commands-label`. **Scope:** point 2 of the
+owner's original task filing on `scripts/check-scoring-receipt.mjs` — a
+judgment call the orchestrator resolved as: widen the Command field pattern
+to accept the plural `**Commands**` form (and an optional parenthetical
+qualifier before the colon), and widen the simulation-language claim scan in
+lockstep, so the check's strength is unchanged. Point 1 (the `---`/`***`
+separator-span defect, directly above) is untouched by this section — it was
+already fixed in `2942fdb7`.
+
+**Why the plural form matters:** three honest entries already in the ledger
+(`docs/p1-benchmark/MEASUREMENT_RECEIPTS.md` lines ~1988, ~2056, ~2171) write
+`**Commands (all run in this worktree):**` because more than one command was
+actually run for that entry — that is a MORE precise claim than the singular
+template's `**Command:**`, not a less honest one. Before this fix,
+`REQUIRED_FIELDS`'s Command pattern
+(`/\*\*\s*Command\s*:?\s*\*\*/i`) matched only the singular, so a NEW entry
+honestly written in the plural form would fail with "missing required field
+**Command**" — the gate was punishing the more careful phrasing, which is
+exactly backwards for a check whose whole point is rewarding honest,
+specific receipts.
+
+**Why lockstep matters — the gap it would otherwise open:** `REQUIRED_FIELDS`
+(existence) and `CLAIM_FIELD_LABELS` (the simulation-language scan) are two
+independent lookups over the same field. If only `REQUIRED_FIELDS` had been
+widened, a `**Commands (…):** (simulated local execution)` field would have
+satisfied the required-field check — the field is *present* — while
+`CLAIM_FIELD_LABELS`'s old label-derived lookup (`fieldValue()`, which builds
+`\*\*\s*Command\s*:?\s*\*\*` from the literal string `'Command'`) still could
+not find it under the plural/parenthetical spelling, so the simulation scan
+would never see the field's text at all. A fabricated entry could then write
+its Command field in the plural, parenthetical form specifically to slip an
+admission of simulation past the ONE scan built to catch exactly that
+admission (the mechanism the 2026-08-08 fabrication's singular `**Command:**`
+field was originally caught by). Widening only one side of a field-presence
+check and a field-content check that are supposed to look at the same field
+is the general shape of that gap — not specific to this field — so the fix
+makes both sides share one pattern rather than widening them separately by
+hand.
+
+**The fix** (`scripts/check-scoring-receipt.mjs`):
+
+1. One shared pattern,
+   `COMMAND_FIELD_RE = /\*\*\s*Commands?(?:\s*\([^)]*\))?\s*:?\s*\*\*/i` — a
+   bold label starting with `Command` or `Commands`, an optional
+   parenthetical qualifier, an optional colon, then the closing `**`
+   immediately. Used as the Command entry's pattern in `REQUIRED_FIELDS`.
+2. `CLAIM_FIELD_LABELS` now carries `{ label, pattern? }` entries instead of
+   bare label strings. The `Command` entry carries an explicit
+   `pattern: COMMAND_FIELD_RE` — the SAME constant `REQUIRED_FIELDS` uses —
+   so a field that satisfies the required-field check is, by construction,
+   the same field the simulation scan reads. The other four labels (`Git
+   SHA`, `Baseline used`, `Runner attestation`, `Attestation`) carry no
+   explicit pattern and fall back to `fieldValue()`'s existing label-derived
+   regex, unchanged.
+3. The PENDING required-field scan (`pendingReason()`) already iterates
+   `REQUIRED_FIELDS`'s patterns via `fieldValueByPattern()`, so it inherited
+   the widened Command pattern with no code change — confirmed by a
+   dedicated test (case 4 below) rather than assumed.
+4. The closing `**` is required directly after the optional
+   parenthetical/colon, so a look-alike label — `**Commander:**` or
+   `**Command line:**` — does not match: after consuming `Command` (and
+   optionally a literal `s`), the pattern still needs `**` immediately, and
+   `er:**` / ` line:**` do not provide it. Confirmed by two negative tests
+   (case 5 below); nothing else the pattern matches was loosened.
+
+**New tests** (`tests/core/scoring-receipt-guard.test.ts`, describe block
+"measurement-receipt entry validation — Command label widening", added
+directly after the existing PENDING-entries block since it uses the same
+`validateEntry()`/`alwaysExists` harness):
+
+1. **ACCEPTS** a well-formed entry whose Command field is
+   `**Commands (all run in this worktree):**` — fail-first: before the fix,
+   `problems` was `["missing required field **Command** (see §3's entry
+   template)"]`; after the fix, `[]`.
+2. **ACCEPTS** the same with the plain plural `**Commands:**` (no
+   parenthetical) — same fail-first shape, same fix.
+3. **REJECTS** `**Commands (…):** (simulated local execution)` — the
+   lockstep guarantee. Before the fix this slipped past the field-content
+   scan entirely; the ONLY reason it failed at all was the unrelated,
+   whole-entry `ENTRY_SIMULATION_PATTERNS` catch-all (`"the entry says the
+   run was simulated (\"simulated local execution\")"`), stacked with a
+   spurious `"missing required field **Command**"` — i.e. before the fix the
+   entry was rejected, but for the WRONG reason (a missing field that in fact
+   exists) plus an accident of a second, broader scanner catching the same
+   phrase by coincidence, not because the Command-field scan itself saw it.
+   After the fix, `problems` is exactly
+   `["the **Command** field contains \"simulated\" — a receipt records what
+   was RUN. …"]` — attributed to the Command field specifically, and the
+   missing-field problem is gone. The test asserts both the positive match on
+   the Command-field message and the ABSENCE of the missing-field message.
+4. **REJECTS** `**Commands:** PENDING owner run` — before the fix this also
+   failed, but only because the fixture's heading happened to be checked
+   first in a version that had no field-level reach at all; the fix is
+   confirmed directly by asserting the reported reason names the **Command**
+   field specifically (`"the **Command** field contains \"PENDING\""`),
+   proving `pendingReason()`'s existing `REQUIRED_FIELDS`-driven loop reached
+   the widened pattern rather than merely relying on the entry failing for
+   some other reason.
+5. **Two negative tests**: an entry whose only Command-shaped field is
+   `**Commander:**` alone, and one whose only such field is
+   `**Command line:**` alone, each still report `"missing required field
+   **Command**"` — unchanged from before the fix in both cases (these two
+   already passed pre-fix, confirming the widening is additive, not a
+   general loosening).
+6. The full pre-existing suite in this file (28 tests before this block) was
+   re-run unchanged and passed identically before and after this fix — this
+   change touches only `REQUIRED_FIELDS`'s Command entry and
+   `CLAIM_FIELD_LABELS`'s Command entry, nothing else in the field or claim
+   tables.
+
+Fail-first summary: 4 of the 6 new subtests failed pre-fix (cases 1-4 above);
+the two negative guards (case 5) already passed pre-fix, as expected since
+they exercise the "do not loosen further" requirement rather than the
+widening itself. All 32 tests in the file (26 pre-existing + 6 new) pass
+post-fix.
+
+**Gates run:** `tests/core/scoring-receipt-guard.test.ts` (32/32),
+`tests/core/receipt-gate-inplace-rewrite.test.ts` (13/13, one comment
+updated to reflect the widened pattern — see that file's own note beside
+`oldFieldsPluralCommands`),
+`tests/core/check-scoring-receipt.test.ts` (8/8),
+`tests/scripts/receipt-conversion.test.ts` (43/43),
+`tests/scripts/owner-measure-e2e.test.ts` (56/56),
+`tests/scripts/owner-measure-plan.test.ts` (30/30),
+`tests/core/ci-gates-intact.test.ts` (64/64),
+`tests/core/honesty-audit-claims.test.ts` (15/15). `npm run lint` is clean.
+`node scripts/check-scoring-receipt.mjs 128e0ab7..HEAD` reports "no
+scoring-path files changed. OK." (this lane touches only gate tooling and
+tests, never the scoring path). `node scripts/check-scoring-receipt.mjs
+$(git merge-base origin/main HEAD)..HEAD` reports the concurrent lanes'
+scoring-path files (`doctor.ts`, `scene-split.ts`,
+`screenplay-normalizer.ts`, `approved-spans.ts`, `pipeline.ts`,
+`src/lib/fountain.ts`) alongside their own well-formed receipt entry and
+still exits 0 — no new `MEASUREMENT_RECEIPTS.md` entry is required for this
+lane's own change, since it never touches the scoring path itself.
+`tests/core/brain-coverage.test.ts` passed 8/8 with this section and its
+brain-note pointer line added.
+
+## § Required-field presence is per line, like the scans (2026-09-19 continued,
+## Finding 3, CONFIRMED by an adversarial reviewer's probe)
+
+**The gap:** the required-field presence check (`validateEntry`,
+`scripts/check-scoring-receipt.mjs`, ~line 837) tested each
+`REQUIRED_FIELDS` pattern against the JOINED entry body
+(`entry.lines.join('\n')`), while the simulation-language claim scan
+(`fieldValueByPattern`) and the PENDING field scan both matched PER LINE
+(`entryLines.findIndex((l) => pattern.test(l))`). `COMMAND_FIELD_RE`'s
+`(?:\s*\([^)]*\))?` matches ACROSS a newline on the joined body but never on
+a single line when the parenthetical wraps onto its own line. So an entry
+whose Command label spans two lines —
+
+```
+- **Commands (all run
+  in this worktree):** estimated from a prior run
+```
+
+— satisfied the required Command field (the joined-body regex bridges the
+newline) while the simulation scan and the PENDING scan never located the
+field at all, because each tests one line at a time and no single line
+carries the whole label. The reviewer's probe accepted this shape with
+"estimated", "would be the same", "extrapolated", "simulated", and "PENDING"
+in the value — every one rejected when the same label is written on one
+line. A narrower pre-existing form, splitting before the colon
+(`- **Command` / `:** estimated …`), was accepted the same way. The
+"lockstep" comment written for the Command-widening fix above (§ this file)
+claimed the required-field scan and the simulation scan "move in lockstep";
+they did not — they used two different matching strategies (joined-body vs.
+per-line) that happened to agree on every single-line fixture tested at the
+time.
+
+**The fix:** one shared primitive, `findFieldLine(entryLines, pattern)`,
+returns the per-line index where a field's bolded label starts (or -1).
+`fieldValueByPattern()` is refactored onto it instead of its own inline
+`findIndex`, and the required-field presence check in `validateEntry()` now
+calls `field.patterns.some((re) => findFieldLine(entry.lines, re) !== -1)`
+instead of `field.patterns.some((re) => re.test(body))`. All three
+consumers — required-field presence, the claim/simulation scan, and the
+PENDING field scan — now resolve a field through the exact same per-line
+matcher, so they cannot diverge on where (or whether) a field starts again.
+The "lockstep" comment beside `CLAIM_FIELD_LABELS` is rewritten to say what
+is actually guaranteed: a field is either found in the same place by all
+three scans, or found by none of them. The missing-field diagnostic also
+gained a hint: when no line matches, the message now tells the author that a
+label wrapped across two lines is not a recognized field and to put it back
+on one line — the wrapped-but-honest case (below) would otherwise read as an
+unexplained rejection.
+
+**New tests** (`tests/core/scoring-receipt-guard.test.ts`, describe block
+"measurement-receipt entry validation — required-field presence is per
+line"):
+
+1. The two-line `**Commands (all run` / `in this worktree):** estimated …`
+   entry — REJECTED (fails today: accepted).
+2. The split-before-colon form, `- **Command` / `:** estimated` — REJECTED
+   (fails today: accepted).
+3. A two-line label with otherwise HONEST content — also REJECTED, as
+   "missing required field **Command**", with the message naming that a
+   wrapped label needs to be on one line.
+4. The honest single-line `**Commands (all run in this worktree):**` form —
+   still ACCEPTED, unchanged.
+5. All pre-existing cases in the file (36 tests total after this addition)
+   pass unchanged.
+
+**Gates run:** `tests/core/scoring-receipt-guard.test.ts` (36/36),
+`tests/core/receipt-gate-inplace-rewrite.test.ts` (13/13),
+`tests/core/check-scoring-receipt.test.ts` (8/8),
+`tests/scripts/receipt-conversion.test.ts` (43/43),
+`tests/scripts/owner-measure-e2e.test.ts` (56/56),
+`tests/scripts/owner-measure-plan.test.ts` (30/30),
+`tests/core/ci-gates-intact.test.ts` (64/64),
+`tests/core/honesty-audit-claims.test.ts` (15/15). `npm run lint` is clean.
+This lane touches only `scripts/check-scoring-receipt.mjs`, a test file, and
+this audit doc, so `node scripts/check-scoring-receipt.mjs 02d8cfb4..HEAD`
+reports "no scoring-path files changed. OK." `node
+scripts/check-scoring-receipt.mjs $(git merge-base origin/main HEAD)..HEAD`
+was also run and still exits 0, confirming the real ledger's entries (all
+single-line labels) are unaffected by this fix.
+`tests/core/brain-coverage.test.ts` passed 8/8 with this section and its
+brain-note pointer line added.

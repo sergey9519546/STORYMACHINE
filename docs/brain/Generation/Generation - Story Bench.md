@@ -104,9 +104,15 @@ largely restate scenes-committed, per the AUC figures below.
 
 - **Neither generative call site goes through `generateContent()`**, so
   neither gets its 30 s `withTimeout` or its 3-attempt `withRetry`. They call
-  `provider.generate()` directly, with no deadline. A slow model simply blocks
-  until the route's own budget (`AI_BUDGET_CONVERGE_TIMEOUT_MS`, 180 s per
-  converge) fires.
+  `provider.generate()` directly, with no deadline of their own. A slow model
+  simply blocks until the route's own budget fires —
+  `AI_BUDGET_CONVERGE_TIMEOUT_MS` (180 s per converge) for the candidate-
+  generation site. Until [[Audit - 2026-09-19 Revise Deadline]], the revision
+  pipeline's site (`rewrite-llm.ts`, up to 14 sequential calls) had NO such
+  backstop at all — §4c below is the consequence that was actually measured:
+  a client-side `headersTimeout` was mistaken for the server's own deadline,
+  because the server did not have one. It now does
+  (`AI_BUDGET_REVISE_TIMEOUT_MS`, default 900 s for the whole 14-pass run).
 - **One candidate-generation call measured 15–78 s** against the configured
   reasoning model (n = 6, median ~26 s; 391 prompt tokens, 1,370–2,306
   completion tokens, of which most are `reasoning_content`). Capping
@@ -138,7 +144,7 @@ turn, or whether anyone would keep reading. The reading packet
 
 Scene-count scarcity carries AUC ~0.938 of the doctor's discrimination against
 ~0.076 for the entire weighted-rule channel
-(`server/nvm/analyze/doctor.ts:2092-2093`). On a generated script that means
+(`server/nvm/analyze/doctor.ts:1862-1863`). On a generated script that means
 health and verdict are very largely a restatement of how many scenes committed —
 which is why the v1-to-v2 comparison is roughly two movements, not nine, and why
 the reading packet heads each script with the COMMITTED scene count and names

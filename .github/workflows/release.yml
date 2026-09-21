@@ -209,6 +209,7 @@ jobs:
             tests/core/finding-jump.test.ts \
             tests/core/honesty-audit-claims.test.ts \
             tests/core/p0-sample-drift.test.ts \
+            tests/core/p0-session-records.test.ts \
             tests/core/public-benchmark.test.ts \
             tests/core/rule-test-coverage.test.ts \
             tests/core/rulebook-links.test.ts \
