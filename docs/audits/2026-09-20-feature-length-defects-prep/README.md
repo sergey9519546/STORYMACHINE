@@ -1996,6 +1996,6 @@ ran exactly one worker job and nothing in-process; and the two reports are
 | `npm run check-no-console` | 0 (312 files, 4 quarantine entries, all proven unreachable) |
 | `node scripts/check-scoring-receipt.mjs 263420ac..HEAD` | OK — the feature-length entry gained the `#### PRODUCTION-LOADER PASS, 2026-09-21` addendum and a standalone `### 2026-09-21` output-identity entry follows it (the gate does not count an in-place addendum alone as a receipt for a new range) |
 | `node scripts/check-scoring-receipt.mjs 6ca3fcd0..HEAD` | OK |
-| `honesty-audit-claims` · `brain-coverage` · `docs-gating-set` | see the hand-back; run after this section was written |
+| `honesty-audit-claims` · `brain-coverage` · `docs-gating-set` (one run, after this section was written) | 31 tests, 31 pass, 0 fail. The first run had one failure: the 33-line comment added to `subDensityCurve` moved every later line of `doctor.ts`, and `docs/CLAIMS_REGISTER.md` row 22 anchored `doctor.ts:2454-2455`; its anchor now reads `2487-2488` (`4d0de138`), its two text anchors unchanged, and `npm run honesty-audit` is clean (427 files, 125 register rows) |
 
 Nothing was pushed. The full `npm test` is the orchestrator's run.
